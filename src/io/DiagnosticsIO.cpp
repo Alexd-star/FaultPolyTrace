@@ -73,6 +73,8 @@ void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
     out << "    \"rootAntiMergeRadius\": " << d.rootAntiMergeRadius << ",\n";
     out << "    \"rootAntiMergeSupportRatio\": " << d.rootAntiMergeSupportRatio << ",\n";
     out << "    \"rootAntiMergeMaxBridgeValue\": " << d.rootAntiMergeMaxBridgeValue << ",\n";
+    out << "    \"rootAntiMergeMinPartCells\": " << d.rootAntiMergeMinPartCells << ",\n";
+    out << "    \"rootAntiMergeMinPartRatio\": " << d.rootAntiMergeMinPartRatio << ",\n";
     out << "    \"adaptiveAreaFilter\": " << (d.adaptiveAreaFilter ? "true" : "false") << ",\n";
     out << "    \"adaptiveAreaMinCells\": " << d.adaptiveAreaMinCells << ",\n";
     out << "    \"adaptiveAreaMinAspect\": " << d.adaptiveAreaMinAspect << ",\n";
@@ -103,6 +105,7 @@ void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
     out << "    \"activeCellCount\": " << d.activeCellCount << ",\n";
     out << "    \"polygonCount\": " << d.polygonCount << ",\n";
     out << "    \"keptPolygonCount\": " << d.keptPolygonCount << ",\n";
+    out << "    \"suppressedInternalRings\": " << d.suppressedInternalRings << ",\n";
     out << "    \"elapsedMs\": " << d.elapsedMs << "\n";
     out << "  },\n";
     out << "  \"skeleton\": {\n";
@@ -112,7 +115,11 @@ void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
     out << "    \"keptBranches\": " << d.keptBranches << ",\n";
     out << "    \"prunedBranches\": " << d.prunedBranches << ",\n";
     out << "    \"connectedGaps\": " << d.connectedGaps << ",\n";
-    out << "    \"rootAntiMergeCutCells\": " << d.rootAntiMergeCutCells << "\n";
+    out << "    \"rootAntiMergeCandidateCutCells\": " << d.rootAntiMergeCandidateCutCells << ",\n";
+    out << "    \"rootAntiMergeCutCells\": " << d.rootAntiMergeCutCells << ",\n";
+    out << "    \"rootAntiMergeRejectedCutCells\": " << d.rootAntiMergeRejectedCutCells << ",\n";
+    out << "    \"rootAntiMergeAcceptedComponents\": " << d.rootAntiMergeAcceptedComponents << ",\n";
+    out << "    \"rootAntiMergeRejectedComponents\": " << d.rootAntiMergeRejectedComponents << "\n";
     out << "  },\n";
     out << "  \"topology\": {\n";
     out << "    \"openRings\": " << d.openRingCount << ",\n";

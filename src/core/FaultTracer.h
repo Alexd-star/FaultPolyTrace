@@ -40,6 +40,8 @@ struct TraceOptions {
     int rootAntiMergeRadius = 1;
     double rootAntiMergeSupportRatio = 0.98;
     double rootAntiMergeMaxBridgeValue = 1e-12;
+    int rootAntiMergeMinPartCells = 0;
+    double rootAntiMergeMinPartRatio = 0.12;
     bool adaptiveAreaFilter = true;
     int adaptiveAreaMinCells = 4;
     double adaptiveAreaMinAspect = 2.0;
@@ -86,7 +88,12 @@ struct TraceResult {
     int keptBranches = 0;
     int prunedBranches = 0;
     int connectedGaps = 0;
+    int rootAntiMergeCandidateCutCells = 0;
     int rootAntiMergeCutCells = 0;
+    int rootAntiMergeRejectedCutCells = 0;
+    int rootAntiMergeAcceptedComponents = 0;
+    int rootAntiMergeRejectedComponents = 0;
+    int suppressedInternalRings = 0;
 };
 
 TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options);

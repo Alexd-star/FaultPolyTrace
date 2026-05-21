@@ -87,6 +87,8 @@ private:
     QCheckBox* rootAntiMergeCheck_ = nullptr;
     QSpinBox* rootAntiMergeRadiusSpin_ = nullptr;
     QDoubleSpinBox* rootAntiMergeSupportRatioSpin_ = nullptr;
+    QSpinBox* rootAntiMergeMinPartCellsSpin_ = nullptr;
+    QDoubleSpinBox* rootAntiMergeMinPartRatioSpin_ = nullptr;
     QDoubleSpinBox* simplifyToleranceSpin_ = nullptr;
     QSpinBox* smoothIterationsSpin_ = nullptr;
     QCheckBox* residualTraceCheck_ = nullptr;

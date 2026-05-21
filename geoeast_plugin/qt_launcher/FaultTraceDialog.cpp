@@ -172,6 +172,7 @@ void FaultTraceDialog::buildUi() {
     presetCombo_ = new QComboBox(this);
     presetCombo_->addItem(QString::fromUtf8("全覆盖优先"));
     presetCombo_->addItem(QString::fromUtf8("贴合融合推荐"));
+    presetCombo_->addItem(QString::fromUtf8("防黏连增强"));
     presetCombo_->addItem(QString::fromUtf8("均衡推荐"));
     presetCombo_->addItem(QString::fromUtf8("保守高精度"));
     presetCombo_->addItem(QString::fromUtf8("弱响应高召回"));
@@ -254,6 +255,15 @@ void FaultTraceDialog::buildUi() {
     rootAntiMergeSupportRatioSpin_->setDecimals(3);
     rootAntiMergeSupportRatioSpin_->setSingleStep(0.01);
     rootAntiMergeSupportRatioSpin_->setValue(0.98);
+    rootAntiMergeMinPartCellsSpin_ = new QSpinBox(this);
+    rootAntiMergeMinPartCellsSpin_->setRange(0, 1000000);
+    rootAntiMergeMinPartCellsSpin_->setSpecialValueText(QString::fromUtf8("自动"));
+    rootAntiMergeMinPartCellsSpin_->setValue(0);
+    rootAntiMergeMinPartRatioSpin_ = new QDoubleSpinBox(this);
+    rootAntiMergeMinPartRatioSpin_->setRange(0.0, 0.5);
+    rootAntiMergeMinPartRatioSpin_->setDecimals(3);
+    rootAntiMergeMinPartRatioSpin_->setSingleStep(0.01);
+    rootAntiMergeMinPartRatioSpin_->setValue(0.12);
     simplifyToleranceSpin_ = new QDoubleSpinBox(this);
     simplifyToleranceSpin_->setRange(0.0, 1000.0);
     simplifyToleranceSpin_->setDecimals(2);
@@ -311,15 +321,19 @@ void FaultTraceDialog::buildUi() {
     paramsLayout->addWidget(rootAntiMergeRadiusSpin_, 8, 3);
     paramsLayout->addWidget(new QLabel(QString::fromUtf8("防黏连支撑"), this), 9, 0);
     paramsLayout->addWidget(rootAntiMergeSupportRatioSpin_, 9, 1);
-    paramsLayout->addWidget(new QLabel(QString::fromUtf8("简化容差"), this), 9, 2);
-    paramsLayout->addWidget(simplifyToleranceSpin_, 9, 3);
-    paramsLayout->addWidget(new QLabel(QString::fromUtf8("平滑次数"), this), 10, 0);
-    paramsLayout->addWidget(smoothIterationsSpin_, 10, 1);
-    paramsLayout->addWidget(residualTraceCheck_, 10, 2);
-    paramsLayout->addWidget(new QLabel(QString::fromUtf8("补追最短"), this), 11, 0);
-    paramsLayout->addWidget(residualTraceMinLengthSpin_, 11, 1);
-    paramsLayout->addWidget(new QLabel(QString::fromUtf8("补追上限"), this), 11, 2);
-    paramsLayout->addWidget(residualTraceMaxCellsSpin_, 11, 3);
+    paramsLayout->addWidget(new QLabel(QString::fromUtf8("最小主体"), this), 9, 2);
+    paramsLayout->addWidget(rootAntiMergeMinPartCellsSpin_, 9, 3);
+    paramsLayout->addWidget(new QLabel(QString::fromUtf8("主体比例"), this), 10, 0);
+    paramsLayout->addWidget(rootAntiMergeMinPartRatioSpin_, 10, 1);
+    paramsLayout->addWidget(new QLabel(QString::fromUtf8("简化容差"), this), 10, 2);
+    paramsLayout->addWidget(simplifyToleranceSpin_, 10, 3);
+    paramsLayout->addWidget(new QLabel(QString::fromUtf8("平滑次数"), this), 11, 0);
+    paramsLayout->addWidget(smoothIterationsSpin_, 11, 1);
+    paramsLayout->addWidget(residualTraceCheck_, 11, 2);
+    paramsLayout->addWidget(new QLabel(QString::fromUtf8("补追最短"), this), 12, 0);
+    paramsLayout->addWidget(residualTraceMinLengthSpin_, 12, 1);
+    paramsLayout->addWidget(new QLabel(QString::fromUtf8("补追上限"), this), 12, 2);
+    paramsLayout->addWidget(residualTraceMaxCellsSpin_, 12, 3);
 
     runButton_ = new QPushButton(QString::fromUtf8("开始追踪"), this);
     stopButton_ = new QPushButton(QString::fromUtf8("停止"), this);
@@ -418,6 +432,8 @@ void FaultTraceDialog::loadSettings() {
     rootAntiMergeCheck_->setChecked(settings.value("rootAntiMerge", rootAntiMergeCheck_->isChecked()).toBool());
     rootAntiMergeRadiusSpin_->setValue(settings.value("rootAntiMergeRadius", rootAntiMergeRadiusSpin_->value()).toInt());
     rootAntiMergeSupportRatioSpin_->setValue(settings.value("rootAntiMergeSupportRatio", rootAntiMergeSupportRatioSpin_->value()).toDouble());
+    rootAntiMergeMinPartCellsSpin_->setValue(settings.value("rootAntiMergeMinPartCells", rootAntiMergeMinPartCellsSpin_->value()).toInt());
+    rootAntiMergeMinPartRatioSpin_->setValue(settings.value("rootAntiMergeMinPartRatio", rootAntiMergeMinPartRatioSpin_->value()).toDouble());
     residualTraceCheck_->setChecked(settings.value("residualTrace", residualTraceCheck_->isChecked()).toBool());
     residualTraceMinLengthSpin_->setValue(settings.value("residualTraceMinLength", residualTraceMinLengthSpin_->value()).toInt());
     residualTraceMaxCellsSpin_->setValue(settings.value("residualTraceMaxCells", residualTraceMaxCellsSpin_->value()).toInt());
@@ -441,6 +457,8 @@ void FaultTraceDialog::saveSettings() const {
     settings.setValue("rootAntiMerge", rootAntiMergeCheck_->isChecked());
     settings.setValue("rootAntiMergeRadius", rootAntiMergeRadiusSpin_->value());
     settings.setValue("rootAntiMergeSupportRatio", rootAntiMergeSupportRatioSpin_->value());
+    settings.setValue("rootAntiMergeMinPartCells", rootAntiMergeMinPartCellsSpin_->value());
+    settings.setValue("rootAntiMergeMinPartRatio", rootAntiMergeMinPartRatioSpin_->value());
     settings.setValue("residualTrace", residualTraceCheck_->isChecked());
     settings.setValue("residualTraceMinLength", residualTraceMinLengthSpin_->value());
     settings.setValue("residualTraceMaxCells", residualTraceMaxCellsSpin_->value());
@@ -550,6 +568,8 @@ QStringList FaultTraceDialog::traceArgs() const {
          << "--root-anti-merge-radius" << QString::number(rootAntiMergeRadiusSpin_->value())
          << "--root-anti-merge-support-ratio" << QString::number(rootAntiMergeSupportRatioSpin_->value(), 'g', 12)
          << "--root-anti-merge-max-bridge-value" << "1e-12"
+         << "--root-anti-merge-min-part-cells" << QString::number(rootAntiMergeMinPartCellsSpin_->value())
+         << "--root-anti-merge-min-part-ratio" << QString::number(rootAntiMergeMinPartRatioSpin_->value(), 'g', 12)
          << "--residual-percentile" << "0.955"
          << "--residual-fill-radius" << "4"
          << "--residual-min-cells" << "2"
@@ -605,10 +625,37 @@ void FaultTraceDialog::applyParameterPreset(const QString& presetName) {
         residualTraceCheck_->setChecked(true);
         rootAntiMergeRadiusSpin_->setValue(1);
         rootAntiMergeSupportRatioSpin_->setValue(0.98);
+        rootAntiMergeMinPartCellsSpin_->setValue(0);
+        rootAntiMergeMinPartRatioSpin_->setValue(0.12);
         simplifyToleranceSpin_->setValue(1.5);
         smoothIterationsSpin_->setValue(0);
         residualTraceMinLengthSpin_->setValue(5);
         residualTraceMaxCellsSpin_->setValue(120);
+    } else if (presetName == QString::fromUtf8("防黏连增强")) {
+        percentileSpin_->setValue(0.98);
+        minAreaSpin_->setValue(120.0);
+        closeRadiusSpin_->setValue(1);
+        weakPercentileSpin_->setValue(0.965);
+        weakConnectRadiusSpin_->setValue(1);
+        beltRadiusSpin_->setValue(3);
+        postBeltCloseRadiusSpin_->setValue(1);
+        attributeConstrainedBeltCheck_->setChecked(true);
+        attributeEnvelopeRadiusSpin_->setValue(1);
+        minBranchLengthSpin_->setValue(4);
+        minJunctionBranchLengthSpin_->setValue(2);
+        minJunctionBranchMeanSpin_->setValue(0.94);
+        maxGapDistanceSpin_->setValue(12);
+        maxGapAngleSpin_->setValue(55.0);
+        rootAntiMergeCheck_->setChecked(true);
+        residualTraceCheck_->setChecked(false);
+        rootAntiMergeRadiusSpin_->setValue(1);
+        rootAntiMergeSupportRatioSpin_->setValue(0.25);
+        rootAntiMergeMinPartCellsSpin_->setValue(0);
+        rootAntiMergeMinPartRatioSpin_->setValue(0.12);
+        simplifyToleranceSpin_->setValue(2.0);
+        smoothIterationsSpin_->setValue(1);
+        residualTraceMinLengthSpin_->setValue(6);
+        residualTraceMaxCellsSpin_->setValue(80);
     } else if (presetName == QString::fromUtf8("保守高精度")) {
         percentileSpin_->setValue(0.985);
         minAreaSpin_->setValue(250.0);
@@ -628,6 +675,8 @@ void FaultTraceDialog::applyParameterPreset(const QString& presetName) {
         residualTraceCheck_->setChecked(false);
         rootAntiMergeRadiusSpin_->setValue(1);
         rootAntiMergeSupportRatioSpin_->setValue(0.98);
+        rootAntiMergeMinPartCellsSpin_->setValue(0);
+        rootAntiMergeMinPartRatioSpin_->setValue(0.12);
         simplifyToleranceSpin_->setValue(5.0);
         smoothIterationsSpin_->setValue(1);
         residualTraceMinLengthSpin_->setValue(8);
@@ -651,6 +700,8 @@ void FaultTraceDialog::applyParameterPreset(const QString& presetName) {
         residualTraceCheck_->setChecked(true);
         rootAntiMergeRadiusSpin_->setValue(1);
         rootAntiMergeSupportRatioSpin_->setValue(0.98);
+        rootAntiMergeMinPartCellsSpin_->setValue(0);
+        rootAntiMergeMinPartRatioSpin_->setValue(0.12);
         simplifyToleranceSpin_->setValue(2.0);
         smoothIterationsSpin_->setValue(1);
         residualTraceMinLengthSpin_->setValue(5);
@@ -674,6 +725,8 @@ void FaultTraceDialog::applyParameterPreset(const QString& presetName) {
         residualTraceCheck_->setChecked(false);
         rootAntiMergeRadiusSpin_->setValue(1);
         rootAntiMergeSupportRatioSpin_->setValue(0.98);
+        rootAntiMergeMinPartCellsSpin_->setValue(0);
+        rootAntiMergeMinPartRatioSpin_->setValue(0.12);
         simplifyToleranceSpin_->setValue(6.0);
         smoothIterationsSpin_->setValue(1);
         residualTraceMinLengthSpin_->setValue(8);
@@ -697,6 +750,8 @@ void FaultTraceDialog::applyParameterPreset(const QString& presetName) {
         residualTraceCheck_->setChecked(false);
         rootAntiMergeRadiusSpin_->setValue(1);
         rootAntiMergeSupportRatioSpin_->setValue(0.98);
+        rootAntiMergeMinPartCellsSpin_->setValue(0);
+        rootAntiMergeMinPartRatioSpin_->setValue(0.12);
         simplifyToleranceSpin_->setValue(3.0);
         smoothIterationsSpin_->setValue(1);
         residualTraceMinLengthSpin_->setValue(4);
@@ -720,6 +775,8 @@ void FaultTraceDialog::applyParameterPreset(const QString& presetName) {
         residualTraceCheck_->setChecked(false);
         rootAntiMergeRadiusSpin_->setValue(1);
         rootAntiMergeSupportRatioSpin_->setValue(0.98);
+        rootAntiMergeMinPartCellsSpin_->setValue(0);
+        rootAntiMergeMinPartRatioSpin_->setValue(0.12);
         simplifyToleranceSpin_->setValue(2.0);
         smoothIterationsSpin_->setValue(1);
         residualTraceMinLengthSpin_->setValue(6);
@@ -743,6 +800,8 @@ void FaultTraceDialog::applyParameterPreset(const QString& presetName) {
         residualTraceCheck_->setChecked(false);
         rootAntiMergeRadiusSpin_->setValue(1);
         rootAntiMergeSupportRatioSpin_->setValue(0.98);
+        rootAntiMergeMinPartCellsSpin_->setValue(0);
+        rootAntiMergeMinPartRatioSpin_->setValue(0.12);
         simplifyToleranceSpin_->setValue(2.0);
         smoothIterationsSpin_->setValue(1);
         residualTraceMinLengthSpin_->setValue(6);

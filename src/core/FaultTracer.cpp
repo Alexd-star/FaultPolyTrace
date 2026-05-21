@@ -347,6 +347,155 @@ BinaryMask buildRootAntiMergeCutMask(
     return cutMask;
 }
 
+struct RootAntiMergeValidationStats {
+    int candidateCutCells = 0;
+    int acceptedCutCells = 0;
+    int rejectedCutCells = 0;
+    int acceptedComponents = 0;
+    int rejectedComponents = 0;
+};
+
+BinaryMask validateRootAntiMergeCutMask(
+    const Grid2D& grid,
+    const BinaryMask& activeMask,
+    const BinaryMask& candidateCutMask,
+    const TraceOptions& options,
+    RootAntiMergeValidationStats& stats) {
+    BinaryMask acceptedCutMask(grid.nx(), grid.ny());
+    stats.candidateCutCells = candidateCutMask.countActive();
+    if (stats.candidateCutCells <= 0) {
+        return acceptedCutMask;
+    }
+
+    const int width = grid.nx();
+    const int height = grid.ny();
+    const int minPartCells = options.rootAntiMergeMinPartCells > 0
+        ? options.rootAntiMergeMinPartCells
+        : std::max(12, std::max(options.adaptiveAreaMinCells * 3, options.beltRadius * options.beltRadius * 2));
+
+    auto indexOf = [width](int x, int y) {
+        return y * width + x;
+    };
+
+    constexpr int offsets[8][2] = {
+        {-1, -1}, {0, -1}, {1, -1},
+        {-1, 0},           {1, 0},
+        {-1, 1},  {0, 1},  {1, 1}
+    };
+
+    std::vector<unsigned char> visited(static_cast<std::size_t>(width * height), 0);
+    std::vector<unsigned char> inComponent(static_cast<std::size_t>(width * height), 0);
+    std::vector<unsigned char> partVisited(static_cast<std::size_t>(width * height), 0);
+
+    for (int y0 = 0; y0 < height; ++y0) {
+        for (int x0 = 0; x0 < width; ++x0) {
+            const std::size_t startIdx = static_cast<std::size_t>(indexOf(x0, y0));
+            if (!activeMask.get(x0, y0) || visited[startIdx]) {
+                continue;
+            }
+
+            std::queue<Cell> queue;
+            std::vector<Cell> cells;
+            queue.push({x0, y0});
+            visited[startIdx] = 1;
+            int componentCutCells = 0;
+
+            while (!queue.empty()) {
+                const Cell cell = queue.front();
+                queue.pop();
+                cells.push_back(cell);
+                inComponent[static_cast<std::size_t>(indexOf(cell.x, cell.y))] = 1;
+                if (candidateCutMask.get(cell.x, cell.y)) {
+                    ++componentCutCells;
+                }
+
+                for (const auto& offset : offsets) {
+                    const int nxCell = cell.x + offset[0];
+                    const int nyCell = cell.y + offset[1];
+                    if (!grid.inBounds(nxCell, nyCell)) {
+                        continue;
+                    }
+                    const std::size_t pos = static_cast<std::size_t>(indexOf(nxCell, nyCell));
+                    if (!activeMask.get(nxCell, nyCell) || visited[pos]) {
+                        continue;
+                    }
+                    visited[pos] = 1;
+                    queue.push({nxCell, nyCell});
+                }
+            }
+
+            if (componentCutCells <= 0) {
+                for (const Cell& cell : cells) {
+                    inComponent[static_cast<std::size_t>(indexOf(cell.x, cell.y))] = 0;
+                }
+                continue;
+            }
+
+            int partCount = 0;
+            int majorPartCount = 0;
+            const double minMajorPartCells = static_cast<double>(cells.size()) *
+                std::max(0.0, options.rootAntiMergeMinPartRatio);
+
+            for (const Cell& startCell : cells) {
+                const std::size_t startPos = static_cast<std::size_t>(indexOf(startCell.x, startCell.y));
+                if (partVisited[startPos] || candidateCutMask.get(startCell.x, startCell.y)) {
+                    continue;
+                }
+
+                std::queue<Cell> partQueue;
+                partQueue.push(startCell);
+                partVisited[startPos] = 1;
+                int partCells = 0;
+
+                while (!partQueue.empty()) {
+                    const Cell cell = partQueue.front();
+                    partQueue.pop();
+                    ++partCells;
+
+                    for (const auto& offset : offsets) {
+                        const int nxCell = cell.x + offset[0];
+                        const int nyCell = cell.y + offset[1];
+                        if (!grid.inBounds(nxCell, nyCell)) {
+                            continue;
+                        }
+                        const std::size_t pos = static_cast<std::size_t>(indexOf(nxCell, nyCell));
+                        if (!inComponent[pos] || partVisited[pos] || candidateCutMask.get(nxCell, nyCell)) {
+                            continue;
+                        }
+                        partVisited[pos] = 1;
+                        partQueue.push({nxCell, nyCell});
+                    }
+                }
+
+                ++partCount;
+                if (partCells >= minPartCells && static_cast<double>(partCells) >= minMajorPartCells) {
+                    ++majorPartCount;
+                }
+            }
+
+            const bool accepted = partCount >= 2 && majorPartCount >= 2;
+            if (accepted) {
+                ++stats.acceptedComponents;
+                stats.acceptedCutCells += componentCutCells;
+            } else {
+                ++stats.rejectedComponents;
+                stats.rejectedCutCells += componentCutCells;
+            }
+
+            for (const Cell& cell : cells) {
+                const std::size_t pos = static_cast<std::size_t>(indexOf(cell.x, cell.y));
+                if (candidateCutMask.get(cell.x, cell.y) && accepted) {
+                    acceptedCutMask.set(cell.x, cell.y, true);
+                }
+                inComponent[pos] = 0;
+                partVisited[pos] = 0;
+            }
+        }
+    }
+
+    return acceptedCutMask;
+}
+
 std::vector<BranchGroup> groupBranchesByRootTrace(
     const std::vector<const SkeletonBranch*>& branches,
     double maxTurnAngleDegrees) {
@@ -505,6 +654,73 @@ double signedPolygonArea(const std::vector<Point>& points) {
         sum += a.x * b.y - b.x * a.y;
     }
     return 0.5 * sum;
+}
+
+bool pointInRing(const Point& point, const std::vector<Point>& ring) {
+    if (ring.size() < 3) {
+        return false;
+    }
+
+    bool inside = false;
+    for (std::size_t i = 0, j = ring.size() - 1; i < ring.size(); j = i++) {
+        const Point& a = ring[i];
+        const Point& b = ring[j];
+        const bool crosses = ((a.y > point.y) != (b.y > point.y)) &&
+            (point.x < (b.x - a.x) * (point.y - a.y) / ((b.y - a.y) + 1e-30) + a.x);
+        if (crosses) {
+            inside = !inside;
+        }
+    }
+    return inside;
+}
+
+std::vector<std::vector<Point>> selectExteriorBoundaryRings(
+    std::vector<std::vector<Point>> rings,
+    int& suppressedInternalRings) {
+    std::vector<std::vector<Point>> exterior;
+    if (rings.empty()) {
+        return exterior;
+    }
+
+    std::vector<double> areas(rings.size(), 0.0);
+    for (std::size_t i = 0; i < rings.size(); ++i) {
+        areas[i] = std::abs(signedPolygonArea(rings[i]));
+    }
+
+    std::vector<unsigned char> keep(rings.size(), 0);
+    for (std::size_t i = 0; i < rings.size(); ++i) {
+        if (rings[i].size() < 3 || areas[i] <= 1e-9) {
+            ++suppressedInternalRings;
+            continue;
+        }
+
+        const Point probe = rings[i].front();
+        bool containedByLargerRing = false;
+        for (std::size_t j = 0; j < rings.size(); ++j) {
+            if (i == j || areas[j] <= areas[i]) {
+                continue;
+            }
+            if (pointInRing(probe, rings[j])) {
+                containedByLargerRing = true;
+                break;
+            }
+        }
+
+        if (containedByLargerRing) {
+            ++suppressedInternalRings;
+        } else {
+            keep[i] = 1;
+        }
+    }
+
+    exterior.reserve(rings.size());
+    for (std::size_t i = 0; i < rings.size(); ++i) {
+        if (keep[i]) {
+            exterior.push_back(std::move(rings[i]));
+        }
+    }
+
+    return exterior;
 }
 
 ComponentStats computeComponentStats(const std::vector<Cell>& cells) {
@@ -765,7 +981,9 @@ void appendPolygonsFromMask(
             }
 
             const ComponentStats stats = computeComponentStats(cells);
-            std::vector<std::vector<Point>> rings = traceBoundaryRings(grid, cells);
+            std::vector<std::vector<Point>> rings = selectExteriorBoundaryRings(
+                traceBoundaryRings(grid, cells),
+                result.suppressedInternalRings);
             for (std::vector<Point>& ring : rings) {
                 finalizeAndAppendPolygon(cells, sum, maxValue, std::move(ring), stats, options, result.effectiveThreshold, result, nextId);
             }
@@ -851,7 +1069,9 @@ void appendPolygonsFromMaskBounds(
             }
 
             const ComponentStats stats = computeComponentStats(cells);
-            std::vector<std::vector<Point>> rings = traceBoundaryRings(grid, cells);
+            std::vector<std::vector<Point>> rings = selectExteriorBoundaryRings(
+                traceBoundaryRings(grid, cells),
+                result.suppressedInternalRings);
             for (std::vector<Point>& ring : rings) {
                 finalizeAndAppendPolygon(cells, sum, maxValue, std::move(ring), stats, options, result.effectiveThreshold, result, nextId);
             }
@@ -934,7 +1154,9 @@ void appendPolygonsFromLocalMask(
             }
 
             const ComponentStats stats = computeComponentStats(cells);
-            std::vector<std::vector<Point>> rings = traceBoundaryRings(grid, cells);
+            std::vector<std::vector<Point>> rings = selectExteriorBoundaryRings(
+                traceBoundaryRings(grid, cells),
+                result.suppressedInternalRings);
             for (std::vector<Point>& ring : rings) {
                 const bool kept = finalizeAndAppendPolygon(cells, sum, maxValue, std::move(ring), stats, options, result.effectiveThreshold, result, nextId);
                 if (kept && keptCoverageMask) {
@@ -1434,6 +1656,12 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
     if (options.rootAntiMergeMaxBridgeValue < 0.0) {
         throw std::runtime_error("rootAntiMergeMaxBridgeValue must be non-negative.");
     }
+    if (options.rootAntiMergeMinPartCells < 0) {
+        throw std::runtime_error("rootAntiMergeMinPartCells must be non-negative.");
+    }
+    if (options.rootAntiMergeMinPartRatio < 0.0 || options.rootAntiMergeMinPartRatio > 0.5) {
+        throw std::runtime_error("rootAntiMergeMinPartRatio must be between 0 and 0.5.");
+    }
     if (options.simplifyTolerance < 0.0) {
         throw std::runtime_error("simplifyTolerance must be non-negative.");
     }
@@ -1624,7 +1852,7 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
             const int ownershipRadius = options.beltRadius + options.postBeltCloseRadius + options.attributeEnvelopeRadius + 3;
             const std::vector<BranchGroup> branchGroups = groupBranchesByRootTrace(keptBranchRefs, options.maxGapAngle);
             const std::vector<int> groupOwners = buildGroupOwnershipMap(nx, ny, branchGroups, ownershipRadius);
-            const BinaryMask cutMask = buildRootAntiMergeCutMask(
+            const BinaryMask candidateCutMask = buildRootAntiMergeCutMask(
                 grid,
                 activeMask,
                 attributeMask,
@@ -1632,7 +1860,18 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
                 options.rootAntiMergeRadius,
                 options.rootAntiMergeSupportRatio,
                 options.rootAntiMergeMaxBridgeValue);
-            result.rootAntiMergeCutCells = cutMask.countActive();
+            RootAntiMergeValidationStats validationStats;
+            const BinaryMask cutMask = validateRootAntiMergeCutMask(
+                grid,
+                activeMask,
+                candidateCutMask,
+                options,
+                validationStats);
+            result.rootAntiMergeCandidateCutCells = validationStats.candidateCutCells;
+            result.rootAntiMergeCutCells = validationStats.acceptedCutCells;
+            result.rootAntiMergeRejectedCutCells = validationStats.rejectedCutCells;
+            result.rootAntiMergeAcceptedComponents = validationStats.acceptedComponents;
+            result.rootAntiMergeRejectedComponents = validationStats.rejectedComponents;
             for (int y = 0; y < ny; ++y) {
                 for (int x = 0; x < nx; ++x) {
                     if (cutMask.get(x, y)) {

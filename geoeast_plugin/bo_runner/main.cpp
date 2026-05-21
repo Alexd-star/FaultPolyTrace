@@ -85,6 +85,8 @@ void printUsage() {
         << "  --root-anti-merge-radius <count>\n"
         << "  --root-anti-merge-support-ratio <0-1>\n"
         << "  --root-anti-merge-max-bridge-value <value>\n"
+        << "  --root-anti-merge-min-part-cells <count>\n"
+        << "  --root-anti-merge-min-part-ratio <0-0.5>\n"
         << "  --no-adaptive-area-filter\n"
         << "  --adaptive-area-min-cells <count>\n"
         << "  --adaptive-area-min-aspect <value>\n"
@@ -331,6 +333,10 @@ Options parseArgs(int argc, char** argv) {
             options.trace.rootAntiMergeSupportRatio = std::stod(requireValue(arg));
         } else if (arg == "--root-anti-merge-max-bridge-value") {
             options.trace.rootAntiMergeMaxBridgeValue = std::stod(requireValue(arg));
+        } else if (arg == "--root-anti-merge-min-part-cells") {
+            options.trace.rootAntiMergeMinPartCells = std::stoi(requireValue(arg));
+        } else if (arg == "--root-anti-merge-min-part-ratio") {
+            options.trace.rootAntiMergeMinPartRatio = std::stod(requireValue(arg));
         } else if (arg == "--no-adaptive-area-filter") {
             options.trace.adaptiveAreaFilter = false;
         } else if (arg == "--adaptive-area-min-cells") {
@@ -518,6 +524,15 @@ int main(int argc, char** argv) {
         std::cout << "Grid: " << grid.nx() << " x " << grid.ny() << "\n";
         std::cout << "Effective threshold: " << result.effectiveThreshold << "\n";
         std::cout << "Polygons: " << result.polygons.size() << " total, " << kept << " kept\n";
+        if (options.trace.rootAntiMerge) {
+            std::cout << "Root anti-merge candidate cut cells: " << result.rootAntiMergeCandidateCutCells << "\n";
+            std::cout << "Root anti-merge accepted cut cells: " << result.rootAntiMergeCutCells << "\n";
+            std::cout << "Root anti-merge rejected cut cells: " << result.rootAntiMergeRejectedCutCells << "\n";
+            std::cout << "Root anti-merge accepted/rejected components: "
+                      << result.rootAntiMergeAcceptedComponents << "/"
+                      << result.rootAntiMergeRejectedComponents << "\n";
+        }
+        std::cout << "Suppressed internal rings: " << result.suppressedInternalRings << "\n";
         std::cout << "Topology open rings: " << topology.openRingCount << "\n";
         std::cout << "Topology self-intersections: " << topology.selfIntersectingPolygonCount << "\n";
         std::cout << "Topology polygon intersections: " << topology.polygonIntersectionCount << "\n";
