@@ -43,7 +43,7 @@ struct CliOptions {
     bool separateBranchBelts = false;
     bool rootAntiMerge = false;
     int rootAntiMergeRadius = 1;
-    double rootAntiMergeSupportRatio = 0.98;
+    double rootAntiMergeSupportRatio = 0.25;
     double rootAntiMergeMaxBridgeValue = 1e-12;
     int rootAntiMergeMinPartCells = 0;
     double rootAntiMergeMinPartRatio = 0.12;
@@ -104,7 +104,7 @@ void printUsage() {
         << "  --root-anti-merge          Cut unsupported bridge cells between different root traces. Default: off\n"
         << "  --no-root-anti-merge       Disable root-trace anti-merge guard. Default: on\n"
         << "  --root-anti-merge-radius <n> Neighborhood radius for bridge detection. Default: 1\n"
-        << "  --root-anti-merge-support-ratio <v> Attribute support ratio needed to keep bridge cells. Default: 0.98\n"
+        << "  --root-anti-merge-support-ratio <v> Attribute support ratio needed to keep bridge cells. Default: 0.25\n"
         << "  --root-anti-merge-max-bridge-value <v> Max raw attribute value treated as background bridge. Default: 1e-12\n"
         << "  --root-anti-merge-min-part-cells <n> Minimum major split part cells after bridge cutting. Default: auto\n"
         << "  --root-anti-merge-min-part-ratio <v> Minimum major split part ratio after bridge cutting. Default: 0.12\n"

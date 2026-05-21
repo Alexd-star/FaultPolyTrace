@@ -38,7 +38,7 @@ struct TraceOptions {
     bool separateBranchBelts = false;
     bool rootAntiMerge = false;
     int rootAntiMergeRadius = 1;
-    double rootAntiMergeSupportRatio = 0.98;
+    double rootAntiMergeSupportRatio = 0.25;
     double rootAntiMergeMaxBridgeValue = 1e-12;
     int rootAntiMergeMinPartCells = 0;
     double rootAntiMergeMinPartRatio = 0.12;

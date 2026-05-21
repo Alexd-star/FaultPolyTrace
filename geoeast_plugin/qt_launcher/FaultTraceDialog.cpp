@@ -254,7 +254,7 @@ void FaultTraceDialog::buildUi() {
     rootAntiMergeSupportRatioSpin_->setRange(0.0, 1.0);
     rootAntiMergeSupportRatioSpin_->setDecimals(3);
     rootAntiMergeSupportRatioSpin_->setSingleStep(0.01);
-    rootAntiMergeSupportRatioSpin_->setValue(0.98);
+    rootAntiMergeSupportRatioSpin_->setValue(0.25);
     rootAntiMergeMinPartCellsSpin_ = new QSpinBox(this);
     rootAntiMergeMinPartCellsSpin_->setRange(0, 1000000);
     rootAntiMergeMinPartCellsSpin_->setSpecialValueText(QString::fromUtf8("自动"));
@@ -624,7 +624,7 @@ void FaultTraceDialog::applyParameterPreset(const QString& presetName) {
         rootAntiMergeCheck_->setChecked(false);
         residualTraceCheck_->setChecked(true);
         rootAntiMergeRadiusSpin_->setValue(1);
-        rootAntiMergeSupportRatioSpin_->setValue(0.98);
+        rootAntiMergeSupportRatioSpin_->setValue(0.25);
         rootAntiMergeMinPartCellsSpin_->setValue(0);
         rootAntiMergeMinPartRatioSpin_->setValue(0.12);
         simplifyToleranceSpin_->setValue(1.5);
@@ -674,7 +674,7 @@ void FaultTraceDialog::applyParameterPreset(const QString& presetName) {
         rootAntiMergeCheck_->setChecked(false);
         residualTraceCheck_->setChecked(false);
         rootAntiMergeRadiusSpin_->setValue(1);
-        rootAntiMergeSupportRatioSpin_->setValue(0.98);
+        rootAntiMergeSupportRatioSpin_->setValue(0.25);
         rootAntiMergeMinPartCellsSpin_->setValue(0);
         rootAntiMergeMinPartRatioSpin_->setValue(0.12);
         simplifyToleranceSpin_->setValue(5.0);
@@ -699,7 +699,7 @@ void FaultTraceDialog::applyParameterPreset(const QString& presetName) {
         rootAntiMergeCheck_->setChecked(false);
         residualTraceCheck_->setChecked(true);
         rootAntiMergeRadiusSpin_->setValue(1);
-        rootAntiMergeSupportRatioSpin_->setValue(0.98);
+        rootAntiMergeSupportRatioSpin_->setValue(0.25);
         rootAntiMergeMinPartCellsSpin_->setValue(0);
         rootAntiMergeMinPartRatioSpin_->setValue(0.12);
         simplifyToleranceSpin_->setValue(2.0);
@@ -724,7 +724,7 @@ void FaultTraceDialog::applyParameterPreset(const QString& presetName) {
         rootAntiMergeCheck_->setChecked(false);
         residualTraceCheck_->setChecked(false);
         rootAntiMergeRadiusSpin_->setValue(1);
-        rootAntiMergeSupportRatioSpin_->setValue(0.98);
+        rootAntiMergeSupportRatioSpin_->setValue(0.25);
         rootAntiMergeMinPartCellsSpin_->setValue(0);
         rootAntiMergeMinPartRatioSpin_->setValue(0.12);
         simplifyToleranceSpin_->setValue(6.0);
@@ -749,7 +749,7 @@ void FaultTraceDialog::applyParameterPreset(const QString& presetName) {
         rootAntiMergeCheck_->setChecked(false);
         residualTraceCheck_->setChecked(false);
         rootAntiMergeRadiusSpin_->setValue(1);
-        rootAntiMergeSupportRatioSpin_->setValue(0.98);
+        rootAntiMergeSupportRatioSpin_->setValue(0.25);
         rootAntiMergeMinPartCellsSpin_->setValue(0);
         rootAntiMergeMinPartRatioSpin_->setValue(0.12);
         simplifyToleranceSpin_->setValue(3.0);
@@ -774,7 +774,7 @@ void FaultTraceDialog::applyParameterPreset(const QString& presetName) {
         rootAntiMergeCheck_->setChecked(false);
         residualTraceCheck_->setChecked(false);
         rootAntiMergeRadiusSpin_->setValue(1);
-        rootAntiMergeSupportRatioSpin_->setValue(0.98);
+        rootAntiMergeSupportRatioSpin_->setValue(0.25);
         rootAntiMergeMinPartCellsSpin_->setValue(0);
         rootAntiMergeMinPartRatioSpin_->setValue(0.12);
         simplifyToleranceSpin_->setValue(2.0);
@@ -799,7 +799,7 @@ void FaultTraceDialog::applyParameterPreset(const QString& presetName) {
         rootAntiMergeCheck_->setChecked(false);
         residualTraceCheck_->setChecked(false);
         rootAntiMergeRadiusSpin_->setValue(1);
-        rootAntiMergeSupportRatioSpin_->setValue(0.98);
+        rootAntiMergeSupportRatioSpin_->setValue(0.25);
         rootAntiMergeMinPartCellsSpin_->setValue(0);
         rootAntiMergeMinPartRatioSpin_->setValue(0.12);
         simplifyToleranceSpin_->setValue(2.0);
