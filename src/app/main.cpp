@@ -35,9 +35,9 @@ struct CliOptions {
     bool attributeConstrainedBelt = true;
     int attributeEnvelopeRadius = 1;
     int minBranchLength = 4;
-    int minJunctionBranchLength = 4;
-    double minJunctionBranchMean = 1.0;
-    int maxGapDistance = 20;
+    int minJunctionBranchLength = 2;
+    double minJunctionBranchMean = 0.94;
+    int maxGapDistance = 12;
     double maxGapAngle = 55.0;
     double minGapSupportRatio = 0.25;
     bool separateBranchBelts = false;
@@ -92,9 +92,9 @@ void printUsage() {
         << "  --no-attribute-constrained-belt Disable attribute envelope constraint. Default: off\n"
         << "  --attribute-envelope-radius <count> Attribute envelope radius in cells. Default: 1\n"
         << "  --min-branch-length <count> Minimum skeleton branch pixels kept in ridge-belt mode. Default: 4\n"
-        << "  --min-junction-branch-length <count> Minimum branch pixels kept near junctions. Default: 4\n"
-        << "  --min-junction-branch-mean <value> Minimum mean attribute for short junction branches. Default: 1.0\n"
-        << "  --max-gap-distance <count>  Max endpoint gap connected in ridge-belt mode. Default: 20\n"
+        << "  --min-junction-branch-length <count> Minimum branch pixels kept near junctions. Default: 2\n"
+        << "  --min-junction-branch-mean <value> Minimum mean attribute for short junction branches. Default: 0.94\n"
+        << "  --max-gap-distance <count>  Max endpoint gap connected in ridge-belt mode. Default: 12\n"
         << "  --max-gap-angle <degrees>   Max endpoint direction mismatch. Default: 55\n"
         << "  --min-gap-support-ratio <v> Minimum weak support ratio for endpoint continuation. Default: 0.25\n"
         << "  --separate-branch-belts    Output root-trace-separated local belts. Default: off\n"

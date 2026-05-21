@@ -89,6 +89,7 @@ private:
     QDoubleSpinBox* rootAntiMergeSupportRatioSpin_ = nullptr;
     QDoubleSpinBox* simplifyToleranceSpin_ = nullptr;
     QSpinBox* smoothIterationsSpin_ = nullptr;
+    QCheckBox* residualTraceCheck_ = nullptr;
     QSpinBox* residualTraceMinLengthSpin_ = nullptr;
     QSpinBox* residualTraceMaxCellsSpin_ = nullptr;
     QPushButton* refreshButton_ = nullptr;

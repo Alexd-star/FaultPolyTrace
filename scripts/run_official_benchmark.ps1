@@ -35,15 +35,18 @@ if ($LASTEXITCODE -ne 0) {
     --min-branch-length 4 `
     --min-junction-branch-length 2 `
     --min-junction-branch-mean 0.94 `
-    --max-gap-distance 20 `
+    --max-gap-distance 12 `
     --max-gap-angle 55 `
     --min-gap-support-ratio 0.25 `
+    --no-separate-branch-belts `
+    --no-root-anti-merge `
     --residual-percentile 0.955 `
     --residual-fill-radius 4 `
     --residual-min-cells 2 `
     --residual-trace-min-length 6 `
     --residual-trace-max-cells 80 `
     --residual-covered-guard-radius 0 `
+    --no-residual-trace `
     --min-area 120 `
     --simplify-tolerance 2 `
     --smooth-iterations 1
