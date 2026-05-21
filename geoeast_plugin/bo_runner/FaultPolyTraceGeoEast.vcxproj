@@ -1,0 +1,198 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{8D64BFD9-7C45-3782-8E24-E0F7FC0CF975}</ProjectGuid>
+    <RootNamespace>faultpolytrace_geoeast_runner</RootNamespace>
+    <Keyword>QtVS_v304</Keyword>
+    <WindowsTargetPlatformVersion>10.0.22621.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformMinVersion>10.0.22621.0</WindowsTargetPlatformMinVersion>
+    <QtMsBuild Condition="'$(QtMsBuild)'=='' OR !Exists('$(QtMsBuild)\qt.targets')">$(MSBuildProjectDirectory)\QtMsBuild</QtMsBuild>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <PlatformToolset>v142</PlatformToolset>
+    <OutputDirectory>.\</OutputDirectory>
+    <ATLMinimizesCRunTimeLibraryUsage>false</ATLMinimizesCRunTimeLibraryUsage>
+    <CharacterSet>NotSet</CharacterSet>
+    <ConfigurationType>Application</ConfigurationType>
+    <IntermediateDirectory>.obj\</IntermediateDirectory>
+    <PrimaryOutput>faultpolytrace_geoeast_runner</PrimaryOutput>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <PlatformToolset>v142</PlatformToolset>
+    <OutputDirectory>.\</OutputDirectory>
+    <ATLMinimizesCRunTimeLibraryUsage>false</ATLMinimizesCRunTimeLibraryUsage>
+    <CharacterSet>NotSet</CharacterSet>
+    <ConfigurationType>Application</ConfigurationType>
+    <IntermediateDirectory>.obj\</IntermediateDirectory>
+    <PrimaryOutput>faultpolytrace_geoeast_runner</PrimaryOutput>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <Import Project="$(QtMsBuild)\qt_defaults.props" Condition="Exists('$(QtMsBuild)\qt_defaults.props')" />
+  <PropertyGroup Label="QtSettings" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <QtInstall>msvc2017_64</QtInstall>
+    <QtModules>core;gui</QtModules>
+  </PropertyGroup>
+  <PropertyGroup Label="QtSettings" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <QtInstall>msvc2017_64</QtInstall>
+    <QtModules>core;gui</QtModules>
+  </PropertyGroup>
+  <Target Name="QtMsBuildNotFound" BeforeTargets="CustomBuild;ClCompile" Condition="!Exists('$(QtMsBuild)\qt.targets') OR !Exists('$(QtMsBuild)\Qt.props')">
+    <Message Importance="High" Text="QtMsBuild: could not locate qt.targets, qt.props; project may not build correctly." />
+  </Target>
+  <ImportGroup Label="ExtensionSettings" />
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" />
+    <Import Project="$(QtMsBuild)\Qt.props" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" />
+    <Import Project="$(QtMsBuild)\Qt.props" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">.\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">.obj\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">faultpolytrace_geoeast_runner</TargetName>
+    <IgnoreImportLibrary Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</IgnoreImportLibrary>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkIncremental>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">.\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">.obj\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">faultpolytrace_geoeast_runner</TargetName>
+    <IgnoreImportLibrary Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</IgnoreImportLibrary>
+  </PropertyGroup>
+  <PropertyGroup Label="QtMocPreprocessDefines" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <QtMocPreprocessDefinesCommand>cl -Bx"$(QTDIR)\bin\qmake.exe" -nologo -Zc:wchar_t -FS -Zc:rvalueCast -Zc:inline -Zc:strictStrings -Zc:throwingNew -Zc:referenceBinding -Zc:__cplusplus /utf-8 -O2 -MD -std:c++17 -W0 -E $(QTDIR)\mkspecs\features\data\dummy.cpp 2&gt;NUL &gt;.moc\moc_predefs.h</QtMocPreprocessDefinesCommand>
+    <QtMocPreprocessDefinesInputs>$(QTDIR)\mkspecs\features\data\dummy.cpp</QtMocPreprocessDefinesInputs>
+    <QtMocPreprocessDefinesOutputs>.moc\moc_predefs.h</QtMocPreprocessDefinesOutputs>
+    <QtMocPreprocessDefinesMessage>Generate moc_predefs.h</QtMocPreprocessDefinesMessage>
+  </PropertyGroup>
+  <PropertyGroup Label="QtMocPreprocessDefines" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <QtMocPreprocessDefinesCommand>cl -Bx"$(QTDIR)\bin\qmake.exe" -nologo -Zc:wchar_t -FS -Zc:rvalueCast -Zc:inline -Zc:strictStrings -Zc:throwingNew -Zc:referenceBinding -Zc:__cplusplus /utf-8 -Zi -MDd -std:c++17 -W0 -E $(QTDIR)\mkspecs\features\data\dummy.cpp 2&gt;NUL &gt;.moc\moc_predefs.h</QtMocPreprocessDefinesCommand>
+    <QtMocPreprocessDefinesInputs>$(QTDIR)\mkspecs\features\data\dummy.cpp</QtMocPreprocessDefinesInputs>
+    <QtMocPreprocessDefinesOutputs>.moc\moc_predefs.h</QtMocPreprocessDefinesOutputs>
+    <QtMocPreprocessDefinesMessage>Generate moc_predefs.h</QtMocPreprocessDefinesMessage>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>.\GeneratedFiles\$(ConfigurationName);.\GeneratedFiles;.;..\..\src;..\..\src\core;$(IECO)/include/ndp/core;$(IECO)/include/ndp/bdo;$(IECO)/include/ndp/bo;$(IECO)/include/common/ggeometry;$(NGP)/support/libxml2-2.9.9/include;C:\Users\26312\GeoEast\NGP\support\iconv\include;C:\Users\26312\GeoEast\NGP\support\libxml2-2.9.9\include;C:\Users\26312\GeoEast\NGP\support\strptime\include;C:\Users\26312\GeoEast\NGP\support\syslog\include;C:\Users\26312\GeoEast\NGP\support\thread\include;C:\Users\26312\GeoEast\NGP\support\gdal\include;C:\Users\26312\GeoEast\NGP\support\qwt\include;$(PG_HOME)/include;$(PG_HOME)/include/libpq;.moc;/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>-Zc:rvalueCast -Zc:inline -Zc:strictStrings -Zc:throwingNew -Zc:referenceBinding -Zc:__cplusplus /utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AssemblerListingLocation>.obj\</AssemblerListingLocation>
+      <BrowseInformation>false</BrowseInformation>
+      <DebugInformationFormat>None</DebugInformationFormat>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <ObjectFileName>.obj\</ObjectFileName>
+      <Optimization>MaxSpeed</Optimization>
+      <PreprocessorDefinitions>_CONSOLE;UNICODE;_UNICODE;WIN32;NOMINMAX;_HAS_STD_BYTE=0;_ENABLE_EXTENDED_ALIGNED_STORAGE;WIN64;NDEBUG;QT_NO_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessToFile>false</PreprocessToFile>
+      <ProgramDataBaseFileName></ProgramDataBaseFileName>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+      <TreatWChar_tAsBuiltInType>true</TreatWChar_tAsBuiltInType>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>$(IECO)\libso\ndp\bowell.lib;$(IECO)\libso\ndp\boref.lib;$(IECO)\libso\ndp\bointp.lib;$(IECO)\libso\ndp\boseis.lib;$(IECO)\libso\ndp\bomgr.lib;$(IECO)\libso\ndp\boprocess.lib;$(IECO)\libso\ndp\bdowell.lib;$(IECO)\libso\ndp\bdoseis.lib;$(IECO)\libso\ndp\bdoprocess.lib;$(IECO)\libso\ndp\sqlcore.lib;$(IECO)\libso\ndp\cpool.lib;$(IECO)\libso\ndp\dpplug.lib;$(IECO)\libso\ndp\dpbase.lib;$(IECO)\libso\ndp\bdointp.lib;$(IECO)\libso\ndp\bdomgr.lib;$(IECO)\libso\ndp\dpconf.lib;$(IECO)\libso\ndp\dpthreadlck.lib;$(IECO)\libso\ndp\dpfiles.lib;$(IECO)\libso\ndp\dpuomsys.lib;$(IECO)\libso\ndp\dpcrs.lib;$(IECO)\libso\common\ggeometry5.lib;C:\Users\26312\GeoEast\NGP\support\iconv\lib\release\iconv.lib;C:\Users\26312\GeoEast\NGP\support\strptime\lib\release\strptime.lib;C:\Users\26312\GeoEast\NGP\support\syslog\lib\release\syslog.lib;C:\Users\26312\GeoEast\NGP\support\thread\lib\release\pthreadVC2.lib;C:\Users\26312\GeoEast\NGP\support\gdal\lib\release\gdal_i.lib;C:\Users\26312\GeoEast\NGP\support\libxml2-2.9.9\lib\release\libxml2.lib;C:\Users\26312\GeoEast\NGP\support\qwt\lib\release\qwt.lib;$(PG_HOME)\lib\libpq.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(IECO)\libso\ndp;$(IECO)\libso\common;C:\Users\26312\GeoEast\NGP\support\iconv\lib\release;C:\Users\26312\GeoEast\NGP\support\strptime\lib\release;C:\Users\26312\GeoEast\NGP\support\syslog\lib\release;C:\Users\26312\GeoEast\NGP\support\thread\lib\release;C:\Users\26312\GeoEast\NGP\support\gdal\lib\release;C:\Users\26312\GeoEast\NGP\support\libxml2-2.9.9\lib\release;C:\Users\26312\GeoEast\NGP\support\qwt\lib\release;$(PG_HOME)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalOptions>"/MANIFESTDEPENDENCY:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' publicKeyToken='6595b64144ccf1df' language='*' processorArchitecture='*'" %(AdditionalOptions)</AdditionalOptions>
+      <DataExecutionPrevention>true</DataExecutionPrevention>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <IgnoreImportLibrary>true</IgnoreImportLibrary>
+      <LinkIncremental>false</LinkIncremental>
+      <OptimizeReferences>true</OptimizeReferences>
+      <OutputFile>$(OutDir)\faultpolytrace_geoeast_runner.exe</OutputFile>
+      <RandomizedBaseAddress>true</RandomizedBaseAddress>
+      <SubSystem>Console</SubSystem>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+    </Link>
+    <Midl>
+      <DefaultCharType>Unsigned</DefaultCharType>
+      <EnableErrorChecks>None</EnableErrorChecks>
+      <WarningLevel>0</WarningLevel>
+    </Midl>
+    <ResourceCompile>
+      <PreprocessorDefinitions>_CONSOLE;UNICODE;_UNICODE;WIN32;NOMINMAX;_HAS_STD_BYTE=0;_ENABLE_EXTENDED_ALIGNED_STORAGE;WIN64;NDEBUG;QT_NO_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ResourceCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>.\GeneratedFiles\$(ConfigurationName);.\GeneratedFiles;.;..\..\src;..\..\src\core;$(IECO)/include/ndp/core;$(IECO)/include/ndp/bdo;$(IECO)/include/ndp/bo;$(IECO)/include/common/ggeometry;$(NGP)/support/libxml2-2.9.9/include;C:\Users\26312\GeoEast\NGP\support\iconv\include;C:\Users\26312\GeoEast\NGP\support\libxml2-2.9.9\include;C:\Users\26312\GeoEast\NGP\support\strptime\include;C:\Users\26312\GeoEast\NGP\support\syslog\include;C:\Users\26312\GeoEast\NGP\support\thread\include;C:\Users\26312\GeoEast\NGP\support\gdal\include;C:\Users\26312\GeoEast\NGP\support\qwt\include;$(PG_HOME)/include;$(PG_HOME)/include/libpq;.moc;/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>-Zc:rvalueCast -Zc:inline -Zc:strictStrings -Zc:throwingNew -Zc:referenceBinding -Zc:__cplusplus /utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AssemblerListingLocation>.obj\</AssemblerListingLocation>
+      <BrowseInformation>false</BrowseInformation>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <ObjectFileName>.obj\</ObjectFileName>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>_CONSOLE;UNICODE;_UNICODE;WIN32;NOMINMAX;_HAS_STD_BYTE=0;_ENABLE_EXTENDED_ALIGNED_STORAGE;WIN64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessToFile>false</PreprocessToFile>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+      <TreatWChar_tAsBuiltInType>true</TreatWChar_tAsBuiltInType>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>$(IECO)\libso\ndp\bowell.lib;$(IECO)\libso\ndp\boref.lib;$(IECO)\libso\ndp\bointp.lib;$(IECO)\libso\ndp\boseis.lib;$(IECO)\libso\ndp\bomgr.lib;$(IECO)\libso\ndp\boprocess.lib;$(IECO)\libso\ndp\bdowell.lib;$(IECO)\libso\ndp\bdoseis.lib;$(IECO)\libso\ndp\bdoprocess.lib;$(IECO)\libso\ndp\sqlcore.lib;$(IECO)\libso\ndp\cpool.lib;$(IECO)\libso\ndp\dpplug.lib;$(IECO)\libso\ndp\dpbase.lib;$(IECO)\libso\ndp\bdointp.lib;$(IECO)\libso\ndp\bdomgr.lib;$(IECO)\libso\ndp\dpconf.lib;$(IECO)\libso\ndp\dpthreadlck.lib;$(IECO)\libso\ndp\dpfiles.lib;$(IECO)\libso\ndp\dpuomsys.lib;$(IECO)\libso\ndp\dpcrs.lib;$(IECO)\libso\common\ggeometry5.lib;C:\Users\26312\GeoEast\NGP\support\iconv\lib\release\iconv.lib;C:\Users\26312\GeoEast\NGP\support\strptime\lib\release\strptime.lib;C:\Users\26312\GeoEast\NGP\support\syslog\lib\release\syslog.lib;C:\Users\26312\GeoEast\NGP\support\thread\lib\release\pthreadVC2.lib;C:\Users\26312\GeoEast\NGP\support\gdal\lib\release\gdal_i.lib;C:\Users\26312\GeoEast\NGP\support\libxml2-2.9.9\lib\release\libxml2.lib;C:\Users\26312\GeoEast\NGP\support\qwt\lib\release\qwt.lib;$(PG_HOME)\lib\libpq.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(IECO)\libso\ndp;$(IECO)\libso\common;C:\Users\26312\GeoEast\NGP\support\iconv\lib\release;C:\Users\26312\GeoEast\NGP\support\strptime\lib\release;C:\Users\26312\GeoEast\NGP\support\syslog\lib\release;C:\Users\26312\GeoEast\NGP\support\thread\lib\release;C:\Users\26312\GeoEast\NGP\support\gdal\lib\release;C:\Users\26312\GeoEast\NGP\support\libxml2-2.9.9\lib\release;C:\Users\26312\GeoEast\NGP\support\qwt\lib\release;$(PG_HOME)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalOptions>"/MANIFESTDEPENDENCY:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' publicKeyToken='6595b64144ccf1df' language='*' processorArchitecture='*'" %(AdditionalOptions)</AdditionalOptions>
+      <DataExecutionPrevention>true</DataExecutionPrevention>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <IgnoreImportLibrary>true</IgnoreImportLibrary>
+      <OutputFile>$(OutDir)\faultpolytrace_geoeast_runner.exe</OutputFile>
+      <RandomizedBaseAddress>true</RandomizedBaseAddress>
+      <SubSystem>Console</SubSystem>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+    </Link>
+    <Midl>
+      <DefaultCharType>Unsigned</DefaultCharType>
+      <EnableErrorChecks>None</EnableErrorChecks>
+      <WarningLevel>0</WarningLevel>
+    </Midl>
+    <ResourceCompile>
+      <PreprocessorDefinitions>_CONSOLE;UNICODE;_UNICODE;WIN32;NOMINMAX;_HAS_STD_BYTE=0;_ENABLE_EXTENDED_ALIGNED_STORAGE;WIN64;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ResourceCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\src\core\BinaryMask.cpp" />
+    <ClCompile Include="..\..\src\core\FaultTracer.cpp" />
+    <ClCompile Include="GeoEastBoAdapter.cpp" />
+    <ClCompile Include="..\..\src\core\Grid2D.cpp" />
+    <ClCompile Include="..\..\src\io\AsciiGridIO.cpp" />
+    <ClCompile Include="..\..\src\io\DiagnosticsIO.cpp" />
+    <ClCompile Include="..\..\src\core\Polygon.cpp" />
+    <ClCompile Include="..\..\src\core\Segmentation.cpp" />
+    <ClCompile Include="..\..\src\core\SkeletonGraph.cpp" />
+    <ClCompile Include="..\..\src\core\Topology.cpp" />
+    <ClCompile Include="main.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\src\core\BinaryMask.h" />
+    <ClInclude Include="..\..\src\core\FaultTracer.h" />
+    <ClInclude Include="GeoEastBoAdapter.h" />
+    <ClInclude Include="..\..\src\core\Grid2D.h" />
+    <ClInclude Include="..\..\src\io\AsciiGridIO.h" />
+    <ClInclude Include="..\..\src\io\DiagnosticsIO.h" />
+    <ClInclude Include="..\..\src\core\Polygon.h" />
+    <ClInclude Include="..\..\src\core\Segmentation.h" />
+    <ClInclude Include="..\..\src\core\SkeletonGraph.h" />
+    <ClInclude Include="..\..\src\core\Topology.h" />
+  </ItemGroup>
+  <ItemGroup />
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Import Project="$(QtMsBuild)\qt.targets" Condition="Exists('$(QtMsBuild)\qt.targets')" />
+  <ImportGroup Label="ExtensionTargets" />
+</Project>

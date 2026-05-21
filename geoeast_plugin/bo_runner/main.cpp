@@ -1,0 +1,541 @@
+#include "GeoEastBoAdapter.h"
+
+#include "../../src/core/FaultTracer.h"
+#include "../../src/core/Topology.h"
+#include "../../src/io/AsciiGridIO.h"
+#include "../../src/io/DiagnosticsIO.h"
+
+#include <chrono>
+#include <cctype>
+#include <cstdlib>
+#include <exception>
+#include <fstream>
+#include <iostream>
+#include <memory>
+#include <limits>
+#include <algorithm>
+#include <cmath>
+#include <string>
+#include <vector>
+
+#include "boproject.h"
+#include "bosystemroot.h"
+
+namespace geobo = ngp::bo;
+
+#ifdef _WIN32
+extern "C" __declspec(dllimport) void __stdcall OutputDebugStringA(const char* outputString);
+#endif
+
+namespace {
+
+struct Options {
+    std::string databaseName;
+    std::string projectName;
+    std::string userName;
+    std::string password;
+    std::string gridName;
+    std::string outputName;
+    std::string topologyOutputPath;
+    std::string importGeoEastDatPath;
+    bool listGrids = false;
+    bool validateGridOnly = false;
+    bool overwriteGrid = false;
+    fpt_geoeast::FaultPolygonStyle polygonStyle;
+    fpt::TraceOptions trace;
+};
+
+void printUsage() {
+    std::cout
+        << "Usage:\n"
+        << "  faultpolytrace_geoeast_runner --db <database> --project <project> "
+        << "--user <user> [--password <password>] --grid <BOMapGrid> --output <BOFaultPolygon> [options]\n\n"
+        << "Options:\n"
+        << "  --trace-mode region|ridge-belt\n"
+        << "  --list-grids\n"
+        << "  --validate-grid\n"
+        << "  --import-geoeast-dat <test.dat>\n"
+        << "  --overwrite-grid\n"
+        << "  --threshold-mode fixed|percentile|positive-percentile\n"
+        << "  --threshold <value>\n"
+        << "  --percentile <0-1>\n"
+        << "  --min-area <value>\n"
+        << "  --min-cells <count>\n"
+        << "  --open-radius <count>\n"
+        << "  --close-radius <count>\n"
+        << "  --weak-percentile <0-1>\n"
+        << "  --weak-connect-radius <count>\n"
+        << "  --max-weak-component-cells <count>\n"
+        << "  --min-weak-component-aspect <value>\n"
+        << "  --belt-radius <count>\n"
+        << "  --post-belt-close-radius <count>\n"
+        << "  --attribute-constrained-belt\n"
+        << "  --no-attribute-constrained-belt\n"
+        << "  --attribute-envelope-radius <count>\n"
+        << "  --min-branch-length <count>\n"
+        << "  --min-junction-branch-length <count>\n"
+        << "  --min-junction-branch-mean <value>\n"
+        << "  --max-gap-distance <count>\n"
+        << "  --max-gap-angle <degrees>\n"
+        << "  --min-gap-support-ratio <0-1>\n"
+        << "  --separate-branch-belts\n"
+        << "  --no-separate-branch-belts\n"
+        << "  --root-anti-merge\n"
+        << "  --no-root-anti-merge\n"
+        << "  --root-anti-merge-radius <count>\n"
+        << "  --root-anti-merge-support-ratio <0-1>\n"
+        << "  --root-anti-merge-max-bridge-value <value>\n"
+        << "  --no-adaptive-area-filter\n"
+        << "  --adaptive-area-min-cells <count>\n"
+        << "  --adaptive-area-min-aspect <value>\n"
+        << "  --adaptive-area-min-mean-ratio <value>\n"
+        << "  --adaptive-area-min-max-ratio <value>\n"
+        << "  --no-residual-fill\n"
+        << "  --residual-trace\n"
+        << "  --no-residual-trace\n"
+        << "  --residual-percentile <0-1>\n"
+        << "  --residual-fill-radius <count>\n"
+        << "  --residual-min-cells <count>\n"
+        << "  --residual-trace-min-length <count>\n"
+        << "  --residual-trace-max-cells <count>\n"
+        << "  --residual-covered-guard-radius <count>\n"
+        << "  --no-residual-detached-trace\n"
+        << "  --residual-detached-min-cells <count>\n"
+        << "  --residual-detached-min-length <count>\n"
+        << "  --residual-detached-min-aspect <value>\n"
+        << "  --residual-detached-min-mean-ratio <value>\n"
+        << "  --residual-detached-min-max-ratio <value>\n"
+        << "  --simplify-tolerance <dist>\n"
+        << "  --smooth-iterations <count>\n"
+        << "  --polygon-color <cyan|yellow|magenta|white|green|blue|red|R,G,B|#RRGGBB>\n"
+        << "  --polygon-linewidth <value>\n"
+        << "  --topology-output <csv>\n";
+}
+
+int clampColor(int value) {
+    return std::max(0, std::min(255, value));
+}
+
+fpt_geoeast::FaultPolygonStyle parsePolygonColor(
+    const std::string& text,
+    const fpt_geoeast::FaultPolygonStyle& current) {
+    fpt_geoeast::FaultPolygonStyle style = current;
+    std::string lower = text;
+    std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+
+    if (lower == "cyan") {
+        style.red = 0; style.green = 255; style.blue = 255;
+    } else if (lower == "yellow") {
+        style.red = 255; style.green = 255; style.blue = 0;
+    } else if (lower == "magenta") {
+        style.red = 255; style.green = 0; style.blue = 255;
+    } else if (lower == "white") {
+        style.red = 255; style.green = 255; style.blue = 255;
+    } else if (lower == "green") {
+        style.red = 0; style.green = 255; style.blue = 0;
+    } else if (lower == "blue") {
+        style.red = 0; style.green = 0; style.blue = 255;
+    } else if (lower == "red") {
+        style.red = 255; style.green = 0; style.blue = 0;
+    } else if (lower.size() == 7 && lower[0] == '#') {
+        style.red = clampColor(std::stoi(lower.substr(1, 2), nullptr, 16));
+        style.green = clampColor(std::stoi(lower.substr(3, 2), nullptr, 16));
+        style.blue = clampColor(std::stoi(lower.substr(5, 2), nullptr, 16));
+    } else {
+        const std::size_t first = lower.find(',');
+        const std::size_t second = first == std::string::npos ? std::string::npos : lower.find(',', first + 1);
+        if (first == std::string::npos || second == std::string::npos) {
+            throw std::runtime_error("Invalid --polygon-color: " + text);
+        }
+        style.red = clampColor(std::stoi(lower.substr(0, first)));
+        style.green = clampColor(std::stoi(lower.substr(first + 1, second - first - 1)));
+        style.blue = clampColor(std::stoi(lower.substr(second + 1)));
+    }
+    return style;
+}
+
+void debugLog(const std::string& message) {
+#ifdef _WIN32
+    OutputDebugStringA((message + "\n").c_str());
+#endif
+    std::cerr << message << "\n";
+}
+
+void validateGeoEastEnvironment() {
+    const char* required[] = {"NGP", "IECO", "NDPDIR", "NGPDIR", "GEOEAST", "PG_HOME"};
+    for (const char* name : required) {
+        const char* value = std::getenv(name);
+        if (!value || !*value) {
+            throw std::runtime_error(std::string("Missing GeoEast environment variable: ") + name);
+        }
+        debugLog(std::string("Env ") + name + "=" + value);
+    }
+
+    const std::string hostFile = std::string(std::getenv("PG_HOME")) + "/network/hostname.pg";
+    std::ifstream input(hostFile.c_str());
+    if (!input.good()) {
+        throw std::runtime_error("Missing GeoEast PostgreSQL host file: " + hostFile);
+    }
+    debugLog("GeoEast PostgreSQL host file found: " + hostFile);
+}
+
+Options parseArgs(int argc, char** argv) {
+    Options options;
+    options.databaseName = "ndp";
+    options.projectName = "BGPCup2026_Test7";
+    options.userName = "26312";
+    options.password = "";
+    options.gridName = "test";
+    options.outputName = "FaultPolyTrace_Result";
+    options.trace.traceMode = fpt::TraceMode::RidgeBelt;
+    options.trace.thresholdMode = fpt::ThresholdMode::Percentile;
+    options.trace.percentile = 0.98;
+    options.trace.closeRadius = 1;
+    options.trace.weakPercentile = 0.965;
+    options.trace.weakConnectRadius = 1;
+    options.trace.maxWeakComponentCells = 20000;
+    options.trace.minWeakComponentAspect = 3.0;
+    options.trace.beltRadius = 3;
+    options.trace.postBeltCloseRadius = 1;
+    options.trace.attributeConstrainedBelt = true;
+    options.trace.attributeEnvelopeRadius = 1;
+    options.trace.minBranchLength = 4;
+    options.trace.minJunctionBranchLength = 2;
+    options.trace.minJunctionBranchMean = 0.94;
+    options.trace.maxGapDistance = 12;
+    options.trace.maxGapAngle = 55.0;
+    options.trace.minGapSupportRatio = 0.25;
+    options.trace.residualAttributeFill = true;
+    options.trace.residualTrace = false;
+    options.trace.residualPercentile = 0.955;
+    options.trace.residualFillRadius = 4;
+    options.trace.residualMinCells = 2;
+    options.trace.residualTraceMinLength = 6;
+    options.trace.residualTraceMaxCells = 80;
+    options.trace.residualCoveredGuardRadius = 0;
+    options.trace.minArea = 120.0;
+    options.trace.simplifyTolerance = 2.0;
+    options.trace.smoothIterations = 1;
+
+    if (argc == 1) {
+        debugLog("No command-line arguments supplied. Using local defaults and validating BOMapGrid 'test' first.");
+        return options;
+    }
+
+    for (int i = 1; i < argc; ++i) {
+        const std::string arg = argv[i];
+        auto requireValue = [&](const std::string& name) -> std::string {
+            if (i + 1 >= argc) {
+                throw std::runtime_error("Missing value for " + name);
+            }
+            return argv[++i];
+        };
+
+        if (arg == "--db") {
+            options.databaseName = requireValue(arg);
+        } else if (arg == "--project") {
+            options.projectName = requireValue(arg);
+        } else if (arg == "--user") {
+            options.userName = requireValue(arg);
+        } else if (arg == "--password") {
+            options.password = requireValue(arg);
+        } else if (arg == "--grid") {
+            options.gridName = requireValue(arg);
+        } else if (arg == "--output") {
+            options.outputName = requireValue(arg);
+        } else if (arg == "--topology-output") {
+            options.topologyOutputPath = requireValue(arg);
+        } else if (arg == "--import-geoeast-dat") {
+            options.importGeoEastDatPath = requireValue(arg);
+        } else if (arg == "--list-grids") {
+            options.listGrids = true;
+        } else if (arg == "--validate-grid") {
+            options.validateGridOnly = true;
+        } else if (arg == "--overwrite-grid") {
+            options.overwriteGrid = true;
+        } else if (arg == "--trace-mode") {
+            const std::string mode = requireValue(arg);
+            if (mode == "region") {
+                options.trace.traceMode = fpt::TraceMode::Region;
+            } else if (mode == "ridge-belt") {
+                options.trace.traceMode = fpt::TraceMode::RidgeBelt;
+            } else {
+                throw std::runtime_error("Unknown trace mode: " + mode);
+            }
+        } else if (arg == "--threshold-mode") {
+            const std::string mode = requireValue(arg);
+            if (mode == "fixed") {
+                options.trace.thresholdMode = fpt::ThresholdMode::Fixed;
+            } else if (mode == "percentile") {
+                options.trace.thresholdMode = fpt::ThresholdMode::Percentile;
+            } else if (mode == "positive-percentile") {
+                options.trace.thresholdMode = fpt::ThresholdMode::PositivePercentile;
+            } else {
+                throw std::runtime_error("Unknown threshold mode: " + mode);
+            }
+        } else if (arg == "--threshold") {
+            options.trace.threshold = std::stod(requireValue(arg));
+        } else if (arg == "--percentile") {
+            options.trace.percentile = std::stod(requireValue(arg));
+        } else if (arg == "--min-area") {
+            options.trace.minArea = std::stod(requireValue(arg));
+        } else if (arg == "--min-cells") {
+            options.trace.minCells = std::stoi(requireValue(arg));
+        } else if (arg == "--open-radius") {
+            options.trace.openRadius = std::stoi(requireValue(arg));
+        } else if (arg == "--close-radius") {
+            options.trace.closeRadius = std::stoi(requireValue(arg));
+        } else if (arg == "--weak-percentile") {
+            options.trace.weakPercentile = std::stod(requireValue(arg));
+        } else if (arg == "--weak-connect-radius") {
+            options.trace.weakConnectRadius = std::stoi(requireValue(arg));
+        } else if (arg == "--max-weak-component-cells") {
+            options.trace.maxWeakComponentCells = std::stoi(requireValue(arg));
+        } else if (arg == "--min-weak-component-aspect") {
+            options.trace.minWeakComponentAspect = std::stod(requireValue(arg));
+        } else if (arg == "--belt-radius") {
+            options.trace.beltRadius = std::stoi(requireValue(arg));
+        } else if (arg == "--post-belt-close-radius") {
+            options.trace.postBeltCloseRadius = std::stoi(requireValue(arg));
+        } else if (arg == "--attribute-constrained-belt") {
+            options.trace.attributeConstrainedBelt = true;
+        } else if (arg == "--no-attribute-constrained-belt") {
+            options.trace.attributeConstrainedBelt = false;
+        } else if (arg == "--attribute-envelope-radius") {
+            options.trace.attributeEnvelopeRadius = std::stoi(requireValue(arg));
+        } else if (arg == "--min-branch-length") {
+            options.trace.minBranchLength = std::stoi(requireValue(arg));
+        } else if (arg == "--min-junction-branch-length") {
+            options.trace.minJunctionBranchLength = std::stoi(requireValue(arg));
+        } else if (arg == "--min-junction-branch-mean") {
+            options.trace.minJunctionBranchMean = std::stod(requireValue(arg));
+        } else if (arg == "--max-gap-distance") {
+            options.trace.maxGapDistance = std::stoi(requireValue(arg));
+        } else if (arg == "--max-gap-angle") {
+            options.trace.maxGapAngle = std::stod(requireValue(arg));
+        } else if (arg == "--min-gap-support-ratio") {
+            options.trace.minGapSupportRatio = std::stod(requireValue(arg));
+        } else if (arg == "--separate-branch-belts") {
+            options.trace.separateBranchBelts = true;
+        } else if (arg == "--no-separate-branch-belts") {
+            options.trace.separateBranchBelts = false;
+        } else if (arg == "--root-anti-merge") {
+            options.trace.rootAntiMerge = true;
+        } else if (arg == "--no-root-anti-merge") {
+            options.trace.rootAntiMerge = false;
+        } else if (arg == "--root-anti-merge-radius") {
+            options.trace.rootAntiMergeRadius = std::stoi(requireValue(arg));
+        } else if (arg == "--root-anti-merge-support-ratio") {
+            options.trace.rootAntiMergeSupportRatio = std::stod(requireValue(arg));
+        } else if (arg == "--root-anti-merge-max-bridge-value") {
+            options.trace.rootAntiMergeMaxBridgeValue = std::stod(requireValue(arg));
+        } else if (arg == "--no-adaptive-area-filter") {
+            options.trace.adaptiveAreaFilter = false;
+        } else if (arg == "--adaptive-area-min-cells") {
+            options.trace.adaptiveAreaMinCells = std::stoi(requireValue(arg));
+        } else if (arg == "--adaptive-area-min-aspect") {
+            options.trace.adaptiveAreaMinAspect = std::stod(requireValue(arg));
+        } else if (arg == "--adaptive-area-min-mean-ratio") {
+            options.trace.adaptiveAreaMinMeanRatio = std::stod(requireValue(arg));
+        } else if (arg == "--adaptive-area-min-max-ratio") {
+            options.trace.adaptiveAreaMinMaxRatio = std::stod(requireValue(arg));
+        } else if (arg == "--no-residual-fill") {
+            options.trace.residualAttributeFill = false;
+        } else if (arg == "--residual-trace") {
+            options.trace.residualTrace = true;
+        } else if (arg == "--no-residual-trace") {
+            options.trace.residualTrace = false;
+        } else if (arg == "--residual-percentile") {
+            options.trace.residualPercentile = std::stod(requireValue(arg));
+        } else if (arg == "--residual-fill-radius") {
+            options.trace.residualFillRadius = std::stoi(requireValue(arg));
+        } else if (arg == "--residual-min-cells") {
+            options.trace.residualMinCells = std::stoi(requireValue(arg));
+        } else if (arg == "--residual-trace-min-length") {
+            options.trace.residualTraceMinLength = std::stoi(requireValue(arg));
+        } else if (arg == "--residual-trace-max-cells") {
+            options.trace.residualTraceMaxCells = std::stoi(requireValue(arg));
+        } else if (arg == "--residual-covered-guard-radius") {
+            options.trace.residualCoveredGuardRadius = std::stoi(requireValue(arg));
+        } else if (arg == "--no-residual-detached-trace") {
+            options.trace.residualTraceDetached = false;
+        } else if (arg == "--residual-detached-min-cells") {
+            options.trace.residualDetachedMinCells = std::stoi(requireValue(arg));
+        } else if (arg == "--residual-detached-min-length") {
+            options.trace.residualDetachedMinLength = std::stoi(requireValue(arg));
+        } else if (arg == "--residual-detached-min-aspect") {
+            options.trace.residualDetachedMinAspect = std::stod(requireValue(arg));
+        } else if (arg == "--residual-detached-min-mean-ratio") {
+            options.trace.residualDetachedMinMeanRatio = std::stod(requireValue(arg));
+        } else if (arg == "--residual-detached-min-max-ratio") {
+            options.trace.residualDetachedMinMaxRatio = std::stod(requireValue(arg));
+        } else if (arg == "--simplify-tolerance") {
+            options.trace.simplifyTolerance = std::stod(requireValue(arg));
+        } else if (arg == "--smooth-iterations") {
+            options.trace.smoothIterations = std::stoi(requireValue(arg));
+        } else if (arg == "--polygon-color") {
+            options.polygonStyle = parsePolygonColor(requireValue(arg), options.polygonStyle);
+        } else if (arg == "--polygon-linewidth") {
+            options.polygonStyle.lineWidth = std::stod(requireValue(arg));
+        } else if (arg == "--help" || arg == "-h") {
+            printUsage();
+            std::exit(0);
+        } else {
+            throw std::runtime_error("Unknown argument: " + arg);
+        }
+    }
+
+    if (options.databaseName.empty() || options.projectName.empty() || options.userName.empty()) {
+        throw std::runtime_error("Missing required GeoEast connection or data arguments.");
+    }
+    if (!options.listGrids && options.gridName.empty()) {
+        throw std::runtime_error("Missing --grid. Use --list-grids to inspect available BOMapGrid objects.");
+    }
+    if (!options.listGrids && options.importGeoEastDatPath.empty() && !options.validateGridOnly && options.outputName.empty()) {
+        throw std::runtime_error("Missing --output. Use --list-grids to inspect available BOMapGrid objects.");
+    }
+    return options;
+}
+
+void printGridStats(const fpt::Grid2D& grid) {
+    double minValue = std::numeric_limits<double>::max();
+    double maxValue = -std::numeric_limits<double>::max();
+    double sum = 0.0;
+    std::size_t finiteCount = 0;
+    std::size_t nonZeroCount = 0;
+
+    for (double value : grid.values()) {
+        if (!std::isfinite(value)) {
+            continue;
+        }
+        minValue = std::min(minValue, value);
+        maxValue = std::max(maxValue, value);
+        sum += value;
+        ++finiteCount;
+        if (value != 0.0) {
+            ++nonZeroCount;
+        }
+    }
+
+    std::cout << "Grid stats:\n";
+    std::cout << "  size: " << grid.nx() << " x " << grid.ny() << "\n";
+    std::cout << "  origin: sx=" << grid.sx() << " sy=" << grid.sy() << "\n";
+    std::cout << "  spacing: dx=" << grid.dx() << " dy=" << grid.dy() << "\n";
+    std::cout << "  finite cells: " << finiteCount << "\n";
+    std::cout << "  nonzero cells: " << nonZeroCount << "\n";
+    if (finiteCount > 0) {
+        std::cout << "  min: " << minValue << "\n";
+        std::cout << "  max: " << maxValue << "\n";
+        std::cout << "  mean: " << (sum / static_cast<double>(finiteCount)) << "\n";
+    }
+}
+
+} // namespace
+
+int main(int argc, char** argv) {
+    try {
+        const Options options = parseArgs(argc, argv);
+        const auto start = std::chrono::steady_clock::now();
+
+        validateGeoEastEnvironment();
+
+        debugLog("Connecting GeoEast database: " + options.databaseName);
+        std::shared_ptr<geobo::BOSystemRoot> root = geobo::BOSystemRoot::instance(options.databaseName);
+        debugLog("BOSystemRoot::instance returned.");
+        if (root->Fail()) {
+            throw std::runtime_error("Failed to connect database: " + root->Message());
+        }
+        debugLog("Setting GeoEast auth user: " + options.userName);
+        root->setAuth(options.userName, options.password);
+
+        debugLog("Getting GeoEast project: " + options.projectName);
+        fpt_geoeast::GeoEastProjectPtr project = root->getChild<geobo::BOProject>(options.projectName);
+        debugLog("BOProject getChild returned.");
+        if (!project) {
+            throw std::runtime_error("Failed to get project: " + options.projectName + " " + root->Message());
+        }
+
+        if (options.listGrids) {
+            debugLog("Listing BOMapGrid objects...");
+            const std::vector<std::string> gridNames = fpt_geoeast::listMapGrids(project);
+            debugLog("BOMapGrid list completed.");
+            std::cout << "BOMapGrid objects in project " << options.projectName << ":\n";
+            for (const std::string& gridName : gridNames) {
+                std::cout << "  " << gridName << "\n";
+            }
+            std::cout << "Total: " << gridNames.size() << "\n";
+            return 0;
+        }
+
+        if (argc == 1) {
+            debugLog("Validating BOMapGrid without loading full data: " + options.gridName);
+            fpt_geoeast::validateMapGrid(project, options.gridName);
+            debugLog("Default validation completed. Set command arguments to run full tracing.");
+            return 0;
+        }
+
+        fpt::Grid2D grid;
+        if (!options.importGeoEastDatPath.empty()) {
+            debugLog("Reading official GeoEast DAT grid: " + options.importGeoEastDatPath);
+            grid = fpt::readGeoEastDatGrid(options.importGeoEastDatPath);
+            debugLog("Official GeoEast DAT grid parsed.");
+            printGridStats(grid);
+            debugLog("Writing parsed grid to GeoEast BOMapGrid: " + options.gridName);
+            fpt_geoeast::writeMapGrid(project, options.projectName, options.gridName, grid, options.overwriteGrid);
+            debugLog("Imported BOMapGrid write completed.");
+        } else {
+            debugLog("Reading BOMapGrid: " + options.gridName);
+            grid = fpt_geoeast::readMapGrid(project, options.gridName);
+            debugLog("BOMapGrid read completed.");
+        }
+        if (options.validateGridOnly) {
+            printGridStats(grid);
+            return 0;
+        }
+        debugLog("Running FaultPolyTrace core.");
+        fpt::TraceResult result = fpt::traceFaultPolygons(grid, options.trace);
+        fpt::TopologyDiagnostics topology = fpt::diagnoseTopology(result.polygons, true);
+        if (!options.topologyOutputPath.empty()) {
+            fpt::writeTopologyDetailsCsv(options.topologyOutputPath, topology);
+        }
+        debugLog("Writing BOFaultPolygon: " + options.outputName);
+        fpt_geoeast::writeFaultPolygons(project, options.outputName, result.polygons, true, options.polygonStyle);
+        debugLog("BOFaultPolygon write completed.");
+
+        int kept = 0;
+        for (const fpt::Polygon& polygon : result.polygons) {
+            if (polygon.kept) {
+                ++kept;
+            }
+        }
+
+        const auto end = std::chrono::steady_clock::now();
+        const auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+        std::cout << "FaultPolyTrace GeoEast runner completed.\n";
+        std::cout << "Grid: " << grid.nx() << " x " << grid.ny() << "\n";
+        std::cout << "Effective threshold: " << result.effectiveThreshold << "\n";
+        std::cout << "Polygons: " << result.polygons.size() << " total, " << kept << " kept\n";
+        std::cout << "Topology open rings: " << topology.openRingCount << "\n";
+        std::cout << "Topology self-intersections: " << topology.selfIntersectingPolygonCount << "\n";
+        std::cout << "Topology polygon intersections: " << topology.polygonIntersectionCount << "\n";
+        if (!options.topologyOutputPath.empty()) {
+            std::cout << "Topology details: " << options.topologyOutputPath << "\n";
+        }
+        std::cout << "Output BOFaultPolygon: " << options.outputName << "\n";
+        std::cout << "Elapsed: " << elapsedMs << " ms\n";
+        return 0;
+    } catch (const std::bad_alloc& ex) {
+        debugLog(std::string("Error: bad allocation. Last GeoEast step above is the failing area. Detail: ") + ex.what());
+        std::cerr << "\n";
+        printUsage();
+        return 1;
+    } catch (const std::exception& ex) {
+        debugLog(std::string("Error: ") + ex.what());
+        std::cerr << "\n";
+        printUsage();
+        return 1;
+    }
+}

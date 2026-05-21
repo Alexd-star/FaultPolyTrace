@@ -1,0 +1,723 @@
+
+
+===== 第 1 页 =====
+ 
+GeoEast 
+ 
+1 
+经典面属性 
+所谓地震属性就是在原始地震数据基础上，经过各种信号分析处理手段后，从中
+所提取出的可以用来刻画某些地质特征的原始数据的子集，如振幅、频率等。地震属
+性广泛应用于构造解释、储层预测以及油气检测之中。 
+从地震数据中提取地震面属性，首先要从地震数据目的层出取出一段数据，为了
+减少目的层上、下邻层反射波的影响，又要尽量保留目的层的反射信息，通常在时窗
+数据两端乘以窗函数，以使地震属性带有更多的储层信息。 
+1 方法原理 
+GeoEast 解释系统中的面属性主要是指经过希尔伯特变换后，计算的三瞬属性，
+以及由此延伸出的其它属性。 
+地震道 x(t) 经过希尔伯特后得到一个与原信号相差90o 相位的信号 y(t) ，复数道
+Z(t)则可以表示为。 
+ 
+瞬时属性由一个样本接一个样本计算得到，代表了多种参数的瞬时变化。三瞬参
+数指的是瞬时振幅、瞬时相位和瞬时频率。 
+1.1 瞬时振幅 
+瞬时振幅也称为反射强度，或是振幅包络，它可以被视为是地震道的包络函数
+（OliverosandRadovich，1997）。瞬时振幅能反映地震波能量的瞬时变化情况，与地
+震相位无关。瞬时振幅可以表示为： 
+ 
+1.2 瞬时相位 
+瞬时相位是地震剖面上来度量同相轴连续性的参数，即使能量值很低，只要是有
+效波，都能在瞬时相位图上显示出来。瞬时相位是度量地震反射波同相轴连续性的参
+数，当地震波在地下传播遇到地层连续性异常时，在剖面将呈现明显的不连续性。瞬
+时相位可以表示为： 
+ 
+
+
+===== 第 2 页 =====
+用户手册 
+2 
+1.3 瞬时频率 
+瞬时频率来源于瞬时相位，它能够反映地层岩性的变化情况，有助于识别地层。
+瞬时频率可表示为： 
+ 
+2 启动与参数说明 
+在属性提取主窗口菜单条选择 Surface Attribute  Standard Attribute.，弹出
+经典面属性提取窗口。 
+
+
+===== 第 3 页 =====
+经典面属性 
+GeoEast  
+ 
+3 
+2.1 操作说明 
+ 
+图1：经典面属性提取窗口 
+ 
+1） 在面属性集名（Surface Attribute Set）中输入要保存的名字 
+2） 通过Extract Mode选择面属性时间范围的计算方式，通过层位和时窗的组合，确定目标时
+间范围 
+3） 通过属性类型（Attribute Type）选择要提取的面属性 
+4） 选择源数据：同时选择多个面属性提取时，每一个属性可以从不同的数据体中进行提取。
+数据源的选择如下： 
+
+
+===== 第 4 页 =====
+用户手册 
+4 
+ 
+图2：源数据的选择 
+ 
+a) 在右侧列表中，通过Ctrl+A、Ctrl+鼠标左键以及Shift+鼠标左键，选择要设置相同数据
+源的属性 
+b) 然后按住Ctrl键，同时用鼠标左键双击Volume对应的任意单元格，弹出下图所示的选择
+数据体窗口 
+c) 在选择数据体窗口中选择一个数据后，点击OK，选择的数据名同时显示在所有选中属
+性对应的Volume单元格中 
+ 
+图3：数据体选择窗口 
+ 
+5） Using mean for instant attributes: 是否用时窗内属性的平均值代替瞬时属性值。当选择目
+标属性中含瞬时类属性时该选项亮化，否则为灰化状态。 
+6） Resample:是否进行重采样。 
+7） 用户自定义属性参数选择：在选择用户自定义属性（User Defined）后，Process 
+Parameters 中列出选择的用户自定义属性，可以选择每个用户自定义计算方法
+（Instantaneous、Maximum、Mimium、RMS、Summary和Average）以及最终生成属性
+的前缀。 
+最终创建的用户自定义属性名：用户自定义属性名_Method_Prefix 
+比如：User-01_Instantaneous_seismic. 
+
+
+===== 第 5 页 =====
+经典面属性 
+GeoEast  
+ 
+5 
+  
+图4：用户自定义属性计算参数 
+2.2 参数说明 
+1）时窗参数： 
+时窗的选取是地震属性研究中影响储层预测精度的关键之一。选取的时窗过小，
+一方面会使地质目标超出提取范围之外，另一方面过小的时窗会影响某些参数的有效
+性;而选取的时窗过大则会使地质目标的特征异常淹没在其他背景异常中。 
+      
+ 
+图4：AVT沿层时窗10-0ms               图5：AVT沿层时窗20-0ms 
+ 
+上图为沿目标层上时窗10ms和20ms提取的振幅体属性（AVT：Amplitude Volume 
+Technique），时窗为10ms的AVT属性主河道刻画更加清楚，而且在左下角红色箭头
+所指处，另外一条河道依稀可见。 
+ 
+8） Using mean for instant attributes: 是否用时窗内属性的平均值代替瞬时属性值选择
+此选型，则用时窗范围内所有属性的均值来替换目标层位时间点的瞬时属性值。 
+
+
+===== 第 6 页 =====
+用户手册 
+6 
+ 
+图6：Using mean for instant Attributes参数含义 
+ 
+ 
+ 
+图7：甜点（时窗30-0ms）     图8：甜点（时窗30-0ms）， 
+选择“Using mean for instant Attributes” 
+3 应用效果 
+下图是沿层的经典面属性，在不同的面属性上反映了河道储层的差异。 
+ 
+ 
+瞬时带宽（IBand）                      光滑反射强度（Perigram） 
+
+
+===== 第 7 页 =====
+经典面属性 
+GeoEast  
+ 
+7 
+ 
+ 
+甜点（Sweetness）                     瞬时虚振幅（IQuadAmp） 
+不同面属性属性反映了河道的差异性，从不同角度刻画了河道的轮廓。 
+4 经典面属性列表及其物理意义 
+将55 种经典面属性根据其含义的不同分六个部分，即： 
+ 
+瞬时属性（Instantaneous）：                21 种 
+ 
+子波属性(Wavelets)：                              4 种 
+ 
+时窗及振幅属性(Amplitude Statistics)： 13 种 
+ 
+功率谱属性(Spectral Statistics)：           10 种 
+ 
+自相关属性(AutoCorrelation Statistics)： 4 种 
+ 
+其它方面属性(Others)：                           3 种 
+ 
+瞬时属性21 种： 
+ 
+IReAmp 
+Instantaneous Real Amplitude 
+瞬时实振幅 
+IQuadAmp 
+Inst.Quadrature Ampiltude 
+瞬时虚振幅 
+IPhase 
+Instantaneous Phase 
+瞬时相位 
+CIP 
+Cosine of Inst.Phase 
+瞬时相位余弦 
+IFreq 
+Instantaneous Frequency 
+瞬时频率 
+RStWtFreq 
+Reflection Strength Weighted Frequency 
+平滑频率（振幅
+平均的瞬时频
+率） 
+IAcc 
+Inst.Acceleration  
+(Slope of Inst.Frequency) 
+瞬时加速度（瞬
+时频率斜率） 
+ThnBedID 
+Thin Bed Indicator 
+薄层指示器 
+IBand 
+Instantaneous  Bandwidth 
+瞬时带宽 
+IDomFreq 
+Inst.Dominant Frequency 
+瞬时主频 
+RSt 
+Reflection Strength 
+反射强度 
+Perigram 
+Flattened Reflection Strength  
+光滑反射强度
+
+
+===== 第 8 页 =====
+用户手册 
+8 
+(Median-filter Energy Reflection Strength) 
+（中值滤波反射
+强度） 
+PrgCIP 
+Perigram Multiple Cosine of Inst.Phase 
+光滑反射强度与
+相位余弦之积 
+SlpRSt 
+Slope of Reflection Strength (Envelop) 
+反射强度的斜率
+（包络的斜率） 
+SecDRSt 
+Second Derivative of Reflection Strength  
+包络的二阶导数 
+RelQ 
+Relative Quality Factor 
+品质因子 
+ThkStrat 
+Thickness of Stratigraphic 
+相对层厚度 
+QMnStrat 
+Strata Mean Quality Factor 
+层平均品质因子 
+MnAbspt 
+Mean of Absorption Coefficient 
+平均吸收系数 
+Sweetness 
+Sweetness 
+甜点 
+AVT 
+Amplitude Volume Technique 
+瞬时属性振幅体 
+ 
+子波属性4 种： 
+ 
+AppPolar 
+Apparent Polarity 
+视极性 
+RespPhase 
+Response Phase 
+响应相位 
+RespFreq 
+Response Frequency 
+响应频率 
+RespBand 
+Response Bandwidth 
+响应带宽 
+ 
+时窗及振幅属性 13 种： 
+ 
+AvgVibEn 
+Average Vibration Energy 
+平均振动能量 
+ArmMean 
+Arithmetic Mean of Samples 
+平均记录长度变
+化（振幅算数平
+均） 
+MaxPkAmp 
+Maximum Peak Amplitude 
+最大波峰振幅 
+MaxTrouAmp 
+Maximum Trough Amplitude 
+最大波谷振幅 
+IntAbsAmp 
+Integrated Absolute Amplitude 
+绝对振幅积分 
+CompAbsAmp 
+Composite Absolute Amplitude 
+绝对振幅组合 
+RMSAmp 
+Root Mean Square Amplitude 
+均方根振幅 
+AmpSlp 
+Amplitude Slope 
+振幅斜率 
+AmpKurt 
+Ampitude Kurtosis 
+振幅峰态 
+RaPosNeg 
+Ratio of Positive and Negative Vibration 
+包络比值组合
+（正负能量之
+比） 
+LocWid 
+Object Layer Located Wave Half Width 
+目标层峰宽度
+（目标层波半宽
+
+
+===== 第 9 页 =====
+经典面属性 
+GeoEast  
+ 
+9 
+度） 
+LocMnAmp 
+Object 
+Layer 
+Located 
+Wave 
+Mean 
+Amplitude 
+目标层平均振幅 
+LocKurt 
+Object Layer Located Wave  Kurtosis 
+目标层波峰态 
+ 
+ 
+ 
+功率谱属性 10 种： 
+ 
+DomPowSpec 
+Dominant Power Spectrum 
+优势功率谱 
+CndWtFreq 
+Centroid Weighted Frequency 
+质心频率 
+25%Freq 
+Low Frequency 
+低端频率 
+50%Freq 
+Middle Frequency 
+中间频率 
+75%Freq 
+High Frequency 
+高端频率 
+AccPowSpec 
+Accumulative of Power Spectrum 
+功率谱积分 
+MaxPowSpec 
+Maximum Power Spectrum 
+最大功率谱 
+PowSpecSym 
+Power Spectrum Symmetry 
+功率谱的对称性 
+BandEst 
+Normal Bandwidth Estimate 
+正常带宽估计 
+PowSpecKurt 
+Power Spectrum Kurtosis 
+功率谱峰态 
+ 
+ 
+ 
+自相关属性  4 种： 
+ 
+MaxAcor 
+Maximum Auto-correlation 
+最大自相关 
+MinAcor 
+Minimum Auto-correlation 
+最小自相关 
+SumAcor 
+Sum of Maximum Auto-correlation Wave 
+自相关之和 
+WidAcor  
+Width of Maximum auto-correlation Wave 
+自相关主瓣宽度 
+ 
+其它属性3 种： 
+ 
+FrctDim 
+Fractal Dimension 
+分形维数 
+LyapIndex 
+Lyapnov Chaotic Index 
+混沌李指数 
+InfoEntr 
+Lyapnov Chaotic Information Entropy 
+信息熵 
+5 属性含义及其应用 
+5.1 瞬时属性（21 种） 
+假定复数道表示为：
+)t(
+iy
+)t(
+x
+)t(
+u
+
+
+，则 
+1 
+瞬时实振幅  IReAmp ( Instantaneous Amplitude ) 
+是在选定的采样点上地震道时域振动振幅。是振幅属性的基本参数。 
+
+
+===== 第 10 页 =====
+用户手册 
+10 
+广泛用于构造和地层学解释。用来圈定高或低振幅异常，即亮点、暗点。反映不同
+储集层、含气、油、水情况及厚度预测。 
+2 
+瞬时虚振幅  IQuadAmp (Inst.Quadrature Amplitude) 
+是复数地震道的虚部，与复数地震道的相位为90º时的时域振动振幅。即正交道，
+为虚振幅。 
+因它只能在特定的相位观测到，多用来识别与薄储层中的AVO 异常。 
+3 
+瞬时相位IPhase ( Instantaneous Phase) 
+))
+t(
+x
+)t(
+y
+tan(
+A
+)t(
+
+
+, 定义为正切，输出相位已转换为角度，数值范围是[-
+180o,180o]。为q(t)/f(t)的一个角，是采样点处地震道的相位。 
+有助于加强储层内部的弱反射同相轴，但同时也加强了噪声，可用于指示横向连续
+性；显示与波传播有关的相位部分；用于计算相速度；因为没有振幅信息因此能够
+显示所有同相轴；用于显示不连续；断层、显示层序边界。由于烃类聚集常引起局
+部相位变化，也可以做烃类直接指示之一。 
+4 
+瞬时相位余弦  CIP ( Cosine of Inst.Phase ) 
+是瞬时相位导出的属性。其计算式为
+))
+t(
+(
+Cos 
+ 
+常用来改进瞬时相位的变异显示。并用于相位追踪和检查地震剖面对比、解释的质
+量。多与瞬时相位联用。 
+5 
+瞬时频率  IFreq (Inst.Frequeney)  
+定义为瞬时相位对时间的函数
+dt
+)t(
+d
+（以度/毫秒或弧度/毫秒表示），其量纲为
+频率的量纲(Hz)，是地震道在频率方面的瞬时属性。 
+用来计算、估算地震波的衰减。油气储层常引起高频成分衰减及杂乱反射显示，所
+以横向上可用于碳氢指示。高频成份多显示为尖锐的界面或薄层，亦可反映岩相的
+粗、细变化及地层旋回。 
+6 
+平滑频率（振幅平均的瞬时频率） RStWtFreq (Reflection Strength Weighted 
+Frequency) 
+定义为包络加权平均意义下的频率。亦可采用简单的时间平均得到平滑的频率，也
+可用中值滤波的频率。 
+可反映岩相的粗细变化，含油气变化及地层旋回的分析。 
+7 
+瞬时加速度（瞬时频率斜率）IAcc (Inst.Acceleration) (Slope of Inst.Frequency) 
+定义为瞬时频率的变化率。 
+表示衰减率和吸收速率。因为油、气、水饱和度会引起反射波衰减的不同，可预测
+储集层流体边界。 
+8 
+薄层指示器 ThnBedID (Thin Bed Indicator) 
+通过瞬时频率的摆动来获得一些局部信息，这些摆动指示了相邻反射同相轴的变
+化，就是通过瞬时频率与光滑后的瞬时频率的差异来反映薄互层信息的。 
+9 
+瞬时带宽  IBand (Inst.Band width) 
+在所取时窗数据内频率分布范围的统计量。受子波、反射系数影响。 
+由于在空间上与各种噪声相比，地震子波和频率带宽更稳定，这种属性显示了强/
+弱、多次波/混响区域。弱混响产生小的带宽。 
+
+
+===== 第 11 页 =====
+经典面属性 
+GeoEast  
+ 
+11 
+10 瞬时主频IDomFreq ( Inst.Dominant  Frequency) 
+瞬时主频等于瞬时频率与瞬时带宽的几何平均值。即： 
+DF＝
+2
+2
+Ib
+If
+
+ 
+式中：If 表示瞬时频率；Ib 表示瞬时带宽 
+地震波的主频常常来自非常稳定的空间，其变化是由于局部岩性和流体变化而引起
+的，而且碳氢化物又常常引起高频成份衰减。可预测地层中油气引起的高频成分衰
+减、岩石粒度；粗、细、地层的旋回性等均可预测。同时该属性常用于对特定地区
+的横向异常的追踪。 
+11 反射强度 RSt (Reflection Strength) 
+定义为[x2(t)+y2(t)]1/2，也称瞬时振幅、瞬时包络。为复数地震道的绝对值。 
+用来识别亮点/暗点/平点。可确定储层中流体成份、岩性、地层的横向变化。但垂
+直分辩率降低了。 
+12 光滑反射强度（中值滤波反射强度）或光滑滤波反射强度Perigram (Flattened 
+Reflection Strength ) ( Median-filter Energy Reflection Strength) 
+定义为反射强度的时间域中值滤波能量。可以加强反射强度峰值异常。对亮点、暗
+点、平点的确定及储层、岩性的预测都有很好的效果。 
+13 光滑滤波反射强度与相位余弦之积 PrgtCIP ( Perigram Multiple Cosine of 
+Inst.Phase)  
+从反射强度中减去dc/平均分量能得到滤波反射强度。这种复振幅是为增强峰/谷振
+幅，尤其零相位数据效果更好。因加强了峰/谷振幅，并把所有谷振幅反转成视峰
+振幅，分析振幅异常很有用。对同相轴质量有所提高，以便对地震资料更细微的解
+释。 
+14 包络的斜率（反射强度斜率）SlpRSt (Slope of Reflection Strength) 
+即反射强度随时间的变化率。 
+用来表示垂直地层层序和储层中流体成份的垂直变化，及相关的响应效应、尖灭、
+不整合的预测。 
+15 包络的二阶导数SecDRSt (Second Derivative of Reflection Strength (Envelop)) 
+是包络的二阶导数。在地震带宽内显示的是反射界面。 
+指示同相轴的粗、细、岩性的剧烈变化、沉积环境的剧烈变化，也能很好地表示旋
+回。 
+16 品质因子 RelQ ( Relative Quality Factor) 
+可用功率谱比法得到或归一化后的最大振幅包络得到。但功率谱比法因为高频成份
+的损失，其结果不稳定，为此采用修正的谱比法，用以克服高频缺失带来的不稳定
+性。 
+品质因子是对岩性非常敏感的参数，因此可用于油藏不均匀性、孔隙度、饱和度、
+砂体等研究提供工具。同时用波阻抗指示Q 的局部变化，若用压力和S 波的Q 值
+可得到流体含量；指示层内的相对吸收特征即不均匀性。 
+17 相对层厚度ThkStrat ( Thickness of Stratigraphic) 
+即用光滑后的反射强度取相邻峰值之间的差值表示相对厚度。 
+可沿横向追踪，求取相对稳定地层的厚度。 
+
+
+===== 第 12 页 =====
+用户手册 
+12 
+18 层平均品质因子QMnStrat (Strata Mean Quality Factor) 
+定义为：
+
+
+Q
+n
+Q
+1
+平
+ 
+在已知品质因子基础上进一步求得某层平均品质因子。 
+可提高反射波质量，对层追踪中一些不规则数据可以消除，与品质因子联用对油藏
+预测提供重要依据。 
+19 平均吸收系数 MnAbspt (Mean of Absorption Coefficient) 
+为时窗和振幅方面的属性。用于指示层内相对吸收特性，即不均匀性的分析。是反
+射波时窗和振幅的特征值。 
+是地震资料岩性解释、储层预测常用的定量参数。 
+20 甜点 Sweetnness 
+甜点属性源于与频率有关的振幅变化属性，可用于识别薄层和其他地质体外部特
+征。 
+甜点属性（Sweetness） = 瞬时振幅包络/sqrt（瞬时频率）。 
+21 瞬时属性振幅体 AVT（Amplitude Volume Technique） 
+瞬时属性振幅体AVT 充分利用地震道与正交地震道的振幅信息，获取低频信息，
+表征大尺度地质现象，可用于从带限数据中创建低频成分。 
+5.2 子波属性（4 种） 
+22 视极性AppPolar (Apparent Polarity) 
+定义为反射强度的极性。 
+用来检查沿反射层位极性横向变化。常与反射强度联用。用于亮点、暗点、平点的
+确定，提高层位标定质量，地震解释质量等。 
+23 响应相位RespPhase ( Response Phase) 
+实际响应属性反映的是两个最大包络之间的属性。由反射强度波瓣周围的瞬时相位
+导出。是子波特征的某种表达。表示子波性质。 
+用于分析子波的空间和时间变化的另一种追踪方法。亦用于砂岩含油气水边界的确
+定。 
+24 响应频率 RespFreq ( Response Frequency) 
+与响应相位类似的频率属性。由反射强度波瓣周围的瞬时频率导出。对地震子波在
+时间和空间中主频变化的另一种追踪方法。是反映包络峰值的瞬时频率。可以反映
+岩相变化范围，确定含油、气、水/砂岩的分界及岩相的粗、细和地层旋回。 
+25 响应带宽RespBand (Response Bandwith) 
+是瞬时带宽的包络响应。是指爆炸点到接收点之间接收到的频率范围。 
+对地层横向追踪中确定异常带。 
+
+
+===== 第 13 页 =====
+经典面属性 
+GeoEast  
+ 
+13 
+5.3 时窗及振幅属性（13 种） 
+26 平均振动能量 AvgVibEn ( Average Vibration Energy) 
+定义为在时间域内时窗中所有采样点的平均能量（振幅平方）。为反射波时窗和振
+幅特征值。 
+用来分析有意义的区段/层位的振幅异常，是检测亮点或暗点的关键属性。是地震
+资料岩性解释、储层预测常用的定量参数之一。 
+27 平均记录长度变化（振幅算术平均）ArmMean (Arithmetic Mean of Sanples) 
+定义为平均地震道波形的长度。是综合了振幅和频率特性的联合属性。 
+与其它振幅、频率属性联用，以区分强振幅/高频率、强振幅/低频率、弱振幅/高频
+率、弱振幅/低频率特征，用于分析岩性、储层特征。 
+28 最大波峰振幅 MaxPkAmp (Maximum Peak Amplitude) 
+反映道在时窗间隔内波峰振幅的极值。即信号的最大值。 
+用来确定由于岩性和烃类聚集的变化引起的振幅异常，与地层的波阻抗差异、岩
+性、速度、厚度及孔隙度有关。 
+29 最大波谷振幅 MaxTrouAmp ( Maximum Trough Amplitude) 
+定义为道在时窗间隔内波谷振幅的最大值，即信号的最小值。 
+用来确定由于岩性和烃类聚集的变化引起的振幅异常。与围岩的速度。厚度、岩性
+有关。 
+30 绝对振幅积分IntAbsAmp ( Integrated Absolute Amplitude) 
+定义为道在时窗间隔内特征记录所有振幅绝对值之和。反映信号的总体反射强度。
+用于地层的岩性、速度等方面的预测。 
+31 绝对振幅组合 CompAbsAmp ( Composite Absolute Amplitude) 
+定义为时窗内记录波峰振幅和波谷振幅绝对值之和。 
+多用来表征在有意义的区段上，由于岩性和烃类聚集的变化引起的横向变化。 
+32 均方根振幅 RMSAmp ( Root Mean Square Amplitude) 
+定义为时间窗内时间域能量之和（振幅的平方）的平方根。 
+可以确定孤立的或极值振幅异常。用来追踪像三角洲、河道砂、含气砂体等的岩性
+变化。 
+33 振幅斜率 AmpSlp (Amplitude Slope) 
+定义为时窗间隔内道记录振幅值随时间变化率的平均，记录能量总趋势的量度。 
+可以测量道能量的总趋势。表示垂直地层层序和储层中流体成份的变化，用于小区
+间内确定有利的趋势。对识别断层有很好的效果。 
+34 振幅峰态Ampkurt (Amplitude Kurtosis) 
+定义为时窗间隔内振幅的四次幂之和。它是一个显示振幅值大小起伏相对摆动量的
+量度。 
+
+
+===== 第 14 页 =====
+用户手册 
+14 
+用来确定地震记录相对平稳（波的到达相当少）的数据部分。反映反射层厚度变化
+及地层结构等。 
+35 包络比值组合（正负能量之比）RaPosNeg (Ratio of Positive and Negative 
+Vibration) 
+定义为正振幅区面积与负振幅区面积之比。 
+用来确定在时窗内地震波到达的同相轴平衡状态。如：确定储层内部的由于高声阻
+抗对比度而使地震波同相轴加宽。反映上复层与下覆层厚度、岩性、速度的变化。 
+36 目标层峰宽度（目标层波半宽度）LocWid (Object Layer Located Wave Half 
+Width) 
+在目标层反射波的波形拐点之间的宽度。 
+反映地层厚度变化，在横向上由于地层岩性成份等的变化，可预测储层的分布及目
+标层的频率变化。 
+37 目标层平均振幅  LocMnAmp (Object Layer Located Wave Mean Amplitude) 
+定义为时窗间隔内所有样点的振幅平均值。即目标层的所有样点的振幅平均。 
+用于稳定地层横向变化的振幅定量参数的求得。 
+38 目标层波峰态  LocKurt (Object Layer Located Wave kurtosis) 
+定义为道中相关值的四次方，或时窗间隔内振幅值的四次方。 
+用来加强地震间断性。通常加强的是低相关点或轮廓。 
+5.4 功率谱属性（10 种） 
+39 优势功率谱  DomPowSpec (Dominant Power Spectrum) 
+定义为与优势频率对应的功率谱值。即对应于主频率的功率谱值。 
+用于沿着有意义的区段发生横向变化，表示反射体由于岩性和流体饱和度变化而产
+生的不均质。 
+40 质心频率：CndWtFreq (Centroid Weighted Frequency) 
+定义为对应功率谱中心频率。区别于中心频率和优势频率估计。它可能偏离中心频
+率或主频率，为获得稳定的频谱至少取8～10 个采样点。 
+常和中心频率及主频率联用，多用于对质量的控制。 
+41 低端频率 25%Freq (Low Frequency) 
+定义为用总能量的25％所处的频率来计算。反映信号的低频成份频率。 
+用于对油、气、岩性的精细的分析解释。 
+42 中间频率  50%Freq (Middle Frequency) 
+定义为用总能量的50％所处的频率来计算。反映信号的中频成份频率。 
+用于对油、气、岩性进行较精细的分析解释。 
+43 高端频率 75%Freq (High Frequency) 
+
+
+===== 第 15 页 =====
+经典面属性 
+GeoEast  
+ 
+15 
+定义为用总能量的75％所处的频率来表示。反映信号高频成份的频率。 
+用于岩性和流体的变化引起的反射层的非均匀性及地层厚度，速度变化的研究。更
+精细的进行地震分析。 
+44 功率谱积分 AccPowSpec (Accumulative of Power Spectrum) 
+反映信号的总能量。 
+在横向上可分析岩性和流体引起的反射层的非均匀性，预测油、气、储层的有利部
+位。 
+45 最大功率谱 MaxPowSpec (Maximum Power Spectrum) 
+定义为信号在其主频上的能量。是由地震记录自相关函数的付立叶变换求得。 
+是描述地震记录特征。常确定油、气、水的边界，有利地区的范围。 
+46 功率谱的对称性 PowSpecSym (Power Spectrum Symmetry) 
+它描述频谱的分布和频谱形状，相对中心频率的对称性。 
+显示含气异常很有用，由于高频衰减而引起的对称谱形态与周围地区相比发生变
+化，因此可用因高频衰减引起谱形态的不对称性来分析含气状态。用于对天然气异
+常的预测。 
+47 正常带宽估计  BandEst (Normal Bandwidth Estimate) 
+是在时窗内对频率分布的统计度量。地震子波频率带宽的空间分布相对稳定。 
+该属性可反映高/低反射区变化，低反射区会得到相对小的带宽。 
+48 功率谱峰态：PowSpecKurt ( Power Spectrum Kurtosis) 
+是反映功率谱总体分布形态的锐度的一个量度。若分别占功率谱总体中10％、25
+％、75％、90％的值时则用X10、X25、X75、X90 表示。则： 
+功率谱峰态＝（X75－X25）/2(X90-X10) 
+功率谱波峰态势有的复杂，有的呈光滑，则分析功率谱峰态的变化可对某些不均匀
+性引起的异常进行分析。 
+用于描述功率谱的可靠性，增加对油、气、储层预测的可靠性。 
+5.5 自相关属性（4 种） 
+49 最大自相关：MaxAcor (Maximum Auto-correlation) 
+自相关函数是表示地震记录特征的，是地震记录重复性的标志。自相关函数主极值
+幅度代表记录段能量；主极值宽度与记录视周期有关。频率低的信号主极值宽度
+大，频率高的信号主极值宽度变窄。当反射层有薄层结构时，反射有干涉现象，自
+相关函数幅值和面积均增大。所在地震记录的自相关特征反映了记录的整个特点，
+有代表性的定量属性。 
+最大自相关定义为在道时窗中最大的互相关值。通常与最小互相关值联合使用，它
+们之间的差值有助于地震非连续性解释。 
+多用于断层的确定和不整合解释。 
+50 最小自相关  MinAcor ( Minimum Auto-correlation) 
+
+
+===== 第 16 页 =====
+用户手册 
+16 
+定义为在道时窗内互相关的极小值。极小值振幅的大小表示地震子波波形特点及脉
+冲延续时间。若极小值振幅低表示子波为一相位个数少的短脉冲，当极小值振幅高
+时，表示一个多相位延续时间长的脉冲。亦可认为在道时窗中最小的互相关值。 
+用于检测地震间断性的断层，超复及不整合，表示每一道附近的优势地震间断性。 
+51 自相关之和  SumAcor ( Sum of Maximum Auto-Correlation) 
+定义为主极值的面积。即自相关函数主极值半周期所包含的面积，与地震脉冲能量
+分布有关。当地震脉冲相位个数少，延续时间短，能量集中于头部，则主极值面积
+大，包含的能量强；相反，脉冲为多相位，延续时间长，能量分布分散，主极值面
+积小，包含能量弱。 
+用来检测地震道间断性及由于岩性，流体的不同变化，引起地层的不连续性的预
+测。 
+52 自相关主瓣宽度  WidAcor (Width of Maximum Auto-corretation Wave) 
+指的是自相关函数第一个零值点延迟时的τ1两倍，其数值决定于地震记录的视周
+期的大小。 
+用来了解同一岩性地层或薄互层的厚度变化。 
+5.6 其他属性（3 种） 
+53 分形关联维，FrctDim (Fractal Dimension) 
+分形几何是用来描述这样的体系；当扩大观察范围时，增加的细节是重复出现的，
+自相似性指局部是整体成比例缩小的性质。具有自相似性的几何对象即分形。描述
+分形维数的量为分维数。 
+分维数是具有自相似结构的几何对象的重要参量。它刻划了分形结构的重要几何特
+征，可以定量地描述事物内部结构的复杂性。 
+关联维的大小反映了地震反射序列的复杂程度。用维数表示盆地演化的某些特征及
+相应的沉积地层特征，为储层内部结构及油气预测提供更多的信息。 
+54 混沌李指数  LyapIndex (Laypnov Chaotic Index) 
+Lyapnov 指数刻划了序列是否是“混沌”的，同时划分了序列的“混沌”程度，其
+值越大，说明序列的“混沌”程度越高，即越复杂。一般来说含油、气部位的地质
+结构比不含油气的部位复杂，相应的地震反射序列也如此， 
+可用Lyapnov 来刻划地震序列的“混沌”程度，即复杂程度，从而揭示其横向变
+化，达到寻找含油气部位的目的。 
+55 信息熵  InfoEntr (Information Entropy) 
+熵为平均信息含量的度量，即所包含的信息量的大小，信息杂乱度的度量。 
+当熵值越大时，其杂乱程度亦大，反之杂乱程度小。用于含油气地层的分析及预
+测。 
+ 
+ 

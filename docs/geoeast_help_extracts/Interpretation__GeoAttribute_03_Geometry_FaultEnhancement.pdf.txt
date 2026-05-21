@@ -1,0 +1,116 @@
+
+
+===== PAGE 1 =====
+ 
+GeoEast  1 
+断层增强 
+1 方法原理 
+断层增强属性是增强地震属性体内局部平面特征的一种叠后属性，其目的是为了
+提高相干属性对断层的刻画能力。通过适当的参数选择，可以增强不整合面及其它与
+倾斜反射层平行的不连续性特征，还可以增强由最正和最负曲率体刻画的轴面。该算
+法除了对断层有锐化作用外，还得到描绘断层的另外两个属性体断层倾角和断层倾角
+方位角。图 1是相干体效果图，图 2是断层加强效果图。 
+ 
+ 
+图1：相干效果 
+ 
+
+===== PAGE 2 =====
+用户手册 
+2 
+ 
+图2：断层增强效果 
+2 启动与参数说明 
+在三维地震属性提取与分析子系统主窗口菜单条选 GeometryFault 
+Enhancement…，启动断层加强属性提取模块，弹出如图 3所示的窗口。 
+
+===== PAGE 3 =====
+断层增强 
+GeoEast   3 
+ 
+图3：断层增强主界面 
+其中： 
+Input     输入数据 
+Fault Attribute                     属性（相干类或方差类）数据 
+Inline Dip                 Inline方向倾角数据。通过点击“…”按钮，弹
+出一个通用的数据体选择窗口，该窗口中提供
+数据过滤，数据名称过滤等功能。默认只显示
+后缀为“ .dip_inline”的Inline数据，若所需数
+据被过滤，删除过滤选项即可。 
+Crossline Dip                           Crossline 方向倾角数据。根据Inline方向倾角数
+据自动匹配；若无法自配，通过点击“…”按
+钮，在弹出的数据体选择窗口中选择，默认只
+显示后缀为“ .dip_crossline ”的 Crossline 数
+据，若所需数据被过滤，删除过滤选项即可。 
+Process Parameters               参数 
+
+===== PAGE 4 =====
+用户手册 
+4 
+Data Type            数据类型 
+Similarity              相干类型数据，即数据的小值标示断层线状构
+造。 
+Variance              方差类型数据选择，即数据的大值标示断裂线
+状构造。 
+Tukey Filtering Parameters      Tukey滤波参数 
+Dip1                           默认值10，范围[0,90]。 
+Dip2                           默认值25，范围[0,90]。 
+Computation Window    估算时窗 
+Inline                           半窗口长度，倍数值，默认值3，范围[1,5]。详
+见说明7。 
+Crossline                      半窗口宽度，倍数值，默认值3，范围[1,5]。详
+见说明7。 
+Time(ms)                       半窗口高度。 
+Rectangular Window      窗口采用矩形窗。 
+Elliptical Window            窗口采用椭圆形窗（默认值）。 
+Gauss Filtering Parameters      高通滤波参数 
+sigma3                           默认值和范围由输入数据决定。 
+sigma1                           默认值为三倍的Sigma3 
+Invalid Value                     无效值 
+Fault Opacity                 断 层 不 透 明 度 。 Fault probability 小于 Fault 
+Opacity为无效点，在无效点处 dip magnitude
+和dip azimuth 取界面上设定的 NULL值。默认
+值为-1，取值范围[-1,1]。 
+NULL value for fault dip magnitude    
+断层倾角门槛值（默认100），不能更改。 
+NULL value for fault dip azimuth      
+断层方位门槛值（默认200），不能更改。 
+Velocity                    自动读取速度值，若不能读取则需手动填写。 
+Output                            输出 
+Fault Probability                 断层加强属性。 
+Fault Dip Magnitude           断层倾角。 
+Fault Dip Azimuth               断层方位角。 
+ 
+说明： 
+1.   本模块有三个输入数据：相干类（方差类）属性数据、 inline 方向的倾角数据
+体、crossline 方向的倾角数据体，其中后两个数据体是以 原始地震数据作为输
+入数据，利用多窗口倾角扫描处理出来的结果，并且需要使用归一化的相干数
+据。 
+2.   本模块不适用深度数据。 
+3.   本模块的三个输入数据体中，用户主要选择 Fault Attribute 和 Inline Dip 数据
+体，当用户选择了某个 Inline Dip 数据后，Crossline Dip 中由系统自动设置成与
+当前 inline 方向倾角数据体匹配的 Crossline Dip 数据体； Inline Dip 和
+
+===== PAGE 5 =====
+断层增强 
+GeoEast   5 
+Crossline Dip 数据体选择弹框中默认显示后 缀为“ .dip_inline ”和
+“.dip_crossline”的数据，如果没有用户需要的数据体，删除过滤关键字即
+可；如果系统不能自动找到 Inline 以外的数据体及处理参数信息，需要用户手
+动选择对应的 Crossline Dip 数据。 
+4.   本模块的三个输出数据体，即断层加强属性、断层倾角和断层方位角，是其他
+模块所需的输入数据，因此在本模块中这三个结果体要求必须输出；窗口启动
+后，Output 中 Fault Probability 、Fault Dip Magnitude 和 Fault Dip Azimuth 这
+三个选项始终是选中并灰化状态，不可更改。 
+5.   在本模块参数选项中，Computation Window 中的 Time(ms)、Gauss Filtering 
+Parameters 中的 Sigma1 和 Sigma3、Velocity(m/s)由系统内部计算得出，当输
+入数据 Crossline Dip 可自动匹配时，在三个输入数据都选择完成后将自动设置
+上述参数的默认值，其中 Time(ms)不可更改；如果输入的 Crossline Dip 数据
+是由用户手动选择，则需要用户手动填写 Velocity(m/s)参数，在该参数填写完
+成后将自动显示 Time(ms)、Sigma1 和 Sigma3 的值。 
+6.   本模块参数选项中，Computation Window 中的 Time(ms)、Invalid Value 中的
+NULL value for fault dip magnitude 和 NULL value for dip azimuth 均灰化，其
+值由模块内定义，用户不可更改。 
+7.   本模块 Computation Window 参数中，Inline、Crossline 中填写的均为倍数，即
+半窗口长度=Inline 中填写的倍数*道间距，半窗口宽度=Crossline 中填写的倍数
+*线间距。默认的倍数值均为 3 倍，范围[1,5]。 

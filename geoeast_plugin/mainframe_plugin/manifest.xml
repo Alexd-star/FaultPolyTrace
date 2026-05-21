@@ -1,0 +1,10 @@
+<?xml version='1.0'?>
+<Plugin ModuleName="FaultPolyTraceModules">
+    <extension iiidentifier="PluginFramework::Plugin" id="root" extension-point="mainframe.ribbonbar">
+        <ribbon-page index="120" id="FaultPolyTrace" label="断层多边形追踪">
+            <ribbon-group root-id="" index="10" id="FaultPolyTraceGroup" icon="" label="赛题7" parent-id="">
+                <ribbon-action index="10" class="GtAttriModuleAction_faultpolytrace_launcher_0" />
+            </ribbon-group>
+        </ribbon-page>
+    </extension>
+</Plugin>
