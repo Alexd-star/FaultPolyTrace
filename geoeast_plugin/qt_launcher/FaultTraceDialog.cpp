@@ -264,6 +264,32 @@ void FaultTraceDialog::buildUi() {
     rootAntiMergeMinPartRatioSpin_->setDecimals(3);
     rootAntiMergeMinPartRatioSpin_->setSingleStep(0.01);
     rootAntiMergeMinPartRatioSpin_->setValue(0.12);
+    localAntiMergeCheck_ = new QCheckBox(QString::fromUtf8("局部桥防黏连"), this);
+    localAntiMergeCheck_->setChecked(false);
+    localAntiMergeLowThresholdSpin_ = new QDoubleSpinBox(this);
+    localAntiMergeLowThresholdSpin_->setRange(0.0, 1.0);
+    localAntiMergeLowThresholdSpin_->setDecimals(4);
+    localAntiMergeLowThresholdSpin_->setSingleStep(0.01);
+    localAntiMergeLowThresholdSpin_->setValue(0.05);
+    localAntiMergeBridgeRadiusSpin_ = new QSpinBox(this);
+    localAntiMergeBridgeRadiusSpin_->setRange(0, 20);
+    localAntiMergeBridgeRadiusSpin_->setValue(2);
+    localAntiMergeMinPartCellsSpin_ = new QSpinBox(this);
+    localAntiMergeMinPartCellsSpin_->setRange(1, 1000000);
+    localAntiMergeMinPartCellsSpin_->setValue(80);
+    localAntiMergeMinPartRatioSpin_ = new QDoubleSpinBox(this);
+    localAntiMergeMinPartRatioSpin_->setRange(0.0, 0.5);
+    localAntiMergeMinPartRatioSpin_->setDecimals(3);
+    localAntiMergeMinPartRatioSpin_->setSingleStep(0.01);
+    localAntiMergeMinPartRatioSpin_->setValue(0.08);
+    localAntiMergeMinBridgeCellsSpin_ = new QSpinBox(this);
+    localAntiMergeMinBridgeCellsSpin_->setRange(1, 1000000);
+    localAntiMergeMinBridgeCellsSpin_->setValue(6);
+    localAntiMergeMinLowRatioSpin_ = new QDoubleSpinBox(this);
+    localAntiMergeMinLowRatioSpin_->setRange(0.0, 1.0);
+    localAntiMergeMinLowRatioSpin_->setDecimals(3);
+    localAntiMergeMinLowRatioSpin_->setSingleStep(0.01);
+    localAntiMergeMinLowRatioSpin_->setValue(0.55);
     simplifyToleranceSpin_ = new QDoubleSpinBox(this);
     simplifyToleranceSpin_->setRange(0.0, 1000.0);
     simplifyToleranceSpin_->setDecimals(2);
@@ -325,15 +351,28 @@ void FaultTraceDialog::buildUi() {
     paramsLayout->addWidget(rootAntiMergeMinPartCellsSpin_, 9, 3);
     paramsLayout->addWidget(new QLabel(QString::fromUtf8("主体比例"), this), 10, 0);
     paramsLayout->addWidget(rootAntiMergeMinPartRatioSpin_, 10, 1);
-    paramsLayout->addWidget(new QLabel(QString::fromUtf8("简化容差"), this), 10, 2);
-    paramsLayout->addWidget(simplifyToleranceSpin_, 10, 3);
-    paramsLayout->addWidget(new QLabel(QString::fromUtf8("平滑次数"), this), 11, 0);
-    paramsLayout->addWidget(smoothIterationsSpin_, 11, 1);
-    paramsLayout->addWidget(residualTraceCheck_, 11, 2);
-    paramsLayout->addWidget(new QLabel(QString::fromUtf8("补追最短"), this), 12, 0);
-    paramsLayout->addWidget(residualTraceMinLengthSpin_, 12, 1);
-    paramsLayout->addWidget(new QLabel(QString::fromUtf8("补追上限"), this), 12, 2);
-    paramsLayout->addWidget(residualTraceMaxCellsSpin_, 12, 3);
+    paramsLayout->addWidget(localAntiMergeCheck_, 10, 2);
+    paramsLayout->addWidget(new QLabel(QString::fromUtf8("低值阈值"), this), 11, 0);
+    paramsLayout->addWidget(localAntiMergeLowThresholdSpin_, 11, 1);
+    paramsLayout->addWidget(new QLabel(QString::fromUtf8("桥半径"), this), 11, 2);
+    paramsLayout->addWidget(localAntiMergeBridgeRadiusSpin_, 11, 3);
+    paramsLayout->addWidget(new QLabel(QString::fromUtf8("局部主体"), this), 12, 0);
+    paramsLayout->addWidget(localAntiMergeMinPartCellsSpin_, 12, 1);
+    paramsLayout->addWidget(new QLabel(QString::fromUtf8("局部比例"), this), 12, 2);
+    paramsLayout->addWidget(localAntiMergeMinPartRatioSpin_, 12, 3);
+    paramsLayout->addWidget(new QLabel(QString::fromUtf8("桥像元"), this), 13, 0);
+    paramsLayout->addWidget(localAntiMergeMinBridgeCellsSpin_, 13, 1);
+    paramsLayout->addWidget(new QLabel(QString::fromUtf8("低值占比"), this), 13, 2);
+    paramsLayout->addWidget(localAntiMergeMinLowRatioSpin_, 13, 3);
+    paramsLayout->addWidget(new QLabel(QString::fromUtf8("简化容差"), this), 14, 0);
+    paramsLayout->addWidget(simplifyToleranceSpin_, 14, 1);
+    paramsLayout->addWidget(new QLabel(QString::fromUtf8("平滑次数"), this), 14, 2);
+    paramsLayout->addWidget(smoothIterationsSpin_, 14, 3);
+    paramsLayout->addWidget(residualTraceCheck_, 15, 0);
+    paramsLayout->addWidget(new QLabel(QString::fromUtf8("补追最短"), this), 15, 1);
+    paramsLayout->addWidget(residualTraceMinLengthSpin_, 15, 2);
+    paramsLayout->addWidget(new QLabel(QString::fromUtf8("补追上限"), this), 16, 0);
+    paramsLayout->addWidget(residualTraceMaxCellsSpin_, 16, 1);
 
     runButton_ = new QPushButton(QString::fromUtf8("开始追踪"), this);
     stopButton_ = new QPushButton(QString::fromUtf8("停止"), this);
@@ -434,6 +473,13 @@ void FaultTraceDialog::loadSettings() {
     rootAntiMergeSupportRatioSpin_->setValue(settings.value("rootAntiMergeSupportRatio", rootAntiMergeSupportRatioSpin_->value()).toDouble());
     rootAntiMergeMinPartCellsSpin_->setValue(settings.value("rootAntiMergeMinPartCells", rootAntiMergeMinPartCellsSpin_->value()).toInt());
     rootAntiMergeMinPartRatioSpin_->setValue(settings.value("rootAntiMergeMinPartRatio", rootAntiMergeMinPartRatioSpin_->value()).toDouble());
+    localAntiMergeCheck_->setChecked(settings.value("localAntiMerge", localAntiMergeCheck_->isChecked()).toBool());
+    localAntiMergeLowThresholdSpin_->setValue(settings.value("localAntiMergeLowThreshold", localAntiMergeLowThresholdSpin_->value()).toDouble());
+    localAntiMergeBridgeRadiusSpin_->setValue(settings.value("localAntiMergeBridgeRadius", localAntiMergeBridgeRadiusSpin_->value()).toInt());
+    localAntiMergeMinPartCellsSpin_->setValue(settings.value("localAntiMergeMinPartCells", localAntiMergeMinPartCellsSpin_->value()).toInt());
+    localAntiMergeMinPartRatioSpin_->setValue(settings.value("localAntiMergeMinPartRatio", localAntiMergeMinPartRatioSpin_->value()).toDouble());
+    localAntiMergeMinBridgeCellsSpin_->setValue(settings.value("localAntiMergeMinBridgeCells", localAntiMergeMinBridgeCellsSpin_->value()).toInt());
+    localAntiMergeMinLowRatioSpin_->setValue(settings.value("localAntiMergeMinLowRatio", localAntiMergeMinLowRatioSpin_->value()).toDouble());
     residualTraceCheck_->setChecked(settings.value("residualTrace", residualTraceCheck_->isChecked()).toBool());
     residualTraceMinLengthSpin_->setValue(settings.value("residualTraceMinLength", residualTraceMinLengthSpin_->value()).toInt());
     residualTraceMaxCellsSpin_->setValue(settings.value("residualTraceMaxCells", residualTraceMaxCellsSpin_->value()).toInt());
@@ -459,6 +505,13 @@ void FaultTraceDialog::saveSettings() const {
     settings.setValue("rootAntiMergeSupportRatio", rootAntiMergeSupportRatioSpin_->value());
     settings.setValue("rootAntiMergeMinPartCells", rootAntiMergeMinPartCellsSpin_->value());
     settings.setValue("rootAntiMergeMinPartRatio", rootAntiMergeMinPartRatioSpin_->value());
+    settings.setValue("localAntiMerge", localAntiMergeCheck_->isChecked());
+    settings.setValue("localAntiMergeLowThreshold", localAntiMergeLowThresholdSpin_->value());
+    settings.setValue("localAntiMergeBridgeRadius", localAntiMergeBridgeRadiusSpin_->value());
+    settings.setValue("localAntiMergeMinPartCells", localAntiMergeMinPartCellsSpin_->value());
+    settings.setValue("localAntiMergeMinPartRatio", localAntiMergeMinPartRatioSpin_->value());
+    settings.setValue("localAntiMergeMinBridgeCells", localAntiMergeMinBridgeCellsSpin_->value());
+    settings.setValue("localAntiMergeMinLowRatio", localAntiMergeMinLowRatioSpin_->value());
     settings.setValue("residualTrace", residualTraceCheck_->isChecked());
     settings.setValue("residualTraceMinLength", residualTraceMinLengthSpin_->value());
     settings.setValue("residualTraceMaxCells", residualTraceMaxCellsSpin_->value());
@@ -570,6 +623,12 @@ QStringList FaultTraceDialog::traceArgs() const {
          << "--root-anti-merge-max-bridge-value" << "1e-12"
          << "--root-anti-merge-min-part-cells" << QString::number(rootAntiMergeMinPartCellsSpin_->value())
          << "--root-anti-merge-min-part-ratio" << QString::number(rootAntiMergeMinPartRatioSpin_->value(), 'g', 12)
+         << "--local-anti-merge-low-threshold" << QString::number(localAntiMergeLowThresholdSpin_->value(), 'g', 12)
+         << "--local-anti-merge-bridge-radius" << QString::number(localAntiMergeBridgeRadiusSpin_->value())
+         << "--local-anti-merge-min-part-cells" << QString::number(localAntiMergeMinPartCellsSpin_->value())
+         << "--local-anti-merge-min-part-ratio" << QString::number(localAntiMergeMinPartRatioSpin_->value(), 'g', 12)
+         << "--local-anti-merge-min-bridge-cells" << QString::number(localAntiMergeMinBridgeCellsSpin_->value())
+         << "--local-anti-merge-min-low-ratio" << QString::number(localAntiMergeMinLowRatioSpin_->value(), 'g', 12)
          << "--residual-percentile" << "0.955"
          << "--residual-fill-radius" << "4"
          << "--residual-min-cells" << "2"
@@ -591,6 +650,11 @@ QStringList FaultTraceDialog::traceArgs() const {
     } else {
         args << "--no-root-anti-merge";
     }
+    if (localAntiMergeCheck_->isChecked()) {
+        args << "--local-anti-merge";
+    } else {
+        args << "--no-local-anti-merge";
+    }
     if (residualTraceCheck_->isChecked()) {
         args << "--residual-trace";
     } else {
@@ -603,6 +667,16 @@ void FaultTraceDialog::applyParameterPreset(const QString& presetName) {
     traceModeCombo_->setCurrentText("ridge-belt");
     thresholdModeCombo_->setCurrentText("percentile");
     thresholdSpin_->setValue(0.95);
+    auto setLocalAntiMergePreset = [&](bool enabled) {
+        localAntiMergeCheck_->setChecked(enabled);
+        localAntiMergeLowThresholdSpin_->setValue(0.05);
+        localAntiMergeBridgeRadiusSpin_->setValue(2);
+        localAntiMergeMinPartCellsSpin_->setValue(80);
+        localAntiMergeMinPartRatioSpin_->setValue(0.08);
+        localAntiMergeMinBridgeCellsSpin_->setValue(6);
+        localAntiMergeMinLowRatioSpin_->setValue(0.55);
+    };
+    setLocalAntiMergePreset(false);
 
     if (presetName == QString::fromUtf8("全覆盖优先")) {
         traceModeCombo_->setCurrentText("ridge-belt");

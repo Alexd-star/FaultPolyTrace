@@ -39,6 +39,13 @@ struct RunDiagnostics {
     double rootAntiMergeMaxBridgeValue = 0.0;
     int rootAntiMergeMinPartCells = 0;
     double rootAntiMergeMinPartRatio = 0.0;
+    bool localAntiMerge = false;
+    double localAntiMergeLowThreshold = 0.0;
+    int localAntiMergeBridgeRadius = 0;
+    int localAntiMergeMinPartCells = 0;
+    double localAntiMergeMinPartRatio = 0.0;
+    int localAntiMergeMinBridgeCells = 0;
+    double localAntiMergeMinLowRatio = 0.0;
     bool adaptiveAreaFilter = false;
     int adaptiveAreaMinCells = 0;
     double adaptiveAreaMinAspect = 0.0;
@@ -76,6 +83,11 @@ struct RunDiagnostics {
     int rootAntiMergeRejectedCutCells = 0;
     int rootAntiMergeAcceptedComponents = 0;
     int rootAntiMergeRejectedComponents = 0;
+    int localAntiMergeCandidateCutCells = 0;
+    int localAntiMergeCutCells = 0;
+    int localAntiMergeRejectedCutCells = 0;
+    int localAntiMergeAcceptedComponents = 0;
+    int localAntiMergeRejectedComponents = 0;
     int suppressedInternalRings = 0;
     int openRingCount = 0;
     int selfIntersectingPolygonCount = 0;

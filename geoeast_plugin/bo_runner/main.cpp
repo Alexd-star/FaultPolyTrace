@@ -87,6 +87,14 @@ void printUsage() {
         << "  --root-anti-merge-max-bridge-value <value>\n"
         << "  --root-anti-merge-min-part-cells <count>\n"
         << "  --root-anti-merge-min-part-ratio <0-0.5>\n"
+        << "  --local-anti-merge\n"
+        << "  --no-local-anti-merge\n"
+        << "  --local-anti-merge-low-threshold <value>\n"
+        << "  --local-anti-merge-bridge-radius <count>\n"
+        << "  --local-anti-merge-min-part-cells <count>\n"
+        << "  --local-anti-merge-min-part-ratio <0-0.5>\n"
+        << "  --local-anti-merge-min-bridge-cells <count>\n"
+        << "  --local-anti-merge-min-low-ratio <0-1>\n"
         << "  --no-adaptive-area-filter\n"
         << "  --adaptive-area-min-cells <count>\n"
         << "  --adaptive-area-min-aspect <value>\n"
@@ -337,6 +345,22 @@ Options parseArgs(int argc, char** argv) {
             options.trace.rootAntiMergeMinPartCells = std::stoi(requireValue(arg));
         } else if (arg == "--root-anti-merge-min-part-ratio") {
             options.trace.rootAntiMergeMinPartRatio = std::stod(requireValue(arg));
+        } else if (arg == "--local-anti-merge") {
+            options.trace.localAntiMerge = true;
+        } else if (arg == "--no-local-anti-merge") {
+            options.trace.localAntiMerge = false;
+        } else if (arg == "--local-anti-merge-low-threshold") {
+            options.trace.localAntiMergeLowThreshold = std::stod(requireValue(arg));
+        } else if (arg == "--local-anti-merge-bridge-radius") {
+            options.trace.localAntiMergeBridgeRadius = std::stoi(requireValue(arg));
+        } else if (arg == "--local-anti-merge-min-part-cells") {
+            options.trace.localAntiMergeMinPartCells = std::stoi(requireValue(arg));
+        } else if (arg == "--local-anti-merge-min-part-ratio") {
+            options.trace.localAntiMergeMinPartRatio = std::stod(requireValue(arg));
+        } else if (arg == "--local-anti-merge-min-bridge-cells") {
+            options.trace.localAntiMergeMinBridgeCells = std::stoi(requireValue(arg));
+        } else if (arg == "--local-anti-merge-min-low-ratio") {
+            options.trace.localAntiMergeMinLowRatio = std::stod(requireValue(arg));
         } else if (arg == "--no-adaptive-area-filter") {
             options.trace.adaptiveAreaFilter = false;
         } else if (arg == "--adaptive-area-min-cells") {
@@ -531,6 +555,14 @@ int main(int argc, char** argv) {
             std::cout << "Root anti-merge accepted/rejected components: "
                       << result.rootAntiMergeAcceptedComponents << "/"
                       << result.rootAntiMergeRejectedComponents << "\n";
+        }
+        if (options.trace.localAntiMerge) {
+            std::cout << "Local anti-merge candidate cut cells: " << result.localAntiMergeCandidateCutCells << "\n";
+            std::cout << "Local anti-merge accepted cut cells: " << result.localAntiMergeCutCells << "\n";
+            std::cout << "Local anti-merge rejected cut cells: " << result.localAntiMergeRejectedCutCells << "\n";
+            std::cout << "Local anti-merge accepted/rejected components: "
+                      << result.localAntiMergeAcceptedComponents << "/"
+                      << result.localAntiMergeRejectedComponents << "\n";
         }
         std::cout << "Suppressed internal rings: " << result.suppressedInternalRings << "\n";
         std::cout << "Topology open rings: " << topology.openRingCount << "\n";

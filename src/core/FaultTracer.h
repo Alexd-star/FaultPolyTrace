@@ -42,6 +42,13 @@ struct TraceOptions {
     double rootAntiMergeMaxBridgeValue = 1e-12;
     int rootAntiMergeMinPartCells = 0;
     double rootAntiMergeMinPartRatio = 0.12;
+    bool localAntiMerge = false;
+    double localAntiMergeLowThreshold = 0.05;
+    int localAntiMergeBridgeRadius = 2;
+    int localAntiMergeMinPartCells = 80;
+    double localAntiMergeMinPartRatio = 0.08;
+    int localAntiMergeMinBridgeCells = 6;
+    double localAntiMergeMinLowRatio = 0.55;
     bool adaptiveAreaFilter = true;
     int adaptiveAreaMinCells = 4;
     double adaptiveAreaMinAspect = 2.0;
@@ -93,6 +100,11 @@ struct TraceResult {
     int rootAntiMergeRejectedCutCells = 0;
     int rootAntiMergeAcceptedComponents = 0;
     int rootAntiMergeRejectedComponents = 0;
+    int localAntiMergeCandidateCutCells = 0;
+    int localAntiMergeCutCells = 0;
+    int localAntiMergeRejectedCutCells = 0;
+    int localAntiMergeAcceptedComponents = 0;
+    int localAntiMergeRejectedComponents = 0;
     int suppressedInternalRings = 0;
 };
 

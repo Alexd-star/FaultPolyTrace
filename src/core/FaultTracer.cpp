@@ -355,6 +355,14 @@ struct RootAntiMergeValidationStats {
     int rejectedComponents = 0;
 };
 
+struct LocalAntiMergeValidationStats {
+    int candidateCutCells = 0;
+    int acceptedCutCells = 0;
+    int rejectedCutCells = 0;
+    int acceptedComponents = 0;
+    int rejectedComponents = 0;
+};
+
 BinaryMask validateRootAntiMergeCutMask(
     const Grid2D& grid,
     const BinaryMask& activeMask,
@@ -489,6 +497,253 @@ BinaryMask validateRootAntiMergeCutMask(
                 }
                 inComponent[pos] = 0;
                 partVisited[pos] = 0;
+            }
+        }
+    }
+
+    return acceptedCutMask;
+}
+
+BinaryMask buildLocalAntiMergeCutMask(
+    const Grid2D& grid,
+    const BinaryMask& activeMask,
+    const TraceOptions& options,
+    LocalAntiMergeValidationStats& stats) {
+    BinaryMask acceptedCutMask(grid.nx(), grid.ny());
+    const int width = grid.nx();
+    const int height = grid.ny();
+    if (width <= 0 || height <= 0 || !options.localAntiMerge) {
+        return acceptedCutMask;
+    }
+
+    const int minPartCells = std::max(1, options.localAntiMergeMinPartCells);
+    const int minBridgeCells = std::max(1, options.localAntiMergeMinBridgeCells);
+    const int bridgeRadius = std::max(0, options.localAntiMergeBridgeRadius);
+    const double minPartRatio = std::max(0.0, options.localAntiMergeMinPartRatio);
+    const double minLowRatio = std::max(0.0, options.localAntiMergeMinLowRatio);
+    const double lowThreshold = options.localAntiMergeLowThreshold;
+
+    auto indexOf = [width](int x, int y) {
+        return y * width + x;
+    };
+
+    auto isLowValue = [&grid, lowThreshold](int x, int y) {
+        const double value = grid.value(x, y);
+        return !std::isfinite(value) || value <= lowThreshold;
+    };
+
+    constexpr int offsets[8][2] = {
+        {-1, -1}, {0, -1}, {1, -1},
+        {-1, 0},           {1, 0},
+        {-1, 1},  {0, 1},  {1, 1}
+    };
+
+    std::vector<unsigned char> visited(static_cast<std::size_t>(width * height), 0);
+    std::vector<unsigned char> inComponent(static_cast<std::size_t>(width * height), 0);
+    std::vector<unsigned char> nonLowVisited(static_cast<std::size_t>(width * height), 0);
+    std::vector<unsigned char> splitVisited(static_cast<std::size_t>(width * height), 0);
+    std::vector<unsigned char> candidateInComponent(static_cast<std::size_t>(width * height), 0);
+    std::vector<int> labels(static_cast<std::size_t>(width * height), 0);
+
+    for (int y0 = 0; y0 < height; ++y0) {
+        for (int x0 = 0; x0 < width; ++x0) {
+            const std::size_t startIdx = static_cast<std::size_t>(indexOf(x0, y0));
+            if (!activeMask.get(x0, y0) || visited[startIdx]) {
+                continue;
+            }
+
+            std::queue<Cell> queue;
+            std::vector<Cell> cells;
+            queue.push({x0, y0});
+            visited[startIdx] = 1;
+            int lowCellCount = 0;
+
+            while (!queue.empty()) {
+                const Cell cell = queue.front();
+                queue.pop();
+                cells.push_back(cell);
+                inComponent[static_cast<std::size_t>(indexOf(cell.x, cell.y))] = 1;
+                if (isLowValue(cell.x, cell.y)) {
+                    ++lowCellCount;
+                }
+
+                for (const auto& offset : offsets) {
+                    const int nxCell = cell.x + offset[0];
+                    const int nyCell = cell.y + offset[1];
+                    if (!grid.inBounds(nxCell, nyCell)) {
+                        continue;
+                    }
+                    const std::size_t pos = static_cast<std::size_t>(indexOf(nxCell, nyCell));
+                    if (!activeMask.get(nxCell, nyCell) || visited[pos]) {
+                        continue;
+                    }
+                    visited[pos] = 1;
+                    queue.push({nxCell, nyCell});
+                }
+            }
+
+            const double componentCells = static_cast<double>(cells.size());
+            const bool enoughCells = static_cast<int>(cells.size()) >= minPartCells * 2 + minBridgeCells;
+            const double lowRatio = componentCells > 0.0
+                ? static_cast<double>(lowCellCount) / componentCells
+                : 0.0;
+            if (!enoughCells || lowRatio < minLowRatio) {
+                for (const Cell& cell : cells) {
+                    inComponent[static_cast<std::size_t>(indexOf(cell.x, cell.y))] = 0;
+                }
+                continue;
+            }
+
+            int nextLabel = 0;
+            std::vector<int> partCells(1, 0);
+            for (const Cell& startCell : cells) {
+                const std::size_t startPos = static_cast<std::size_t>(indexOf(startCell.x, startCell.y));
+                if (nonLowVisited[startPos] || isLowValue(startCell.x, startCell.y)) {
+                    continue;
+                }
+
+                ++nextLabel;
+                partCells.push_back(0);
+                std::queue<Cell> partQueue;
+                partQueue.push(startCell);
+                nonLowVisited[startPos] = 1;
+                labels[startPos] = nextLabel;
+
+                while (!partQueue.empty()) {
+                    const Cell cell = partQueue.front();
+                    partQueue.pop();
+                    ++partCells[static_cast<std::size_t>(nextLabel)];
+
+                    for (const auto& offset : offsets) {
+                        const int nxCell = cell.x + offset[0];
+                        const int nyCell = cell.y + offset[1];
+                        if (!grid.inBounds(nxCell, nyCell)) {
+                            continue;
+                        }
+                        const std::size_t pos = static_cast<std::size_t>(indexOf(nxCell, nyCell));
+                        if (!inComponent[pos] || nonLowVisited[pos] || isLowValue(nxCell, nyCell)) {
+                            continue;
+                        }
+                        nonLowVisited[pos] = 1;
+                        labels[pos] = nextLabel;
+                        partQueue.push({nxCell, nyCell});
+                    }
+                }
+            }
+
+            const double minMajorPartCells = componentCells * minPartRatio;
+            std::vector<unsigned char> majorLabel(static_cast<std::size_t>(nextLabel + 1), 0);
+            int majorPartCount = 0;
+            for (int label = 1; label <= nextLabel; ++label) {
+                const int count = partCells[static_cast<std::size_t>(label)];
+                if (count >= minPartCells && static_cast<double>(count) >= minMajorPartCells) {
+                    majorLabel[static_cast<std::size_t>(label)] = 1;
+                    ++majorPartCount;
+                }
+            }
+
+            std::vector<Cell> candidateCells;
+            if (majorPartCount >= 2) {
+                std::vector<unsigned char> touched(static_cast<std::size_t>(nextLabel + 1), 0);
+                for (const Cell& cell : cells) {
+                    if (!isLowValue(cell.x, cell.y)) {
+                        continue;
+                    }
+
+                    std::vector<int> touchedLabels;
+                    for (int yy = cell.y - bridgeRadius; yy <= cell.y + bridgeRadius; ++yy) {
+                        for (int xx = cell.x - bridgeRadius; xx <= cell.x + bridgeRadius; ++xx) {
+                            if (!grid.inBounds(xx, yy)) {
+                                continue;
+                            }
+                            const int label = labels[static_cast<std::size_t>(indexOf(xx, yy))];
+                            if (label > 0 &&
+                                majorLabel[static_cast<std::size_t>(label)] &&
+                                !touched[static_cast<std::size_t>(label)]) {
+                                touched[static_cast<std::size_t>(label)] = 1;
+                                touchedLabels.push_back(label);
+                            }
+                        }
+                    }
+                    if (touchedLabels.size() >= 2) {
+                        candidateCells.push_back(cell);
+                    }
+                    for (const int label : touchedLabels) {
+                        touched[static_cast<std::size_t>(label)] = 0;
+                    }
+                }
+            }
+
+            const int componentCandidateCells = static_cast<int>(candidateCells.size());
+            stats.candidateCutCells += componentCandidateCells;
+            bool accepted = false;
+            if (componentCandidateCells >= minBridgeCells) {
+                for (const Cell& cell : candidateCells) {
+                    candidateInComponent[static_cast<std::size_t>(indexOf(cell.x, cell.y))] = 1;
+                }
+
+                int splitPartCount = 0;
+                int splitMajorPartCount = 0;
+                for (const Cell& startCell : cells) {
+                    const std::size_t startPos = static_cast<std::size_t>(indexOf(startCell.x, startCell.y));
+                    if (splitVisited[startPos] || candidateInComponent[startPos]) {
+                        continue;
+                    }
+
+                    std::queue<Cell> splitQueue;
+                    splitQueue.push(startCell);
+                    splitVisited[startPos] = 1;
+                    int splitCells = 0;
+
+                    while (!splitQueue.empty()) {
+                        const Cell cell = splitQueue.front();
+                        splitQueue.pop();
+                        ++splitCells;
+
+                        for (const auto& offset : offsets) {
+                            const int nxCell = cell.x + offset[0];
+                            const int nyCell = cell.y + offset[1];
+                            if (!grid.inBounds(nxCell, nyCell)) {
+                                continue;
+                            }
+                            const std::size_t pos = static_cast<std::size_t>(indexOf(nxCell, nyCell));
+                            if (!inComponent[pos] || splitVisited[pos] || candidateInComponent[pos]) {
+                                continue;
+                            }
+                            splitVisited[pos] = 1;
+                            splitQueue.push({nxCell, nyCell});
+                        }
+                    }
+
+                    ++splitPartCount;
+                    if (splitCells >= minPartCells && static_cast<double>(splitCells) >= minMajorPartCells) {
+                        ++splitMajorPartCount;
+                    }
+                }
+
+                accepted = splitPartCount >= 2 && splitMajorPartCount >= 2;
+            }
+
+            if (componentCandidateCells > 0) {
+                if (accepted) {
+                    ++stats.acceptedComponents;
+                    stats.acceptedCutCells += componentCandidateCells;
+                    for (const Cell& cell : candidateCells) {
+                        acceptedCutMask.set(cell.x, cell.y, true);
+                    }
+                } else {
+                    ++stats.rejectedComponents;
+                    stats.rejectedCutCells += componentCandidateCells;
+                }
+            }
+
+            for (const Cell& cell : cells) {
+                const std::size_t pos = static_cast<std::size_t>(indexOf(cell.x, cell.y));
+                inComponent[pos] = 0;
+                nonLowVisited[pos] = 0;
+                splitVisited[pos] = 0;
+                candidateInComponent[pos] = 0;
+                labels[pos] = 0;
             }
         }
     }
@@ -1662,6 +1917,24 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
     if (options.rootAntiMergeMinPartRatio < 0.0 || options.rootAntiMergeMinPartRatio > 0.5) {
         throw std::runtime_error("rootAntiMergeMinPartRatio must be between 0 and 0.5.");
     }
+    if (options.localAntiMergeLowThreshold < 0.0) {
+        throw std::runtime_error("localAntiMergeLowThreshold must be non-negative.");
+    }
+    if (options.localAntiMergeBridgeRadius < 0) {
+        throw std::runtime_error("localAntiMergeBridgeRadius must be non-negative.");
+    }
+    if (options.localAntiMergeMinPartCells < 1) {
+        throw std::runtime_error("localAntiMergeMinPartCells must be at least 1.");
+    }
+    if (options.localAntiMergeMinPartRatio < 0.0 || options.localAntiMergeMinPartRatio > 0.5) {
+        throw std::runtime_error("localAntiMergeMinPartRatio must be between 0 and 0.5.");
+    }
+    if (options.localAntiMergeMinBridgeCells < 1) {
+        throw std::runtime_error("localAntiMergeMinBridgeCells must be at least 1.");
+    }
+    if (options.localAntiMergeMinLowRatio < 0.0 || options.localAntiMergeMinLowRatio > 1.0) {
+        throw std::runtime_error("localAntiMergeMinLowRatio must be between 0 and 1.");
+    }
     if (options.simplifyTolerance < 0.0) {
         throw std::runtime_error("simplifyTolerance must be non-negative.");
     }
@@ -1872,6 +2145,26 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
             result.rootAntiMergeRejectedCutCells = validationStats.rejectedCutCells;
             result.rootAntiMergeAcceptedComponents = validationStats.acceptedComponents;
             result.rootAntiMergeRejectedComponents = validationStats.rejectedComponents;
+            for (int y = 0; y < ny; ++y) {
+                for (int x = 0; x < nx; ++x) {
+                    if (cutMask.get(x, y)) {
+                        activeMask.set(x, y, false);
+                    }
+                }
+            }
+        }
+        if (options.localAntiMerge) {
+            LocalAntiMergeValidationStats validationStats;
+            const BinaryMask cutMask = buildLocalAntiMergeCutMask(
+                grid,
+                activeMask,
+                options,
+                validationStats);
+            result.localAntiMergeCandidateCutCells = validationStats.candidateCutCells;
+            result.localAntiMergeCutCells = validationStats.acceptedCutCells;
+            result.localAntiMergeRejectedCutCells = validationStats.rejectedCutCells;
+            result.localAntiMergeAcceptedComponents = validationStats.acceptedComponents;
+            result.localAntiMergeRejectedComponents = validationStats.rejectedComponents;
             for (int y = 0; y < ny; ++y) {
                 for (int x = 0; x < nx; ++x) {
                     if (cutMask.get(x, y)) {

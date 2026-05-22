@@ -47,6 +47,13 @@ struct CliOptions {
     double rootAntiMergeMaxBridgeValue = 1e-12;
     int rootAntiMergeMinPartCells = 0;
     double rootAntiMergeMinPartRatio = 0.12;
+    bool localAntiMerge = false;
+    double localAntiMergeLowThreshold = 0.05;
+    int localAntiMergeBridgeRadius = 2;
+    int localAntiMergeMinPartCells = 80;
+    double localAntiMergeMinPartRatio = 0.08;
+    int localAntiMergeMinBridgeCells = 6;
+    double localAntiMergeMinLowRatio = 0.55;
     bool adaptiveAreaFilter = true;
     int adaptiveAreaMinCells = 4;
     double adaptiveAreaMinAspect = 2.0;
@@ -108,6 +115,14 @@ void printUsage() {
         << "  --root-anti-merge-max-bridge-value <v> Max raw attribute value treated as background bridge. Default: 1e-12\n"
         << "  --root-anti-merge-min-part-cells <n> Minimum major split part cells after bridge cutting. Default: auto\n"
         << "  --root-anti-merge-min-part-ratio <v> Minimum major split part ratio after bridge cutting. Default: 0.12\n"
+        << "  --local-anti-merge         Experimental local low-value bridge cutting. Default: off\n"
+        << "  --no-local-anti-merge      Disable local low-value bridge cutting. Local anti-merge is off by default\n"
+        << "  --local-anti-merge-low-threshold <v> Raw value treated as local background bridge. Default: 0.05\n"
+        << "  --local-anti-merge-bridge-radius <n> Neighborhood radius for local bridge support. Default: 2\n"
+        << "  --local-anti-merge-min-part-cells <n> Minimum major split part cells. Default: 80\n"
+        << "  --local-anti-merge-min-part-ratio <v> Minimum major split part ratio. Default: 0.08\n"
+        << "  --local-anti-merge-min-bridge-cells <n> Minimum low bridge cells before cutting. Default: 6\n"
+        << "  --local-anti-merge-min-low-ratio <v> Minimum low-value ratio for a component to be tested. Default: 0.55\n"
         << "  --no-adaptive-area-filter   Disable line-like small polygon retention. Default: on\n"
         << "  --adaptive-area-min-cells <n> Minimum cells for adaptive retention. Default: 4\n"
         << "  --adaptive-area-min-aspect <v> Minimum line-like aspect ratio. Default: 2\n"
@@ -254,6 +269,22 @@ CliOptions parseArgs(int argc, char** argv) {
             options.rootAntiMergeMinPartCells = std::stoi(requireValue(arg));
         } else if (arg == "--root-anti-merge-min-part-ratio") {
             options.rootAntiMergeMinPartRatio = std::stod(requireValue(arg));
+        } else if (arg == "--local-anti-merge") {
+            options.localAntiMerge = true;
+        } else if (arg == "--no-local-anti-merge") {
+            options.localAntiMerge = false;
+        } else if (arg == "--local-anti-merge-low-threshold") {
+            options.localAntiMergeLowThreshold = std::stod(requireValue(arg));
+        } else if (arg == "--local-anti-merge-bridge-radius") {
+            options.localAntiMergeBridgeRadius = std::stoi(requireValue(arg));
+        } else if (arg == "--local-anti-merge-min-part-cells") {
+            options.localAntiMergeMinPartCells = std::stoi(requireValue(arg));
+        } else if (arg == "--local-anti-merge-min-part-ratio") {
+            options.localAntiMergeMinPartRatio = std::stod(requireValue(arg));
+        } else if (arg == "--local-anti-merge-min-bridge-cells") {
+            options.localAntiMergeMinBridgeCells = std::stoi(requireValue(arg));
+        } else if (arg == "--local-anti-merge-min-low-ratio") {
+            options.localAntiMergeMinLowRatio = std::stod(requireValue(arg));
         } else if (arg == "--no-adaptive-area-filter") {
             options.adaptiveAreaFilter = false;
         } else if (arg == "--adaptive-area-min-cells") {
@@ -368,6 +399,13 @@ int main(int argc, char** argv) {
         traceOptions.rootAntiMergeMaxBridgeValue = cli.rootAntiMergeMaxBridgeValue;
         traceOptions.rootAntiMergeMinPartCells = cli.rootAntiMergeMinPartCells;
         traceOptions.rootAntiMergeMinPartRatio = cli.rootAntiMergeMinPartRatio;
+        traceOptions.localAntiMerge = cli.localAntiMerge;
+        traceOptions.localAntiMergeLowThreshold = cli.localAntiMergeLowThreshold;
+        traceOptions.localAntiMergeBridgeRadius = cli.localAntiMergeBridgeRadius;
+        traceOptions.localAntiMergeMinPartCells = cli.localAntiMergeMinPartCells;
+        traceOptions.localAntiMergeMinPartRatio = cli.localAntiMergeMinPartRatio;
+        traceOptions.localAntiMergeMinBridgeCells = cli.localAntiMergeMinBridgeCells;
+        traceOptions.localAntiMergeMinLowRatio = cli.localAntiMergeMinLowRatio;
         traceOptions.adaptiveAreaFilter = cli.adaptiveAreaFilter;
         traceOptions.adaptiveAreaMinCells = cli.adaptiveAreaMinCells;
         traceOptions.adaptiveAreaMinAspect = cli.adaptiveAreaMinAspect;
@@ -442,6 +480,13 @@ int main(int argc, char** argv) {
         diagnostics.rootAntiMergeMaxBridgeValue = cli.rootAntiMergeMaxBridgeValue;
         diagnostics.rootAntiMergeMinPartCells = cli.rootAntiMergeMinPartCells;
         diagnostics.rootAntiMergeMinPartRatio = cli.rootAntiMergeMinPartRatio;
+        diagnostics.localAntiMerge = cli.localAntiMerge;
+        diagnostics.localAntiMergeLowThreshold = cli.localAntiMergeLowThreshold;
+        diagnostics.localAntiMergeBridgeRadius = cli.localAntiMergeBridgeRadius;
+        diagnostics.localAntiMergeMinPartCells = cli.localAntiMergeMinPartCells;
+        diagnostics.localAntiMergeMinPartRatio = cli.localAntiMergeMinPartRatio;
+        diagnostics.localAntiMergeMinBridgeCells = cli.localAntiMergeMinBridgeCells;
+        diagnostics.localAntiMergeMinLowRatio = cli.localAntiMergeMinLowRatio;
         diagnostics.adaptiveAreaFilter = cli.adaptiveAreaFilter;
         diagnostics.adaptiveAreaMinCells = cli.adaptiveAreaMinCells;
         diagnostics.adaptiveAreaMinAspect = cli.adaptiveAreaMinAspect;
@@ -479,6 +524,11 @@ int main(int argc, char** argv) {
         diagnostics.rootAntiMergeRejectedCutCells = result.rootAntiMergeRejectedCutCells;
         diagnostics.rootAntiMergeAcceptedComponents = result.rootAntiMergeAcceptedComponents;
         diagnostics.rootAntiMergeRejectedComponents = result.rootAntiMergeRejectedComponents;
+        diagnostics.localAntiMergeCandidateCutCells = result.localAntiMergeCandidateCutCells;
+        diagnostics.localAntiMergeCutCells = result.localAntiMergeCutCells;
+        diagnostics.localAntiMergeRejectedCutCells = result.localAntiMergeRejectedCutCells;
+        diagnostics.localAntiMergeAcceptedComponents = result.localAntiMergeAcceptedComponents;
+        diagnostics.localAntiMergeRejectedComponents = result.localAntiMergeRejectedComponents;
         diagnostics.suppressedInternalRings = result.suppressedInternalRings;
         diagnostics.openRingCount = topology.openRingCount;
         diagnostics.selfIntersectingPolygonCount = topology.selfIntersectingPolygonCount;
@@ -508,6 +558,14 @@ int main(int argc, char** argv) {
                 std::cout << "Root anti-merge accepted/rejected components: "
                           << result.rootAntiMergeAcceptedComponents << "/"
                           << result.rootAntiMergeRejectedComponents << "\n";
+            }
+            if (cli.localAntiMerge) {
+                std::cout << "Local anti-merge candidate cut cells: " << result.localAntiMergeCandidateCutCells << "\n";
+                std::cout << "Local anti-merge accepted cut cells: " << result.localAntiMergeCutCells << "\n";
+                std::cout << "Local anti-merge rejected cut cells: " << result.localAntiMergeRejectedCutCells << "\n";
+                std::cout << "Local anti-merge accepted/rejected components: "
+                          << result.localAntiMergeAcceptedComponents << "/"
+                          << result.localAntiMergeRejectedComponents << "\n";
             }
         }
         std::cout << "Polygons: " << result.polygons.size() << " total, " << kept << " kept\n";

@@ -75,6 +75,13 @@ void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
     out << "    \"rootAntiMergeMaxBridgeValue\": " << d.rootAntiMergeMaxBridgeValue << ",\n";
     out << "    \"rootAntiMergeMinPartCells\": " << d.rootAntiMergeMinPartCells << ",\n";
     out << "    \"rootAntiMergeMinPartRatio\": " << d.rootAntiMergeMinPartRatio << ",\n";
+    out << "    \"localAntiMerge\": " << (d.localAntiMerge ? "true" : "false") << ",\n";
+    out << "    \"localAntiMergeLowThreshold\": " << d.localAntiMergeLowThreshold << ",\n";
+    out << "    \"localAntiMergeBridgeRadius\": " << d.localAntiMergeBridgeRadius << ",\n";
+    out << "    \"localAntiMergeMinPartCells\": " << d.localAntiMergeMinPartCells << ",\n";
+    out << "    \"localAntiMergeMinPartRatio\": " << d.localAntiMergeMinPartRatio << ",\n";
+    out << "    \"localAntiMergeMinBridgeCells\": " << d.localAntiMergeMinBridgeCells << ",\n";
+    out << "    \"localAntiMergeMinLowRatio\": " << d.localAntiMergeMinLowRatio << ",\n";
     out << "    \"adaptiveAreaFilter\": " << (d.adaptiveAreaFilter ? "true" : "false") << ",\n";
     out << "    \"adaptiveAreaMinCells\": " << d.adaptiveAreaMinCells << ",\n";
     out << "    \"adaptiveAreaMinAspect\": " << d.adaptiveAreaMinAspect << ",\n";
@@ -119,7 +126,12 @@ void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
     out << "    \"rootAntiMergeCutCells\": " << d.rootAntiMergeCutCells << ",\n";
     out << "    \"rootAntiMergeRejectedCutCells\": " << d.rootAntiMergeRejectedCutCells << ",\n";
     out << "    \"rootAntiMergeAcceptedComponents\": " << d.rootAntiMergeAcceptedComponents << ",\n";
-    out << "    \"rootAntiMergeRejectedComponents\": " << d.rootAntiMergeRejectedComponents << "\n";
+    out << "    \"rootAntiMergeRejectedComponents\": " << d.rootAntiMergeRejectedComponents << ",\n";
+    out << "    \"localAntiMergeCandidateCutCells\": " << d.localAntiMergeCandidateCutCells << ",\n";
+    out << "    \"localAntiMergeCutCells\": " << d.localAntiMergeCutCells << ",\n";
+    out << "    \"localAntiMergeRejectedCutCells\": " << d.localAntiMergeRejectedCutCells << ",\n";
+    out << "    \"localAntiMergeAcceptedComponents\": " << d.localAntiMergeAcceptedComponents << ",\n";
+    out << "    \"localAntiMergeRejectedComponents\": " << d.localAntiMergeRejectedComponents << "\n";
     out << "  },\n";
     out << "  \"topology\": {\n";
     out << "    \"openRings\": " << d.openRingCount << ",\n";
