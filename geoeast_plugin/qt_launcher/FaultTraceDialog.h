@@ -89,6 +89,8 @@ private:
     QDoubleSpinBox* rootAntiMergeSupportRatioSpin_ = nullptr;
     QSpinBox* rootAntiMergeMinPartCellsSpin_ = nullptr;
     QDoubleSpinBox* rootAntiMergeMinPartRatioSpin_ = nullptr;
+    QDoubleSpinBox* rootAntiMergeWeakGuardThresholdSpin_ = nullptr;
+    QSpinBox* rootAntiMergeWeakGuardRadiusSpin_ = nullptr;
     QCheckBox* localAntiMergeCheck_ = nullptr;
     QDoubleSpinBox* localAntiMergeLowThresholdSpin_ = nullptr;
     QSpinBox* localAntiMergeBridgeRadiusSpin_ = nullptr;

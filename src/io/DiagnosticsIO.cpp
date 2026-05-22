@@ -75,6 +75,8 @@ void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
     out << "    \"rootAntiMergeMaxBridgeValue\": " << d.rootAntiMergeMaxBridgeValue << ",\n";
     out << "    \"rootAntiMergeMinPartCells\": " << d.rootAntiMergeMinPartCells << ",\n";
     out << "    \"rootAntiMergeMinPartRatio\": " << d.rootAntiMergeMinPartRatio << ",\n";
+    out << "    \"rootAntiMergeWeakGuardThreshold\": " << d.rootAntiMergeWeakGuardThreshold << ",\n";
+    out << "    \"rootAntiMergeWeakGuardRadius\": " << d.rootAntiMergeWeakGuardRadius << ",\n";
     out << "    \"localAntiMerge\": " << (d.localAntiMerge ? "true" : "false") << ",\n";
     out << "    \"localAntiMergeLowThreshold\": " << d.localAntiMergeLowThreshold << ",\n";
     out << "    \"localAntiMergeBridgeRadius\": " << d.localAntiMergeBridgeRadius << ",\n";
@@ -127,6 +129,8 @@ void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
     out << "    \"rootAntiMergeRejectedCutCells\": " << d.rootAntiMergeRejectedCutCells << ",\n";
     out << "    \"rootAntiMergeAcceptedComponents\": " << d.rootAntiMergeAcceptedComponents << ",\n";
     out << "    \"rootAntiMergeRejectedComponents\": " << d.rootAntiMergeRejectedComponents << ",\n";
+    out << "    \"rootAntiMergeWeakGuardRejectedCutCells\": " << d.rootAntiMergeWeakGuardRejectedCutCells << ",\n";
+    out << "    \"rootAntiMergeWeakGuardRejectedComponents\": " << d.rootAntiMergeWeakGuardRejectedComponents << ",\n";
     out << "    \"localAntiMergeCandidateCutCells\": " << d.localAntiMergeCandidateCutCells << ",\n";
     out << "    \"localAntiMergeCutCells\": " << d.localAntiMergeCutCells << ",\n";
     out << "    \"localAntiMergeRejectedCutCells\": " << d.localAntiMergeRejectedCutCells << ",\n";

@@ -47,6 +47,8 @@ struct CliOptions {
     double rootAntiMergeMaxBridgeValue = 1e-12;
     int rootAntiMergeMinPartCells = 0;
     double rootAntiMergeMinPartRatio = 0.12;
+    double rootAntiMergeWeakGuardThreshold = 0.66;
+    int rootAntiMergeWeakGuardRadius = 0;
     bool localAntiMerge = false;
     double localAntiMergeLowThreshold = 0.05;
     int localAntiMergeBridgeRadius = 2;
@@ -109,12 +111,14 @@ void printUsage() {
         << "  --separate-branch-belts    Output root-trace-separated local belts. Default: off\n"
         << "  --no-separate-branch-belts Use one merged ridge belt before polygon tracing. Default: on\n"
         << "  --root-anti-merge          Cut unsupported bridge cells between different root traces. Default: off\n"
-        << "  --no-root-anti-merge       Disable root-trace anti-merge guard. Default: on\n"
+        << "  --no-root-anti-merge       Disable root-trace anti-merge guard. Root anti-merge is off by default\n"
         << "  --root-anti-merge-radius <n> Neighborhood radius for bridge detection. Default: 1\n"
         << "  --root-anti-merge-support-ratio <v> Attribute support ratio needed to keep bridge cells. Default: 0.25\n"
         << "  --root-anti-merge-max-bridge-value <v> Max raw attribute value treated as background bridge. Default: 1e-12\n"
         << "  --root-anti-merge-min-part-cells <n> Minimum major split part cells after bridge cutting. Default: auto\n"
         << "  --root-anti-merge-min-part-ratio <v> Minimum major split part ratio after bridge cutting. Default: 0.12\n"
+        << "  --root-anti-merge-weak-guard-threshold <v> Protect bridge cuts near weak response cells. Default: 0.66\n"
+        << "  --root-anti-merge-weak-guard-radius <n> Experimental weak response protection radius in cells. Default: 0\n"
         << "  --local-anti-merge         Experimental local low-value bridge cutting. Default: off\n"
         << "  --no-local-anti-merge      Disable local low-value bridge cutting. Local anti-merge is off by default\n"
         << "  --local-anti-merge-low-threshold <v> Raw value treated as local background bridge. Default: 0.05\n"
@@ -269,6 +273,10 @@ CliOptions parseArgs(int argc, char** argv) {
             options.rootAntiMergeMinPartCells = std::stoi(requireValue(arg));
         } else if (arg == "--root-anti-merge-min-part-ratio") {
             options.rootAntiMergeMinPartRatio = std::stod(requireValue(arg));
+        } else if (arg == "--root-anti-merge-weak-guard-threshold") {
+            options.rootAntiMergeWeakGuardThreshold = std::stod(requireValue(arg));
+        } else if (arg == "--root-anti-merge-weak-guard-radius") {
+            options.rootAntiMergeWeakGuardRadius = std::stoi(requireValue(arg));
         } else if (arg == "--local-anti-merge") {
             options.localAntiMerge = true;
         } else if (arg == "--no-local-anti-merge") {
@@ -399,6 +407,8 @@ int main(int argc, char** argv) {
         traceOptions.rootAntiMergeMaxBridgeValue = cli.rootAntiMergeMaxBridgeValue;
         traceOptions.rootAntiMergeMinPartCells = cli.rootAntiMergeMinPartCells;
         traceOptions.rootAntiMergeMinPartRatio = cli.rootAntiMergeMinPartRatio;
+        traceOptions.rootAntiMergeWeakGuardThreshold = cli.rootAntiMergeWeakGuardThreshold;
+        traceOptions.rootAntiMergeWeakGuardRadius = cli.rootAntiMergeWeakGuardRadius;
         traceOptions.localAntiMerge = cli.localAntiMerge;
         traceOptions.localAntiMergeLowThreshold = cli.localAntiMergeLowThreshold;
         traceOptions.localAntiMergeBridgeRadius = cli.localAntiMergeBridgeRadius;
@@ -480,6 +490,8 @@ int main(int argc, char** argv) {
         diagnostics.rootAntiMergeMaxBridgeValue = cli.rootAntiMergeMaxBridgeValue;
         diagnostics.rootAntiMergeMinPartCells = cli.rootAntiMergeMinPartCells;
         diagnostics.rootAntiMergeMinPartRatio = cli.rootAntiMergeMinPartRatio;
+        diagnostics.rootAntiMergeWeakGuardThreshold = cli.rootAntiMergeWeakGuardThreshold;
+        diagnostics.rootAntiMergeWeakGuardRadius = cli.rootAntiMergeWeakGuardRadius;
         diagnostics.localAntiMerge = cli.localAntiMerge;
         diagnostics.localAntiMergeLowThreshold = cli.localAntiMergeLowThreshold;
         diagnostics.localAntiMergeBridgeRadius = cli.localAntiMergeBridgeRadius;
@@ -524,6 +536,8 @@ int main(int argc, char** argv) {
         diagnostics.rootAntiMergeRejectedCutCells = result.rootAntiMergeRejectedCutCells;
         diagnostics.rootAntiMergeAcceptedComponents = result.rootAntiMergeAcceptedComponents;
         diagnostics.rootAntiMergeRejectedComponents = result.rootAntiMergeRejectedComponents;
+        diagnostics.rootAntiMergeWeakGuardRejectedCutCells = result.rootAntiMergeWeakGuardRejectedCutCells;
+        diagnostics.rootAntiMergeWeakGuardRejectedComponents = result.rootAntiMergeWeakGuardRejectedComponents;
         diagnostics.localAntiMergeCandidateCutCells = result.localAntiMergeCandidateCutCells;
         diagnostics.localAntiMergeCutCells = result.localAntiMergeCutCells;
         diagnostics.localAntiMergeRejectedCutCells = result.localAntiMergeRejectedCutCells;
@@ -558,6 +572,10 @@ int main(int argc, char** argv) {
                 std::cout << "Root anti-merge accepted/rejected components: "
                           << result.rootAntiMergeAcceptedComponents << "/"
                           << result.rootAntiMergeRejectedComponents << "\n";
+                std::cout << "Root anti-merge weak-guard rejected cut cells: "
+                          << result.rootAntiMergeWeakGuardRejectedCutCells << "\n";
+                std::cout << "Root anti-merge weak-guard rejected components: "
+                          << result.rootAntiMergeWeakGuardRejectedComponents << "\n";
             }
             if (cli.localAntiMerge) {
                 std::cout << "Local anti-merge candidate cut cells: " << result.localAntiMergeCandidateCutCells << "\n";

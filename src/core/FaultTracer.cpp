@@ -353,6 +353,8 @@ struct RootAntiMergeValidationStats {
     int rejectedCutCells = 0;
     int acceptedComponents = 0;
     int rejectedComponents = 0;
+    int weakGuardRejectedCutCells = 0;
+    int weakGuardRejectedComponents = 0;
 };
 
 struct LocalAntiMergeValidationStats {
@@ -380,9 +382,29 @@ BinaryMask validateRootAntiMergeCutMask(
     const int minPartCells = options.rootAntiMergeMinPartCells > 0
         ? options.rootAntiMergeMinPartCells
         : std::max(12, std::max(options.adaptiveAreaMinCells * 3, options.beltRadius * options.beltRadius * 2));
+    const int weakGuardRadius = std::max(0, options.rootAntiMergeWeakGuardRadius);
+    const double weakGuardThreshold = options.rootAntiMergeWeakGuardThreshold;
 
     auto indexOf = [width](int x, int y) {
         return y * width + x;
+    };
+
+    auto isWeakGuardedCandidate = [&grid, weakGuardRadius, weakGuardThreshold](int x, int y) {
+        if (weakGuardRadius <= 0 || weakGuardThreshold <= 0.0) {
+            return false;
+        }
+        for (int yy = y - weakGuardRadius; yy <= y + weakGuardRadius; ++yy) {
+            for (int xx = x - weakGuardRadius; xx <= x + weakGuardRadius; ++xx) {
+                if (!grid.inBounds(xx, yy)) {
+                    continue;
+                }
+                const double value = grid.value(xx, yy);
+                if (std::isfinite(value) && value >= weakGuardThreshold) {
+                    return true;
+                }
+            }
+        }
+        return false;
     };
 
     constexpr int offsets[8][2] = {
@@ -394,6 +416,7 @@ BinaryMask validateRootAntiMergeCutMask(
     std::vector<unsigned char> visited(static_cast<std::size_t>(width * height), 0);
     std::vector<unsigned char> inComponent(static_cast<std::size_t>(width * height), 0);
     std::vector<unsigned char> partVisited(static_cast<std::size_t>(width * height), 0);
+    std::vector<unsigned char> weakGuardedCut(static_cast<std::size_t>(width * height), 0);
 
     for (int y0 = 0; y0 < height; ++y0) {
         for (int x0 = 0; x0 < width; ++x0) {
@@ -407,6 +430,8 @@ BinaryMask validateRootAntiMergeCutMask(
             queue.push({x0, y0});
             visited[startIdx] = 1;
             int componentCutCells = 0;
+            int componentWeakGuardedCutCells = 0;
+            int componentEligibleCutCells = 0;
 
             while (!queue.empty()) {
                 const Cell cell = queue.front();
@@ -415,6 +440,13 @@ BinaryMask validateRootAntiMergeCutMask(
                 inComponent[static_cast<std::size_t>(indexOf(cell.x, cell.y))] = 1;
                 if (candidateCutMask.get(cell.x, cell.y)) {
                     ++componentCutCells;
+                    const bool weakGuarded = isWeakGuardedCandidate(cell.x, cell.y);
+                    if (weakGuarded) {
+                        ++componentWeakGuardedCutCells;
+                        weakGuardedCut[static_cast<std::size_t>(indexOf(cell.x, cell.y))] = 1;
+                    } else {
+                        ++componentEligibleCutCells;
+                    }
                 }
 
                 for (const auto& offset : offsets) {
@@ -435,6 +467,7 @@ BinaryMask validateRootAntiMergeCutMask(
             if (componentCutCells <= 0) {
                 for (const Cell& cell : cells) {
                     inComponent[static_cast<std::size_t>(indexOf(cell.x, cell.y))] = 0;
+                    weakGuardedCut[static_cast<std::size_t>(indexOf(cell.x, cell.y))] = 0;
                 }
                 continue;
             }
@@ -446,7 +479,8 @@ BinaryMask validateRootAntiMergeCutMask(
 
             for (const Cell& startCell : cells) {
                 const std::size_t startPos = static_cast<std::size_t>(indexOf(startCell.x, startCell.y));
-                if (partVisited[startPos] || candidateCutMask.get(startCell.x, startCell.y)) {
+                if (partVisited[startPos] ||
+                    (candidateCutMask.get(startCell.x, startCell.y) && !weakGuardedCut[startPos])) {
                     continue;
                 }
 
@@ -467,7 +501,8 @@ BinaryMask validateRootAntiMergeCutMask(
                             continue;
                         }
                         const std::size_t pos = static_cast<std::size_t>(indexOf(nxCell, nyCell));
-                        if (!inComponent[pos] || partVisited[pos] || candidateCutMask.get(nxCell, nyCell)) {
+                        if (!inComponent[pos] || partVisited[pos] ||
+                            (candidateCutMask.get(nxCell, nyCell) && !weakGuardedCut[pos])) {
                             continue;
                         }
                         partVisited[pos] = 1;
@@ -481,22 +516,28 @@ BinaryMask validateRootAntiMergeCutMask(
                 }
             }
 
-            const bool accepted = partCount >= 2 && majorPartCount >= 2;
+            const bool accepted = componentEligibleCutCells > 0 && partCount >= 2 && majorPartCount >= 2;
             if (accepted) {
                 ++stats.acceptedComponents;
-                stats.acceptedCutCells += componentCutCells;
+                stats.acceptedCutCells += componentEligibleCutCells;
+                stats.rejectedCutCells += componentWeakGuardedCutCells;
             } else {
                 ++stats.rejectedComponents;
                 stats.rejectedCutCells += componentCutCells;
             }
+            if (componentWeakGuardedCutCells > 0) {
+                stats.weakGuardRejectedCutCells += componentWeakGuardedCutCells;
+                ++stats.weakGuardRejectedComponents;
+            }
 
             for (const Cell& cell : cells) {
                 const std::size_t pos = static_cast<std::size_t>(indexOf(cell.x, cell.y));
-                if (candidateCutMask.get(cell.x, cell.y) && accepted) {
+                if (candidateCutMask.get(cell.x, cell.y) && !weakGuardedCut[pos] && accepted) {
                     acceptedCutMask.set(cell.x, cell.y, true);
                 }
                 inComponent[pos] = 0;
                 partVisited[pos] = 0;
+                weakGuardedCut[pos] = 0;
             }
         }
     }
@@ -1917,6 +1958,12 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
     if (options.rootAntiMergeMinPartRatio < 0.0 || options.rootAntiMergeMinPartRatio > 0.5) {
         throw std::runtime_error("rootAntiMergeMinPartRatio must be between 0 and 0.5.");
     }
+    if (options.rootAntiMergeWeakGuardThreshold < 0.0) {
+        throw std::runtime_error("rootAntiMergeWeakGuardThreshold must be non-negative.");
+    }
+    if (options.rootAntiMergeWeakGuardRadius < 0) {
+        throw std::runtime_error("rootAntiMergeWeakGuardRadius must be non-negative.");
+    }
     if (options.localAntiMergeLowThreshold < 0.0) {
         throw std::runtime_error("localAntiMergeLowThreshold must be non-negative.");
     }
@@ -2145,6 +2192,8 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
             result.rootAntiMergeRejectedCutCells = validationStats.rejectedCutCells;
             result.rootAntiMergeAcceptedComponents = validationStats.acceptedComponents;
             result.rootAntiMergeRejectedComponents = validationStats.rejectedComponents;
+            result.rootAntiMergeWeakGuardRejectedCutCells = validationStats.weakGuardRejectedCutCells;
+            result.rootAntiMergeWeakGuardRejectedComponents = validationStats.weakGuardRejectedComponents;
             for (int y = 0; y < ny; ++y) {
                 for (int x = 0; x < nx; ++x) {
                     if (cutMask.get(x, y)) {
