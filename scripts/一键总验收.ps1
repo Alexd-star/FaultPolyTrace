@@ -28,6 +28,7 @@ $missQcDir = Join-Path $acceptanceDir "漏检质控"
 $topQualityDir = Join-Path $acceptanceDir "顶尖质量诊断"
 $autoParamsDir = Join-Path $acceptanceDir "自动参数推荐"
 $topReviewDir = Join-Path $acceptanceDir "冲顶局部复核"
+$missRootCauseDir = Join-Path $acceptanceDir "漏检根因诊断"
 $reportPath = Join-Path $acceptanceDir "本次验收报告.md"
 
 function Read-TextNumber {
@@ -58,25 +59,25 @@ if (!(Test-Path -LiteralPath $OfficialDat)) {
 
 New-Item -ItemType Directory -Force -Path $acceptanceDir | Out-Null
 
-Write-Host "== 1/12 构建离线算法 =="
+Write-Host "== 1/13 构建离线算法 =="
 & (Join-Path $PSScriptRoot "build.ps1")
 if ($LASTEXITCODE -ne 0) {
     throw "离线算法构建失败。"
 }
 
-Write-Host "== 2/12 运行基础烟测 =="
+Write-Host "== 2/13 运行基础烟测 =="
 & (Join-Path $PSScriptRoot "run_smoke_test.ps1")
 if ($LASTEXITCODE -ne 0) {
     throw "基础烟测失败。"
 }
 
-Write-Host "== 3/12 运行泛化鲁棒性验证 =="
+Write-Host "== 3/13 运行泛化鲁棒性验证 =="
 python (Join-Path $PSScriptRoot "泛化鲁棒性验证.py") | Out-Host
 if ($LASTEXITCODE -ne 0) {
     throw "泛化鲁棒性验证失败。"
 }
 
-Write-Host "== 4/12 运行官方数据推荐参数 =="
+Write-Host "== 4/13 运行官方数据推荐参数 =="
 & $exe `
     --input $OfficialDat `
     --input-format geoeast-dat `
@@ -115,7 +116,7 @@ if ($LASTEXITCODE -ne 0) {
     throw "官方数据推荐参数运行失败。"
 }
 
-Write-Host "== 5/12 生成白底质量评估图 =="
+Write-Host "== 5/13 生成白底质量评估图 =="
 python (Join-Path $PSScriptRoot "生成质量评估图.py") `
     --dat $OfficialDat `
     --runs-dir $acceptanceDir `
@@ -125,7 +126,7 @@ if ($LASTEXITCODE -ne 0) {
     throw "质量评估图生成失败。"
 }
 
-Write-Host "== 6/12 生成漏检质控图 =="
+Write-Host "== 6/13 生成漏检质控图 =="
 python (Join-Path $PSScriptRoot "生成漏检质控图.py") `
     --dat $OfficialDat `
     --csv $resultCsv `
@@ -137,7 +138,7 @@ if ($LASTEXITCODE -ne 0) {
     throw "漏检质控图生成失败。"
 }
 
-Write-Host "== 7/12 生成顶尖质量诊断 =="
+Write-Host "== 7/13 生成顶尖质量诊断 =="
 python (Join-Path $PSScriptRoot "顶尖质量诊断.py") `
     --dat $OfficialDat `
     --csv $resultCsv `
@@ -151,7 +152,7 @@ if ($LASTEXITCODE -ne 0) {
     throw "顶尖质量诊断生成失败。"
 }
 
-Write-Host "== 8/12 生成自动参数推荐 =="
+Write-Host "== 8/13 生成自动参数推荐 =="
 python (Join-Path $PSScriptRoot "自动参数推荐.py") `
     --dat $OfficialDat `
     --out-dir $autoParamsDir | Out-Host
@@ -159,7 +160,7 @@ if ($LASTEXITCODE -ne 0) {
     throw "自动参数推荐生成失败。"
 }
 
-Write-Host "== 9/12 生成冲顶局部复核包 =="
+Write-Host "== 9/13 生成冲顶局部复核包 =="
 python (Join-Path $PSScriptRoot "生成冲顶复核包.py") `
     --dat $OfficialDat `
     --csv $resultCsv `
@@ -169,7 +170,20 @@ if ($LASTEXITCODE -ne 0) {
     throw "冲顶局部复核包生成失败。"
 }
 
-Write-Host "== 10/12 读取验收指标并生成报告 =="
+Write-Host "== 10/13 生成漏检根因诊断 =="
+python (Join-Path $PSScriptRoot "漏检根因诊断.py") `
+    --dat $OfficialDat `
+    --csv $resultCsv `
+    --out-dir $missRootCauseDir `
+    --strong-threshold 0.95 `
+    --weak-threshold 0.66 `
+    --min-review-cells 8 `
+    --min-line-aspect 3 | Out-Host
+if ($LASTEXITCODE -ne 0) {
+    throw "漏检根因诊断生成失败。"
+}
+
+Write-Host "== 11/13 读取验收指标并生成报告 =="
 $diagnosticsPath = "$resultCsv.diagnostics.json"
 $diagnostics = Get-Content -LiteralPath $diagnosticsPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $qualityCsv = Join-Path $qualityDir "metrics\质量评估汇总.csv"
@@ -301,6 +315,8 @@ $report.Add("- 逐多边形质量诊断表：$topQualityDir\逐多边形质量�
 $report.Add("- 自动参数推荐报告：$autoParamsDir\自动参数推荐报告.md")
 $report.Add("- 冲顶局部复核报告：$topReviewDir\冲顶局部复核报告.md")
 $report.Add("- 冲顶局部复核图：$topReviewDir\局部复核图")
+$report.Add("- 漏检根因诊断报告：$missRootCauseDir\漏检根因诊断报告.md")
+$report.Add("- 漏检根因诊断明细：$missRootCauseDir\漏检根因诊断明细.csv")
 $report.Add("")
 $report.Add("## 6. 说明")
 $report.Add("")
@@ -310,20 +326,20 @@ Set-Content -LiteralPath $reportPath -Value $report -Encoding UTF8
 Write-Host "验收报告: $reportPath"
 
 if (!$SkipGeoEastBuild) {
-    Write-Host "== 11/12 构建并部署 GeoEast 组件 =="
+    Write-Host "== 12/13 构建并部署 GeoEast 组件 =="
     & (Join-Path $PSScriptRoot "build_geoeast_bo_runner.ps1") -GeoEastRoot $GeoEastRoot -UseVisualStudioProject
     & (Join-Path $PSScriptRoot "build_qt_launcher.ps1") -GeoEastRoot $GeoEastRoot
     & (Join-Path $PSScriptRoot "build_geoeast_mainframe_plugin.ps1") -GeoEastRoot $GeoEastRoot
     & (Join-Path $PSScriptRoot "部署到GeoEast.ps1") -GeoEastRoot $GeoEastRoot -SkipBuild
 } else {
-    Write-Host "== 11/12 跳过 GeoEast 构建部署 =="
+    Write-Host "== 12/13 跳过 GeoEast 构建部署 =="
 }
 
 if (!$SkipPackage) {
-    Write-Host "== 12/12 生成发布包 =="
+    Write-Host "== 13/13 生成发布包 =="
     & (Join-Path $PSScriptRoot "打包发布包.ps1") -Version $PackageVersion -GeoEastRoot $GeoEastRoot -SkipBuild
 } else {
-    Write-Host "== 12/12 跳过发布包生成 =="
+    Write-Host "== 13/13 跳过发布包生成 =="
 }
 
 if ($failedChecks.Count -gt 0) {
