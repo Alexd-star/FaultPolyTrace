@@ -1,5 +1,7 @@
+# -*- coding: utf-8 -*-
 import argparse
 import csv
+import json
 import os
 import re
 import sys
@@ -353,6 +355,19 @@ def main():
 
     split_candidates = [r for r in rows if r["recommendation"] == "建议进入局部拆分候选"]
     review_candidates = [r for r in rows if r["recommendation"] == "建议人工复核后决定是否拆分"]
+    summary = {
+        "input_dat": str(Path(args.dat)),
+        "input_csv": str(Path(args.csv)),
+        "suspect_csv": str(Path(args.suspect_csv)) if args.suspect_csv else "",
+        "checked_polygon_count": len(rows),
+        "actionable_split_candidate_count": len(split_candidates),
+        "manual_review_candidate_count": len(review_candidates),
+        "figure_count": len(figures),
+        "actionable_split_candidate_ids": [int(r["id"]) for r in split_candidates],
+        "manual_review_candidate_ids": [int(r["id"]) for r in review_candidates],
+    }
+    with open(out_dir / "局部防黏连候选摘要.json", "w", encoding="utf-8") as f:
+        json.dump(summary, f, ensure_ascii=False, indent=2)
     lines = [
         "# 局部防黏连候选诊断报告",
         "",
@@ -384,6 +399,7 @@ def main():
             "## 4. 输出文件",
             "",
             f"- 候选表：`{out_dir / '局部防黏连候选.csv'}`",
+            f"- 候选摘要：`{out_dir / '局部防黏连候选摘要.json'}`",
             f"- 局部图目录：`{figure_dir}`",
         ]
     )

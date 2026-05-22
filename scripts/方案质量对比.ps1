@@ -98,6 +98,7 @@ $plans = @(
 )
 
 $summaryRows = @()
+$baselineCsv = ""
 foreach ($plan in $plans) {
     $planDir = Join-Path $OutputRoot $plan.Name
     New-Item -ItemType Directory -Force -Path $planDir | Out-Null
@@ -118,14 +119,53 @@ foreach ($plan in $plans) {
         throw "质量诊断失败：$($plan.Name)"
     }
 
+    $splitSummary = ""
+    if ($plan.Name -eq "01_balanced") {
+        $baselineCsv = $csv
+    } elseif (![string]::IsNullOrWhiteSpace($baselineCsv)) {
+        $diffDir = Join-Path $planDir "diff_from_balanced"
+        python (Join-Path $repoRoot "scripts\防黏连差异诊断.py") `
+            --dat $OfficialDat `
+            --baseline-csv $baselineCsv `
+            --candidate-csv $csv `
+            --out-dir $diffDir `
+            --max-figures 12 | Out-Host
+        if ($LASTEXITCODE -ne 0) {
+            throw "防黏连差异诊断失败：$($plan.Name)"
+        }
+        $splitSummary = Join-Path $diffDir "防黏连差异摘要.json"
+    }
+
+    $localCandidateDir = Join-Path $planDir "local_candidate_check"
+    $suspectCsv = Join-Path $diagnosisDir "疑似误合并多边形.csv"
+    python (Join-Path $repoRoot "scripts\局部防黏连候选诊断.py") `
+        --dat $OfficialDat `
+        --csv $csv `
+        --suspect-csv $suspectCsv `
+        --out-dir $localCandidateDir `
+        --max-figures 8 | Out-Host
+    if ($LASTEXITCODE -ne 0) {
+        throw "局部防黏连候选诊断失败：$($plan.Name)"
+    }
+    $localSummary = Join-Path $localCandidateDir "局部防黏连候选摘要.json"
+
     $metricsPath = Join-Path $diagnosisDir "总体指标.json"
     $scoreJson = Join-Path $planDir "综合质量评分.json"
     $scoreReport = Join-Path $planDir "综合质量评分报告.md"
-    python (Join-Path $repoRoot "scripts\综合质量评分.py") `
-        --metrics $metricsPath `
-        --csv $csv `
-        --out-json $scoreJson `
-        --out-report $scoreReport | Out-Host
+    $scoreArgs = @(
+        (Join-Path $repoRoot "scripts\综合质量评分.py"),
+        "--metrics", $metricsPath,
+        "--csv", $csv,
+        "--out-json", $scoreJson,
+        "--out-report", $scoreReport
+    )
+    if (![string]::IsNullOrWhiteSpace($splitSummary)) {
+        $scoreArgs += @("--split-summary", $splitSummary)
+    }
+    if (Test-Path -LiteralPath $localSummary) {
+        $scoreArgs += @("--local-summary", $localSummary)
+    }
+    python @scoreArgs | Out-Host
     if ($LASTEXITCODE -ne 0) {
         throw "综合评分失败：$($plan.Name)"
     }
@@ -145,7 +185,11 @@ foreach ($plan in $plans) {
         弱复核 = [int]$score.metrics.weak_line_review_components
         高风险黏连 = [int]$score.metrics.high_risk_merge_polygons
         中风险黏连 = [int]$score.metrics.middle_risk_merge_polygons
+        安全拆分修正 = [double]$score.subscores.split_benefit
+        可行动桥风险 = [double]$score.subscores.local_candidate_risk
         小碎片 = [int]$score.metrics.small_polygon_count
+        远背景包络 = [double]$score.metrics.boundary_background_ratio
+        高远背景多边形 = [int]$score.metrics.large_background_polygon_count
         拓扑 = "$($score.metrics.open_rings)/$($score.metrics.self_intersections)/$($score.metrics.polygon_intersections)"
         核心耗时ms = [double]$score.metrics.trace_ms
         总耗时ms = [double]$score.metrics.elapsed_ms
@@ -162,16 +206,16 @@ $lines = @(
     "",
     "## 1. 说明",
     "",
-    "本报告不把固定多边形数量作为唯一标准，而是用覆盖率、漏检复核、疑似黏连、碎片粒度、拓扑和性能共同评价结果。多边形数量可以变化，但必须服务于解释质量。",
+    "本报告不把固定多边形数量作为唯一标准，而是用覆盖率、漏检复核、疑似黏连、边界贴合、碎片粒度、拓扑和性能共同评价结果。多边形数量可以变化，但必须服务于解释质量。",
     "",
     "## 2. 对比结果",
     "",
-    "| 方案 | 综合评分 | 等级 | 门禁 | 多边形 | 强覆盖 | 弱覆盖 | 高风险黏连 | 中风险黏连 | 小碎片 | 拓扑 | 核心耗时 |",
-    "|---|---:|---|---|---:|---:|---:|---:|---:|---:|---|---:|"
+    "| 方案 | 综合评分 | 等级 | 门禁 | 多边形 | 强覆盖 | 弱覆盖 | 高风险黏连 | 中风险黏连 | 安全拆分修正 | 可行动桥风险 | 小碎片 | 远背景包络 | 高远背景 | 拓扑 | 核心耗时 |",
+    "|---|---:|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---:|"
 )
 foreach ($row in ($summaryRows | Sort-Object -Property 综合评分 -Descending)) {
     $gateText = if ($row.门禁通过) { "通过" } else { "未通过" }
-    $lines += "| $($row.方案) | $('{0:N2}' -f $row.综合评分) | $($row.等级) | $gateText | $($row.多边形) | $('{0:P4}' -f $row.强覆盖) | $('{0:P4}' -f $row.弱覆盖) | $($row.高风险黏连) | $($row.中风险黏连) | $($row.小碎片) | $($row.拓扑) | $('{0:N0}' -f $row.核心耗时ms) ms |"
+    $lines += "| $($row.方案) | $('{0:N2}' -f $row.综合评分) | $($row.等级) | $gateText | $($row.多边形) | $('{0:P4}' -f $row.强覆盖) | $('{0:P4}' -f $row.弱覆盖) | $($row.高风险黏连) | $($row.中风险黏连) | $('{0:+0.00;-0.00;0.00}' -f $row.安全拆分修正) | $('{0:+0.00;-0.00;0.00}' -f $row.可行动桥风险) | $($row.小碎片) | $('{0:P2}' -f $row.远背景包络) | $($row.高远背景多边形) | $($row.拓扑) | $('{0:N0}' -f $row.核心耗时ms) ms |"
 }
 $lines += @(
     "",

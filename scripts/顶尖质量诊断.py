@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import argparse
 import csv
 import json
@@ -155,7 +156,28 @@ def ratio(numerator, denominator):
     return float(numerator) / float(denominator) if denominator else 0.0
 
 
-def summarize_polygon(poly, mask, values, strong_threshold, weak_threshold, low_threshold, median_area):
+def distance_to_mask(mask):
+    h, w = mask.shape
+    distances = np.full(mask.shape, -1, dtype=np.int32)
+    q = deque()
+    ys, xs = np.nonzero(mask)
+    for y, x in zip(ys, xs):
+        distances[y, x] = 0
+        q.append((x, y))
+
+    offsets = [(-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1)]
+    while q:
+        x, y = q.popleft()
+        next_distance = int(distances[y, x]) + 1
+        for ox, oy in offsets:
+            nx, ny = x + ox, y + oy
+            if 0 <= nx < w and 0 <= ny < h and distances[ny, nx] < 0:
+                distances[ny, nx] = next_distance
+                q.append((nx, ny))
+    return distances
+
+
+def summarize_polygon(poly, mask, values, distance_to_weak, strong_threshold, weak_threshold, low_threshold, median_area, background_fit_radius):
     inside = values[mask]
     covered_cells = int(np.count_nonzero(mask))
     if covered_cells == 0:
@@ -164,10 +186,12 @@ def summarize_polygon(poly, mask, values, strong_threshold, weak_threshold, low_
     strong_inside = mask & (values >= strong_threshold)
     weak_inside = mask & (values >= weak_threshold)
     low_inside = mask & (values <= low_threshold)
+    far_low_inside = low_inside & (distance_to_weak > background_fit_radius)
     strong_components = [c for c in connected_components(strong_inside) if c["cell_count"] >= 3]
     weak_components = [c for c in connected_components(weak_inside) if c["cell_count"] >= 3]
 
     low_ratio = ratio(np.count_nonzero(low_inside), covered_cells)
+    far_low_ratio = ratio(np.count_nonzero(far_low_inside), covered_cells)
     strong_ratio = ratio(np.count_nonzero(strong_inside), covered_cells)
     weak_ratio = ratio(np.count_nonzero(weak_inside), covered_cells)
     mean_value = float(np.mean(inside)) if inside.size else 0.0
@@ -210,6 +234,7 @@ def summarize_polygon(poly, mask, values, strong_threshold, weak_threshold, low_
         "strong_cell_ratio": strong_ratio,
         "weak_cell_ratio": weak_ratio,
         "low_value_ratio": low_ratio,
+        "far_low_background_ratio": far_low_ratio,
         "strong_component_count": len(strong_components),
         "weak_component_count": len(weak_components),
         "risk_score": risk_score,
@@ -236,6 +261,7 @@ def main():
     parser.add_argument("--low-threshold", type=float, default=0.05)
     parser.add_argument("--min-review-cells", type=int, default=8)
     parser.add_argument("--min-line-aspect", type=float, default=3.0)
+    parser.add_argument("--background-fit-radius", type=int, default=2, help="多边形内距离弱响应超过该格数的低值背景计为远背景")
     args = parser.parse_args()
 
     out_dir = Path(args.out_dir)
@@ -250,16 +276,27 @@ def main():
     polygon_rows = []
     areas = [p["area"] for p in polygons if p["area"] > 0.0]
     median_area = float(np.median(areas)) if areas else 0.0
+    weak_mask = values >= args.weak_threshold
+    distance_to_weak = distance_to_mask(weak_mask)
 
     for poly in polygons:
         mask = rasterize_polygon(poly["coords"], width, height, xs, ys, dx, dy)
         total_mask |= mask
-        row = summarize_polygon(poly, mask, values, args.strong_threshold, args.weak_threshold, args.low_threshold, median_area)
+        row = summarize_polygon(
+            poly,
+            mask,
+            values,
+            distance_to_weak,
+            args.strong_threshold,
+            args.weak_threshold,
+            args.low_threshold,
+            median_area,
+            args.background_fit_radius,
+        )
         if row:
             polygon_rows.append(row)
 
     strong_mask = values >= args.strong_threshold
-    weak_mask = values >= args.weak_threshold
     nonzero_mask = values > 0
     missed_strong = strong_mask & ~total_mask
     missed_weak = weak_mask & ~total_mask
@@ -276,6 +313,15 @@ def main():
     high_risk = [r for r in polygon_rows if r["risk_level"] == "高"]
     middle_risk = [r for r in polygon_rows if r["risk_level"] == "中"]
     small_polygons = [r for r in polygon_rows if r["area"] < median_area * 0.25] if median_area else []
+    large_background_polygons = [
+        r for r in polygon_rows
+        if r["far_low_background_ratio"] >= 0.60 and r["weak_cell_ratio"] < 0.30
+    ]
+    weighted_covered_cells = sum(r["raster_cell_count"] for r in polygon_rows)
+    boundary_background_ratio = (
+        sum(r["far_low_background_ratio"] * r["raster_cell_count"] for r in polygon_rows) / weighted_covered_cells
+        if weighted_covered_cells else 0.0
+    )
 
     overall = {
         "input_dat": str(Path(args.dat)),
@@ -298,6 +344,9 @@ def main():
         "high_risk_merge_polygons": len(high_risk),
         "middle_risk_merge_polygons": len(middle_risk),
         "small_polygon_count": len(small_polygons),
+        "boundary_background_ratio": boundary_background_ratio,
+        "large_background_polygon_count": len(large_background_polygons),
+        "background_fit_radius": args.background_fit_radius,
     }
 
     write_csv(
@@ -306,7 +355,7 @@ def main():
         [
             "id", "area", "perimeter", "reported_cell_count", "raster_cell_count",
             "bbox_aspect", "mean_value", "max_value", "strong_cell_ratio", "weak_cell_ratio", "low_value_ratio",
-            "strong_component_count", "weak_component_count", "risk_score", "risk_level", "reason",
+            "far_low_background_ratio", "strong_component_count", "weak_component_count", "risk_score", "risk_level", "reason",
         ],
     )
     write_csv(
@@ -314,7 +363,7 @@ def main():
         sorted(high_risk + middle_risk, key=lambda r: (r["risk_score"], r["area"]), reverse=True),
         [
             "id", "area", "bbox_aspect", "mean_value", "max_value", "strong_cell_ratio", "weak_cell_ratio", "low_value_ratio",
-            "strong_component_count", "weak_component_count", "risk_score", "risk_level", "reason",
+            "far_low_background_ratio", "strong_component_count", "weak_component_count", "risk_score", "risk_level", "reason",
         ],
     )
     write_csv(
@@ -360,10 +409,12 @@ def main():
         f"| 高风险疑似误合并多边形 | {overall['high_risk_merge_polygons']} |",
         f"| 中风险疑似误合并多边形 | {overall['middle_risk_merge_polygons']} |",
         f"| 小碎片多边形数量 | {overall['small_polygon_count']} |",
+        f"| 远背景包络比例 | {overall['boundary_background_ratio']:.4%} |",
+        f"| 高远背景包络多边形 | {overall['large_background_polygon_count']} |",
         "",
         "## 3. 诊断解释",
         "",
-        "本报告不直接判定某个多边形一定错误，而是把需要人工或算法进一步检查的位置列出来。误合并复核规则经过收紧：只有当一个多边形同时表现出多个强响应段、较高低属性背景比例，并且整体形态不够细长时，才会被标为中高风险。单纯长断层沿走向强弱变化不会直接视为误合并。漏检风险通常表现为：强响应或细长弱响应连通域没有被任何正式多边形覆盖。",
+        "本报告不直接判定某个多边形一定错误，而是把需要人工或算法进一步检查的位置列出来。误合并复核规则经过收紧：只有当一个多边形同时表现出多个强响应段、较高低属性背景比例，并且整体形态不够细长时，才会被标为中高风险。单纯长断层沿走向强弱变化不会直接视为误合并。漏检风险通常表现为：强响应或细长弱响应连通域没有被任何正式多边形覆盖。远背景包络比例用于衡量结果是否包入过多远离弱响应的 0 值背景，它不是单独扣分依据，但可辅助判断边界是否过宽、是否存在低值桥黏连。",
         "",
         "## 4. 输出文件",
         "",

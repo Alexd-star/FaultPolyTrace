@@ -415,6 +415,23 @@ def main():
     high_value_loss = [row for row in split_rows if row["lost_strong_cells"] > 0]
     weak_value_loss = [row for row in split_rows if row["lost_weak_cells"] > 0]
     multi_part = [row for row in split_rows if row["candidate_parts"] >= 2]
+    safe_splits = [
+        row for row in multi_part
+        if row["lost_strong_cells"] == 0 and row["lost_weak_cells"] == 0
+    ]
+    background_bridge_splits = [
+        row for row in safe_splits
+        if row["lost_cells"] > 0 and row["lost_mean"] <= 0.05
+    ]
+    lossless_splits = [row for row in safe_splits if row["lost_cells"] == 0]
+    weak_loss_splits = [
+        row for row in multi_part
+        if row["lost_strong_cells"] == 0 and row["lost_weak_cells"] > 0
+    ]
+    lost_cells_total = int(sum(int(row["lost_cells"]) for row in changed))
+    lost_weak_cells_total = int(sum(int(row["lost_weak_cells"]) for row in changed))
+    lost_strong_cells_total = int(sum(int(row["lost_strong_cells"]) for row in changed))
+    changed_covered_ratios = [float(row["covered_ratio"]) for row in changed]
     summary = {
         "baseline_csv": str(Path(args.baseline_csv)),
         "candidate_csv": str(Path(args.candidate_csv)),
@@ -424,6 +441,18 @@ def main():
         "multi_part_base_polygon_count": len(multi_part),
         "strong_value_loss_base_polygon_count": len(high_value_loss),
         "weak_value_loss_base_polygon_count": len(weak_value_loss),
+        "safe_split_base_polygon_count": len(safe_splits),
+        "background_bridge_split_count": len(background_bridge_splits),
+        "lossless_split_count": len(lossless_splits),
+        "weak_loss_split_count": len(weak_loss_splits),
+        "lost_cells_total": lost_cells_total,
+        "lost_weak_cells_total": lost_weak_cells_total,
+        "lost_strong_cells_total": lost_strong_cells_total,
+        "min_changed_covered_ratio": min(changed_covered_ratios) if changed_covered_ratios else 1.0,
+        "mean_changed_covered_ratio": (
+            sum(changed_covered_ratios) / len(changed_covered_ratios)
+            if changed_covered_ratios else 1.0
+        ),
         "unmatched_candidate_count": len(unmatched_candidates),
     }
     (out_dir / "防黏连差异摘要.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -444,6 +473,12 @@ def main():
         f"- 被候选结果拆成多段的基线多边形：{summary['multi_part_base_polygon_count']}",
         f"- 切掉强响应像元的基线多边形：{summary['strong_value_loss_base_polygon_count']}",
         f"- 切掉弱响应像元的基线多边形：{summary['weak_value_loss_base_polygon_count']}",
+        f"- 安全拆分的基线多边形：{summary['safe_split_base_polygon_count']}",
+        f"- 只切掉低值背景桥的拆分：{summary['background_bridge_split_count']}",
+        f"- 完全不损失覆盖的拆分：{summary['lossless_split_count']}",
+        f"- 丢失弱响应像元总数：{summary['lost_weak_cells_total']}",
+        f"- 丢失强响应像元总数：{summary['lost_strong_cells_total']}",
+        f"- 发生变化对象的最低覆盖保持率：{summary['min_changed_covered_ratio']:.2%}",
         f"- 没有明显基线来源的候选多边形：{summary['unmatched_candidate_count']}",
         "",
         "## 3. 判断原则",

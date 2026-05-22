@@ -40,15 +40,24 @@ if (!(Test-Path -LiteralPath $ResultCsv)) {
 
 New-Item -ItemType Directory -Force -Path $OutputRoot | Out-Null
 
-python (Join-Path $PSScriptRoot "顶尖质量诊断.py") `
-    --dat $OfficialDat `
-    --csv $ResultCsv `
-    --out-dir $OutputRoot `
-    --strong-threshold $StrongThreshold `
-    --weak-threshold $WeakThreshold `
-    --low-threshold $LowThreshold `
-    --min-review-cells $MinReviewCells `
-    --min-line-aspect $MinLineAspect | Out-Host
+$diagnosisScript = Join-Path $PSScriptRoot "顶尖质量诊断.py"
+$runner = @"
+import runpy
+import sys
+sys.argv = [
+    r'$diagnosisScript',
+    '--dat', r'$OfficialDat',
+    '--csv', r'$ResultCsv',
+    '--out-dir', r'$OutputRoot',
+    '--strong-threshold', '$StrongThreshold',
+    '--weak-threshold', '$WeakThreshold',
+    '--low-threshold', '$LowThreshold',
+    '--min-review-cells', '$MinReviewCells',
+    '--min-line-aspect', '$MinLineAspect',
+]
+runpy.run_path(r'$diagnosisScript', run_name='__main__')
+"@
+$runner | python - | Out-Host
 
 if ($LASTEXITCODE -ne 0) {
     throw "顶尖质量诊断失败。"
