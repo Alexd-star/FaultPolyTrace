@@ -1,5 +1,6 @@
 #include "FaultTracer.h"
 #include "SkeletonGraph.h"
+#include "Topology.h"
 
 #include <algorithm>
 #include <cmath>
@@ -130,6 +131,28 @@ double pointDistance(const Point& a, const Point& b) {
     const double dx = a.x - b.x;
     const double dy = a.y - b.y;
     return std::sqrt(dx * dx + dy * dy);
+}
+
+double pointSegmentDistanceSquared(const Point& p, const Point& a, const Point& b) {
+    const double ax = a.x;
+    const double ay = a.y;
+    const double bx = b.x;
+    const double by = b.y;
+    const double dx = bx - ax;
+    const double dy = by - ay;
+    const double length2 = dx * dx + dy * dy;
+    if (length2 <= 1e-24) {
+        const double px = p.x - ax;
+        const double py = p.y - ay;
+        return px * px + py * py;
+    }
+    double t = ((p.x - ax) * dx + (p.y - ay) * dy) / length2;
+    t = std::max(0.0, std::min(1.0, t));
+    const double cx = ax + t * dx;
+    const double cy = ay + t * dy;
+    const double px = p.x - cx;
+    const double py = p.y - cy;
+    return px * px + py * py;
 }
 
 double vectorNorm(const SkeletonPoint& v) {
@@ -390,7 +413,7 @@ BinaryMask validateRootAntiMergeCutMask(
     };
 
     auto isWeakGuardedCandidate = [&grid, weakGuardRadius, weakGuardThreshold](int x, int y) {
-        if (weakGuardRadius <= 0 || weakGuardThreshold <= 0.0) {
+        if (weakGuardRadius < 0 || weakGuardThreshold <= 0.0) {
             return false;
         }
         for (int yy = y - weakGuardRadius; yy <= y + weakGuardRadius; ++yy) {
@@ -970,6 +993,53 @@ bool pointInRing(const Point& point, const std::vector<Point>& ring) {
     return inside;
 }
 
+double pointToRingDistance(const Point& point, const std::vector<Point>& ring) {
+    if (pointInRing(point, ring)) {
+        return 0.0;
+    }
+    if (ring.size() < 2) {
+        return std::numeric_limits<double>::infinity();
+    }
+
+    double best = std::numeric_limits<double>::infinity();
+    for (std::size_t i = 0; i < ring.size(); ++i) {
+        const Point& a = ring[i];
+        const Point& b = ring[(i + 1) % ring.size()];
+        best = std::min(best, pointSegmentDistanceSquared(point, a, b));
+    }
+    return std::sqrt(best);
+}
+
+bool polygonPreservesCoverage(
+    const Grid2D& grid,
+    const std::vector<Point>& ring,
+    const std::vector<Cell>& cells,
+    double minPreserveValue,
+    double preserveMargin) {
+    if (ring.size() < 3) {
+        return false;
+    }
+    const double margin = std::max(0.0, preserveMargin);
+    int protectedCellCount = 0;
+    for (const Cell& cell : cells) {
+        if (grid.value(cell.x, cell.y) < minPreserveValue) {
+            continue;
+        }
+        ++protectedCellCount;
+        const Point center{
+            grid.worldX(cell.x + 0.5),
+            grid.worldY(cell.y + 0.5)
+        };
+        if (pointToRingDistance(center, ring) > margin) {
+            return false;
+        }
+    }
+    if (protectedCellCount == 0) {
+        return true;
+    }
+    return true;
+}
+
 std::vector<std::vector<Point>> selectExteriorBoundaryRings(
     std::vector<std::vector<Point>> rings,
     int& suppressedInternalRings) {
@@ -1067,6 +1137,7 @@ bool shouldKeepPolygon(
 }
 
 bool finalizeAndAppendPolygon(
+    const Grid2D& grid,
     const std::vector<Cell>& cells,
     double sum,
     double maxValue,
@@ -1083,11 +1154,48 @@ bool finalizeAndAppendPolygon(
     Polygon polygon;
     polygon.id = nextId++;
     polygon.points = std::move(ring);
+    const double minPreserveValue = std::max(0.0, keepThreshold * options.coveragePreserveMinValueRatio);
     if (options.simplifyTolerance > 0.0) {
-        polygon.points = simplifyRingDouglasPeucker(polygon.points, options.simplifyTolerance);
+        std::vector<Point> simplified = simplifyRingDouglasPeucker(polygon.points, options.simplifyTolerance);
+        if (options.preserveCoverageAfterSmoothing &&
+            !polygonPreservesCoverage(grid, simplified, cells, minPreserveValue, options.coveragePreserveMargin)) {
+            Polygon coverageFallback = polygon;
+            if (polygonHasTopologyConflict(coverageFallback, result.polygons, true)) {
+                Polygon topologySafeCandidate = polygon;
+                topologySafeCandidate.points = std::move(simplified);
+                if (!polygonHasTopologyConflict(topologySafeCandidate, result.polygons, true)) {
+                    polygon.points = std::move(topologySafeCandidate.points);
+                    ++result.coveragePreserveTopologyOverridePolygons;
+                } else {
+                    ++result.coveragePreserveSimplifyFallbackPolygons;
+                }
+            } else {
+                ++result.coveragePreserveSimplifyFallbackPolygons;
+            }
+        } else {
+            polygon.points = std::move(simplified);
+        }
     }
     if (options.smoothIterations > 0) {
-        polygon.points = smoothRingChaikin(polygon.points, options.smoothIterations);
+        std::vector<Point> smoothed = smoothRingChaikin(polygon.points, options.smoothIterations);
+        if (options.preserveCoverageAfterSmoothing &&
+            !polygonPreservesCoverage(grid, smoothed, cells, minPreserveValue, options.coveragePreserveMargin)) {
+            Polygon coverageFallback = polygon;
+            if (polygonHasTopologyConflict(coverageFallback, result.polygons, true)) {
+                Polygon topologySafeCandidate = polygon;
+                topologySafeCandidate.points = std::move(smoothed);
+                if (!polygonHasTopologyConflict(topologySafeCandidate, result.polygons, true)) {
+                    polygon.points = std::move(topologySafeCandidate.points);
+                    ++result.coveragePreserveTopologyOverridePolygons;
+                } else {
+                    ++result.coveragePreserveSmoothFallbackPolygons;
+                }
+            } else {
+                ++result.coveragePreserveSmoothFallbackPolygons;
+            }
+        } else {
+            polygon.points = std::move(smoothed);
+        }
     }
     polygon.area = polygonArea(polygon.points);
     polygon.perimeter = polygonPerimeter(polygon.points);
@@ -1281,7 +1389,7 @@ void appendPolygonsFromMask(
                 traceBoundaryRings(grid, cells),
                 result.suppressedInternalRings);
             for (std::vector<Point>& ring : rings) {
-                finalizeAndAppendPolygon(cells, sum, maxValue, std::move(ring), stats, options, result.effectiveThreshold, result, nextId);
+                finalizeAndAppendPolygon(grid, cells, sum, maxValue, std::move(ring), stats, options, result.effectiveThreshold, result, nextId);
             }
         }
     }
@@ -1369,7 +1477,7 @@ void appendPolygonsFromMaskBounds(
                 traceBoundaryRings(grid, cells),
                 result.suppressedInternalRings);
             for (std::vector<Point>& ring : rings) {
-                finalizeAndAppendPolygon(cells, sum, maxValue, std::move(ring), stats, options, result.effectiveThreshold, result, nextId);
+                finalizeAndAppendPolygon(grid, cells, sum, maxValue, std::move(ring), stats, options, result.effectiveThreshold, result, nextId);
             }
         }
     }
@@ -1454,7 +1562,7 @@ void appendPolygonsFromLocalMask(
                 traceBoundaryRings(grid, cells),
                 result.suppressedInternalRings);
             for (std::vector<Point>& ring : rings) {
-                const bool kept = finalizeAndAppendPolygon(cells, sum, maxValue, std::move(ring), stats, options, result.effectiveThreshold, result, nextId);
+                const bool kept = finalizeAndAppendPolygon(grid, cells, sum, maxValue, std::move(ring), stats, options, result.effectiveThreshold, result, nextId);
                 if (kept && keptCoverageMask) {
                     for (const Cell& cell : cells) {
                         keptCoverageMask->set(cell.x, cell.y, true);

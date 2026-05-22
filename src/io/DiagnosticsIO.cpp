@@ -104,7 +104,9 @@ void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
     out << "    \"residualDetachedMinMeanRatio\": " << d.residualDetachedMinMeanRatio << ",\n";
     out << "    \"residualDetachedMinMaxRatio\": " << d.residualDetachedMinMaxRatio << ",\n";
     out << "    \"simplifyTolerance\": " << d.simplifyTolerance << ",\n";
-    out << "    \"smoothIterations\": " << d.smoothIterations << "\n";
+    out << "    \"smoothIterations\": " << d.smoothIterations << ",\n";
+    out << "    \"preserveCoverageAfterSmoothing\": " << (d.preserveCoverageAfterSmoothing ? "true" : "false") << ",\n";
+    out << "    \"coveragePreserveMargin\": " << d.coveragePreserveMargin << "\n";
     out << "  },\n";
     out << "  \"grid\": {\n";
     out << "    \"nx\": " << d.gridNx << ",\n";
@@ -135,7 +137,10 @@ void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
     out << "    \"localAntiMergeCutCells\": " << d.localAntiMergeCutCells << ",\n";
     out << "    \"localAntiMergeRejectedCutCells\": " << d.localAntiMergeRejectedCutCells << ",\n";
     out << "    \"localAntiMergeAcceptedComponents\": " << d.localAntiMergeAcceptedComponents << ",\n";
-    out << "    \"localAntiMergeRejectedComponents\": " << d.localAntiMergeRejectedComponents << "\n";
+    out << "    \"localAntiMergeRejectedComponents\": " << d.localAntiMergeRejectedComponents << ",\n";
+    out << "    \"coveragePreserveSimplifyFallbackPolygons\": " << d.coveragePreserveSimplifyFallbackPolygons << ",\n";
+    out << "    \"coveragePreserveSmoothFallbackPolygons\": " << d.coveragePreserveSmoothFallbackPolygons << ",\n";
+    out << "    \"coveragePreserveTopologyOverridePolygons\": " << d.coveragePreserveTopologyOverridePolygons << "\n";
     out << "  },\n";
     out << "  \"topology\": {\n";
     out << "    \"openRings\": " << d.openRingCount << ",\n";

@@ -520,6 +520,8 @@ int main(int argc, char** argv) {
         diagnostics.residualDetachedMinMaxRatio = cli.residualDetachedMinMaxRatio;
         diagnostics.simplifyTolerance = cli.simplifyTolerance;
         diagnostics.smoothIterations = cli.smoothIterations;
+        diagnostics.preserveCoverageAfterSmoothing = traceOptions.preserveCoverageAfterSmoothing;
+        diagnostics.coveragePreserveMargin = traceOptions.coveragePreserveMargin;
         diagnostics.gridNx = grid.nx();
         diagnostics.gridNy = grid.ny();
         diagnostics.activeCellCount = result.activeCellCount;
@@ -544,6 +546,9 @@ int main(int argc, char** argv) {
         diagnostics.localAntiMergeAcceptedComponents = result.localAntiMergeAcceptedComponents;
         diagnostics.localAntiMergeRejectedComponents = result.localAntiMergeRejectedComponents;
         diagnostics.suppressedInternalRings = result.suppressedInternalRings;
+        diagnostics.coveragePreserveSimplifyFallbackPolygons = result.coveragePreserveSimplifyFallbackPolygons;
+        diagnostics.coveragePreserveSmoothFallbackPolygons = result.coveragePreserveSmoothFallbackPolygons;
+        diagnostics.coveragePreserveTopologyOverridePolygons = result.coveragePreserveTopologyOverridePolygons;
         diagnostics.openRingCount = topology.openRingCount;
         diagnostics.selfIntersectingPolygonCount = topology.selfIntersectingPolygonCount;
         diagnostics.polygonIntersectionCount = topology.polygonIntersectionCount;

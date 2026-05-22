@@ -243,4 +243,34 @@ TopologyDiagnostics diagnoseTopology(const std::vector<Polygon>& polygons, bool 
     return diagnostics;
 }
 
+bool polygonHasTopologyConflict(
+    const Polygon& candidate,
+    const std::vector<Polygon>& polygons,
+    bool keptOnly) {
+    if (candidate.points.size() < 3) {
+        return true;
+    }
+
+    TopologyDiagnostics diagnostics;
+    if (polygonSelfIntersects(candidate, diagnostics)) {
+        return true;
+    }
+
+    for (const Polygon& polygon : polygons) {
+        if (polygon.id == candidate.id) {
+            continue;
+        }
+        if (keptOnly && !polygon.kept) {
+            continue;
+        }
+        if (polygon.points.size() < 3) {
+            continue;
+        }
+        if (polygonsIntersect(candidate, polygon, diagnostics)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 } // namespace fpt

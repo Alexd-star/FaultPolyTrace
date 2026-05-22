@@ -69,6 +69,8 @@ struct RunDiagnostics {
     double residualDetachedMinMaxRatio = 0.0;
     double simplifyTolerance = 0.0;
     int smoothIterations = 0;
+    bool preserveCoverageAfterSmoothing = false;
+    double coveragePreserveMargin = 0.0;
     int gridNx = 0;
     int gridNy = 0;
     int activeCellCount = 0;
@@ -93,6 +95,9 @@ struct RunDiagnostics {
     int localAntiMergeAcceptedComponents = 0;
     int localAntiMergeRejectedComponents = 0;
     int suppressedInternalRings = 0;
+    int coveragePreserveSimplifyFallbackPolygons = 0;
+    int coveragePreserveSmoothFallbackPolygons = 0;
+    int coveragePreserveTopologyOverridePolygons = 0;
     int openRingCount = 0;
     int selfIntersectingPolygonCount = 0;
     int polygonIntersectionCount = 0;

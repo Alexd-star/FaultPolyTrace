@@ -72,6 +72,9 @@ struct TraceOptions {
     double residualDetachedMinMaxRatio = 0.92;
     double simplifyTolerance = 0.0;
     int smoothIterations = 0;
+    bool preserveCoverageAfterSmoothing = true;
+    double coveragePreserveMargin = 0.0;
+    double coveragePreserveMinValueRatio = 0.70;
 };
 
 struct BranchTrace {
@@ -110,6 +113,9 @@ struct TraceResult {
     int localAntiMergeAcceptedComponents = 0;
     int localAntiMergeRejectedComponents = 0;
     int suppressedInternalRings = 0;
+    int coveragePreserveSimplifyFallbackPolygons = 0;
+    int coveragePreserveSmoothFallbackPolygons = 0;
+    int coveragePreserveTopologyOverridePolygons = 0;
 };
 
 TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options);

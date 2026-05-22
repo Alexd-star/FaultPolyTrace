@@ -28,5 +28,9 @@ struct TopologyDiagnostics {
 
 TopologyDiagnostics diagnoseTopology(const std::vector<Polygon>& polygons);
 TopologyDiagnostics diagnoseTopology(const std::vector<Polygon>& polygons, bool keptOnly);
+bool polygonHasTopologyConflict(
+    const Polygon& candidate,
+    const std::vector<Polygon>& polygons,
+    bool keptOnly);
 
 } // namespace fpt

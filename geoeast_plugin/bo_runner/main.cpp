@@ -575,6 +575,12 @@ int main(int argc, char** argv) {
                       << result.localAntiMergeRejectedComponents << "\n";
         }
         std::cout << "Suppressed internal rings: " << result.suppressedInternalRings << "\n";
+        std::cout << "Coverage preserve simplify fallback polygons: "
+                  << result.coveragePreserveSimplifyFallbackPolygons << "\n";
+        std::cout << "Coverage preserve smooth fallback polygons: "
+                  << result.coveragePreserveSmoothFallbackPolygons << "\n";
+        std::cout << "Coverage preserve topology override polygons: "
+                  << result.coveragePreserveTopologyOverridePolygons << "\n";
         std::cout << "Topology open rings: " << topology.openRingCount << "\n";
         std::cout << "Topology self-intersections: " << topology.selfIntersectingPolygonCount << "\n";
         std::cout << "Topology polygon intersections: " << topology.polygonIntersectionCount << "\n";
