@@ -1040,12 +1040,17 @@ bool polygonPreservesCoverage(
     return true;
 }
 
-std::vector<std::vector<Point>> selectExteriorBoundaryRings(
+struct BoundaryRingSet {
+    std::vector<Point> exterior;
+    std::vector<std::vector<Point>> holes;
+};
+
+std::vector<BoundaryRingSet> selectBoundaryRingSets(
     std::vector<std::vector<Point>> rings,
     int& suppressedInternalRings) {
-    std::vector<std::vector<Point>> exterior;
+    std::vector<BoundaryRingSet> ringSets;
     if (rings.empty()) {
-        return exterior;
+        return ringSets;
     }
 
     std::vector<double> areas(rings.size(), 0.0);
@@ -1053,40 +1058,76 @@ std::vector<std::vector<Point>> selectExteriorBoundaryRings(
         areas[i] = std::abs(signedPolygonArea(rings[i]));
     }
 
-    std::vector<unsigned char> keep(rings.size(), 0);
+    std::vector<int> parent(rings.size(), -1);
+    std::vector<int> depth(rings.size(), 0);
+    std::vector<unsigned char> valid(rings.size(), 1);
     for (std::size_t i = 0; i < rings.size(); ++i) {
         if (rings[i].size() < 3 || areas[i] <= 1e-9) {
             ++suppressedInternalRings;
+            valid[i] = 0;
             continue;
         }
 
         const Point probe = rings[i].front();
-        bool containedByLargerRing = false;
+        double bestParentArea = std::numeric_limits<double>::infinity();
         for (std::size_t j = 0; j < rings.size(); ++j) {
-            if (i == j || areas[j] <= areas[i]) {
+            if (i == j || rings[j].size() < 3 || areas[j] <= areas[i]) {
                 continue;
             }
             if (pointInRing(probe, rings[j])) {
-                containedByLargerRing = true;
-                break;
+                if (areas[j] < bestParentArea) {
+                    bestParentArea = areas[j];
+                    parent[i] = static_cast<int>(j);
+                }
             }
         }
-
-        if (containedByLargerRing) {
-            ++suppressedInternalRings;
-        } else {
-            keep[i] = 1;
-        }
     }
 
-    exterior.reserve(rings.size());
     for (std::size_t i = 0; i < rings.size(); ++i) {
-        if (keep[i]) {
-            exterior.push_back(std::move(rings[i]));
+        if (!valid[i]) {
+            continue;
+        }
+        int cursor = parent[i];
+        while (cursor >= 0) {
+            ++depth[i];
+            cursor = parent[static_cast<std::size_t>(cursor)];
         }
     }
 
-    return exterior;
+    std::vector<int> exteriorSetIndex(rings.size(), -1);
+    for (std::size_t i = 0; i < rings.size(); ++i) {
+        if (!valid[i]) {
+            continue;
+        }
+        if (depth[i] == 0 || (depth[i] % 2) == 0) {
+            exteriorSetIndex[i] = static_cast<int>(ringSets.size());
+            BoundaryRingSet set;
+            set.exterior = std::move(rings[i]);
+            ringSets.push_back(std::move(set));
+        }
+    }
+
+    for (std::size_t i = 0; i < rings.size(); ++i) {
+        if (!valid[i] || (depth[i] % 2) != 1) {
+            continue;
+        }
+        int ancestor = parent[i];
+        while (ancestor >= 0 && (depth[static_cast<std::size_t>(ancestor)] % 2) != 0) {
+            ancestor = parent[static_cast<std::size_t>(ancestor)];
+        }
+        if (ancestor < 0) {
+            ++suppressedInternalRings;
+            continue;
+        }
+        const int setIndex = exteriorSetIndex[static_cast<std::size_t>(ancestor)];
+        if (setIndex < 0 || setIndex >= static_cast<int>(ringSets.size())) {
+            ++suppressedInternalRings;
+            continue;
+        }
+        ringSets[static_cast<std::size_t>(setIndex)].holes.push_back(std::move(rings[i]));
+    }
+
+    return ringSets;
 }
 
 ComponentStats computeComponentStats(const std::vector<Cell>& cells) {
@@ -1142,18 +1183,38 @@ bool finalizeAndAppendPolygon(
     double sum,
     double maxValue,
     std::vector<Point> ring,
+    std::vector<std::vector<Point>> holes,
     const ComponentStats& stats,
     const TraceOptions& options,
     double keepThreshold,
     TraceResult& result,
     int& nextId) {
-    if (signedPolygonArea(ring) <= 0.0) {
+    const double inputSignedArea = signedPolygonArea(ring);
+    if (std::abs(inputSignedArea) <= 1e-9) {
         return false;
+    }
+    if (inputSignedArea < 0.0) {
+        std::reverse(ring.begin(), ring.end());
     }
 
     Polygon polygon;
     polygon.id = nextId++;
     polygon.points = std::move(ring);
+    polygon.holes = std::move(holes);
+    for (std::vector<Point>& hole : polygon.holes) {
+        const double holeSignedArea = signedPolygonArea(hole);
+        if (std::abs(holeSignedArea) <= 1e-9) {
+            hole.clear();
+        } else if (holeSignedArea > 0.0) {
+            std::reverse(hole.begin(), hole.end());
+        }
+    }
+    polygon.holes.erase(
+        std::remove_if(
+            polygon.holes.begin(),
+            polygon.holes.end(),
+            [](const std::vector<Point>& hole) { return hole.size() < 3; }),
+        polygon.holes.end());
     const double minPreserveValue = std::max(0.0, keepThreshold * options.coveragePreserveMinValueRatio);
     if (options.simplifyTolerance > 0.0) {
         std::vector<Point> simplified = simplifyRingDouglasPeucker(polygon.points, options.simplifyTolerance);
@@ -1199,6 +1260,11 @@ bool finalizeAndAppendPolygon(
     }
     polygon.area = polygonArea(polygon.points);
     polygon.perimeter = polygonPerimeter(polygon.points);
+    for (const std::vector<Point>& hole : polygon.holes) {
+        polygon.area -= polygonArea(hole);
+        polygon.perimeter += polygonPerimeter(hole);
+    }
+    polygon.area = std::max(0.0, polygon.area);
     polygon.cellCount = static_cast<int>(cells.size());
     polygon.meanValue = cells.empty() ? 0.0 : sum / static_cast<double>(cells.size());
     polygon.maxValue = maxValue;
@@ -1235,6 +1301,49 @@ std::vector<Point> removeCollinear(std::vector<Point> points) {
         }
     }
     return compact.size() >= 3 ? compact : points;
+}
+
+std::vector<std::vector<Vertex>> splitSelfTouchingVertexRing(const std::vector<Vertex>& vertices) {
+    std::vector<std::vector<Vertex>> loops;
+    if (vertices.size() < 3) {
+        return loops;
+    }
+
+    std::vector<Vertex> stack;
+    std::map<Vertex, std::size_t> positionByVertex;
+
+    auto pushVertex = [&stack, &positionByVertex](const Vertex& vertex) {
+        positionByVertex[vertex] = stack.size();
+        stack.push_back(vertex);
+    };
+
+    for (std::size_t i = 0; i <= vertices.size(); ++i) {
+        const Vertex vertex = (i == vertices.size()) ? vertices.front() : vertices[i];
+        if (stack.empty()) {
+            pushVertex(vertex);
+            continue;
+        }
+
+        auto repeat = positionByVertex.find(vertex);
+        if (repeat == positionByVertex.end()) {
+            pushVertex(vertex);
+            continue;
+        }
+
+        const std::size_t start = repeat->second;
+        if (stack.size() - start >= 3) {
+            loops.emplace_back(stack.begin() + static_cast<std::ptrdiff_t>(start), stack.end());
+        }
+        for (std::size_t eraseIndex = start + 1; eraseIndex < stack.size(); ++eraseIndex) {
+            positionByVertex.erase(stack[eraseIndex]);
+        }
+        stack.resize(start + 1);
+    }
+
+    if (loops.empty()) {
+        loops.push_back(vertices);
+    }
+    return loops;
 }
 
 std::vector<std::vector<Point>> traceBoundaryRings(const Grid2D& grid, const std::vector<Cell>& cells) {
@@ -1309,14 +1418,17 @@ std::vector<std::vector<Point>> traceBoundaryRings(const Grid2D& grid, const std
             continue;
         }
 
-        std::vector<Point> ring;
-        ring.reserve(ringVertices.size());
-        for (const Vertex& vertex : ringVertices) {
-            ring.push_back(toWorldPoint(grid, vertex));
-        }
-        ring = removeCollinear(std::move(ring));
-        if (ring.size() >= 3) {
-            rings.push_back(std::move(ring));
+        std::vector<std::vector<Vertex>> simpleVertexLoops = splitSelfTouchingVertexRing(ringVertices);
+        for (const std::vector<Vertex>& vertexLoop : simpleVertexLoops) {
+            std::vector<Point> ring;
+            ring.reserve(vertexLoop.size());
+            for (const Vertex& vertex : vertexLoop) {
+                ring.push_back(toWorldPoint(grid, vertex));
+            }
+            ring = removeCollinear(std::move(ring));
+            if (ring.size() >= 3) {
+                rings.push_back(std::move(ring));
+            }
         }
     }
 
@@ -1385,11 +1497,22 @@ void appendPolygonsFromMask(
             }
 
             const ComponentStats stats = computeComponentStats(cells);
-            std::vector<std::vector<Point>> rings = selectExteriorBoundaryRings(
+            std::vector<BoundaryRingSet> rings = selectBoundaryRingSets(
                 traceBoundaryRings(grid, cells),
                 result.suppressedInternalRings);
-            for (std::vector<Point>& ring : rings) {
-                finalizeAndAppendPolygon(grid, cells, sum, maxValue, std::move(ring), stats, options, result.effectiveThreshold, result, nextId);
+            for (BoundaryRingSet& ring : rings) {
+                finalizeAndAppendPolygon(
+                    grid,
+                    cells,
+                    sum,
+                    maxValue,
+                    std::move(ring.exterior),
+                    std::move(ring.holes),
+                    stats,
+                    options,
+                    result.effectiveThreshold,
+                    result,
+                    nextId);
             }
         }
     }
@@ -1473,11 +1596,22 @@ void appendPolygonsFromMaskBounds(
             }
 
             const ComponentStats stats = computeComponentStats(cells);
-            std::vector<std::vector<Point>> rings = selectExteriorBoundaryRings(
+            std::vector<BoundaryRingSet> rings = selectBoundaryRingSets(
                 traceBoundaryRings(grid, cells),
                 result.suppressedInternalRings);
-            for (std::vector<Point>& ring : rings) {
-                finalizeAndAppendPolygon(grid, cells, sum, maxValue, std::move(ring), stats, options, result.effectiveThreshold, result, nextId);
+            for (BoundaryRingSet& ring : rings) {
+                finalizeAndAppendPolygon(
+                    grid,
+                    cells,
+                    sum,
+                    maxValue,
+                    std::move(ring.exterior),
+                    std::move(ring.holes),
+                    stats,
+                    options,
+                    result.effectiveThreshold,
+                    result,
+                    nextId);
             }
         }
     }
@@ -1558,11 +1692,22 @@ void appendPolygonsFromLocalMask(
             }
 
             const ComponentStats stats = computeComponentStats(cells);
-            std::vector<std::vector<Point>> rings = selectExteriorBoundaryRings(
+            std::vector<BoundaryRingSet> rings = selectBoundaryRingSets(
                 traceBoundaryRings(grid, cells),
                 result.suppressedInternalRings);
-            for (std::vector<Point>& ring : rings) {
-                const bool kept = finalizeAndAppendPolygon(grid, cells, sum, maxValue, std::move(ring), stats, options, result.effectiveThreshold, result, nextId);
+            for (BoundaryRingSet& ring : rings) {
+                const bool kept = finalizeAndAppendPolygon(
+                    grid,
+                    cells,
+                    sum,
+                    maxValue,
+                    std::move(ring.exterior),
+                    std::move(ring.holes),
+                    stats,
+                    options,
+                    result.effectiveThreshold,
+                    result,
+                    nextId);
                 if (kept && keptCoverageMask) {
                     for (const Cell& cell : cells) {
                         keptCoverageMask->set(cell.x, cell.y, true);
@@ -1719,6 +1864,313 @@ void appendResidualTracePolygons(
                 nextId);
         }
     }
+}
+
+BinaryMask fillResidualAttributesNearActiveBelt(
+    const Grid2D& grid,
+    const BinaryMask& activeMask,
+    const BinaryMask& residualMask,
+    const TraceOptions& options,
+    TraceResult& result) {
+    if (!options.residualAttributeFill || options.residualFillRadius <= 0 || residualMask.empty()) {
+        return activeMask;
+    }
+
+    BinaryMask out = activeMask;
+    const int fillRadius = std::max(0, options.residualEdgeFillRadius);
+    if (fillRadius <= 0) {
+        return activeMask;
+    }
+    const double minFillValue = result.effectiveThreshold * std::max(0.0, options.residualEdgeFillMinValueRatio);
+    const int maxPatchSpan = std::max(1, options.residualEdgeFillMaxPatchSpan);
+    const BinaryMask reachMask = dilate(activeMask, fillRadius);
+    const int width = grid.nx();
+    const int height = grid.ny();
+    std::vector<int> labels(static_cast<std::size_t>(width * height), 0);
+    std::vector<unsigned char> activeVisited(static_cast<std::size_t>(width * height), 0);
+
+    auto indexOf = [width](int x, int y) {
+        return y * width + x;
+    };
+
+    constexpr int offsets[8][2] = {
+        {-1, -1}, {0, -1}, {1, -1},
+        {-1, 0},           {1, 0},
+        {-1, 1},  {0, 1},  {1, 1}
+    };
+
+    int nextLabel = 0;
+    for (int y0 = 0; y0 < height; ++y0) {
+        for (int x0 = 0; x0 < width; ++x0) {
+            const std::size_t startPos = static_cast<std::size_t>(indexOf(x0, y0));
+            if (!activeMask.get(x0, y0) || activeVisited[startPos]) {
+                continue;
+            }
+            ++nextLabel;
+            std::queue<Cell> queue;
+            queue.push({x0, y0});
+            activeVisited[startPos] = 1;
+            labels[startPos] = nextLabel;
+
+            while (!queue.empty()) {
+                const Cell cell = queue.front();
+                queue.pop();
+                for (const auto& offset : offsets) {
+                    const int nxCell = cell.x + offset[0];
+                    const int nyCell = cell.y + offset[1];
+                    if (!grid.inBounds(nxCell, nyCell) || !activeMask.get(nxCell, nyCell)) {
+                        continue;
+                    }
+                    const std::size_t pos = static_cast<std::size_t>(indexOf(nxCell, nyCell));
+                    if (activeVisited[pos]) {
+                        continue;
+                    }
+                    activeVisited[pos] = 1;
+                    labels[pos] = nextLabel;
+                    queue.push({nxCell, nyCell});
+                }
+            }
+        }
+    }
+
+    auto isCandidate = [&](int x, int y) {
+        const double value = grid.value(x, y);
+        return grid.inBounds(x, y) &&
+            !activeMask.get(x, y) &&
+            residualMask.get(x, y) &&
+            std::isfinite(value) &&
+            value >= minFillValue;
+    };
+
+    std::vector<unsigned char> visited(static_cast<std::size_t>(width * height), 0);
+
+    for (int y0 = 0; y0 < height; ++y0) {
+        for (int x0 = 0; x0 < width; ++x0) {
+            const std::size_t startPos = static_cast<std::size_t>(indexOf(x0, y0));
+            if (visited[startPos] || !isCandidate(x0, y0)) {
+                continue;
+            }
+
+            std::queue<Cell> queue;
+            std::vector<Cell> component;
+            queue.push({x0, y0});
+            visited[startPos] = 1;
+            double sum = 0.0;
+            double maxValue = -std::numeric_limits<double>::infinity();
+            bool touchesReach = false;
+            int minX = x0;
+            int minY = y0;
+            int maxX = x0;
+            int maxY = y0;
+            std::vector<int> touchedLabels;
+
+            while (!queue.empty()) {
+                const Cell cell = queue.front();
+                queue.pop();
+                component.push_back(cell);
+                const double value = grid.value(cell.x, cell.y);
+                sum += value;
+                maxValue = std::max(maxValue, value);
+                touchesReach = touchesReach || reachMask.get(cell.x, cell.y);
+                minX = std::min(minX, cell.x);
+                minY = std::min(minY, cell.y);
+                maxX = std::max(maxX, cell.x);
+                maxY = std::max(maxY, cell.y);
+
+                for (const auto& offset : offsets) {
+                    const int nxCell = cell.x + offset[0];
+                    const int nyCell = cell.y + offset[1];
+                    if (!grid.inBounds(nxCell, nyCell)) {
+                        continue;
+                    }
+                    const int label = labels[static_cast<std::size_t>(indexOf(nxCell, nyCell))];
+                    if (label > 0 &&
+                        std::find(touchedLabels.begin(), touchedLabels.end(), label) == touchedLabels.end()) {
+                        touchedLabels.push_back(label);
+                    }
+                    if (activeMask.get(nxCell, nyCell)) {
+                        continue;
+                    }
+                    const std::size_t pos = static_cast<std::size_t>(indexOf(nxCell, nyCell));
+                    if (visited[pos] || !isCandidate(nxCell, nyCell)) {
+                        continue;
+                    }
+                    visited[pos] = 1;
+                    queue.push({nxCell, nyCell});
+                }
+            }
+
+            result.residualFillCandidateCells += static_cast<int>(component.size());
+            const int componentWidth = maxX - minX + 1;
+            const int componentHeight = maxY - minY + 1;
+            const double meanValue = component.empty() ? 0.0 : sum / static_cast<double>(component.size());
+            const bool sizeOk = static_cast<int>(component.size()) >= options.residualMinCells &&
+                (options.residualTraceMaxCells <= 0 || static_cast<int>(component.size()) <= options.residualTraceMaxCells);
+            const bool localPatch = componentWidth <= maxPatchSpan &&
+                componentHeight <= maxPatchSpan;
+            double meanX = 0.0;
+            double meanY = 0.0;
+            for (const Cell& cell : component) {
+                meanX += static_cast<double>(cell.x);
+                meanY += static_cast<double>(cell.y);
+            }
+            if (!component.empty()) {
+                meanX /= static_cast<double>(component.size());
+                meanY /= static_cast<double>(component.size());
+            }
+            double covarianceXX = 0.0;
+            double covarianceXY = 0.0;
+            double covarianceYY = 0.0;
+            for (const Cell& cell : component) {
+                const double dx = static_cast<double>(cell.x) - meanX;
+                const double dy = static_cast<double>(cell.y) - meanY;
+                covarianceXX += dx * dx;
+                covarianceXY += dx * dy;
+                covarianceYY += dy * dy;
+            }
+            const double norm = std::max(1.0, static_cast<double>(component.size() - 1));
+            covarianceXX /= norm;
+            covarianceXY /= norm;
+            covarianceYY /= norm;
+            const double trace = covarianceXX + covarianceYY;
+            const double determinant = covarianceXX * covarianceYY - covarianceXY * covarianceXY;
+            const double discriminant = std::sqrt(std::max(0.0, trace * trace - 4.0 * determinant));
+            const double majorEigen = std::max(0.0, 0.5 * (trace + discriminant));
+            const double minorEigen = std::max(0.0, 0.5 * (trace - discriminant));
+            const double pcaAspect = std::sqrt((majorEigen + 1e-9) / (minorEigen + 1e-9));
+            const int maxLineTipSpan = std::max(maxPatchSpan, options.residualTraceMinLength + options.beltRadius + fillRadius);
+            const bool lineTipPatch =
+                pcaAspect >= options.minWeakComponentAspect &&
+                componentWidth <= maxLineTipSpan &&
+                componentHeight <= maxLineTipSpan;
+            const bool strongEnough = maxValue >= minFillValue && meanValue >= minFillValue;
+            const bool fillEligible = touchesReach && sizeOk && (localPatch || lineTipPatch) && strongEnough;
+            const bool singleOwner = touchedLabels.size() == 1;
+            if (fillEligible && singleOwner) {
+                result.residualFillAddedCells += static_cast<int>(component.size());
+                for (const Cell& cell : component) {
+                    out.set(cell.x, cell.y, true);
+                }
+            } else if (fillEligible && touchedLabels.size() > 1) {
+                std::unordered_map<int, int> localIndexByPosition;
+                localIndexByPosition.reserve(component.size() * 2);
+                for (std::size_t i = 0; i < component.size(); ++i) {
+                    localIndexByPosition[indexOf(component[i].x, component[i].y)] = static_cast<int>(i);
+                }
+
+                std::vector<int> owner(component.size(), 0);
+                std::vector<int> ownerDistance(component.size(), -1);
+                std::queue<int> ownerQueue;
+
+                for (std::size_t i = 0; i < component.size(); ++i) {
+                    const Cell& cell = component[i];
+                    int firstLabel = 0;
+                    bool conflictingSeed = false;
+                    for (int yy = cell.y - fillRadius; yy <= cell.y + fillRadius; ++yy) {
+                        for (int xx = cell.x - fillRadius; xx <= cell.x + fillRadius; ++xx) {
+                            if (!grid.inBounds(xx, yy)) {
+                                continue;
+                            }
+                            const int label = labels[static_cast<std::size_t>(indexOf(xx, yy))];
+                            if (label <= 0) {
+                                continue;
+                            }
+                            if (firstLabel == 0) {
+                                firstLabel = label;
+                            } else if (firstLabel != label) {
+                                conflictingSeed = true;
+                            }
+                        }
+                    }
+                    if (firstLabel <= 0) {
+                        continue;
+                    }
+                    ownerDistance[i] = 0;
+                    if (conflictingSeed) {
+                        owner[i] = -2;
+                    } else {
+                        owner[i] = firstLabel;
+                        ownerQueue.push(static_cast<int>(i));
+                    }
+                }
+
+                while (!ownerQueue.empty()) {
+                    const int currentIndex = ownerQueue.front();
+                    ownerQueue.pop();
+                    if (owner[currentIndex] <= 0) {
+                        continue;
+                    }
+                    const Cell& cell = component[static_cast<std::size_t>(currentIndex)];
+                    const int nextDistance = ownerDistance[static_cast<std::size_t>(currentIndex)] + 1;
+                    for (const auto& offset : offsets) {
+                        const int nxCell = cell.x + offset[0];
+                        const int nyCell = cell.y + offset[1];
+                        if (!grid.inBounds(nxCell, nyCell)) {
+                            continue;
+                        }
+                        const auto it = localIndexByPosition.find(indexOf(nxCell, nyCell));
+                        if (it == localIndexByPosition.end()) {
+                            continue;
+                        }
+                        const int neighborIndex = it->second;
+                        if (owner[static_cast<std::size_t>(neighborIndex)] == -2) {
+                            continue;
+                        }
+                        if (ownerDistance[static_cast<std::size_t>(neighborIndex)] < 0) {
+                            ownerDistance[static_cast<std::size_t>(neighborIndex)] = nextDistance;
+                            owner[static_cast<std::size_t>(neighborIndex)] = owner[static_cast<std::size_t>(currentIndex)];
+                            ownerQueue.push(neighborIndex);
+                        } else if (ownerDistance[static_cast<std::size_t>(neighborIndex)] == nextDistance &&
+                            owner[static_cast<std::size_t>(neighborIndex)] != owner[static_cast<std::size_t>(currentIndex)]) {
+                            owner[static_cast<std::size_t>(neighborIndex)] = -2;
+                        }
+                    }
+                }
+
+                std::vector<unsigned char> boundaryBlocked(component.size(), 0);
+                for (std::size_t i = 0; i < component.size(); ++i) {
+                    if (owner[i] <= 0) {
+                        continue;
+                    }
+                    const Cell& cell = component[i];
+                    for (const auto& offset : offsets) {
+                        const int nxCell = cell.x + offset[0];
+                        const int nyCell = cell.y + offset[1];
+                        if (!grid.inBounds(nxCell, nyCell)) {
+                            continue;
+                        }
+                        const auto it = localIndexByPosition.find(indexOf(nxCell, nyCell));
+                        if (it == localIndexByPosition.end()) {
+                            continue;
+                        }
+                        const int neighborIndex = it->second;
+                        const int neighborOwner = owner[static_cast<std::size_t>(neighborIndex)];
+                        if (neighborOwner > 0 && neighborOwner != owner[i]) {
+                            boundaryBlocked[i] = 1;
+                            boundaryBlocked[static_cast<std::size_t>(neighborIndex)] = 1;
+                        }
+                    }
+                }
+
+                int addedCells = 0;
+                for (std::size_t i = 0; i < component.size(); ++i) {
+                    if (owner[i] > 0 && !boundaryBlocked[i]) {
+                        out.set(component[i].x, component[i].y, true);
+                        ++addedCells;
+                    }
+                }
+                if (addedCells > 0) {
+                    result.residualFillAddedCells += addedCells;
+                } else {
+                    ++result.residualFillRejectedComponents;
+                }
+            } else {
+                ++result.residualFillRejectedComponents;
+            }
+        }
+    }
+
+    return out;
 }
 
 std::vector<unsigned char> buildLocalGroupBelt(
@@ -2027,6 +2479,15 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
     if (options.residualFillRadius < 0) {
         throw std::runtime_error("residualFillRadius must be non-negative.");
     }
+    if (options.residualEdgeFillRadius < 0) {
+        throw std::runtime_error("residualEdgeFillRadius must be non-negative.");
+    }
+    if (options.residualEdgeFillMinValueRatio < 0.0) {
+        throw std::runtime_error("residualEdgeFillMinValueRatio must be non-negative.");
+    }
+    if (options.residualEdgeFillMaxPatchSpan < 1) {
+        throw std::runtime_error("residualEdgeFillMaxPatchSpan must be at least 1.");
+    }
     if (options.residualMinCells < 1) {
         throw std::runtime_error("residualMinCells must be at least 1.");
     }
@@ -2276,6 +2737,12 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
         if (options.postBeltCloseRadius > 0) {
             activeMask = closeMask(activeMask, options.postBeltCloseRadius);
         }
+        activeMask = fillResidualAttributesNearActiveBelt(
+            grid,
+            activeMask,
+            residualMask,
+            options,
+            result);
         if (options.rootAntiMerge && !keptBranchRefs.empty()) {
             const int ownershipRadius = options.beltRadius + options.postBeltCloseRadius + options.attributeEnvelopeRadius + 3;
             const std::vector<BranchGroup> branchGroups = groupBranchesByRootTrace(keptBranchRefs, options.maxGapAngle);

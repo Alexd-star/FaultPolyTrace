@@ -2,15 +2,13 @@
 import argparse
 import csv
 import json
-import math
-import os
-import re
 import sys
 from collections import deque
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageDraw
+
+from wkt_geometry import parse_wkt_polygon_with_holes, rasterize_polygon
 
 csv.field_size_limit(min(sys.maxsize, 2_147_483_647))
 
@@ -50,21 +48,6 @@ def read_geoeast_dat(path):
     return values, xs, ys, dx, dy
 
 
-def parse_wkt_polygon(wkt):
-    text = wkt.strip()
-    match = re.search(r"POLYGON\s*\(\((.*)\)\)", text, re.IGNORECASE)
-    if not match:
-        return []
-    coords = []
-    for pair in match.group(1).split(","):
-        parts = pair.strip().split()
-        if len(parts) >= 2:
-            coords.append((float(parts[0]), float(parts[1])))
-    if len(coords) > 1 and coords[0] == coords[-1]:
-        coords.pop()
-    return coords
-
-
 def read_polygons(path):
     polygons = []
     with open(path, "r", encoding="utf-8", errors="ignore", newline="") as f:
@@ -72,7 +55,7 @@ def read_polygons(path):
         for row in reader:
             if row.get("status", "").lower() != "kept":
                 continue
-            coords = parse_wkt_polygon(row.get("wkt", ""))
+            coords, holes = parse_wkt_polygon_with_holes(row.get("wkt", ""))
             if len(coords) >= 3:
                 polygons.append(
                     {
@@ -83,20 +66,10 @@ def read_polygons(path):
                         "mean_value_reported": float(row.get("mean_value", 0.0) or 0.0),
                         "max_value_reported": float(row.get("max_value", 0.0) or 0.0),
                         "coords": coords,
+                        "holes": holes,
                     }
                 )
     return polygons
-
-
-def rasterize_polygon(coords, width, height, xs, ys, dx, dy):
-    xmin_edge = float(xs.min() - 0.5 * dx)
-    ymax_edge = float(ys.max() + 0.5 * dy)
-    image = Image.new("L", (width, height), 0)
-    draw = ImageDraw.Draw(image)
-    pixel_coords = [((x - xmin_edge) / dx, (ymax_edge - y) / dy) for x, y in coords]
-    if len(pixel_coords) >= 3:
-        draw.polygon(pixel_coords, fill=1)
-    return np.asarray(image, dtype=bool)[::-1, :]
 
 
 def connected_components(mask, values=None, xs=None, ys=None):
@@ -201,26 +174,32 @@ def summarize_polygon(poly, mask, values, distance_to_weak, strong_threshold, we
     bbox_height = float(coord_arr[:, 1].max() - coord_arr[:, 1].min()) if coord_arr.size else 0.0
     bbox_aspect = max(bbox_width, bbox_height) / max(1e-9, min(bbox_width, bbox_height)) if bbox_width > 0.0 and bbox_height > 0.0 else 0.0
 
+    supported_low_ratio = max(0.0, low_ratio - far_low_ratio)
     risk_score = 0
     reasons = []
-    if len(strong_components) >= 4 and low_ratio >= 0.55 and bbox_aspect <= 4.0:
+    if len(strong_components) >= 4 and far_low_ratio >= 0.08 and bbox_aspect <= 4.0:
         risk_score += 3
-        reasons.append("低属性背景跨接多个强响应段，且整体形态不够细长")
+        reasons.append("远离弱响应的低属性背景跨接多个强响应段，且整体形态不够细长")
+    elif len(strong_components) >= 4 and low_ratio >= 0.55 and supported_low_ratio >= 0.50:
+        reasons.append("低值区主要贴近弱响应带，按断层带包络处理，不直接判为误合并")
     if len(strong_components) >= 8 and bbox_aspect <= 6.0:
-        risk_score += 1
-        reasons.append("强响应段数量较多，存在局部拆分复核价值")
-    if len(weak_components) >= 4 and bbox_aspect <= 4.0:
+        if far_low_ratio >= 0.03:
+            risk_score += 1
+            reasons.append("强响应段数量较多，且存在少量远背景低值区，需局部复核")
+        else:
+            reasons.append("强响应段数量较多，但低值区受弱响应支撑，倾向于连续断层带或交切复合区")
+    if len(weak_components) >= 4 and bbox_aspect <= 4.0 and far_low_ratio >= 0.03:
         risk_score += 1
         reasons.append("弱响应连通段较多且形态偏面状")
-    if mean_value < weak_threshold * 0.32 and poly["area"] >= median_area * 2.0:
+    if mean_value < weak_threshold * 0.32 and poly["area"] >= median_area * 2.0 and far_low_ratio >= 0.08:
         risk_score += 1
-        reasons.append("大面积多边形平均属性偏低")
-    if strong_ratio < 0.12 and poly["area"] >= median_area * 2.0:
+        reasons.append("大面积多边形平均属性偏低，且远背景包络偏多")
+    if strong_ratio < 0.12 and poly["area"] >= median_area * 2.0 and far_low_ratio >= 0.08:
         risk_score += 1
-        reasons.append("强响应面积占比偏低")
-    if poly["area"] >= median_area * 5.0 and bbox_aspect <= 4.0:
+        reasons.append("强响应面积占比偏低，且远背景包络偏多")
+    if poly["area"] >= median_area * 5.0 and bbox_aspect <= 4.0 and far_low_ratio >= 0.08:
         risk_score += 1
-        reasons.append("面积显著偏大且不够细长")
+        reasons.append("面积显著偏大且不够细长，同时远背景包络偏多")
 
     return {
         "id": poly["id"],
@@ -280,7 +259,7 @@ def main():
     distance_to_weak = distance_to_mask(weak_mask)
 
     for poly in polygons:
-        mask = rasterize_polygon(poly["coords"], width, height, xs, ys, dx, dy)
+        mask = rasterize_polygon(poly["coords"], width, height, xs, ys, dx, dy, poly.get("holes", []))
         total_mask |= mask
         row = summarize_polygon(
             poly,

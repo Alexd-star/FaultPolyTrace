@@ -12,6 +12,7 @@ struct Point {
 struct Polygon {
     int id = 0;
     std::vector<Point> points;
+    std::vector<std::vector<Point>> holes;
     double area = 0.0;
     double perimeter = 0.0;
     int cellCount = 0;

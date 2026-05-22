@@ -44,6 +44,7 @@ $diagnosisScript = Join-Path $PSScriptRoot "顶尖质量诊断.py"
 $runner = @"
 import runpy
 import sys
+sys.path.insert(0, r'$PSScriptRoot')
 sys.argv = [
     r'$diagnosisScript',
     '--dat', r'$OfficialDat',

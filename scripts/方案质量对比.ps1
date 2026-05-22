@@ -61,6 +61,7 @@ $baseArgs = @(
     "--no-separate-branch-belts",
     "--residual-percentile", "0.955",
     "--residual-fill-radius", "4",
+    "--residual-edge-fill-radius", "2",
     "--residual-min-cells", "2",
     "--residual-trace-min-length", "6",
     "--residual-trace-max-cells", "80",

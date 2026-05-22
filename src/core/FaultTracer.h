@@ -60,6 +60,9 @@ struct TraceOptions {
     bool residualTrace = false;
     double residualPercentile = 0.955;
     int residualFillRadius = 2;
+    int residualEdgeFillRadius = 2;
+    double residualEdgeFillMinValueRatio = 0.97;
+    int residualEdgeFillMaxPatchSpan = 5;
     int residualMinCells = 2;
     int residualTraceMinLength = 6;
     int residualTraceMaxCells = 160;
@@ -112,6 +115,9 @@ struct TraceResult {
     int localAntiMergeRejectedCutCells = 0;
     int localAntiMergeAcceptedComponents = 0;
     int localAntiMergeRejectedComponents = 0;
+    int residualFillCandidateCells = 0;
+    int residualFillAddedCells = 0;
+    int residualFillRejectedComponents = 0;
     int suppressedInternalRings = 0;
     int coveragePreserveSimplifyFallbackPolygons = 0;
     int coveragePreserveSmoothFallbackPolygons = 0;

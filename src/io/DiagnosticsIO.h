@@ -57,6 +57,9 @@ struct RunDiagnostics {
     bool residualTrace = false;
     double residualPercentile = 0.0;
     int residualFillRadius = 0;
+    int residualEdgeFillRadius = 0;
+    double residualEdgeFillMinValueRatio = 0.0;
+    int residualEdgeFillMaxPatchSpan = 0;
     int residualMinCells = 0;
     int residualTraceMinLength = 0;
     int residualTraceMaxCells = 0;
@@ -94,6 +97,9 @@ struct RunDiagnostics {
     int localAntiMergeRejectedCutCells = 0;
     int localAntiMergeAcceptedComponents = 0;
     int localAntiMergeRejectedComponents = 0;
+    int residualFillCandidateCells = 0;
+    int residualFillAddedCells = 0;
+    int residualFillRejectedComponents = 0;
     int suppressedInternalRings = 0;
     int coveragePreserveSimplifyFallbackPolygons = 0;
     int coveragePreserveSmoothFallbackPolygons = 0;

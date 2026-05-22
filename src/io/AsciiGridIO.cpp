@@ -11,18 +11,31 @@
 namespace fpt {
 namespace {
 
-void writePolygonWkt(std::ostream& out, const Polygon& polygon) {
-    out << "POLYGON((";
-    for (std::size_t i = 0; i < polygon.points.size(); ++i) {
+void writeRingWkt(std::ostream& out, const std::vector<Point>& points) {
+    out << "(";
+    for (std::size_t i = 0; i < points.size(); ++i) {
         if (i > 0) {
             out << ",";
         }
-        out << polygon.points[i].x << " " << polygon.points[i].y;
+        out << points[i].x << " " << points[i].y;
     }
-    if (!polygon.points.empty()) {
-        out << "," << polygon.points.front().x << " " << polygon.points.front().y;
+    if (!points.empty()) {
+        out << "," << points.front().x << " " << points.front().y;
     }
-    out << "))";
+    out << ")";
+}
+
+void writePolygonWkt(std::ostream& out, const Polygon& polygon) {
+    out << "POLYGON(";
+    writeRingWkt(out, polygon.points);
+    for (const std::vector<Point>& hole : polygon.holes) {
+        if (hole.size() < 3) {
+            continue;
+        }
+        out << ",";
+        writeRingWkt(out, hole);
+    }
+    out << ")";
 }
 
 void writeLineStringWkt(std::ostream& out, const std::vector<Point>& points) {

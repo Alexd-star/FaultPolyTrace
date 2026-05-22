@@ -2,7 +2,6 @@ import argparse
 import csv
 import json
 import os
-import re
 import sys
 from collections import deque
 from datetime import datetime
@@ -15,7 +14,8 @@ from matplotlib import font_manager
 from matplotlib.patches import Polygon as PolygonPatch
 import matplotlib.pyplot as plt
 import numpy as np
-from PIL import Image, ImageDraw
+
+from wkt_geometry import parse_wkt_polygon_with_holes, rasterize_polygon
 
 csv.field_size_limit(min(sys.maxsize, 2_147_483_647))
 
@@ -71,20 +71,6 @@ def read_geoeast_dat(path):
     return values, xs, ys, dx, dy, extent_edges
 
 
-def parse_wkt_polygon(wkt):
-    match = re.search(r"POLYGON\s*\(\((.*)\)\)", str(wkt).strip(), re.IGNORECASE)
-    if not match:
-        return []
-    coords = []
-    for pair in match.group(1).split(","):
-        parts = pair.strip().split()
-        if len(parts) >= 2:
-            coords.append((float(parts[0]), float(parts[1])))
-    if len(coords) > 1 and coords[0] == coords[-1]:
-        coords.pop()
-    return coords
-
-
 def read_polygons(path):
     polygons = []
     with open(path, "r", encoding="utf-8", errors="ignore", newline="") as f:
@@ -92,7 +78,7 @@ def read_polygons(path):
         for row in reader:
             if row.get("status", "").lower() != "kept":
                 continue
-            coords = parse_wkt_polygon(row.get("wkt", ""))
+            coords, holes = parse_wkt_polygon_with_holes(row.get("wkt", ""))
             if len(coords) < 3:
                 continue
             polygons.append(
@@ -103,6 +89,7 @@ def read_polygons(path):
                     "mean_value": float(row.get("mean_value", 0.0) or 0.0),
                     "max_value": float(row.get("max_value", 0.0) or 0.0),
                     "coords": coords,
+                    "holes": holes,
                 }
             )
     return polygons
@@ -115,22 +102,11 @@ def read_csv_rows(path):
         return list(csv.DictReader(f))
 
 
-def rasterize_polygon(coords, width, height, xs, ys, dx, dy):
-    xmin_edge = float(xs.min() - 0.5 * dx)
-    ymax_edge = float(ys.max() + 0.5 * dy)
-    image = Image.new("L", (width, height), 0)
-    draw = ImageDraw.Draw(image)
-    pixel_coords = [((x - xmin_edge) / dx, (ymax_edge - y) / dy) for x, y in coords]
-    if len(pixel_coords) >= 3:
-        draw.polygon(pixel_coords, fill=1)
-    return np.asarray(image, dtype=bool)[::-1, :]
-
-
 def rasterize_all(polygons, width, height, xs, ys, dx, dy):
     total = np.zeros((height, width), dtype=bool)
     by_id = {}
     for poly in polygons:
-        mask = rasterize_polygon(poly["coords"], width, height, xs, ys, dx, dy)
+        mask = rasterize_polygon(poly["coords"], width, height, xs, ys, dx, dy, poly.get("holes", []))
         total |= mask
         by_id[poly["id"]] = mask
     return total, by_id

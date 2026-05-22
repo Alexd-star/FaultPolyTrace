@@ -410,8 +410,8 @@ void FaultTraceDialog::buildUi() {
     mainLayout->addWidget(logEdit_, 1);
     mainLayout->addWidget(statusLabel_);
 
-    presetCombo_->setCurrentText(QString::fromUtf8("贴合融合推荐"));
-    applyParameterPreset(QString::fromUtf8("贴合融合推荐"));
+    presetCombo_->setCurrentText(QString::fromUtf8("防黏连增强"));
+    applyParameterPreset(QString::fromUtf8("防黏连增强"));
 }
 
 QString FaultTraceDialog::defaultRunnerPath() const {
@@ -649,6 +649,9 @@ QStringList FaultTraceDialog::traceArgs() const {
          << "--local-anti-merge-min-low-ratio" << QString::number(localAntiMergeMinLowRatioSpin_->value(), 'g', 12)
          << "--residual-percentile" << "0.955"
          << "--residual-fill-radius" << "4"
+         << "--residual-edge-fill-radius" << "2"
+         << "--residual-edge-fill-min-value-ratio" << "0.97"
+         << "--residual-edge-fill-max-patch-span" << "5"
          << "--residual-min-cells" << "2"
          << "--residual-trace-min-length" << QString::number(residualTraceMinLengthSpin_->value())
          << "--residual-trace-max-cells" << QString::number(residualTraceMaxCellsSpin_->value())

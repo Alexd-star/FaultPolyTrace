@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from wkt_geometry import parse_wkt_polygon_with_holes
+
 
 ROOT = Path(__file__).resolve().parents[1]
 EXE = ROOT / "build" / "faultpolytrace.exe"
@@ -81,6 +83,7 @@ def add_truth(
     min_centerline_coverage=0.99,
     target_centerline_coverage=1.0,
     min_band_coverage=0.72,
+    band_support_threshold=0.25,
     max_outside_band_ratio=0.80,
 ):
     centerline = set()
@@ -91,6 +94,7 @@ def add_truth(
     case["min_centerline_coverage"] = min_centerline_coverage
     case["target_centerline_coverage"] = target_centerline_coverage
     case["min_band_coverage"] = min_band_coverage
+    case["band_support_threshold"] = band_support_threshold
     case["max_outside_band_ratio"] = max_outside_band_ratio
     cases.append(case)
 
@@ -122,31 +126,42 @@ def write_grid(path, data):
             f.write(" ".join(f"{v:.6f}" for v in row) + "\n")
 
 
+def read_grid_values(path):
+    with path.open("r", encoding="utf-8", errors="ignore") as f:
+        nx, ny = map(int, f.readline().split())
+        f.readline()
+        f.readline()
+        values = []
+        for line in f:
+            values.extend(float(v) for v in line.split())
+    if len(values) != nx * ny:
+        raise RuntimeError(f"网格值数量与尺寸不一致：{path}")
+    return nx, ny, values
+
+
 def polygon_cells_from_csv(path, width, height):
     covered = set()
     with path.open("r", encoding="utf-8", errors="ignore", newline="") as f:
         for row in csv.DictReader(f):
             if row.get("status") != "kept":
                 continue
-            wkt = row.get("wkt", "")
-            if not wkt.upper().startswith("POLYGON((") or not wkt.endswith("))"):
-                continue
-            body = wkt[wkt.find("((") + 2:-2]
-            coords = []
-            for pair in body.split(","):
-                parts = pair.strip().split()
-                if len(parts) >= 2:
-                    coords.append((float(parts[0]), float(parts[1])))
+            coords, holes = parse_wkt_polygon_with_holes(row.get("wkt", ""))
             if len(coords) < 3:
                 continue
             min_x = max(0, int(math.floor(min(x for x, _ in coords))))
             max_x = min(width - 1, int(math.ceil(max(x for x, _ in coords))))
             min_y = max(0, int(math.floor(min(y for _, y in coords))))
             max_y = min(height - 1, int(math.ceil(max(y for _, y in coords))))
+            for hole in holes:
+                min_x = max(0, min(min_x, int(math.floor(min(x for x, _ in hole)))))
+                max_x = min(width - 1, max(max_x, int(math.ceil(max(x for x, _ in hole)))))
+                min_y = max(0, min(min_y, int(math.floor(min(y for _, y in hole)))))
+                max_y = min(height - 1, max(max_y, int(math.ceil(max(y for _, y in hole)))))
             for y in range(min_y, max_y + 1):
                 cy = y + 0.5
                 for x in range(min_x, max_x + 1):
-                    if point_in_polygon(x + 0.5, cy, coords):
+                    px = x + 0.5
+                    if point_in_polygon(px, cy, coords) and not any(point_in_polygon(px, cy, hole) for hole in holes):
                         covered.add((x, y))
     return covered
 
@@ -219,10 +234,10 @@ def make_cases():
         "name": "case_02_broken_fault",
         "title": "断续断层自动补连",
         "path": path,
-        "args": ["--percentile", "0.95", "--min-area", "10"],
+        "args": ["--percentile", "0.95", "--min-area", "10", "--max-gap-distance", "15", "--max-gap-angle", "60"],
         "min_polygons": 1,
         "max_elapsed_ms": 3000,
-    }, width, height, lines, truth_radius=4.0, min_centerline_coverage=0.97, min_band_coverage=0.70, max_outside_band_ratio=0.60)
+    }, width, height, lines, truth_radius=4.0, min_centerline_coverage=0.97, min_band_coverage=0.98, band_support_threshold=0.25, max_outside_band_ratio=0.60)
 
     width, height = 180, 110
     lines = [[(14, 78), (50, 70), (86, 63), (128, 52), (166, 44)], [(32, 28), (75, 42), (122, 58), (160, 80)]]
@@ -240,7 +255,7 @@ def make_cases():
         "args": ["--percentile", "0.98", "--weak-percentile", "0.965", "--weak-connect-radius", "1", "--min-area", "20"],
         "min_polygons": 1,
         "max_elapsed_ms": 3000,
-    }, width, height, lines, truth_radius=4.0, min_band_coverage=0.76, max_outside_band_ratio=0.60)
+    }, width, height, lines, truth_radius=4.0, min_band_coverage=0.98, band_support_threshold=0.25, max_outside_band_ratio=0.60)
 
     width, height = 150, 110
     lines = [[(18, 82), (58, 68), (98, 55), (135, 36)], [(35, 24), (70, 42), (114, 70)]]
@@ -254,10 +269,10 @@ def make_cases():
         "name": "case_04_wide_belts",
         "title": "宽断层带响应",
         "path": path,
-        "args": ["--percentile", "0.95", "--min-area", "20"],
+        "args": ["--percentile", "0.95", "--min-area", "20", "--belt-radius", "5", "--attribute-envelope-radius", "3"],
         "min_polygons": 1,
         "max_elapsed_ms": 3000,
-    }, width, height, lines, truth_radius=6.0, min_band_coverage=0.78, max_outside_band_ratio=0.55)
+    }, width, height, lines, truth_radius=6.0, min_band_coverage=0.96, band_support_threshold=0.25, max_outside_band_ratio=0.55)
 
     width, height = 170, 120
     lines = [[(15, 20), (55, 34), (95, 45), (150, 60)], [(35, 96), (70, 83), (112, 75), (155, 88)]]
@@ -275,7 +290,7 @@ def make_cases():
         "min_polygons": 1,
         "max_polygons": 80,
         "max_elapsed_ms": 3000,
-    }, width, height, lines, truth_radius=4.0, min_band_coverage=0.74, max_outside_band_ratio=0.70)
+    }, width, height, lines, truth_radius=4.0, min_band_coverage=0.95, band_support_threshold=0.25, max_outside_band_ratio=0.70)
 
     width, height = 180, 120
     lines = [[(18, 35), (62, 43), (112, 51), (160, 60)], [(20, 75), (65, 82), (112, 88), (158, 98)]]
@@ -293,7 +308,7 @@ def make_cases():
         "min_polygons": 2,
         "max_polygons": 12,
         "max_elapsed_ms": 3000,
-    }, width, height, lines, truth_radius=4.0, min_band_coverage=0.78, max_outside_band_ratio=0.55)
+    }, width, height, lines, truth_radius=4.0, min_band_coverage=0.98, band_support_threshold=0.25, max_outside_band_ratio=0.55)
 
     return cases
 
@@ -345,11 +360,20 @@ def run_case(case):
     kept = sum(1 for row in rows if row.get("status") == "kept")
     truth_centerline_cells = case.get("truth_centerline_cells", set())
     truth_band_cells = case.get("truth_band_cells", set())
+    grid_width, grid_height, grid_values = read_grid_values(case["path"])
+    if grid_width != diag["grid"]["nx"] or grid_height != diag["grid"]["ny"]:
+        raise RuntimeError(f"网格尺寸与诊断结果不一致：{case['path']}")
+    support_threshold = float(case.get("band_support_threshold", 0.25))
+    supported_band_cells = {
+        (i % grid_width, i // grid_width)
+        for i, value in enumerate(grid_values)
+        if value >= support_threshold and (i % grid_width, i // grid_width) in truth_band_cells
+    }
     covered_cells = polygon_cells_from_csv(out_csv, diag["grid"]["nx"], diag["grid"]["ny"]) if truth_centerline_cells else set()
     centerline_covered = len(truth_centerline_cells & covered_cells)
     centerline_coverage = centerline_covered / len(truth_centerline_cells) if truth_centerline_cells else 1.0
-    band_covered = len(truth_band_cells & covered_cells)
-    band_coverage = band_covered / len(truth_band_cells) if truth_band_cells else 1.0
+    band_covered = len(supported_band_cells & covered_cells)
+    band_coverage = band_covered / len(supported_band_cells) if supported_band_cells else 1.0
     outside_band_ratio = (
         max(0, len(covered_cells) - len(covered_cells & truth_band_cells)) / len(covered_cells)
         if covered_cells else 0.0
@@ -385,9 +409,10 @@ def run_case(case):
         "truth_centerline_cells": len(truth_centerline_cells),
         "centerline_covered": centerline_covered,
         "centerline_coverage": centerline_coverage,
-        "truth_band_cells": len(truth_band_cells),
+        "truth_band_cells": len(supported_band_cells),
         "band_covered": band_covered,
         "band_coverage": band_coverage,
+        "band_support_threshold": support_threshold,
         "outside_band_ratio": outside_band_ratio,
         "connected_gaps": diag["skeleton"]["connectedGaps"],
         "open_rings": diag["topology"]["openRings"],
@@ -415,7 +440,7 @@ def write_report(results):
     lines.append(f"- 通过场景：{len(results) - len(failed)}")
     lines.append(f"- 未通过场景：{len(failed)}")
     lines.append(f"- 总体结论：{'通过' if not failed else '存在需修正场景'}")
-    lines.extend(["", "## 2. 场景结果", "", "| 场景 | 结论 | 多边形 | 中心线覆盖率 | 断层带覆盖率 | 带外覆盖比例 | 补连 | 开环 | 自交 | 多边形相交 | 总耗时 ms | 说明 | 质量提示 |", "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|"])
+    lines.extend(["", "## 2. 场景结果", "", "| 场景 | 结论 | 多边形 | 中心线覆盖率 | 支撑带覆盖率 | 带外覆盖比例 | 补连 | 开环 | 自交 | 多边形相交 | 总耗时 ms | 说明 | 质量提示 |", "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|"])
     for r in results:
         lines.append(
             f"| {r['title']} | {'通过' if r['passed'] else '未通过'} | "
@@ -434,7 +459,9 @@ def write_report(results):
         "",
         "通过本验证只能说明当前算法具备基础泛化能力，不能等价于商业产品已在所有地质区块中完全成熟。正式企业级产品还应增加真实多区块数据回归集、人工解释对照、参数自动推荐和交互式质控闭环。",
         "",
-        "中心线覆盖率是第一硬门槛，但不再用绝对 100% 作为通过线。原因是合成中心线按离散采样点计算，端点、斜线采样和多边形边界栅格化会带来少量口径误差。当前硬门槛通常为 99%，断续场景为 97%；100% 作为冲顶目标和质量提示保留。断层带覆盖率和带外覆盖比例是第二层产品质量指标，用于检查边界是否贴合、是否过度解释。该指标比单纯统计多边形数量更接近产品级验收逻辑。",
+        "中心线覆盖率是第一硬门槛，但不再用绝对 100% 作为通过线。原因是合成中心线按离散采样点计算，端点、斜线采样和多边形边界栅格化会带来少量口径误差。当前硬门槛通常为 99%，断续场景为 97%；100% 作为冲顶目标和质量提示保留。",
+        "",
+        "支撑带覆盖率只统计真值断层带内且属性值达到支撑阈值的像元，不再把几何半径内所有弱背景都视为必须覆盖对象。这样更符合实际断层属性解释：边缘属性已经衰减到背景水平的区域不应强制并入多边形，否则会鼓励过宽包络。带外覆盖比例仍按几何真值带统计，用于检查算法是否向断层外过度扩张。",
     ])
     report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return report_path
@@ -450,7 +477,7 @@ def main():
     fields = [
         "name", "title", "passed", "reason", "warning", "note", "kept", "polygon_count", "active_cells",
         "truth_centerline_cells", "centerline_covered", "centerline_coverage",
-        "truth_band_cells", "band_covered", "band_coverage", "outside_band_ratio",
+        "truth_band_cells", "band_covered", "band_coverage", "band_support_threshold", "outside_band_ratio",
         "connected_gaps", "open_rings", "self_intersections", "polygon_intersections",
         "trace_ms", "elapsed_ms", "output",
     ]

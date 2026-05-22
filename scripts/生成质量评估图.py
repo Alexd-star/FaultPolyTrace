@@ -10,11 +10,11 @@ import matplotlib
 
 matplotlib.use("Agg")
 from matplotlib import font_manager
-from matplotlib.path import Path as MplPath
 from matplotlib.patches import Polygon as PolygonPatch
 import matplotlib.pyplot as plt
 import numpy as np
-from PIL import Image, ImageDraw
+
+from wkt_geometry import parse_wkt_polygon_with_holes, rasterize_polygon
 
 csv.field_size_limit(min(sys.maxsize, 2_147_483_647))
 
@@ -66,20 +66,6 @@ def read_geoeast_dat(path):
     return values, xs, ys, dx, dy, extent_edges, extent_centers
 
 
-def parse_wkt_polygon(wkt):
-    match = re.search(r"POLYGON\s*\(\((.*)\)\)", wkt.strip(), re.IGNORECASE)
-    if not match:
-        return []
-    coords = []
-    for pair in match.group(1).split(","):
-        parts = pair.strip().split()
-        if len(parts) >= 2:
-            coords.append((float(parts[0]), float(parts[1])))
-    if len(coords) > 1 and coords[0] == coords[-1]:
-        coords.pop()
-    return coords
-
-
 def read_polygons(csv_path):
     polygons = []
     with open(csv_path, "r", encoding="utf-8", errors="ignore", newline="") as f:
@@ -87,9 +73,9 @@ def read_polygons(csv_path):
         for row in reader:
             if row.get("status", "").lower() != "kept":
                 continue
-            coords = parse_wkt_polygon(row.get("wkt", ""))
+            coords, holes = parse_wkt_polygon_with_holes(row.get("wkt", ""))
             if len(coords) >= 3:
-                polygons.append(coords)
+                polygons.append({"coords": coords, "holes": holes})
     return polygons
 
 
@@ -98,18 +84,10 @@ def rasterize_polygons(polygons, xs, ys):
         return np.zeros((len(ys), len(xs)), dtype=bool)
     dx = abs(xs[1] - xs[0]) if len(xs) > 1 else 1.0
     dy = abs(ys[1] - ys[0]) if len(ys) > 1 else 1.0
-    xmin_edge = float(xs.min() - 0.5 * dx)
-    ymax_edge = float(ys.max() + 0.5 * dy)
-    image = Image.new("L", (len(xs), len(ys)), 0)
-    draw = ImageDraw.Draw(image)
-    for coords in polygons:
-        pixel_coords = [
-            ((x - xmin_edge) / dx, (ymax_edge - y) / dy)
-            for x, y in coords
-        ]
-        if len(pixel_coords) >= 3:
-            draw.polygon(pixel_coords, fill=1)
-    return np.asarray(image, dtype=bool)[::-1, :]
+    total = np.zeros((len(ys), len(xs)), dtype=bool)
+    for poly in polygons:
+        total |= rasterize_polygon(poly["coords"], len(xs), len(ys), xs, ys, dx, dy, poly.get("holes", []))
+    return total
 
 
 def line_like_pixels(values, threshold):
@@ -125,12 +103,15 @@ def draw_official_style(ax, values, extent_edges):
 
 
 def draw_polygons(ax, polygons, fill=False):
-    for coords in polygons:
-        arr = np.asarray(coords, dtype=float)
+    for poly in polygons:
+        arr = np.asarray(poly["coords"], dtype=float)
         if fill:
             ax.add_patch(PolygonPatch(arr, closed=True, facecolor="#ff2020", edgecolor="#e00000", linewidth=0.36, alpha=0.18))
         else:
             ax.plot(arr[:, 0], arr[:, 1], color="#e00000", linewidth=0.42, alpha=0.95)
+        for hole in poly.get("holes", []):
+            hole_arr = np.asarray(hole, dtype=float)
+            ax.plot(hole_arr[:, 0], hole_arr[:, 1], color="#e00000", linewidth=0.32, alpha=0.75, linestyle="--")
 
 
 def set_axes(ax, extent_edges):
@@ -197,6 +178,26 @@ def render_run_figures(values, extent_edges, polygons, output_dir, name):
     plt.close(fig)
 
 
+def collect_result_csvs(runs_dir):
+    csv_paths = []
+    for csv_path in sorted(runs_dir.glob("*.csv")):
+        csv_paths.append(csv_path)
+    for csv_path in sorted(runs_dir.glob("*/*.csv")):
+        csv_paths.append(csv_path)
+    return csv_paths
+
+
+def is_result_csv(csv_path):
+    name = csv_path.name
+    if name.endswith(".branches.csv") or name.endswith(".topology.csv"):
+        return False
+    if name.lower().startswith("run_manifest"):
+        return False
+    if name in {"方案质量对比.csv", "质量评估汇总.csv"}:
+        return False
+    return True
+
+
 def main():
     configure_chinese_font()
     parser = argparse.ArgumentParser(description="生成断层多边形质量评估图和覆盖率指标")
@@ -218,12 +219,12 @@ def main():
 
     summary = []
     include_pattern = re.compile(args.include_regex) if args.include_regex else None
-    for csv_path in sorted(runs_dir.glob("*.csv")):
-        if csv_path.name.endswith(".branches.csv") or csv_path.name.endswith(".topology.csv"):
-            continue
-        if csv_path.name.lower().startswith("run_manifest"):
+    for csv_path in collect_result_csvs(runs_dir):
+        if not is_result_csv(csv_path):
             continue
         name = csv_path.stem
+        if csv_path.parent != runs_dir:
+            name = f"{csv_path.parent.name}_{name}"
         if include_pattern and not include_pattern.search(name):
             continue
         polygons = read_polygons(csv_path)

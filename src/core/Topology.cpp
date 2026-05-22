@@ -38,6 +38,14 @@ Bounds polygonBounds(const Polygon& polygon) {
         bounds.maxX = std::max(bounds.maxX, point.x);
         bounds.maxY = std::max(bounds.maxY, point.y);
     }
+    for (const std::vector<Point>& hole : polygon.holes) {
+        for (const Point& point : hole) {
+            bounds.minX = std::min(bounds.minX, point.x);
+            bounds.minY = std::min(bounds.minY, point.y);
+            bounds.maxX = std::max(bounds.maxX, point.x);
+            bounds.maxY = std::max(bounds.maxY, point.y);
+        }
+    }
     return bounds;
 }
 
@@ -48,13 +56,25 @@ bool boundsOverlap(const Bounds& a, const Bounds& b) {
         && a.maxY + Epsilon >= b.minY;
 }
 
-std::vector<SegmentRef> buildSegments(const Polygon& polygon) {
+std::vector<SegmentRef> buildSegmentsFromRing(const std::vector<Point>& ring) {
     std::vector<SegmentRef> segments;
-    segments.reserve(polygon.points.size());
-    for (std::size_t i = 0; i < polygon.points.size(); ++i) {
-        const Point& a = polygon.points[i];
-        const Point& b = polygon.points[(i + 1) % polygon.points.size()];
+    segments.reserve(ring.size());
+    for (std::size_t i = 0; i < ring.size(); ++i) {
+        const Point& a = ring[i];
+        const Point& b = ring[(i + 1) % ring.size()];
         segments.push_back({&a, &b, makeBounds(a, b)});
+    }
+    return segments;
+}
+
+std::vector<SegmentRef> buildSegments(const Polygon& polygon) {
+    std::vector<SegmentRef> segments = buildSegmentsFromRing(polygon.points);
+    for (const std::vector<Point>& hole : polygon.holes) {
+        if (hole.size() < 3) {
+            continue;
+        }
+        std::vector<SegmentRef> holeSegments = buildSegmentsFromRing(hole);
+        segments.insert(segments.end(), holeSegments.begin(), holeSegments.end());
     }
     return segments;
 }
@@ -69,6 +89,31 @@ bool onSegment(const Point& a, const Point& b, const Point& p) {
         && p.x <= std::max(a.x, b.x) + Epsilon
         && p.y >= std::min(a.y, b.y) - Epsilon
         && p.y <= std::max(a.y, b.y) + Epsilon;
+}
+
+bool collinearSegmentsOverlapInLine(const Point& a, const Point& b, const Point& c, const Point& d) {
+    if (std::abs(orient(a, b, c)) > Epsilon || std::abs(orient(a, b, d)) > Epsilon) {
+        return false;
+    }
+    const double overlapX = std::min(std::max(a.x, b.x), std::max(c.x, d.x)) -
+        std::max(std::min(a.x, b.x), std::min(c.x, d.x));
+    const double overlapY = std::min(std::max(a.y, b.y), std::max(c.y, d.y)) -
+        std::max(std::min(a.y, b.y), std::min(c.y, d.y));
+    return std::max(overlapX, overlapY) > Epsilon;
+}
+
+bool segmentsCrossOrOverlap(const Point& a, const Point& b, const Point& c, const Point& d) {
+    const double o1 = orient(a, b, c);
+    const double o2 = orient(a, b, d);
+    const double o3 = orient(c, d, a);
+    const double o4 = orient(c, d, b);
+
+    const bool straddlesAB = (o1 > Epsilon && o2 < -Epsilon) || (o1 < -Epsilon && o2 > Epsilon);
+    const bool straddlesCD = (o3 > Epsilon && o4 < -Epsilon) || (o3 < -Epsilon && o4 > Epsilon);
+    if (straddlesAB && straddlesCD) {
+        return true;
+    }
+    return collinearSegmentsOverlapInLine(a, b, c, d);
 }
 
 bool segmentsIntersect(const Point& a, const Point& b, const Point& c, const Point& d) {
@@ -136,13 +181,13 @@ bool adjacentEdges(std::size_t edgeA, std::size_t edgeB, std::size_t edgeCount) 
     return false;
 }
 
-bool polygonSelfIntersects(const Polygon& polygon, TopologyDiagnostics& diagnostics) {
-    const std::size_t n = polygon.points.size();
+bool ringSelfIntersects(const std::vector<Point>& ring, const Polygon& polygon, int ringIndex, TopologyDiagnostics& diagnostics) {
+    const std::size_t n = ring.size();
     if (n < 4) {
         return false;
     }
     bool found = false;
-    const std::vector<SegmentRef> segments = buildSegments(polygon);
+    const std::vector<SegmentRef> segments = buildSegmentsFromRing(ring);
     for (std::size_t i = 0; i < n; ++i) {
         const SegmentRef& first = segments[i];
         for (std::size_t j = i + 1; j < n; ++j) {
@@ -156,7 +201,7 @@ bool polygonSelfIntersects(const Polygon& polygon, TopologyDiagnostics& diagnost
             if (segmentsIntersect(*first.a, *first.b, *second.a, *second.b)) {
                 found = true;
                 diagnostics.selfIntersectionDetails.push_back({
-                    "self",
+                    ringIndex == 0 ? "self" : "hole-self",
                     polygon.id,
                     polygon.id,
                     static_cast<int>(i),
@@ -164,6 +209,55 @@ bool polygonSelfIntersects(const Polygon& polygon, TopologyDiagnostics& diagnost
                     approximateIntersectionPoint(*first.a, *first.b, *second.a, *second.b)
                 });
             }
+        }
+    }
+    return found;
+}
+
+bool ringsIntersect(
+    const std::vector<Point>& aRing,
+    const std::vector<Point>& bRing,
+    const Polygon& polygon,
+    int ringAIndex,
+    int ringBIndex,
+    TopologyDiagnostics& diagnostics) {
+    if (aRing.size() < 3 || bRing.size() < 3) {
+        return false;
+    }
+
+    bool found = false;
+    const std::vector<SegmentRef> aSegments = buildSegmentsFromRing(aRing);
+    const std::vector<SegmentRef> bSegments = buildSegmentsFromRing(bRing);
+    for (std::size_t i = 0; i < aSegments.size(); ++i) {
+        const SegmentRef& a = aSegments[i];
+        for (std::size_t j = 0; j < bSegments.size(); ++j) {
+            const SegmentRef& b = bSegments[j];
+            if (!boundsOverlap(a.bounds, b.bounds)) {
+                continue;
+            }
+            if (segmentsCrossOrOverlap(*a.a, *a.b, *b.a, *b.b)) {
+                found = true;
+                diagnostics.selfIntersectionDetails.push_back({
+                    ringAIndex == 0 || ringBIndex == 0 ? "hole-exterior" : "hole-hole",
+                    polygon.id,
+                    polygon.id,
+                    static_cast<int>(i),
+                    static_cast<int>(j),
+                    approximateIntersectionPoint(*a.a, *a.b, *b.a, *b.b)
+                });
+            }
+        }
+    }
+    return found;
+}
+
+bool polygonSelfIntersects(const Polygon& polygon, TopologyDiagnostics& diagnostics) {
+    bool found = ringSelfIntersects(polygon.points, polygon, 0, diagnostics);
+    for (std::size_t i = 0; i < polygon.holes.size(); ++i) {
+        found = ringSelfIntersects(polygon.holes[i], polygon, static_cast<int>(i + 1), diagnostics) || found;
+        found = ringsIntersect(polygon.points, polygon.holes[i], polygon, 0, static_cast<int>(i + 1), diagnostics) || found;
+        for (std::size_t j = i + 1; j < polygon.holes.size(); ++j) {
+            found = ringsIntersect(polygon.holes[i], polygon.holes[j], polygon, static_cast<int>(i + 1), static_cast<int>(j + 1), diagnostics) || found;
         }
     }
     return found;
@@ -179,14 +273,14 @@ bool polygonsIntersect(const Polygon& aPoly, const Polygon& bPoly, TopologyDiagn
     bool found = false;
     const std::vector<SegmentRef> aSegments = buildSegments(aPoly);
     const std::vector<SegmentRef> bSegments = buildSegments(bPoly);
-    for (std::size_t i = 0; i < aPoly.points.size(); ++i) {
+    for (std::size_t i = 0; i < aSegments.size(); ++i) {
         const SegmentRef& a = aSegments[i];
-        for (std::size_t j = 0; j < bPoly.points.size(); ++j) {
+        for (std::size_t j = 0; j < bSegments.size(); ++j) {
             const SegmentRef& b = bSegments[j];
             if (!boundsOverlap(a.bounds, b.bounds)) {
                 continue;
             }
-            if (segmentsIntersect(*a.a, *a.b, *b.a, *b.b)) {
+            if (segmentsCrossOrOverlap(*a.a, *a.b, *b.a, *b.b)) {
                 found = true;
                 diagnostics.polygonIntersectionDetails.push_back({
                     "polygon",

@@ -3,7 +3,6 @@ import argparse
 import csv
 import json
 import os
-import re
 import sys
 from collections import deque
 from pathlib import Path
@@ -15,7 +14,8 @@ from matplotlib import font_manager
 from matplotlib.patches import Polygon as PolygonPatch
 import matplotlib.pyplot as plt
 import numpy as np
-from PIL import Image, ImageDraw
+
+from wkt_geometry import parse_wkt_polygon_with_holes, rasterize_polygon
 
 csv.field_size_limit(min(sys.maxsize, 2_147_483_647))
 
@@ -69,20 +69,6 @@ def read_geoeast_dat(path):
     return values, xs, ys, dx, dy, extent_edges
 
 
-def parse_wkt_polygon(wkt):
-    match = re.search(r"POLYGON\s*\(\((.*)\)\)", str(wkt).strip(), re.IGNORECASE)
-    if not match:
-        return []
-    coords = []
-    for pair in match.group(1).split(","):
-        parts = pair.strip().split()
-        if len(parts) >= 2:
-            coords.append((float(parts[0]), float(parts[1])))
-    if len(coords) > 1 and coords[0] == coords[-1]:
-        coords.pop()
-    return coords
-
-
 def read_polygons(path):
     polygons = {}
     with open(path, "r", encoding="utf-8", errors="ignore", newline="") as f:
@@ -90,7 +76,7 @@ def read_polygons(path):
         for row in reader:
             if row.get("status", "").lower() != "kept":
                 continue
-            coords = parse_wkt_polygon(row.get("wkt", ""))
+            coords, holes = parse_wkt_polygon_with_holes(row.get("wkt", ""))
             if len(coords) < 3:
                 continue
             poly_id = int(float(row.get("id", len(polygons) + 1) or 0))
@@ -101,6 +87,7 @@ def read_polygons(path):
                 "mean_value": float(row.get("mean_value", 0.0) or 0.0),
                 "max_value": float(row.get("max_value", 0.0) or 0.0),
                 "coords": coords,
+                "holes": holes,
             }
     return polygons
 
@@ -120,16 +107,6 @@ def read_suspect_ids(path):
             rows[poly_id] = row
             order.append(poly_id)
     return rows, order
-
-
-def rasterize_polygon(coords, width, height, xs, ys, dx, dy):
-    xmin_edge = float(xs.min() - 0.5 * dx)
-    ymax_edge = float(ys.max() + 0.5 * dy)
-    image = Image.new("L", (width, height), 0)
-    draw = ImageDraw.Draw(image)
-    pixel_coords = [((x - xmin_edge) / dx, (ymax_edge - y) / dy) for x, y in coords]
-    draw.polygon(pixel_coords, fill=1)
-    return np.asarray(image, dtype=bool)[::-1, :]
 
 
 def connected_components(mask, min_cells=1):
@@ -281,7 +258,7 @@ def main():
     height, width = values.shape
     for poly_id in candidate_ids:
         poly = polygons[poly_id]
-        poly_mask = rasterize_polygon(poly["coords"], width, height, xs, ys, dx, dy)
+        poly_mask = rasterize_polygon(poly["coords"], width, height, xs, ys, dx, dy, poly.get("holes", []))
         polygon_cells = int(np.count_nonzero(poly_mask))
         if polygon_cells <= 0:
             continue
@@ -296,13 +273,16 @@ def main():
         bridge_cells = int(np.count_nonzero(bridge_mask))
         strong_parts, _ = connected_components(strong_mask, min_cells=3)
         weak_parts, _ = connected_components(weak_mask, min_cells=3)
+        crossing_like = len(strong_parts) >= 12 and len(weak_parts) >= 4 and len(major_parts) >= 2
 
         suspect = suspect_rows.get(poly_id, {})
         risk_level = suspect.get("risk_level", "")
         risk_score = suspect.get("risk_score", "")
         low_ratio = ratio(np.count_nonzero(low_mask), polygon_cells)
         recommendation = "保留观察"
-        if len(major_parts) >= 2 and bridge_cells >= args.min_bridge_cells and (risk_level == "高" or low_ratio >= 0.60):
+        if crossing_like and bridge_cells >= args.min_bridge_cells:
+            recommendation = "交切复合区保留复核"
+        elif len(major_parts) >= 2 and bridge_cells >= args.min_bridge_cells and (risk_level == "高" or low_ratio >= 0.60):
             recommendation = "建议进入局部拆分候选"
         elif len(major_parts) >= 2 and bridge_cells >= args.min_bridge_cells:
             recommendation = "建议人工复核后决定是否拆分"
@@ -355,6 +335,7 @@ def main():
 
     split_candidates = [r for r in rows if r["recommendation"] == "建议进入局部拆分候选"]
     review_candidates = [r for r in rows if r["recommendation"] == "建议人工复核后决定是否拆分"]
+    crossing_candidates = [r for r in rows if r["recommendation"] == "交切复合区保留复核"]
     summary = {
         "input_dat": str(Path(args.dat)),
         "input_csv": str(Path(args.csv)),
@@ -362,9 +343,11 @@ def main():
         "checked_polygon_count": len(rows),
         "actionable_split_candidate_count": len(split_candidates),
         "manual_review_candidate_count": len(review_candidates),
+        "crossing_review_candidate_count": len(crossing_candidates),
         "figure_count": len(figures),
         "actionable_split_candidate_ids": [int(r["id"]) for r in split_candidates],
         "manual_review_candidate_ids": [int(r["id"]) for r in review_candidates],
+        "crossing_review_candidate_ids": [int(r["id"]) for r in crossing_candidates],
     }
     with open(out_dir / "局部防黏连候选摘要.json", "w", encoding="utf-8") as f:
         json.dump(summary, f, ensure_ascii=False, indent=2)
@@ -378,11 +361,12 @@ def main():
         f"- 疑似误合并表：`{args.suspect_csv}`" if args.suspect_csv else "- 疑似误合并表：未提供，按面积前 80 个多边形诊断",
         f"- 建议进入局部拆分候选：{len(split_candidates)} 个",
         f"- 建议人工复核后决定是否拆分：{len(review_candidates)} 个",
+        f"- 交切复合区保留复核：{len(crossing_candidates)} 个",
         f"- 已生成局部图：{len(figures)} 张",
         "",
         "## 2. 判定逻辑",
         "",
-        "本工具不直接修改正式结果。它先在疑似误合并多边形内部寻找低属性背景桥：如果切掉低属性像元后能形成两个以上有效主体，并且低属性桥接像元同时邻近多个主体，则认为该多边形存在局部拆分价值。该判断用于指导下一步算法拆分，不等同于直接判定结果错误。",
+        "本工具不直接修改正式结果。它先在疑似误合并多边形内部寻找低属性背景桥：如果切掉低属性像元后能形成两个以上有效主体，并且低属性桥接像元同时邻近多个主体，则认为该多边形存在局部拆分价值。对于强响应分支数量较多、弱响应段也较多的区域，优先标记为交切复合区保留复核，避免把真实断层交切关系错误拆散。该判断用于指导下一步算法拆分，不等同于直接判定结果错误。",
         "",
         "## 3. 优先复核对象",
         "",

@@ -243,19 +243,16 @@ void writeFaultPolygons(
     head.blue5 = head.blue;
 
     BAFaultPolygonData data;
-    for (const fpt::Polygon& polygon : polygons) {
-        if (keptOnly && !polygon.kept) {
-            continue;
-        }
-        if (polygon.points.size() < 3) {
-            continue;
+    auto appendRingSegment = [&](const std::vector<fpt::Point>& ring) {
+        if (ring.size() < 3) {
+            return;
         }
 
         BAFaultPolygonSegment segment;
         segment.type = FA_NORMAL;
         segment.closeFlag = 1;
 
-        for (const fpt::Point& sourcePoint : polygon.points) {
+        for (const fpt::Point& sourcePoint : ring) {
             BAFaultPolygonPoint point;
             point.x = sourcePoint.x;
             point.y = sourcePoint.y;
@@ -266,6 +263,20 @@ void writeFaultPolygons(
 
         data.faultPolygonList.push_back(segment);
         ++head.fauNum;
+    };
+
+    for (const fpt::Polygon& polygon : polygons) {
+        if (keptOnly && !polygon.kept) {
+            continue;
+        }
+        if (polygon.points.size() < 3) {
+            continue;
+        }
+
+        appendRingSegment(polygon.points);
+        for (const std::vector<fpt::Point>& hole : polygon.holes) {
+            appendRingSegment(hole);
+        }
     }
 
     if (head.fauNum == 0) {

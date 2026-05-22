@@ -32,6 +32,7 @@ def score_local_candidate_risk(local_summary):
         return 0.0, []
     actionable = int(local_summary.get("actionable_split_candidate_count", 0))
     manual = int(local_summary.get("manual_review_candidate_count", 0))
+    crossing = int(local_summary.get("crossing_review_candidate_count", 0))
     score = 0.0
     score -= min(2.5, actionable * 0.65)
     score -= min(0.8, manual * 0.20)
@@ -42,6 +43,10 @@ def score_local_candidate_risk(local_summary):
         notes.append(f"剩余可行动低值桥候选 {actionable} 个{suffix}")
     if manual:
         notes.append(f"剩余人工复核低值桥候选 {manual} 个")
+    if crossing:
+        ids = local_summary.get("crossing_review_candidate_ids", [])
+        suffix = f"：{ids}" if ids else ""
+        notes.append(f"交切复合区保留复核 {crossing} 个{suffix}")
     return round(clamp(score, -3.0, 0.0), 2), notes
 
 

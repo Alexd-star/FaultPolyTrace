@@ -65,6 +65,9 @@ struct CliOptions {
     bool residualTrace = false;
     double residualPercentile = 0.955;
     int residualFillRadius = 4;
+    int residualEdgeFillRadius = 2;
+    double residualEdgeFillMinValueRatio = 0.97;
+    int residualEdgeFillMaxPatchSpan = 5;
     int residualMinCells = 2;
     int residualTraceMinLength = 6;
     int residualTraceMaxCells = 80;
@@ -137,6 +140,9 @@ void printUsage() {
         << "  --no-residual-trace         Disable secondary residual trace. Default: off\n"
         << "  --residual-percentile <v>   Residual weak-response percentile. Default: 0.955\n"
         << "  --residual-fill-radius <n>  Residual fill reach from root trace in cells. Default: 4\n"
+        << "  --residual-edge-fill-radius <n> Controlled edge micro-fill radius in cells. Default: 2\n"
+        << "  --residual-edge-fill-min-value-ratio <v> Min value ratio for edge micro-fill. Default: 0.97\n"
+        << "  --residual-edge-fill-max-patch-span <n> Max patch width/height for edge micro-fill. Default: 5\n"
         << "  --residual-min-cells <n>    Minimum residual component cells. Default: 2\n"
         << "  --residual-trace-min-length <n> Minimum longest axis of secondary residual trace. Default: 6\n"
         << "  --residual-trace-max-cells <n> Maximum cells of one secondary residual trace, 0 unlimited. Default: 80\n"
@@ -313,6 +319,12 @@ CliOptions parseArgs(int argc, char** argv) {
             options.residualPercentile = std::stod(requireValue(arg));
         } else if (arg == "--residual-fill-radius") {
             options.residualFillRadius = std::stoi(requireValue(arg));
+        } else if (arg == "--residual-edge-fill-radius") {
+            options.residualEdgeFillRadius = std::stoi(requireValue(arg));
+        } else if (arg == "--residual-edge-fill-min-value-ratio") {
+            options.residualEdgeFillMinValueRatio = std::stod(requireValue(arg));
+        } else if (arg == "--residual-edge-fill-max-patch-span") {
+            options.residualEdgeFillMaxPatchSpan = std::stoi(requireValue(arg));
         } else if (arg == "--residual-min-cells") {
             options.residualMinCells = std::stoi(requireValue(arg));
         } else if (arg == "--residual-trace-min-length") {
@@ -425,6 +437,9 @@ int main(int argc, char** argv) {
         traceOptions.residualTrace = cli.residualTrace;
         traceOptions.residualPercentile = cli.residualPercentile;
         traceOptions.residualFillRadius = cli.residualFillRadius;
+        traceOptions.residualEdgeFillRadius = cli.residualEdgeFillRadius;
+        traceOptions.residualEdgeFillMinValueRatio = cli.residualEdgeFillMinValueRatio;
+        traceOptions.residualEdgeFillMaxPatchSpan = cli.residualEdgeFillMaxPatchSpan;
         traceOptions.residualMinCells = cli.residualMinCells;
         traceOptions.residualTraceMinLength = cli.residualTraceMinLength;
         traceOptions.residualTraceMaxCells = cli.residualTraceMaxCells;
@@ -508,6 +523,9 @@ int main(int argc, char** argv) {
         diagnostics.residualTrace = cli.residualTrace;
         diagnostics.residualPercentile = cli.residualPercentile;
         diagnostics.residualFillRadius = cli.residualFillRadius;
+        diagnostics.residualEdgeFillRadius = cli.residualEdgeFillRadius;
+        diagnostics.residualEdgeFillMinValueRatio = cli.residualEdgeFillMinValueRatio;
+        diagnostics.residualEdgeFillMaxPatchSpan = cli.residualEdgeFillMaxPatchSpan;
         diagnostics.residualMinCells = cli.residualMinCells;
         diagnostics.residualTraceMinLength = cli.residualTraceMinLength;
         diagnostics.residualTraceMaxCells = cli.residualTraceMaxCells;
@@ -545,6 +563,9 @@ int main(int argc, char** argv) {
         diagnostics.localAntiMergeRejectedCutCells = result.localAntiMergeRejectedCutCells;
         diagnostics.localAntiMergeAcceptedComponents = result.localAntiMergeAcceptedComponents;
         diagnostics.localAntiMergeRejectedComponents = result.localAntiMergeRejectedComponents;
+        diagnostics.residualFillCandidateCells = result.residualFillCandidateCells;
+        diagnostics.residualFillAddedCells = result.residualFillAddedCells;
+        diagnostics.residualFillRejectedComponents = result.residualFillRejectedComponents;
         diagnostics.suppressedInternalRings = result.suppressedInternalRings;
         diagnostics.coveragePreserveSimplifyFallbackPolygons = result.coveragePreserveSimplifyFallbackPolygons;
         diagnostics.coveragePreserveSmoothFallbackPolygons = result.coveragePreserveSmoothFallbackPolygons;

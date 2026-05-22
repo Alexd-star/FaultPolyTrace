@@ -107,6 +107,9 @@ void printUsage() {
         << "  --no-residual-trace\n"
         << "  --residual-percentile <0-1>\n"
         << "  --residual-fill-radius <count>\n"
+        << "  --residual-edge-fill-radius <count>\n"
+        << "  --residual-edge-fill-min-value-ratio <value>\n"
+        << "  --residual-edge-fill-max-patch-span <count>\n"
         << "  --residual-min-cells <count>\n"
         << "  --residual-trace-min-length <count>\n"
         << "  --residual-trace-max-cells <count>\n"
@@ -223,6 +226,7 @@ Options parseArgs(int argc, char** argv) {
     options.trace.residualTrace = false;
     options.trace.residualPercentile = 0.955;
     options.trace.residualFillRadius = 4;
+    options.trace.residualEdgeFillRadius = 2;
     options.trace.residualMinCells = 2;
     options.trace.residualTraceMinLength = 6;
     options.trace.residualTraceMaxCells = 80;
@@ -387,6 +391,12 @@ Options parseArgs(int argc, char** argv) {
             options.trace.residualPercentile = std::stod(requireValue(arg));
         } else if (arg == "--residual-fill-radius") {
             options.trace.residualFillRadius = std::stoi(requireValue(arg));
+        } else if (arg == "--residual-edge-fill-radius") {
+            options.trace.residualEdgeFillRadius = std::stoi(requireValue(arg));
+        } else if (arg == "--residual-edge-fill-min-value-ratio") {
+            options.trace.residualEdgeFillMinValueRatio = std::stod(requireValue(arg));
+        } else if (arg == "--residual-edge-fill-max-patch-span") {
+            options.trace.residualEdgeFillMaxPatchSpan = std::stoi(requireValue(arg));
         } else if (arg == "--residual-min-cells") {
             options.trace.residualMinCells = std::stoi(requireValue(arg));
         } else if (arg == "--residual-trace-min-length") {

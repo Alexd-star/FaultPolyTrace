@@ -93,6 +93,9 @@ void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
     out << "    \"residualTrace\": " << (d.residualTrace ? "true" : "false") << ",\n";
     out << "    \"residualPercentile\": " << d.residualPercentile << ",\n";
     out << "    \"residualFillRadius\": " << d.residualFillRadius << ",\n";
+    out << "    \"residualEdgeFillRadius\": " << d.residualEdgeFillRadius << ",\n";
+    out << "    \"residualEdgeFillMinValueRatio\": " << d.residualEdgeFillMinValueRatio << ",\n";
+    out << "    \"residualEdgeFillMaxPatchSpan\": " << d.residualEdgeFillMaxPatchSpan << ",\n";
     out << "    \"residualMinCells\": " << d.residualMinCells << ",\n";
     out << "    \"residualTraceMinLength\": " << d.residualTraceMinLength << ",\n";
     out << "    \"residualTraceMaxCells\": " << d.residualTraceMaxCells << ",\n";
@@ -138,6 +141,9 @@ void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
     out << "    \"localAntiMergeRejectedCutCells\": " << d.localAntiMergeRejectedCutCells << ",\n";
     out << "    \"localAntiMergeAcceptedComponents\": " << d.localAntiMergeAcceptedComponents << ",\n";
     out << "    \"localAntiMergeRejectedComponents\": " << d.localAntiMergeRejectedComponents << ",\n";
+    out << "    \"residualFillCandidateCells\": " << d.residualFillCandidateCells << ",\n";
+    out << "    \"residualFillAddedCells\": " << d.residualFillAddedCells << ",\n";
+    out << "    \"residualFillRejectedComponents\": " << d.residualFillRejectedComponents << ",\n";
     out << "    \"coveragePreserveSimplifyFallbackPolygons\": " << d.coveragePreserveSimplifyFallbackPolygons << ",\n";
     out << "    \"coveragePreserveSmoothFallbackPolygons\": " << d.coveragePreserveSmoothFallbackPolygons << ",\n";
     out << "    \"coveragePreserveTopologyOverridePolygons\": " << d.coveragePreserveTopologyOverridePolygons << "\n";
