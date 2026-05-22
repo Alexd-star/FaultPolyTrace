@@ -23,6 +23,76 @@ double pointSegmentDistanceSquared(const Point& p, const Point& a, const Point& 
     return squaredDistance(p, projection);
 }
 
+double signedArea(const std::vector<Point>& points) {
+    if (points.size() < 3) {
+        return 0.0;
+    }
+    double sum = 0.0;
+    for (std::size_t i = 0; i < points.size(); ++i) {
+        const Point& a = points[i];
+        const Point& b = points[(i + 1) % points.size()];
+        sum += a.x * b.y - b.x * a.y;
+    }
+    return 0.5 * sum;
+}
+
+Point centroidForScale(const std::vector<Point>& points) {
+    Point fallback;
+    if (points.empty()) {
+        return fallback;
+    }
+    for (const Point& point : points) {
+        fallback.x += point.x;
+        fallback.y += point.y;
+    }
+    fallback.x /= static_cast<double>(points.size());
+    fallback.y /= static_cast<double>(points.size());
+
+    const double area2 = signedArea(points) * 2.0;
+    if (std::abs(area2) <= 1e-12) {
+        return fallback;
+    }
+
+    Point centroid;
+    for (std::size_t i = 0; i < points.size(); ++i) {
+        const Point& a = points[i];
+        const Point& b = points[(i + 1) % points.size()];
+        const double cross = a.x * b.y - b.x * a.y;
+        centroid.x += (a.x + b.x) * cross;
+        centroid.y += (a.y + b.y) * cross;
+    }
+    centroid.x /= 3.0 * area2;
+    centroid.y /= 3.0 * area2;
+    if (!std::isfinite(centroid.x) || !std::isfinite(centroid.y)) {
+        return fallback;
+    }
+    return centroid;
+}
+
+std::vector<Point> compensateSmoothingArea(
+    const std::vector<Point>& original,
+    std::vector<Point> smoothed) {
+    constexpr double maxScale = 1.08;
+    const double originalArea = polygonArea(original);
+    const double smoothedArea = polygonArea(smoothed);
+    if (originalArea <= 1e-9 || smoothedArea <= 1e-9 || smoothedArea >= originalArea) {
+        return smoothed;
+    }
+
+    double scale = std::sqrt(originalArea / smoothedArea);
+    scale = std::min(maxScale, scale);
+    if (scale <= 1.000001) {
+        return smoothed;
+    }
+
+    const Point center = centroidForScale(smoothed);
+    for (Point& point : smoothed) {
+        point.x = center.x + (point.x - center.x) * scale;
+        point.y = center.y + (point.y - center.y) * scale;
+    }
+    return smoothed;
+}
+
 void simplifyOpenPolyline(
     const std::vector<Point>& points,
     std::size_t first,
@@ -72,16 +142,7 @@ std::vector<Point> rotateRingAtStableAnchor(const std::vector<Point>& points) {
 } // namespace
 
 double polygonArea(const std::vector<Point>& points) {
-    if (points.size() < 3) {
-        return 0.0;
-    }
-    double sum = 0.0;
-    for (std::size_t i = 0; i < points.size(); ++i) {
-        const Point& a = points[i];
-        const Point& b = points[(i + 1) % points.size()];
-        sum += a.x * b.y - b.x * a.y;
-    }
-    return std::abs(sum) * 0.5;
+    return std::abs(signedArea(points));
 }
 
 double polygonPerimeter(const std::vector<Point>& points) {
@@ -142,7 +203,7 @@ std::vector<Point> smoothRingChaikin(const std::vector<Point>& points, int itera
         }
         current = std::move(next);
     }
-    return current.size() >= 3 ? current : points;
+    return current.size() >= 3 ? compensateSmoothingArea(points, std::move(current)) : points;
 }
 
 } // namespace fpt
