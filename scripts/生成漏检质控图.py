@@ -13,7 +13,8 @@ from matplotlib import font_manager
 from matplotlib.patches import Polygon as PolygonPatch
 import matplotlib.pyplot as plt
 import numpy as np
-from PIL import Image, ImageDraw
+
+from wkt_geometry import parse_wkt_polygon_with_holes, rasterize_polygon
 
 csv.field_size_limit(min(sys.maxsize, 2_147_483_647))
 
@@ -59,20 +60,6 @@ def read_geoeast_dat(path):
     return values, xs, ys, dx, dy, extent_edges
 
 
-def parse_wkt_polygon(wkt):
-    match = re.search(r"POLYGON\s*\(\((.*)\)\)", wkt.strip(), re.IGNORECASE)
-    if not match:
-        return []
-    coords = []
-    for pair in match.group(1).split(","):
-        parts = pair.strip().split()
-        if len(parts) >= 2:
-            coords.append((float(parts[0]), float(parts[1])))
-    if len(coords) > 1 and coords[0] == coords[-1]:
-        coords.pop()
-    return coords
-
-
 def read_polygons(path):
     polygons = []
     with open(path, "r", encoding="utf-8", errors="ignore", newline="") as f:
@@ -80,24 +67,19 @@ def read_polygons(path):
         for row in reader:
             if row.get("status", "").lower() != "kept":
                 continue
-            coords = parse_wkt_polygon(row.get("wkt", ""))
+            coords, holes = parse_wkt_polygon_with_holes(row.get("wkt", ""))
             if len(coords) >= 3:
-                polygons.append(coords)
+                polygons.append({"coords": coords, "holes": holes})
     return polygons
 
 
 def rasterize_polygons(polygons, xs, ys):
     dx = abs(xs[1] - xs[0]) if len(xs) > 1 else 1.0
     dy = abs(ys[1] - ys[0]) if len(ys) > 1 else 1.0
-    xmin_edge = float(xs.min() - 0.5 * dx)
-    ymax_edge = float(ys.max() + 0.5 * dy)
-    image = Image.new("L", (len(xs), len(ys)), 0)
-    draw = ImageDraw.Draw(image)
-    for coords in polygons:
-        pixel_coords = [((x - xmin_edge) / dx, (ymax_edge - y) / dy) for x, y in coords]
-        if len(pixel_coords) >= 3:
-            draw.polygon(pixel_coords, fill=1)
-    return np.asarray(image, dtype=bool)[::-1, :]
+    total = np.zeros((len(ys), len(xs)), dtype=bool)
+    for poly in polygons:
+        total |= rasterize_polygon(poly["coords"], len(xs), len(ys), xs, ys, dx, dy, poly.get("holes", []))
+    return total
 
 
 def connected_components(mask, values, xs, ys):
@@ -158,9 +140,12 @@ def draw_base(ax, values, extent_edges):
 
 
 def draw_polygons(ax, polygons):
-    for coords in polygons:
-        arr = np.asarray(coords, dtype=float)
+    for poly in polygons:
+        arr = np.asarray(poly["coords"], dtype=float)
         ax.add_patch(PolygonPatch(arr, closed=True, facecolor="#ff2020", edgecolor="#d00000", linewidth=0.28, alpha=0.13))
+        for hole in poly.get("holes", []):
+            hole_arr = np.asarray(hole, dtype=float)
+            ax.plot(hole_arr[:, 0], hole_arr[:, 1], color="#d00000", linewidth=0.24, alpha=0.70, linestyle="--")
 
 
 def draw_mask(ax, mask, extent_edges, color_cmap, alpha):

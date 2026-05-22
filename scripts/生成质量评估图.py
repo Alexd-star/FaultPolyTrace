@@ -195,7 +195,13 @@ def is_result_csv(csv_path):
         return False
     if name in {"方案质量对比.csv", "质量评估汇总.csv"}:
         return False
-    return True
+    try:
+        with open(csv_path, "r", encoding="utf-8-sig", errors="ignore", newline="") as f:
+            reader = csv.DictReader(f)
+            fieldnames = set(reader.fieldnames or [])
+    except OSError:
+        return False
+    return {"status", "wkt"}.issubset(fieldnames)
 
 
 def main():

@@ -9,6 +9,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
+from wkt_geometry import parse_wkt_polygon_with_holes
+
 
 def read_official_dat(path):
     rows = []
@@ -58,18 +60,6 @@ def read_official_dat(path):
     return values.T, extent
 
 
-def parse_wkt_polygon(wkt):
-    match = re.search(r"POLYGON\s*\(\((.*)\)\)", wkt.strip(), re.IGNORECASE)
-    if not match:
-        return []
-    coords = []
-    for pair in match.group(1).split(","):
-        parts = pair.strip().split()
-        if len(parts) >= 2:
-            coords.append((float(parts[0]), float(parts[1])))
-    return coords
-
-
 def read_polygons(csv_path, max_polygons=None):
     polygons = []
     with open(csv_path, "r", encoding="utf-8", errors="ignore", newline="") as f:
@@ -77,9 +67,9 @@ def read_polygons(csv_path, max_polygons=None):
         for row in reader:
             if row.get("status", "").lower() != "kept":
                 continue
-            coords = parse_wkt_polygon(row.get("wkt", ""))
+            coords, holes = parse_wkt_polygon_with_holes(row.get("wkt", ""))
             if coords:
-                polygons.append(coords)
+                polygons.append({"coords": coords, "holes": holes})
             if max_polygons and len(polygons) >= max_polygons:
                 break
     return polygons
@@ -117,10 +107,15 @@ def draw_overlay(values, extent, polygons, output_path):
         vmin=0.0,
         vmax=max(1.0, float(np.nanmax(values))),
     )
-    for coords in polygons:
+    for poly in polygons:
+        coords = poly["coords"]
         xs = [p[0] for p in coords]
         ys = [p[1] for p in coords]
         ax.plot(xs, ys, color="#ffcc00", linewidth=0.55, alpha=0.9)
+        for hole in poly.get("holes", []):
+            hx = [p[0] for p in hole]
+            hy = [p[1] for p in hole]
+            ax.plot(hx, hy, color="#ffcc00", linewidth=0.40, alpha=0.72, linestyle="--")
     ax.set_title(f"FaultPolyTrace overlay: {len(polygons)} closed polygons")
     ax.set_xlabel("X")
     ax.set_ylabel("Y")

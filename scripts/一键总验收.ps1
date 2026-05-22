@@ -5,7 +5,7 @@ param(
     [int]$MaxElapsedMs = 5000,
     [double]$MinStrongCoverage = 0.990,
     [double]$MinWeakCoverage = 0.955,
-    [int]$ExpectedKeptPolygons = 204,
+    [int]$ExpectedKeptPolygons = 214,
     [int]$MaxKeptPolygonDelta = 15,
     [int]$MaxStrongReviewComponents = 999999,
     [int]$MaxWeakLineReviewComponents = 999999,
@@ -20,15 +20,18 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")
 $exe = Join-Path $repoRoot "build\faultpolytrace.exe"
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-$acceptanceName = "acceptance_${timestamp}_official_fitfusion_multiring"
+$totalSteps = 14
+$resultName = "official_root_antimerge"
+$acceptanceName = "acceptance_${timestamp}_official_root_antimerge"
 $acceptanceDir = Join-Path $repoRoot "examples\outputs\$acceptanceName"
-$resultCsv = Join-Path $acceptanceDir "official_fitfusion_multiring.csv"
+$resultCsv = Join-Path $acceptanceDir "$resultName.csv"
 $qualityDir = Join-Path $acceptanceDir "质量评估"
 $missQcDir = Join-Path $acceptanceDir "漏检质控"
 $topQualityDir = Join-Path $acceptanceDir "顶尖质量诊断"
 $autoParamsDir = Join-Path $acceptanceDir "自动参数推荐"
 $topReviewDir = Join-Path $acceptanceDir "冲顶局部复核"
 $missRootCauseDir = Join-Path $acceptanceDir "漏检根因诊断"
+$residualReviewLayerDir = Join-Path $acceptanceDir "残余复核层"
 $reportPath = Join-Path $acceptanceDir "本次验收报告.md"
 
 function Read-TextNumber {
@@ -59,25 +62,25 @@ if (!(Test-Path -LiteralPath $OfficialDat)) {
 
 New-Item -ItemType Directory -Force -Path $acceptanceDir | Out-Null
 
-Write-Host "== 1/13 构建离线算法 =="
+Write-Host "== 1/$totalSteps 构建离线算法 =="
 & (Join-Path $PSScriptRoot "build.ps1")
 if ($LASTEXITCODE -ne 0) {
     throw "离线算法构建失败。"
 }
 
-Write-Host "== 2/13 运行基础烟测 =="
+Write-Host "== 2/$totalSteps 运行基础烟测 =="
 & (Join-Path $PSScriptRoot "run_smoke_test.ps1")
 if ($LASTEXITCODE -ne 0) {
     throw "基础烟测失败。"
 }
 
-Write-Host "== 3/13 运行泛化鲁棒性验证 =="
+Write-Host "== 3/$totalSteps 运行泛化鲁棒性验证 =="
 python (Join-Path $PSScriptRoot "泛化鲁棒性验证.py") | Out-Host
 if ($LASTEXITCODE -ne 0) {
     throw "泛化鲁棒性验证失败。"
 }
 
-Write-Host "== 4/13 运行官方数据推荐参数 =="
+Write-Host "== 4/$totalSteps 运行官方数据推荐参数 =="
 & $exe `
     --input $OfficialDat `
     --input-format geoeast-dat `
@@ -102,9 +105,17 @@ Write-Host "== 4/13 运行官方数据推荐参数 =="
     --max-gap-angle 55 `
     --min-gap-support-ratio 0.25 `
     --no-separate-branch-belts `
-    --no-root-anti-merge `
+    --root-anti-merge `
+    --root-anti-merge-support-ratio 0.25 `
+    --root-anti-merge-min-part-cells 0 `
+    --root-anti-merge-min-part-ratio 0.12 `
+    --root-anti-merge-weak-guard-threshold 0.66 `
+    --root-anti-merge-weak-guard-radius 0 `
     --residual-percentile 0.955 `
     --residual-fill-radius 4 `
+    --residual-edge-fill-radius 2 `
+    --residual-edge-fill-min-value-ratio 0.97 `
+    --residual-edge-fill-max-patch-span 5 `
     --residual-min-cells 2 `
     --residual-trace-min-length 6 `
     --residual-trace-max-cells 80 `
@@ -116,17 +127,17 @@ if ($LASTEXITCODE -ne 0) {
     throw "官方数据推荐参数运行失败。"
 }
 
-Write-Host "== 5/13 生成白底质量评估图 =="
+Write-Host "== 5/$totalSteps 生成白底质量评估图 =="
 python (Join-Path $PSScriptRoot "生成质量评估图.py") `
     --dat $OfficialDat `
     --runs-dir $acceptanceDir `
     --out-dir $qualityDir `
-    --include-regex "official_fitfusion_multiring" | Out-Host
+    --include-regex "^$([regex]::Escape($resultName))$" | Out-Host
 if ($LASTEXITCODE -ne 0) {
     throw "质量评估图生成失败。"
 }
 
-Write-Host "== 6/13 生成漏检质控图 =="
+Write-Host "== 6/$totalSteps 生成漏检质控图 =="
 python (Join-Path $PSScriptRoot "生成漏检质控图.py") `
     --dat $OfficialDat `
     --csv $resultCsv `
@@ -138,7 +149,7 @@ if ($LASTEXITCODE -ne 0) {
     throw "漏检质控图生成失败。"
 }
 
-Write-Host "== 7/13 生成顶尖质量诊断 =="
+Write-Host "== 7/$totalSteps 生成顶尖质量诊断 =="
 python (Join-Path $PSScriptRoot "顶尖质量诊断.py") `
     --dat $OfficialDat `
     --csv $resultCsv `
@@ -152,7 +163,7 @@ if ($LASTEXITCODE -ne 0) {
     throw "顶尖质量诊断生成失败。"
 }
 
-Write-Host "== 8/13 生成自动参数推荐 =="
+Write-Host "== 8/$totalSteps 生成自动参数推荐 =="
 python (Join-Path $PSScriptRoot "自动参数推荐.py") `
     --dat $OfficialDat `
     --out-dir $autoParamsDir | Out-Host
@@ -160,7 +171,7 @@ if ($LASTEXITCODE -ne 0) {
     throw "自动参数推荐生成失败。"
 }
 
-Write-Host "== 9/13 生成冲顶局部复核包 =="
+Write-Host "== 9/$totalSteps 生成冲顶局部复核包 =="
 python (Join-Path $PSScriptRoot "生成冲顶复核包.py") `
     --dat $OfficialDat `
     --csv $resultCsv `
@@ -170,7 +181,7 @@ if ($LASTEXITCODE -ne 0) {
     throw "冲顶局部复核包生成失败。"
 }
 
-Write-Host "== 10/13 生成漏检根因诊断 =="
+Write-Host "== 10/$totalSteps 生成漏检根因诊断 =="
 python (Join-Path $PSScriptRoot "漏检根因诊断.py") `
     --dat $OfficialDat `
     --csv $resultCsv `
@@ -183,12 +194,33 @@ if ($LASTEXITCODE -ne 0) {
     throw "漏检根因诊断生成失败。"
 }
 
-Write-Host "== 11/13 读取验收指标并生成报告 =="
+Write-Host "== 11/$totalSteps 生成残余复核层 =="
+python (Join-Path $PSScriptRoot "生成残余复核层.py") `
+    --dat $OfficialDat `
+    --csv $resultCsv `
+    --out-dir $residualReviewLayerDir `
+    --strong-threshold 0.95 `
+    --weak-threshold 0.66 `
+    --min-review-cells 8 `
+    --min-line-aspect 3 `
+    --max-local-figures 12 | Out-Host
+if ($LASTEXITCODE -ne 0) {
+    throw "残余复核层生成失败。"
+}
+
+Write-Host "== 12/$totalSteps 读取验收指标并生成报告 =="
 $diagnosticsPath = "$resultCsv.diagnostics.json"
 $diagnostics = Get-Content -LiteralPath $diagnosticsPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $qualityCsv = Join-Path $qualityDir "metrics\质量评估汇总.csv"
 $qualityRows = Import-Csv -LiteralPath $qualityCsv
-$quality = $qualityRows | Select-Object -First 1
+$quality = $qualityRows | Where-Object { $_.name -eq $resultName } | Select-Object -First 1
+if (!$quality) {
+    $availableNames = ($qualityRows | ForEach-Object { $_.name } | Where-Object { $_ }) -join ", "
+    if ([string]::IsNullOrWhiteSpace($availableNames)) {
+        $availableNames = "无"
+    }
+    throw "质量评估汇总未包含正式结果 '$resultName'。已有结果：$availableNames。请检查 include-regex 或结果 CSV 是否有效：$qualityCsv"
+}
 $missSummaryPath = Join-Path $missQcDir "漏检质控摘要.txt"
 $missSummary = Get-Content -LiteralPath $missSummaryPath -Raw -Encoding UTF8
 $topQualityJsonPath = Join-Path $topQualityDir "总体指标.json"
@@ -207,6 +239,9 @@ $weakLineReviewComponents = [int](Read-TextNumber -Text $missSummary -Pattern "�
 $highRiskMergePolygons = [int]$topQuality.high_risk_merge_polygons
 $middleRiskMergePolygons = [int]$topQuality.middle_risk_merge_polygons
 $smallPolygonCount = [int]$topQuality.small_polygon_count
+$residualReviewSummaryPath = Join-Path $residualReviewLayerDir "残余复核层摘要.json"
+$residualReviewSummary = Get-Content -LiteralPath $residualReviewSummaryPath -Raw -Encoding UTF8 | ConvertFrom-Json
+$residualReviewCandidateCount = [int]$residualReviewSummary.candidate_count
 
 $checks = @()
 $checks += [pscustomobject]@{ Item = "核心算法耗时"; Pass = ($traceMs -lt 60000); Detail = "${traceMs} ms，赛题要求 60000 ms 以内" }
@@ -251,6 +286,7 @@ $report.Add("| 弱线性需复核连通域 | $weakLineReviewComponents |")
 $report.Add("| 高风险误合并候选 | $highRiskMergePolygons |")
 $report.Add("| 中风险误合并候选 | $middleRiskMergePolygons |")
 $report.Add("| 小碎片多边形数量 | $smallPolygonCount |")
+$report.Add("| 残余复核层候选 | $residualReviewCandidateCount |")
 $report.Add("| 核心追踪耗时 | $traceMs ms |")
 $report.Add("| 总耗时 | $elapsedMs ms |")
 $report.Add("| 开放环 | $openRings |")
@@ -287,9 +323,15 @@ $report.Add("max-gap-distance = 12")
 $report.Add("max-gap-angle = 55")
 $report.Add("min-gap-support-ratio = 0.25")
 $report.Add("separate-branch-belts = false")
-$report.Add("root-anti-merge = false")
+$report.Add("root-anti-merge = true")
+$report.Add("root-anti-merge-support-ratio = 0.25")
+$report.Add("root-anti-merge-min-part-cells = 0")
+$report.Add("root-anti-merge-min-part-ratio = 0.12")
 $report.Add("residual-percentile = 0.955")
 $report.Add("residual-fill-radius = 4")
+$report.Add("residual-edge-fill-radius = 2")
+$report.Add("residual-edge-fill-min-value-ratio = 0.97")
+$report.Add("residual-edge-fill-max-patch-span = 5")
 $report.Add("residual-min-cells = 2")
 $report.Add("residual-trace-min-length = 6")
 $report.Add("residual-trace-max-cells = 80")
@@ -317,6 +359,10 @@ $report.Add("- 冲顶局部复核报告：$topReviewDir\冲顶局部复核报告
 $report.Add("- 冲顶局部复核图：$topReviewDir\局部复核图")
 $report.Add("- 漏检根因诊断报告：$missRootCauseDir\漏检根因诊断报告.md")
 $report.Add("- 漏检根因诊断明细：$missRootCauseDir\漏检根因诊断明细.csv")
+$report.Add("- 残余复核层报告：$residualReviewLayerDir\残余复核层报告.md")
+$report.Add("- 残余复核层 CSV：$residualReviewLayerDir\残余复核层.csv")
+$report.Add("- 残余复核层 GeoJSON：$residualReviewLayerDir\残余复核层.geojson")
+$report.Add("- 残余复核层图件：$residualReviewLayerDir\残余复核层总览.png")
 $report.Add("")
 $report.Add("## 6. 说明")
 $report.Add("")
@@ -326,20 +372,20 @@ Set-Content -LiteralPath $reportPath -Value $report -Encoding UTF8
 Write-Host "验收报告: $reportPath"
 
 if (!$SkipGeoEastBuild) {
-    Write-Host "== 12/13 构建并部署 GeoEast 组件 =="
+    Write-Host "== 13/$totalSteps 构建并部署 GeoEast 组件 =="
     & (Join-Path $PSScriptRoot "build_geoeast_bo_runner.ps1") -GeoEastRoot $GeoEastRoot -UseVisualStudioProject
     & (Join-Path $PSScriptRoot "build_qt_launcher.ps1") -GeoEastRoot $GeoEastRoot
     & (Join-Path $PSScriptRoot "build_geoeast_mainframe_plugin.ps1") -GeoEastRoot $GeoEastRoot
     & (Join-Path $PSScriptRoot "部署到GeoEast.ps1") -GeoEastRoot $GeoEastRoot -SkipBuild
 } else {
-    Write-Host "== 12/13 跳过 GeoEast 构建部署 =="
+    Write-Host "== 13/$totalSteps 跳过 GeoEast 构建部署 =="
 }
 
 if (!$SkipPackage) {
-    Write-Host "== 13/13 生成发布包 =="
+    Write-Host "== 14/$totalSteps 生成发布包 =="
     & (Join-Path $PSScriptRoot "打包发布包.ps1") -Version $PackageVersion -GeoEastRoot $GeoEastRoot -SkipBuild
 } else {
-    Write-Host "== 13/13 跳过发布包生成 =="
+    Write-Host "== 14/$totalSteps 跳过发布包生成 =="
 }
 
 if ($failedChecks.Count -gt 0) {

@@ -171,6 +171,16 @@ foreach ($plan in $plans) {
         throw "综合评分失败：$($plan.Name)"
     }
 
+    $reviewLayerDir = Join-Path $planDir "residual_review_layer"
+    python (Join-Path $repoRoot "scripts\生成残余复核层.py") `
+        --dat $OfficialDat `
+        --csv $csv `
+        --out-dir $reviewLayerDir `
+        --max-local-figures 12 | Out-Host
+    if ($LASTEXITCODE -ne 0) {
+        throw "残余复核层生成失败：$($plan.Name)"
+    }
+
     $score = Get-Content -LiteralPath $scoreJson -Raw -Encoding UTF8 | ConvertFrom-Json
     $summaryRows += [PSCustomObject]@{
         方案 = $plan.Label

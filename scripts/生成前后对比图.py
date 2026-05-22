@@ -10,6 +10,8 @@ from matplotlib import font_manager
 import matplotlib.pyplot as plt
 import numpy as np
 
+from wkt_geometry import parse_wkt_polygon_with_holes
+
 
 def configure_chinese_font():
     candidates = [
@@ -73,18 +75,6 @@ def read_official_dat(path):
     return values.T, extent
 
 
-def parse_wkt_polygon(wkt):
-    match = re.search(r"POLYGON\s*\(\((.*)\)\)", wkt.strip(), re.IGNORECASE)
-    if not match:
-        return []
-    coords = []
-    for pair in match.group(1).split(","):
-        parts = pair.strip().split()
-        if len(parts) >= 2:
-            coords.append((float(parts[0]), float(parts[1])))
-    return coords
-
-
 def read_polygons(csv_path):
     polygons = []
     with open(csv_path, "r", encoding="utf-8", errors="ignore", newline="") as f:
@@ -92,9 +82,9 @@ def read_polygons(csv_path):
         for row in reader:
             if row.get("status", "").lower() != "kept":
                 continue
-            coords = parse_wkt_polygon(row.get("wkt", ""))
+            coords, holes = parse_wkt_polygon_with_holes(row.get("wkt", ""))
             if coords:
-                polygons.append(coords)
+                polygons.append({"coords": coords, "holes": holes})
     return polygons
 
 
@@ -113,12 +103,17 @@ def add_coordinate_grid(ax, extent):
 
 
 def draw_polygons(ax, polygons, color="#e60000", linewidth=0.62):
-    for coords in polygons:
+    for poly in polygons:
+        coords = poly["coords"]
         if len(coords) < 3:
             continue
         xs = [p[0] for p in coords]
         ys = [p[1] for p in coords]
         ax.plot(xs, ys, color=color, linewidth=linewidth, alpha=0.95, zorder=3)
+        for hole in poly.get("holes", []):
+            hx = [p[0] for p in hole]
+            hy = [p[1] for p in hole]
+            ax.plot(hx, hy, color=color, linewidth=max(0.24, linewidth * 0.72), alpha=0.72, zorder=3, linestyle="--")
 
 
 def render_compare(values, extent, polygons, output_path, title=True):

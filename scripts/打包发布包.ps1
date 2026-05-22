@@ -108,7 +108,17 @@ foreach ($script in @(
     "性能回归检查.ps1",
     "visualize_official_result.py",
     "generate_official_quality_report.py",
-    "生成性能内存报告.py"
+    "生成性能内存报告.py",
+    "生成质量评估图.py",
+    "生成漏检质控图.py",
+    "生成残余复核层.py",
+    "生成前后对比图.py",
+    "顶尖质量诊断.py",
+    "漏检根因诊断.py",
+    "生成冲顶复核包.py",
+    "综合质量评分.py",
+    "自动参数推荐.py",
+    "wkt_geometry.py"
 )) {
     Copy-FileOptional (Join-Path $repoRoot "scripts\$script") (Join-Path $scriptsDir $script) | Out-Null
 }
@@ -143,7 +153,7 @@ if ($runnerIncluded) {
     $manifest += '- GeoEast runner exe：未包含，当前本机重新构建受 `libpq.lib` 链接路径影响；可在 VS2019/Qt 工程中修正 PostgreSQL lib 路径后重建'
 }
 $manifest += '- GeoEast 主控 Ribbon 插件：已构建通过，内含中文“断层多边形追踪/赛题7”入口'
-$manifest += "- GeoMapping 平面成图：当前官方 license 到期，需 2026 有效 license 后补 GeoEast 内部截图"
+$manifest += "- GeoMapping 平面成图：需使用与 GeoEast 版本和年份匹配的有效 license，最终交付前应补 GeoEast 内部截图"
 $manifest += ""
 $manifest += "## 推荐入口"
 $manifest += ""
@@ -151,8 +161,8 @@ $manifest += '1. 先读 `docs/用户操作手册.md`。'
 $manifest += '2. 阅读 `docs/软件设计说明.md` 和 `docs/代码编制说明.md`。'
 $manifest += '3. 双击 `qt_launcher/faultpolytrace_launcher.exe`。'
 $manifest += "4. 使用官方数据默认参数运行。"
-$manifest += '5. 查看 `docs/赛题7官方数据运行质量报告_平滑版.md`。'
-$manifest += '6. 修改代码后运行 `scripts/性能回归检查.ps1`，确认官方数据平滑场景仍满足性能和拓扑门禁。'
+$manifest += '5. 查看 `docs/官方数据最新验收报告.md`。'
+$manifest += '6. 修改代码后运行 `scripts/一键总验收.ps1 -SkipGeoEastBuild -SkipPackage`，确认官方数据仍满足覆盖、防黏连、拓扑和性能门禁。'
 
 Set-Content -LiteralPath (Join-Path $packageDir "发布包清单.md") -Value ($manifest -join "`n") -Encoding UTF8
 
