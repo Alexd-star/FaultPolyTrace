@@ -23,7 +23,7 @@ if ([string]::IsNullOrWhiteSpace($OfficialDat)) {
 }
 
 if ([string]::IsNullOrWhiteSpace($ResultCsv)) {
-    $ResultCsv = Join-Path $repoRoot "examples\outputs\performance_regression\official_fitfusion_multiring.csv"
+    $ResultCsv = Join-Path $repoRoot "examples\outputs\performance_regression\official_root_antimerge.csv"
 }
 
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {

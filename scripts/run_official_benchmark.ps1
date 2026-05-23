@@ -3,7 +3,7 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $officialDat = "D:\BaiduNetdiskDownload\BGPCup2025\赛题7-基于平面断层属性的断层多边形自动追踪\test.dat"
 $outputDir = Join-Path $repoRoot "examples\outputs\official"
-$output = Join-Path $outputDir "test_p98_ridge_belt_benchmark.csv"
+$output = Join-Path $outputDir "official_root_antimerge_benchmark.csv"
 
 if (!(Test-Path -LiteralPath $officialDat)) {
     throw "Official test data not found: $officialDat"
@@ -39,9 +39,17 @@ if ($LASTEXITCODE -ne 0) {
     --max-gap-angle 55 `
     --min-gap-support-ratio 0.25 `
     --no-separate-branch-belts `
-    --no-root-anti-merge `
+    --root-anti-merge `
+    --root-anti-merge-support-ratio 0.25 `
+    --root-anti-merge-min-part-cells 0 `
+    --root-anti-merge-min-part-ratio 0.12 `
+    --root-anti-merge-weak-guard-threshold 0.66 `
+    --root-anti-merge-weak-guard-radius 0 `
     --residual-percentile 0.955 `
     --residual-fill-radius 4 `
+    --residual-edge-fill-radius 2 `
+    --residual-edge-fill-min-value-ratio 0.97 `
+    --residual-edge-fill-max-patch-span 5 `
     --residual-min-cells 2 `
     --residual-trace-min-length 6 `
     --residual-trace-max-cells 80 `

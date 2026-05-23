@@ -156,7 +156,7 @@ C:\Users\26312\Documents\BGPCup\FaultPolyTrace\geoeast_plugin\qt_launcher\faultp
 5. 点击 `刷新网格`。
 6. 选择 `test7_fault_attribute_bo`。
 7. 设置输出名，例如 `FaultPolyTrace_Result`。
-8. 默认使用 `ridge-belt`、`percentile=0.98`、`min area=200`。
+8. 默认使用 `ridge-belt`、`percentile=0.98`、`min area=120`，推荐预设为“防黏连增强”。
 9. 点击 `开始追踪`。
 10. 保存或截图日志证据：网格尺寸、多边形数量、拓扑诊断、耗时。
 
@@ -187,7 +187,7 @@ C:\Users\26312\Documents\BGPCup\FaultPolyTrace\geoeast_plugin\qt_launcher\faultp
 比赛材料建议准备以下截图和日志：
 
 - Basemap 中 `test7_fault_attribute_bo` 的原始属性图。
-- Basemap 中 `FaultPolyTrace_Result` 叠加在属性图上的结果图。
+- Basemap 中 `FaultPolyTrace_Result` 或用户命名结果叠加在属性图上的结果图。
 - `GeoFaultPolygonBrowser` 中显示结果对象的截图。
 - Qt 启动器运行日志截图。
 - 命令行或 JSON 诊断结果：多边形数量、开放环数量、自相交数量、多边形相交数量、耗时。

@@ -1,8 +1,8 @@
 param(
     [string]$OfficialDat = "",
     [int]$MaxElapsedMs = 5000,
-    [int]$ExpectedPolygons = 204,
-    [int]$ExpectedKept = 204,
+    [int]$ExpectedPolygons = 232,
+    [int]$ExpectedKept = 214,
     [int]$MaxPolygonIntersections = 0,
     [switch]$SkipCountCheck
 )
@@ -11,7 +11,7 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $outputDir = Join-Path $repoRoot "examples\outputs\performance_regression"
-$output = Join-Path $outputDir "official_fitfusion_multiring.csv"
+$output = Join-Path $outputDir "official_root_antimerge.csv"
 $exe = Join-Path $repoRoot "build\faultpolytrace.exe"
 
 if ([string]::IsNullOrWhiteSpace($OfficialDat)) {
@@ -58,8 +58,17 @@ if ($LASTEXITCODE -ne 0) {
     --max-gap-angle 55 `
     --min-gap-support-ratio 0.25 `
     --no-separate-branch-belts `
+    --root-anti-merge `
+    --root-anti-merge-support-ratio 0.25 `
+    --root-anti-merge-min-part-cells 0 `
+    --root-anti-merge-min-part-ratio 0.12 `
+    --root-anti-merge-weak-guard-threshold 0.66 `
+    --root-anti-merge-weak-guard-radius 0 `
     --residual-percentile 0.955 `
     --residual-fill-radius 4 `
+    --residual-edge-fill-radius 2 `
+    --residual-edge-fill-min-value-ratio 0.97 `
+    --residual-edge-fill-max-patch-span 5 `
     --residual-min-cells 2 `
     --residual-trace-min-length 6 `
     --residual-trace-max-cells 80 `
