@@ -419,6 +419,18 @@ QString FaultTraceDialog::defaultRunnerPath() const {
     if (!fromEnv.isEmpty()) {
         return QDir::toNativeSeparators(fromEnv);
     }
+    QDir appDir(QCoreApplication::applicationDirPath());
+    const QString localRunner = appDir.absoluteFilePath("faultpolytrace_geoeast_runner.exe");
+    if (QFileInfo::exists(localRunner)) {
+        return QDir::toNativeSeparators(localRunner);
+    }
+    QDir parentDir(appDir);
+    if (parentDir.cdUp()) {
+        const QString parentRunner = parentDir.absoluteFilePath("faultpolytrace_geoeast_runner.exe");
+        if (QFileInfo::exists(parentRunner)) {
+            return QDir::toNativeSeparators(parentRunner);
+        }
+    }
     QDir root(repoRootFromAppDir());
     const QString candidate = root.absoluteFilePath("geoeast_plugin/bo_runner/faultpolytrace_geoeast_runner.exe");
     return QFileInfo::exists(candidate) ? QDir::toNativeSeparators(candidate) : candidate;

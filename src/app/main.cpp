@@ -7,7 +7,13 @@
 #include <cstdlib>
 #include <exception>
 #include <iostream>
+#include <limits>
 #include <string>
+
+#ifdef _WIN32
+#define NOMINMAX
+#include <windows.h>
+#endif
 
 namespace {
 
@@ -158,6 +164,37 @@ void printUsage() {
         << "  --diagnostics <path>        Diagnostics JSON path. Default: <output>.diagnostics.json\n"
         << "  --branches-output <path>    Ridge-belt branch CSV path. Default: <output>.branches.csv\n"
         << "  --topology-output <path>    Topology detail CSV path. Default: <output>.topology.csv\n";
+}
+
+bool likelyStartedByDoubleClick() {
+#ifdef _WIN32
+    DWORD inputConsoleMode = 0;
+    DWORD outputConsoleMode = 0;
+    if (GetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), &inputConsoleMode) == 0 ||
+        GetConsoleMode(GetStdHandle(STD_OUTPUT_HANDLE), &outputConsoleMode) == 0) {
+        return false;
+    }
+    DWORD processes[4] = {};
+    const DWORD count = GetConsoleProcessList(processes, 4);
+    return count <= 1;
+#else
+    return false;
+#endif
+}
+
+void printNoArgumentGuide() {
+    std::cout
+        << "FaultPolyTrace 断层多边形自动追踪 - 独立算法程序\n"
+        << "================================================\n\n"
+        << "这个程序是命令行算法核心，用于外部网格文件批处理和回归验证。\n"
+        << "如果直接双击但没有提供输入参数，程序不会开始计算。\n\n"
+        << "推荐入口：\n"
+        << "  1. 图形界面：双击发布包根目录的 01_打开图形界面.cmd，或运行 qt_launcher/faultpolytrace_launcher.exe。\n"
+        << "  2. 离线演示：双击发布包根目录的 02_运行离线演示.cmd。\n"
+        << "  3. 命令行：在 PowerShell 中运行 bin/faultpolytrace.exe --input <网格文件> --output <结果CSV>。\n\n"
+        << "命令行示例：\n"
+        << "  bin\\faultpolytrace.exe --input examples\\synthetic\\broken_ridge_fault_grid.txt --input-format matrix --output outputs\\demo\\fault_polygons.csv\n\n";
+    printUsage();
 }
 
 std::string traceModeName(fpt::TraceMode mode) {
@@ -376,6 +413,15 @@ CliOptions parseArgs(int argc, char** argv) {
 
 int main(int argc, char** argv) {
     try {
+        if (argc == 1) {
+            printNoArgumentGuide();
+            if (likelyStartedByDoubleClick()) {
+                std::cout << "\n按 Enter 键退出...";
+                std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+            }
+            return 0;
+        }
+
         const CliOptions cli = parseArgs(argc, argv);
         const auto start = std::chrono::steady_clock::now();
 

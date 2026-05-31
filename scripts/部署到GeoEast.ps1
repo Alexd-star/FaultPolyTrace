@@ -14,6 +14,7 @@ $repoRoot = Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")
 $geoEastRc = Join-Path $GeoEastRoot "GeoEast-RC"
 $pluginTargetDir = Join-Path $geoEastRc "bin\plugins\GeoAttribute\FaultPolyTraceMainframePlugin"
 $binTargetDir = Join-Path $geoEastRc "bin"
+$launcherTargetDir = Join-Path $binTargetDir "FaultPolyTraceLauncher"
 
 if (!(Test-Path -LiteralPath $geoEastRc)) {
     throw "GeoEast-RC directory was not found: $geoEastRc"
@@ -47,8 +48,39 @@ foreach ($required in @($launcher, $runner, $manifest, $iconIco, $iconPng)) {
     }
 }
 
+New-Item -ItemType Directory -Force -Path $launcherTargetDir | Out-Null
 Copy-Item -LiteralPath $launcher -Destination (Join-Path $binTargetDir "faultpolytrace_launcher.exe") -Force
+foreach ($item in @(
+    "faultpolytrace_launcher.exe",
+    "faultpolytrace_launcher.example.ini",
+    "README.md",
+    "qt.conf",
+    "Qt5Core.dll",
+    "Qt5Gui.dll",
+    "Qt5Widgets.dll",
+    "Qt5Svg.dll",
+    "libEGL.dll",
+    "libGLESv2.dll",
+    "D3Dcompiler_47.dll",
+    "opengl32sw.dll",
+    "msvcp140.dll",
+    "vcruntime140.dll",
+    "vcruntime140_1.dll",
+    "concrt140.dll"
+)) {
+    $source = Join-Path (Split-Path -Parent $launcher) $item
+    if (Test-Path -LiteralPath $source) {
+        Copy-Item -LiteralPath $source -Destination (Join-Path $launcherTargetDir $item) -Force
+    }
+}
+foreach ($subdir in @("platforms", "imageformats", "iconengines", "styles", "translations")) {
+    $source = Join-Path (Split-Path -Parent $launcher) $subdir
+    if (Test-Path -LiteralPath $source) {
+        Copy-Item -LiteralPath $source -Destination (Join-Path $launcherTargetDir $subdir) -Recurse -Force
+    }
+}
 Copy-Item -LiteralPath $runner -Destination (Join-Path $binTargetDir "faultpolytrace_geoeast_runner.exe") -Force
+Copy-Item -LiteralPath $runner -Destination (Join-Path $launcherTargetDir "faultpolytrace_geoeast_runner.exe") -Force
 Copy-Item -LiteralPath $manifest -Destination (Join-Path $pluginTargetDir "manifest.xml") -Force
 Copy-Item -LiteralPath $iconIco -Destination (Join-Path $binTargetDir "faultpolytrace.ico") -Force
 Copy-Item -LiteralPath $iconPng -Destination (Join-Path $binTargetDir "faultpolytrace.png") -Force
@@ -61,5 +93,6 @@ if (Test-Path -LiteralPath $pluginDllSource) {
 Write-Host "GeoEast deployment completed."
 Write-Host "Plugin dir: $pluginTargetDir"
 Write-Host "Launcher: $(Join-Path $binTargetDir "faultpolytrace_launcher.exe")"
+Write-Host "Portable launcher dir: $launcherTargetDir"
 Write-Host "Runner: $(Join-Path $binTargetDir "faultpolytrace_geoeast_runner.exe")"
 Write-Host "Icon: $(Join-Path $binTargetDir "faultpolytrace.ico")"

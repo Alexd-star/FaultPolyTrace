@@ -28,6 +28,27 @@ $qtBin = Split-Path -Parent $QMake
 $windeployQt = Join-Path $qtBin "windeployqt.exe"
 $launcherExe = Join-Path $launcherDir "faultpolytrace_launcher.exe"
 
+function Copy-VcRuntimeIfAvailable {
+    param([string]$DestinationDir)
+
+    $vcRuntimeCandidates = @(
+        "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Redist\MSVC\14.29.30133\x64\Microsoft.VC142.CRT",
+        "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Redist\MSVC\v142\x64\Microsoft.VC142.CRT"
+    )
+    $vcRuntimeDir = $vcRuntimeCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+    if ([string]::IsNullOrWhiteSpace($vcRuntimeDir)) {
+        Write-Warning "Visual C++ runtime redist directory was not found. Another computer may need vc_redist.x64.exe."
+        return
+    }
+
+    foreach ($dll in @("msvcp140.dll", "vcruntime140.dll", "vcruntime140_1.dll", "concrt140.dll")) {
+        $source = Join-Path $vcRuntimeDir $dll
+        if (Test-Path -LiteralPath $source) {
+            Copy-Item -LiteralPath $source -Destination (Join-Path $DestinationDir $dll) -Force
+        }
+    }
+}
+
 $command = @"
 call "$VcVars" && set "PATH=$qtBin;!PATH!" && cd /d "$launcherDir" && "$QMake" FaultPolyTraceLauncher.pro -spec win32-msvc && nmake
 "@
@@ -43,6 +64,7 @@ if (Test-Path -LiteralPath $windeployQt) {
     if ($LASTEXITCODE -ne 0) {
         throw "windeployqt failed with exit code $LASTEXITCODE."
     }
+    Copy-VcRuntimeIfAvailable $launcherDir
 } else {
     Write-Warning "windeployqt.exe was not found next to qmake.exe: $windeployQt"
 }

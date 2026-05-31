@@ -48,6 +48,7 @@ $examplesDir = Join-Path $packageDir "examples"
 $scriptsDir = Join-Path $packageDir "scripts"
 $srcDir = Join-Path $packageDir "src"
 $geoeastDir = Join-Path $packageDir "geoeast_plugin"
+$prerequisitesDir = Join-Path $packageDir "prerequisites"
 
 Copy-FileRequired (Join-Path $repoRoot "build\faultpolytrace.exe") (Join-Path $binDir "faultpolytrace.exe")
 
@@ -57,6 +58,7 @@ $launcherFiles = @(
     "faultpolytrace_launcher.exe",
     "faultpolytrace_launcher.example.ini",
     "README.md",
+    "qt.conf",
     "Qt5Core.dll",
     "Qt5Gui.dll",
     "Qt5Widgets.dll",
@@ -64,16 +66,34 @@ $launcherFiles = @(
     "libEGL.dll",
     "libGLESv2.dll",
     "D3Dcompiler_47.dll",
-    "opengl32sw.dll"
+    "opengl32sw.dll",
+    "msvcp140.dll",
+    "vcruntime140.dll",
+    "vcruntime140_1.dll",
+    "concrt140.dll"
 )
 foreach ($name in $launcherFiles) {
     Copy-FileOptional (Join-Path $launcherSource $name) (Join-Path $launcherDir $name) | Out-Null
 }
-foreach ($subdir in @("platforms", "imageformats", "iconengines", "styles")) {
+foreach ($subdir in @("platforms", "imageformats", "iconengines", "styles", "translations")) {
     $src = Join-Path $launcherSource $subdir
     if (Test-Path -LiteralPath $src) {
         Copy-Item -LiteralPath $src -Destination (Join-Path $launcherDir $subdir) -Recurse -Force
     }
+}
+
+$packagingWindowsDir = Join-Path $repoRoot "packaging\windows"
+if (Test-Path -LiteralPath $packagingWindowsDir) {
+    Copy-Item -Path (Join-Path $packagingWindowsDir "*") -Destination $packageDir -Force
+}
+
+$vcRedistCandidates = @(
+    "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Redist\MSVC\14.29.30133\vc_redist.x64.exe",
+    "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Redist\MSVC\v142\vc_redist.x64.exe"
+)
+$vcRedist = $vcRedistCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+if (![string]::IsNullOrWhiteSpace($vcRedist)) {
+    Copy-FileOptional $vcRedist (Join-Path $prerequisitesDir "vc_redist.x64.exe") | Out-Null
 }
 
 $runnerPath = Join-Path $repoRoot "geoeast_plugin\bo_runner\faultpolytrace_geoeast_runner.exe"
@@ -136,11 +156,15 @@ $manifest += "## 包含内容"
 $manifest += ""
 $manifest += '- `bin/faultpolytrace.exe`：离线算法程序'
 $manifest += '- `qt_launcher/faultpolytrace_launcher.exe`：Qt 用户界面'
+$manifest += '- `01_打开图形界面.cmd`：评审推荐图形入口'
+$manifest += '- `02_运行离线演示.cmd`：无需 GeoEast 的双击离线演示'
+$manifest += '- `03_查看命令行帮助.cmd`：命令行参数帮助'
 $manifest += '- `docs/`：中文交付文档'
 $manifest += '- `examples/outputs/official/`：官方数据结果、图件、报告依据'
 $manifest += '- `scripts/`：运行、可视化、报告脚本'
 $manifest += '- `src/`：核心源码'
 $manifest += '- `geoeast_plugin/`：GeoEast runner、Qt 启动器联动入口和主控插件'
+$manifest += '- `prerequisites/`：可选运行库安装包'
 $manifest += ""
 $manifest += "## 当前状态"
 $manifest += ""
@@ -157,10 +181,10 @@ $manifest += "- GeoMapping 平面成图：需使用与 GeoEast 版本和年份�
 $manifest += ""
 $manifest += "## 推荐入口"
 $manifest += ""
-$manifest += '1. 先读 `docs/用户操作手册.md`。'
-$manifest += '2. 阅读 `docs/软件设计说明.md` 和 `docs/代码编制说明.md`。'
-$manifest += '3. 双击 `qt_launcher/faultpolytrace_launcher.exe`。'
-$manifest += "4. 使用官方数据默认参数运行。"
+$manifest += '1. 先读 `README_先打开我.md`。'
+$manifest += '2. 双击 `01_打开图形界面.cmd` 查看图形界面。'
+$manifest += '3. 没有 GeoEast 环境时，双击 `02_运行离线演示.cmd` 验证算法独立运行能力。'
+$manifest += '4. 有 GeoEast 环境时，按 `docs/用户操作手册.md` 连接数据库、选择网格并写入结果。'
 $manifest += '5. 查看 `docs/官方数据最新验收报告.md`。'
 $manifest += '6. 修改代码后运行 `scripts/一键总验收.ps1 -SkipGeoEastBuild -SkipPackage`，确认官方数据仍满足覆盖、防黏连、拓扑和性能门禁。'
 
