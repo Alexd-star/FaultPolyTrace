@@ -27,6 +27,9 @@ private slots:
     void browseGeoEastRoot();
     void browseGeoEastDataRoot();
     void choosePolygonColor();
+    void showDatabaseConfigDialog();
+    void saveCurrentPreset();
+    void showHelpHint();
     void refreshGrids();
     void runTrace();
     void stopProcess();
@@ -46,6 +49,7 @@ private:
     QStringList traceArgs() const;
     void applyParameterPreset(const QString& presetName);
     void setPolygonColor(const QColor& color);
+    void updateStatusContext();
     QString defaultRunnerPath() const;
     QString defaultOfficialDatPath() const;
 
@@ -108,6 +112,10 @@ private:
     QPushButton* stopButton_ = nullptr;
     QTextEdit* logEdit_ = nullptr;
     QLabel* statusLabel_ = nullptr;
+    QLabel* coordinateLabel_ = nullptr;
+    QLabel* connectionLabel_ = nullptr;
+    QLabel* projectStatusLabel_ = nullptr;
+    QLabel* gridStatusLabel_ = nullptr;
 
     QProcess* process_ = nullptr;
     bool refreshingGrids_ = false;

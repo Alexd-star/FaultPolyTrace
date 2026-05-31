@@ -1,5 +1,6 @@
 #include "FaultTraceDialog.h"
 
+#include <QAction>
 #include <QCheckBox>
 #include <QColor>
 #include <QColorDialog>
@@ -12,17 +13,26 @@
 #include <QFileInfo>
 #include <QFile>
 #include <QFormLayout>
+#include <QFrame>
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
+#include <QLinearGradient>
+#include <QMenuBar>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMessageBox>
+#include <QPainter>
 #include <QProcessEnvironment>
 #include <QPushButton>
+#include <QScrollArea>
 #include <QSettings>
+#include <QSizePolicy>
 #include <QSpinBox>
+#include <QStyle>
 #include <QTextEdit>
+#include <QTextCursor>
+#include <QToolBar>
 #include <QVBoxLayout>
 
 namespace {
@@ -53,11 +63,118 @@ QString quoteForLog(const QStringList& args) {
     return quoted.join(' ');
 }
 
+class RenderViewWidget : public QWidget {
+public:
+    explicit RenderViewWidget(QWidget* parent = nullptr) : QWidget(parent) {
+        setMinimumSize(560, 420);
+        setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    }
+
+protected:
+    void paintEvent(QPaintEvent*) override {
+        QPainter painter(this);
+        painter.fillRect(rect(), QColor("#FFFFFF"));
+
+        painter.setPen(QPen(QColor("#F1F1F1"), 1));
+        const int step = 50;
+        for (int x = 0; x < width(); x += step) {
+            painter.drawLine(x, 0, x, height());
+        }
+        for (int y = 0; y < height(); y += step) {
+            painter.drawLine(0, y, width(), y);
+        }
+
+        painter.setPen(QPen(QColor("#E7E7E7"), 1));
+        painter.drawRect(rect().adjusted(0, 0, -1, -1));
+
+        QFont titleFont = painter.font();
+        titleFont.setPointSize(16);
+        titleFont.setBold(true);
+        painter.setFont(titleFont);
+        painter.setPen(QColor("#9B9B9B"));
+        painter.drawText(QPoint(26, 38), QString::fromUtf8("[渲染视图区] GeoEast Basemap View"));
+
+        QFont hintFont = painter.font();
+        hintFont.setPointSize(10);
+        hintFont.setBold(false);
+        painter.setFont(hintFont);
+        painter.setPen(QColor("#B6B6B6"));
+        painter.drawText(rect().adjusted(26, 58, -26, -26), Qt::AlignLeft | Qt::AlignTop,
+                         QString::fromUtf8("运行后可在 GeoEast 底图中叠加查看输入断层属性与输出闭合多边形；本区域预留为结果预览与质控图显示。"));
+    }
+};
+
+class ColorBarWidget : public QWidget {
+public:
+    explicit ColorBarWidget(QWidget* parent = nullptr) : QWidget(parent) {
+        setFixedWidth(56);
+        setMinimumHeight(360);
+    }
+
+protected:
+    void paintEvent(QPaintEvent*) override {
+        QPainter painter(this);
+        painter.fillRect(rect(), QColor("#F0F0F0"));
+        painter.setPen(QColor("#A0A0A0"));
+        painter.drawLine(0, 0, 0, height());
+
+        const QRect barRect(20, 34, 18, qMax(120, height() - 88));
+        painter.setPen(QColor("#555555"));
+        QFont labelFont = painter.font();
+        labelFont.setPointSize(8);
+        painter.setFont(labelFont);
+        painter.drawText(QRect(4, 12, 48, 16), Qt::AlignCenter, "100");
+
+        QLinearGradient gradient(barRect.topLeft(), barRect.bottomLeft());
+        gradient.setColorAt(0.00, QColor("#0B35FF"));
+        gradient.setColorAt(0.25, QColor("#00D7FF"));
+        gradient.setColorAt(0.50, QColor("#00E84A"));
+        gradient.setColorAt(0.75, QColor("#FFE600"));
+        gradient.setColorAt(1.00, QColor("#FF0000"));
+        painter.fillRect(barRect, gradient);
+        painter.setPen(QColor("#333333"));
+        painter.drawRect(barRect.adjusted(0, 0, -1, -1));
+
+        painter.setPen(QColor("#DC143C"));
+        painter.drawText(QRect(4, barRect.bottom() + 6, 48, 16), Qt::AlignCenter, "0");
+    }
+};
+
+QLabel* makeFormLabel(const QString& text, QWidget* parent) {
+    QLabel* label = new QLabel(text, parent);
+    label->setObjectName("formLabel");
+    label->setMinimumWidth(112);
+    label->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    return label;
+}
+
+void tuneControl(QWidget* widget) {
+    widget->setMinimumHeight(22);
+    widget->setMaximumHeight(26);
+}
+
+QGridLayout* makeGroupLayout(QGroupBox* box) {
+    QGridLayout* layout = new QGridLayout(box);
+    layout->setContentsMargins(12, 12, 12, 10);
+    layout->setHorizontalSpacing(8);
+    layout->setVerticalSpacing(7);
+    layout->setColumnStretch(0, 0);
+    layout->setColumnStretch(1, 1);
+    return layout;
+}
+
+void addFormRow(QGridLayout* layout, int row, const QString& label, QWidget* editor, QWidget* parent) {
+    tuneControl(editor);
+    layout->addWidget(makeFormLabel(label, parent), row, 0);
+    layout->addWidget(editor, row, 1);
+}
+
 } // namespace
 
 FaultTraceDialog::FaultTraceDialog(QWidget* parent) : QDialog(parent), process_(new QProcess(this)) {
     buildUi();
     loadSettings();
+    updateStatusContext();
 
     connect(process_, &QProcess::readyReadStandardOutput, this, &FaultTraceDialog::onReadyRead);
     connect(process_, &QProcess::readyReadStandardError, this, &FaultTraceDialog::onReadyRead);
@@ -316,102 +433,426 @@ void FaultTraceDialog::buildUi() {
     residualTraceMaxCellsSpin_->setValue(80);
     connect(presetCombo_, &QComboBox::currentTextChanged, this, &FaultTraceDialog::applyParameterPreset);
 
-    QGridLayout* paramsLayout = new QGridLayout(paramsBox);
-    paramsLayout->addWidget(new QLabel(QString::fromUtf8("参数预设"), this), 0, 0);
-    paramsLayout->addWidget(presetCombo_, 0, 1);
-    paramsLayout->addWidget(new QLabel(QString::fromUtf8("追踪模式"), this), 0, 2);
-    paramsLayout->addWidget(traceModeCombo_, 0, 3);
-    paramsLayout->addWidget(new QLabel(QString::fromUtf8("阈值模式"), this), 1, 0);
-    paramsLayout->addWidget(thresholdModeCombo_, 1, 1);
-    paramsLayout->addWidget(new QLabel(QString::fromUtf8("固定阈值"), this), 1, 2);
-    paramsLayout->addWidget(thresholdSpin_, 1, 3);
-    paramsLayout->addWidget(new QLabel(QString::fromUtf8("分位数"), this), 2, 0);
-    paramsLayout->addWidget(percentileSpin_, 2, 1);
-    paramsLayout->addWidget(new QLabel(QString::fromUtf8("最小面积"), this), 2, 2);
-    paramsLayout->addWidget(minAreaSpin_, 2, 3);
-    paramsLayout->addWidget(new QLabel(QString::fromUtf8("闭运算半径"), this), 3, 0);
-    paramsLayout->addWidget(closeRadiusSpin_, 3, 1);
-    paramsLayout->addWidget(new QLabel(QString::fromUtf8("弱延拓分位"), this), 3, 2);
-    paramsLayout->addWidget(weakPercentileSpin_, 3, 3);
-    paramsLayout->addWidget(new QLabel(QString::fromUtf8("弱延拓半径"), this), 4, 0);
-    paramsLayout->addWidget(weakConnectRadiusSpin_, 4, 1);
-    paramsLayout->addWidget(new QLabel(QString::fromUtf8("带宽半径"), this), 4, 2);
-    paramsLayout->addWidget(beltRadiusSpin_, 4, 3);
-    paramsLayout->addWidget(new QLabel(QString::fromUtf8("带后闭合"), this), 5, 0);
-    paramsLayout->addWidget(postBeltCloseRadiusSpin_, 5, 1);
-    paramsLayout->addWidget(attributeConstrainedBeltCheck_, 5, 2);
-    paramsLayout->addWidget(attributeEnvelopeRadiusSpin_, 5, 3);
-    paramsLayout->addWidget(new QLabel(QString::fromUtf8("最短分支"), this), 6, 0);
-    paramsLayout->addWidget(minBranchLengthSpin_, 6, 1);
-    paramsLayout->addWidget(new QLabel(QString::fromUtf8("交切短枝"), this), 6, 2);
-    paramsLayout->addWidget(minJunctionBranchLengthSpin_, 6, 3);
-    paramsLayout->addWidget(new QLabel(QString::fromUtf8("短枝均值"), this), 7, 0);
-    paramsLayout->addWidget(minJunctionBranchMeanSpin_, 7, 1);
-    paramsLayout->addWidget(new QLabel(QString::fromUtf8("最大断距"), this), 7, 2);
-    paramsLayout->addWidget(maxGapDistanceSpin_, 7, 3);
-    paramsLayout->addWidget(new QLabel(QString::fromUtf8("最大夹角"), this), 8, 0);
-    paramsLayout->addWidget(maxGapAngleSpin_, 8, 1);
-    paramsLayout->addWidget(rootAntiMergeCheck_, 8, 2);
-    paramsLayout->addWidget(rootAntiMergeRadiusSpin_, 8, 3);
-    paramsLayout->addWidget(new QLabel(QString::fromUtf8("防黏连支撑"), this), 9, 0);
-    paramsLayout->addWidget(rootAntiMergeSupportRatioSpin_, 9, 1);
-    paramsLayout->addWidget(new QLabel(QString::fromUtf8("最小主体"), this), 9, 2);
-    paramsLayout->addWidget(rootAntiMergeMinPartCellsSpin_, 9, 3);
-    paramsLayout->addWidget(new QLabel(QString::fromUtf8("主体比例"), this), 10, 0);
-    paramsLayout->addWidget(rootAntiMergeMinPartRatioSpin_, 10, 1);
-    paramsLayout->addWidget(new QLabel(QString::fromUtf8("弱保护阈值"), this), 10, 2);
-    paramsLayout->addWidget(rootAntiMergeWeakGuardThresholdSpin_, 10, 3);
-    paramsLayout->addWidget(new QLabel(QString::fromUtf8("弱保护半径"), this), 11, 0);
-    paramsLayout->addWidget(rootAntiMergeWeakGuardRadiusSpin_, 11, 1);
-    paramsLayout->addWidget(localAntiMergeCheck_, 11, 2);
-    paramsLayout->addWidget(new QLabel(QString::fromUtf8("低值阈值"), this), 12, 0);
-    paramsLayout->addWidget(localAntiMergeLowThresholdSpin_, 12, 1);
-    paramsLayout->addWidget(new QLabel(QString::fromUtf8("桥半径"), this), 12, 2);
-    paramsLayout->addWidget(localAntiMergeBridgeRadiusSpin_, 12, 3);
-    paramsLayout->addWidget(new QLabel(QString::fromUtf8("局部主体"), this), 13, 0);
-    paramsLayout->addWidget(localAntiMergeMinPartCellsSpin_, 13, 1);
-    paramsLayout->addWidget(new QLabel(QString::fromUtf8("局部比例"), this), 13, 2);
-    paramsLayout->addWidget(localAntiMergeMinPartRatioSpin_, 13, 3);
-    paramsLayout->addWidget(new QLabel(QString::fromUtf8("桥像元"), this), 14, 0);
-    paramsLayout->addWidget(localAntiMergeMinBridgeCellsSpin_, 14, 1);
-    paramsLayout->addWidget(new QLabel(QString::fromUtf8("低值占比"), this), 14, 2);
-    paramsLayout->addWidget(localAntiMergeMinLowRatioSpin_, 14, 3);
-    paramsLayout->addWidget(new QLabel(QString::fromUtf8("简化容差"), this), 15, 0);
-    paramsLayout->addWidget(simplifyToleranceSpin_, 15, 1);
-    paramsLayout->addWidget(new QLabel(QString::fromUtf8("平滑次数"), this), 15, 2);
-    paramsLayout->addWidget(smoothIterationsSpin_, 15, 3);
-    paramsLayout->addWidget(residualTraceCheck_, 16, 0);
-    paramsLayout->addWidget(new QLabel(QString::fromUtf8("补追最短"), this), 16, 1);
-    paramsLayout->addWidget(residualTraceMinLengthSpin_, 16, 2);
-    paramsLayout->addWidget(new QLabel(QString::fromUtf8("补追上限"), this), 17, 0);
-    paramsLayout->addWidget(residualTraceMaxCellsSpin_, 17, 1);
+    {
+        setWindowTitle(QString::fromUtf8("FaultPolyTrace 断层多边形自动追踪"));
+        setMinimumSize(1024, 680);
+        resize(1280, 760);
 
-    runButton_ = new QPushButton(QString::fromUtf8("开始追踪"), this);
-    stopButton_ = new QPushButton(QString::fromUtf8("停止"), this);
-    stopButton_->setEnabled(false);
-    connect(runButton_, &QPushButton::clicked, this, &FaultTraceDialog::runTrace);
-    connect(stopButton_, &QPushButton::clicked, this, &FaultTraceDialog::stopProcess);
+        connectionBox->hide();
+        dataBox->hide();
+        paramsBox->hide();
 
-    QHBoxLayout* buttonsLayout = new QHBoxLayout;
-    buttonsLayout->addStretch();
-    buttonsLayout->addWidget(runButton_);
-    buttonsLayout->addWidget(stopButton_);
+        polygonColorButton_->setText("v");
+        polygonColorButton_->setToolTip(QString::fromUtf8("选择结果多边形颜色"));
+        polygonColorButton_->setFixedWidth(24);
+        polygonLineWidthSpin_->setFixedWidth(64);
+        browseDatButton->setText(QString::fromUtf8("浏览"));
+        browseDatButton->setFixedWidth(52);
+        refreshButton_->setText(QString::fromUtf8("刷新网格"));
+        refreshButton_->setToolTip(QString::fromUtf8("从 GeoEast 数据库刷新 BOMapGrid 列表"));
 
-    logEdit_ = new QTextEdit(this);
-    logEdit_->setReadOnly(true);
-    logEdit_->setLineWrapMode(QTextEdit::NoWrap);
-    statusLabel_ = new QLabel(QString::fromUtf8("就绪"), this);
+        setStyleSheet(QString::fromUtf8(R"(
+            QDialog {
+                background: #E6E7E8;
+                color: #222222;
+                font-family: "Microsoft YaHei", "Segoe UI", Tahoma, sans-serif;
+                font-size: 12px;
+            }
+            QMenuBar {
+                background: #F0F0F0;
+                border-bottom: 1px solid #D0D0D0;
+                padding: 2px 8px;
+            }
+            QMenuBar::item {
+                padding: 4px 8px;
+                background: transparent;
+                border-radius: 2px;
+            }
+            QMenuBar::item:selected {
+                background: #CCE8FF;
+                border: 1px solid #99D1FF;
+            }
+            QToolBar {
+                background: #F0F0F0;
+                border: 0;
+                border-bottom: 1px solid #A0A0A0;
+                spacing: 4px;
+                padding: 4px 10px;
+            }
+            QToolButton {
+                min-width: 26px;
+                min-height: 24px;
+                border: 1px solid transparent;
+                border-radius: 3px;
+                padding: 2px 6px;
+            }
+            QToolButton:hover {
+                background: #CCE8FF;
+                border-color: #99D1FF;
+            }
+            QFrame#sidebar {
+                background: #F0F0F0;
+                border-right: 1px solid #999999;
+            }
+            QFrame#sidebarHeader {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #FAFAFA, stop:1 #E4E4E4);
+                border-bottom: 1px solid #A0A0A0;
+            }
+            QLabel#sidebarTitle {
+                font-weight: bold;
+                color: #111111;
+            }
+            QLabel#sidebarClose {
+                color: #777777;
+                font-weight: bold;
+                font-size: 13px;
+            }
+            QScrollArea#sidebarScroll {
+                border: 0;
+                background: #F0F0F0;
+            }
+            QWidget#sidebarContent {
+                background: #F0F0F0;
+            }
+            QGroupBox {
+                background: #F0F0F0;
+                border: 1px solid #B5B5B5;
+                border-radius: 3px;
+                margin-top: 9px;
+                padding-top: 5px;
+                font-weight: normal;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 8px;
+                padding: 0 5px;
+                color: #005A9E;
+                font-weight: bold;
+            }
+            QLabel#formLabel {
+                color: #222222;
+            }
+            QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox {
+                background: #FFFFFF;
+                border: 1px solid #A0A0A0;
+                border-radius: 2px;
+                min-height: 22px;
+                padding: 1px 5px;
+                selection-background-color: #0078D7;
+            }
+            QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus {
+                border-color: #0078D7;
+            }
+            QPushButton {
+                background: #E1E1E1;
+                border: 1px solid #A0A0A0;
+                border-radius: 2px;
+                min-height: 22px;
+                padding: 2px 10px;
+                color: #222222;
+            }
+            QPushButton:hover {
+                background: #E5F1FB;
+                border-color: #0078D7;
+            }
+            QPushButton#runButton {
+                background: #0078D7;
+                border-color: #005A9E;
+                color: white;
+                font-weight: bold;
+                min-height: 28px;
+            }
+            QPushButton#runButton:hover {
+                background: #106EBE;
+            }
+            QPushButton#stopButton {
+                background: #E1E1E1;
+                color: #333333;
+                font-weight: bold;
+                min-height: 28px;
+            }
+            QPushButton#stopButton:disabled, QPushButton#runButton:disabled {
+                background: #D8D8D8;
+                color: #777777;
+                border-color: #B8B8B8;
+            }
+            QFrame#actionDock {
+                background: #E8E8E8;
+                border-top: 1px solid #A0A0A0;
+            }
+            QFrame#workspace {
+                background: #FFFFFF;
+            }
+            QFrame#logDock {
+                background: #F8F9FA;
+                border-top: 1px solid #A0A0A0;
+            }
+            QLabel#logHeader {
+                background: #EAEAEA;
+                border-bottom: 1px solid #C0C0C0;
+                color: #444444;
+                font-weight: bold;
+                padding: 4px 10px;
+            }
+            QTextEdit#logEdit {
+                background: #F8F9FA;
+                border: 0;
+                color: #333333;
+                font-family: Consolas, "Courier New", monospace;
+                font-size: 12px;
+            }
+            QFrame#statusBar {
+                background: #F0F0F0;
+                border-top: 1px solid #A0A0A0;
+            }
+            QLabel#statusText {
+                color: #555555;
+                font-size: 11px;
+            }
+        )"));
 
-    QVBoxLayout* mainLayout = new QVBoxLayout(this);
-    mainLayout->addWidget(connectionBox);
-    mainLayout->addWidget(dataBox);
-    mainLayout->addWidget(paramsBox);
-    mainLayout->addLayout(buttonsLayout);
-    mainLayout->addWidget(logEdit_, 1);
-    mainLayout->addWidget(statusLabel_);
+        QMenuBar* menuBar = new QMenuBar(this);
+        menuBar->setNativeMenuBar(false);
+        menuBar->addMenu(QString::fromUtf8("GeoEast(G)"));
+        menuBar->addMenu(QString::fromUtf8("文件(F)"));
+        menuBar->addMenu(QString::fromUtf8("编辑(E)"));
+        menuBar->addMenu(QString::fromUtf8("视图(V)"));
+        menuBar->addMenu(QString::fromUtf8("断层(L)"));
+        menuBar->addMenu(QString::fromUtf8("层位(H)"));
+        menuBar->addMenu(QString::fromUtf8("工具(T)"));
+        QMenu* helpMenu = menuBar->addMenu(QString::fromUtf8("帮助(H)"));
+        QAction* helpAction = helpMenu->addAction(QString::fromUtf8("打开帮助提示"));
+        connect(helpAction, &QAction::triggered, this, &FaultTraceDialog::showHelpHint);
 
-    presetCombo_->setCurrentText(QString::fromUtf8("防黏连增强"));
-    applyParameterPreset(QString::fromUtf8("防黏连增强"));
+        QToolBar* toolbar = new QToolBar(this);
+        toolbar->setIconSize(QSize(18, 18));
+        toolbar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+        QAction* openAction = toolbar->addAction(style()->standardIcon(QStyle::SP_DirOpenIcon), QString::fromUtf8("打开"));
+        connect(openAction, &QAction::triggered, this, &FaultTraceDialog::browseDatFile);
+        toolbar->addAction(style()->standardIcon(QStyle::SP_DialogSaveButton), QString::fromUtf8("保存"));
+        toolbar->addSeparator();
+        toolbar->addAction(style()->standardIcon(QStyle::SP_ArrowUp), QString::fromUtf8("平移"));
+        toolbar->addAction(style()->standardIcon(QStyle::SP_ArrowForward), QString::fromUtf8("放大"));
+        toolbar->addAction(style()->standardIcon(QStyle::SP_ArrowBack), QString::fromUtf8("缩小"));
+        toolbar->addSeparator();
+        QAction* configAction = toolbar->addAction(style()->standardIcon(QStyle::SP_FileDialogDetailedView), QString::fromUtf8("数据库与环境底层配置..."));
+        connect(configAction, &QAction::triggered, this, &FaultTraceDialog::showDatabaseConfigDialog);
+        toolbar->addWidget(refreshButton_);
+        QAction* savePresetAction = toolbar->addAction(style()->standardIcon(QStyle::SP_DialogApplyButton), QString::fromUtf8("保存预设"));
+        connect(savePresetAction, &QAction::triggered, this, &FaultTraceDialog::saveCurrentPreset);
+        QWidget* toolbarSpacer = new QWidget(this);
+        toolbarSpacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+        toolbar->addWidget(toolbarSpacer);
+        QAction* toolbarHelpAction = toolbar->addAction(style()->standardIcon(QStyle::SP_MessageBoxQuestion), QString::fromUtf8("帮助"));
+        connect(toolbarHelpAction, &QAction::triggered, this, &FaultTraceDialog::showHelpHint);
+
+        QFrame* sidebar = new QFrame(this);
+        sidebar->setObjectName("sidebar");
+        sidebar->setFixedWidth(345);
+        QVBoxLayout* sidebarRoot = new QVBoxLayout(sidebar);
+        sidebarRoot->setContentsMargins(0, 0, 0, 0);
+        sidebarRoot->setSpacing(0);
+
+        QFrame* sidebarHeader = new QFrame(sidebar);
+        sidebarHeader->setObjectName("sidebarHeader");
+        sidebarHeader->setFixedHeight(34);
+        QHBoxLayout* sidebarHeaderLayout = new QHBoxLayout(sidebarHeader);
+        sidebarHeaderLayout->setContentsMargins(12, 0, 8, 0);
+        QLabel* sidebarTitle = new QLabel(QString::fromUtf8("FaultPolyTrace 断层多边形自动追踪"), sidebarHeader);
+        sidebarTitle->setObjectName("sidebarTitle");
+        QLabel* sidebarClose = new QLabel("X", sidebarHeader);
+        sidebarClose->setObjectName("sidebarClose");
+        sidebarClose->setFixedSize(24, 22);
+        sidebarClose->setAlignment(Qt::AlignCenter);
+        sidebarClose->setToolTip(QString::fromUtf8("参数面板固定显示"));
+        sidebarHeaderLayout->addWidget(sidebarTitle, 1);
+        sidebarHeaderLayout->addWidget(sidebarClose);
+        sidebarRoot->addWidget(sidebarHeader);
+
+        QScrollArea* sidebarScroll = new QScrollArea(sidebar);
+        sidebarScroll->setObjectName("sidebarScroll");
+        sidebarScroll->setWidgetResizable(true);
+        sidebarScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        QWidget* sidebarContent = new QWidget(sidebarScroll);
+        sidebarContent->setObjectName("sidebarContent");
+        QVBoxLayout* sidebarContentLayout = new QVBoxLayout(sidebarContent);
+        sidebarContentLayout->setContentsMargins(10, 12, 10, 10);
+        sidebarContentLayout->setSpacing(12);
+
+        QGroupBox* dataGroup = new QGroupBox(QString::fromUtf8("数据管理"), sidebarContent);
+        QGridLayout* dataLayoutNew = makeGroupLayout(dataGroup);
+        addFormRow(dataLayoutNew, 0, QString::fromUtf8("输入网格"), gridCombo_, dataGroup);
+        addFormRow(dataLayoutNew, 1, QString::fromUtf8("输出多边形"), outputEdit_, dataGroup);
+        QWidget* colorLineWidget = new QWidget(dataGroup);
+        QHBoxLayout* colorLineLayout = new QHBoxLayout(colorLineWidget);
+        colorLineLayout->setContentsMargins(0, 0, 0, 0);
+        colorLineLayout->setSpacing(5);
+        colorLineLayout->addWidget(polygonColorEdit_, 1);
+        colorLineLayout->addWidget(polygonColorButton_);
+        colorLineLayout->addWidget(polygonLineWidthSpin_);
+        addFormRow(dataLayoutNew, 2, QString::fromUtf8("结果样式 / 线宽"), colorLineWidget, dataGroup);
+        QWidget* datLineWidget = new QWidget(dataGroup);
+        QHBoxLayout* datLineLayout = new QHBoxLayout(datLineWidget);
+        datLineLayout->setContentsMargins(0, 0, 0, 0);
+        datLineLayout->setSpacing(5);
+        datLineLayout->addWidget(datFileEdit_, 1);
+        datLineLayout->addWidget(browseDatButton);
+        addFormRow(dataLayoutNew, 3, QString::fromUtf8("DAT 文件"), datLineWidget, dataGroup);
+        dataLayoutNew->addWidget(overwriteGridCheck_, 4, 0, 1, 2);
+        dataLayoutNew->addWidget(importDatCheck_, 5, 0, 1, 2);
+        sidebarContentLayout->addWidget(dataGroup);
+
+        QGroupBox* traceGroup = new QGroupBox(QString::fromUtf8("追踪参数"), sidebarContent);
+        QGridLayout* traceLayoutNew = makeGroupLayout(traceGroup);
+        addFormRow(traceLayoutNew, 0, QString::fromUtf8("预设模板"), presetCombo_, traceGroup);
+        addFormRow(traceLayoutNew, 1, QString::fromUtf8("追踪模式"), traceModeCombo_, traceGroup);
+        addFormRow(traceLayoutNew, 2, QString::fromUtf8("阈值模式"), thresholdModeCombo_, traceGroup);
+        addFormRow(traceLayoutNew, 3, QString::fromUtf8("分位数"), percentileSpin_, traceGroup);
+        addFormRow(traceLayoutNew, 4, QString::fromUtf8("固定阈值"), thresholdSpin_, traceGroup);
+        addFormRow(traceLayoutNew, 5, QString::fromUtf8("平滑次数"), smoothIterationsSpin_, traceGroup);
+        sidebarContentLayout->addWidget(traceGroup);
+
+        QGroupBox* morphologyGroup = new QGroupBox(QString::fromUtf8("形态与拓扑约束"), sidebarContent);
+        QGridLayout* morphologyLayoutNew = makeGroupLayout(morphologyGroup);
+        addFormRow(morphologyLayoutNew, 0, QString::fromUtf8("闭运算半径"), closeRadiusSpin_, morphologyGroup);
+        addFormRow(morphologyLayoutNew, 1, QString::fromUtf8("最大断距"), maxGapDistanceSpin_, morphologyGroup);
+        addFormRow(morphologyLayoutNew, 2, QString::fromUtf8("最小面积"), minAreaSpin_, morphologyGroup);
+        addFormRow(morphologyLayoutNew, 3, QString::fromUtf8("最大夹角"), maxGapAngleSpin_, morphologyGroup);
+        addFormRow(morphologyLayoutNew, 4, QString::fromUtf8("防黏连支撑"), rootAntiMergeSupportRatioSpin_, morphologyGroup);
+        addFormRow(morphologyLayoutNew, 5, QString::fromUtf8("简化容差"), simplifyToleranceSpin_, morphologyGroup);
+        morphologyLayoutNew->addWidget(attributeConstrainedBeltCheck_, 6, 0);
+        morphologyLayoutNew->addWidget(attributeEnvelopeRadiusSpin_, 6, 1);
+        morphologyLayoutNew->addWidget(rootAntiMergeCheck_, 7, 0);
+        morphologyLayoutNew->addWidget(rootAntiMergeRadiusSpin_, 7, 1);
+        sidebarContentLayout->addWidget(morphologyGroup);
+
+        QGroupBox* detailsGroup = new QGroupBox(QString::fromUtf8("枝干细节与修补"), sidebarContent);
+        QGridLayout* detailsLayoutNew = makeGroupLayout(detailsGroup);
+        addFormRow(detailsLayoutNew, 0, QString::fromUtf8("弱拓扑分位"), weakPercentileSpin_, detailsGroup);
+        addFormRow(detailsLayoutNew, 1, QString::fromUtf8("弱延伸半径"), weakConnectRadiusSpin_, detailsGroup);
+        addFormRow(detailsLayoutNew, 2, QString::fromUtf8("带宽半径"), beltRadiusSpin_, detailsGroup);
+        addFormRow(detailsLayoutNew, 3, QString::fromUtf8("带后闭合"), postBeltCloseRadiusSpin_, detailsGroup);
+        addFormRow(detailsLayoutNew, 4, QString::fromUtf8("最短分支"), minBranchLengthSpin_, detailsGroup);
+        addFormRow(detailsLayoutNew, 5, QString::fromUtf8("交切短枝"), minJunctionBranchLengthSpin_, detailsGroup);
+        addFormRow(detailsLayoutNew, 6, QString::fromUtf8("短枝均值"), minJunctionBranchMeanSpin_, detailsGroup);
+        addFormRow(detailsLayoutNew, 7, QString::fromUtf8("补追最短"), residualTraceMinLengthSpin_, detailsGroup);
+        addFormRow(detailsLayoutNew, 8, QString::fromUtf8("补追上限"), residualTraceMaxCellsSpin_, detailsGroup);
+        detailsLayoutNew->addWidget(residualTraceCheck_, 9, 0, 1, 2);
+        sidebarContentLayout->addWidget(detailsGroup);
+
+        QGroupBox* expertGroup = new QGroupBox(QString::fromUtf8("专家防黏连参数"), sidebarContent);
+        QGridLayout* expertLayoutNew = makeGroupLayout(expertGroup);
+        addFormRow(expertLayoutNew, 0, QString::fromUtf8("根系主体"), rootAntiMergeMinPartCellsSpin_, expertGroup);
+        addFormRow(expertLayoutNew, 1, QString::fromUtf8("主体比例"), rootAntiMergeMinPartRatioSpin_, expertGroup);
+        addFormRow(expertLayoutNew, 2, QString::fromUtf8("弱保护阈值"), rootAntiMergeWeakGuardThresholdSpin_, expertGroup);
+        addFormRow(expertLayoutNew, 3, QString::fromUtf8("弱保护半径"), rootAntiMergeWeakGuardRadiusSpin_, expertGroup);
+        expertLayoutNew->addWidget(localAntiMergeCheck_, 4, 0, 1, 2);
+        addFormRow(expertLayoutNew, 5, QString::fromUtf8("低值阈值"), localAntiMergeLowThresholdSpin_, expertGroup);
+        addFormRow(expertLayoutNew, 6, QString::fromUtf8("桥半径"), localAntiMergeBridgeRadiusSpin_, expertGroup);
+        addFormRow(expertLayoutNew, 7, QString::fromUtf8("局部主体"), localAntiMergeMinPartCellsSpin_, expertGroup);
+        addFormRow(expertLayoutNew, 8, QString::fromUtf8("局部比例"), localAntiMergeMinPartRatioSpin_, expertGroup);
+        addFormRow(expertLayoutNew, 9, QString::fromUtf8("桥像元"), localAntiMergeMinBridgeCellsSpin_, expertGroup);
+        addFormRow(expertLayoutNew, 10, QString::fromUtf8("低值占比"), localAntiMergeMinLowRatioSpin_, expertGroup);
+        sidebarContentLayout->addWidget(expertGroup);
+        sidebarContentLayout->addStretch(1);
+
+        sidebarScroll->setWidget(sidebarContent);
+        sidebarRoot->addWidget(sidebarScroll, 1);
+
+        QFrame* actionDock = new QFrame(sidebar);
+        actionDock->setObjectName("actionDock");
+        actionDock->setFixedHeight(50);
+        QHBoxLayout* actionLayout = new QHBoxLayout(actionDock);
+        actionLayout->setContentsMargins(12, 10, 12, 10);
+        actionLayout->setSpacing(10);
+        runButton_ = new QPushButton(QString::fromUtf8("▶ 开始追踪"), actionDock);
+        runButton_->setObjectName("runButton");
+        stopButton_ = new QPushButton(QString::fromUtf8("■ 停止"), actionDock);
+        stopButton_->setObjectName("stopButton");
+        stopButton_->setEnabled(false);
+        actionLayout->addWidget(runButton_, 2);
+        actionLayout->addWidget(stopButton_, 1);
+        sidebarRoot->addWidget(actionDock);
+        connect(runButton_, &QPushButton::clicked, this, &FaultTraceDialog::runTrace);
+        connect(stopButton_, &QPushButton::clicked, this, &FaultTraceDialog::stopProcess);
+
+        QFrame* workspace = new QFrame(this);
+        workspace->setObjectName("workspace");
+        QVBoxLayout* workspaceLayout = new QVBoxLayout(workspace);
+        workspaceLayout->setContentsMargins(0, 0, 0, 0);
+        workspaceLayout->setSpacing(0);
+
+        QFrame* canvasRow = new QFrame(workspace);
+        canvasRow->setObjectName("canvasRow");
+        QHBoxLayout* canvasLayout = new QHBoxLayout(canvasRow);
+        canvasLayout->setContentsMargins(0, 0, 0, 0);
+        canvasLayout->setSpacing(0);
+        canvasLayout->addWidget(new RenderViewWidget(canvasRow), 1);
+        canvasLayout->addWidget(new ColorBarWidget(canvasRow));
+        workspaceLayout->addWidget(canvasRow, 1);
+
+        QFrame* logDock = new QFrame(workspace);
+        logDock->setObjectName("logDock");
+        logDock->setFixedHeight(120);
+        QVBoxLayout* logLayout = new QVBoxLayout(logDock);
+        logLayout->setContentsMargins(0, 0, 0, 0);
+        logLayout->setSpacing(0);
+        QLabel* logHeader = new QLabel(QString::fromUtf8("运行日志与输出信息"), logDock);
+        logHeader->setObjectName("logHeader");
+        logHeader->setFixedHeight(24);
+        logEdit_ = new QTextEdit(logDock);
+        logEdit_->setObjectName("logEdit");
+        logEdit_->setReadOnly(true);
+        logEdit_->setLineWrapMode(QTextEdit::NoWrap);
+        logLayout->addWidget(logHeader);
+        logLayout->addWidget(logEdit_, 1);
+        workspaceLayout->addWidget(logDock);
+
+        QHBoxLayout* mainFramework = new QHBoxLayout;
+        mainFramework->setContentsMargins(0, 0, 0, 0);
+        mainFramework->setSpacing(0);
+        mainFramework->addWidget(sidebar);
+        mainFramework->addWidget(workspace, 1);
+
+        QFrame* statusBar = new QFrame(this);
+        statusBar->setObjectName("statusBar");
+        statusBar->setFixedHeight(25);
+        QHBoxLayout* statusLayout = new QHBoxLayout(statusBar);
+        statusLayout->setContentsMargins(12, 0, 12, 0);
+        statusLayout->setSpacing(16);
+        coordinateLabel_ = new QLabel(QString::fromUtf8("X: 2380.12   |   Y: 3769.63"), statusBar);
+        connectionLabel_ = new QLabel(QString::fromUtf8("数据库连接待验证"), statusBar);
+        projectStatusLabel_ = new QLabel(statusBar);
+        gridStatusLabel_ = new QLabel(statusBar);
+        statusLabel_ = new QLabel(QString::fromUtf8("就绪"), statusBar);
+        for (QLabel* label : {coordinateLabel_, connectionLabel_, projectStatusLabel_, gridStatusLabel_, statusLabel_}) {
+            label->setObjectName("statusText");
+        }
+        statusLayout->addWidget(coordinateLabel_);
+        statusLayout->addStretch(1);
+        statusLayout->addWidget(connectionLabel_);
+        statusLayout->addWidget(projectStatusLabel_);
+        statusLayout->addWidget(gridStatusLabel_);
+        statusLayout->addWidget(statusLabel_);
+
+        QVBoxLayout* rootLayout = new QVBoxLayout(this);
+        rootLayout->setContentsMargins(0, 0, 0, 0);
+        rootLayout->setSpacing(0);
+        rootLayout->addWidget(menuBar);
+        rootLayout->addWidget(toolbar);
+        rootLayout->addLayout(mainFramework, 1);
+        rootLayout->addWidget(statusBar);
+
+        connect(projectEdit_, &QLineEdit::textChanged, this, &FaultTraceDialog::updateStatusContext);
+        connect(databaseEdit_, &QLineEdit::textChanged, this, &FaultTraceDialog::updateStatusContext);
+        connect(gridCombo_, &QComboBox::currentTextChanged, this, &FaultTraceDialog::updateStatusContext);
+
+        presetCombo_->setCurrentText(QString::fromUtf8("防黏连增强"));
+        applyParameterPreset(QString::fromUtf8("防黏连增强"));
+        updateStatusContext();
+        appendLog(QString::fromUtf8("[系统就绪] 等待参数输入及任务执行..."));
+        appendLog(QString::fromUtf8("加载项目配置：%1 成功。").arg(projectEdit_->text()));
+    }
 }
 
 QString FaultTraceDialog::defaultRunnerPath() const {
@@ -474,6 +915,174 @@ void FaultTraceDialog::browseGeoEastDataRoot() {
     if (!path.isEmpty()) {
         geoEastDataRootEdit_->setText(QDir::toNativeSeparators(path));
     }
+}
+
+void FaultTraceDialog::showDatabaseConfigDialog() {
+    QDialog dialog(this);
+    dialog.setWindowTitle(QString::fromUtf8("GeoEast 环境与数据库底层配置"));
+    dialog.setModal(true);
+    dialog.resize(600, 324);
+    dialog.setStyleSheet(QString::fromUtf8(R"(
+        QDialog {
+            background: #F0F0F0;
+            color: #222222;
+            font-family: "Microsoft YaHei", "Segoe UI", Tahoma, sans-serif;
+            font-size: 12px;
+        }
+        QLabel#dialogHeader {
+            background: #005A9E;
+            color: white;
+            font-weight: bold;
+            padding: 8px 15px;
+        }
+        QLineEdit {
+            background: #FFFFFF;
+            border: 1px solid #A0A0A0;
+            border-radius: 2px;
+            min-height: 22px;
+            padding: 1px 5px;
+        }
+        QLineEdit:focus {
+            border-color: #0078D7;
+        }
+        QPushButton {
+            background: #E1E1E1;
+            border: 1px solid #A0A0A0;
+            border-radius: 2px;
+            min-height: 24px;
+            padding: 2px 12px;
+        }
+        QPushButton:hover {
+            background: #E5F1FB;
+            border-color: #0078D7;
+        }
+        QPushButton#applyButton {
+            background: #0078D7;
+            border-color: #005A9E;
+            color: white;
+            font-weight: bold;
+        }
+        QPushButton#applyButton:hover {
+            background: #106EBE;
+        }
+        QFrame#line {
+            background: #D0D0D0;
+            min-height: 1px;
+            max-height: 1px;
+        }
+    )"));
+
+    QVBoxLayout* root = new QVBoxLayout(&dialog);
+    root->setContentsMargins(0, 0, 0, 0);
+    root->setSpacing(0);
+    QLabel* header = new QLabel(QString::fromUtf8("GeoEast 环境与数据库底层配置"), &dialog);
+    header->setObjectName("dialogHeader");
+    header->setFixedHeight(34);
+    root->addWidget(header);
+
+    QWidget* body = new QWidget(&dialog);
+    QGridLayout* bodyLayout = new QGridLayout(body);
+    bodyLayout->setContentsMargins(15, 15, 15, 12);
+    bodyLayout->setHorizontalSpacing(8);
+    bodyLayout->setVerticalSpacing(8);
+
+    QLineEdit* runnerCopy = new QLineEdit(runnerEdit_->text(), body);
+    QLineEdit* geoEastRootCopy = new QLineEdit(geoEastRootEdit_->text(), body);
+    QLineEdit* dataRootCopy = new QLineEdit(geoEastDataRootEdit_->text(), body);
+    QLineEdit* hostCopy = new QLineEdit(pgHostEdit_->text(), body);
+    QLineEdit* portCopy = new QLineEdit(pgPortEdit_->text(), body);
+    QLineEdit* databaseCopy = new QLineEdit(databaseEdit_->text(), body);
+    QLineEdit* projectCopy = new QLineEdit(projectEdit_->text(), body);
+    QLineEdit* userCopy = new QLineEdit(userEdit_->text(), body);
+    QLineEdit* passwordCopy = new QLineEdit(passwordEdit_->text(), body);
+    passwordCopy->setEchoMode(QLineEdit::Password);
+
+    auto addPathRow = [&](int row, const QString& labelText, QLineEdit* edit, const QString& dialogTitle, bool directory) {
+        QLabel* label = new QLabel(labelText, body);
+        label->setFixedWidth(132);
+        QPushButton* browse = new QPushButton(QString::fromUtf8("浏览..."), body);
+        browse->setFixedWidth(64);
+        connect(browse, &QPushButton::clicked, &dialog, [this, edit, dialogTitle, directory]() {
+            QString path;
+            if (directory) {
+                path = QFileDialog::getExistingDirectory(this, dialogTitle, edit->text());
+            } else {
+                path = QFileDialog::getOpenFileName(this, dialogTitle, QFileInfo(edit->text()).absolutePath(),
+                                                   QString::fromUtf8("可执行文件 (*.exe);;所有文件 (*.*)"));
+            }
+            if (!path.isEmpty()) {
+                edit->setText(QDir::toNativeSeparators(path));
+            }
+        });
+        bodyLayout->addWidget(label, row, 0);
+        bodyLayout->addWidget(edit, row, 1, 1, 3);
+        bodyLayout->addWidget(browse, row, 4);
+    };
+
+    addPathRow(0, QString::fromUtf8("Runner 可执行文件:"), runnerCopy, QString::fromUtf8("选择 GeoEast Runner"), false);
+    addPathRow(1, QString::fromUtf8("GeoEast 根目录:"), geoEastRootCopy, QString::fromUtf8("选择 GeoEast 安装根目录"), true);
+    addPathRow(2, QString::fromUtf8("GeoEast 数据根目录:"), dataRootCopy, QString::fromUtf8("选择 GeoEastData 根目录"), true);
+
+    QFrame* line = new QFrame(body);
+    line->setObjectName("line");
+    bodyLayout->addWidget(line, 3, 0, 1, 5);
+
+    bodyLayout->addWidget(new QLabel(QString::fromUtf8("PG 主机:"), body), 4, 0);
+    bodyLayout->addWidget(hostCopy, 4, 1);
+    bodyLayout->addWidget(new QLabel(QString::fromUtf8("端口:"), body), 4, 2);
+    bodyLayout->addWidget(portCopy, 4, 3, 1, 2);
+    bodyLayout->addWidget(new QLabel(QString::fromUtf8("数据库:"), body), 5, 0);
+    bodyLayout->addWidget(databaseCopy, 5, 1);
+    bodyLayout->addWidget(new QLabel(QString::fromUtf8("项目:"), body), 5, 2);
+    bodyLayout->addWidget(projectCopy, 5, 3, 1, 2);
+    bodyLayout->addWidget(new QLabel(QString::fromUtf8("用户:"), body), 6, 0);
+    bodyLayout->addWidget(userCopy, 6, 1);
+    bodyLayout->addWidget(new QLabel(QString::fromUtf8("密码:"), body), 6, 2);
+    bodyLayout->addWidget(passwordCopy, 6, 3, 1, 2);
+    bodyLayout->setColumnStretch(1, 1);
+    bodyLayout->setColumnStretch(3, 1);
+    root->addWidget(body, 1);
+
+    QFrame* footer = new QFrame(&dialog);
+    footer->setStyleSheet("QFrame { background: #EAEAEA; border-top: 1px solid #C0C0C0; }");
+    QHBoxLayout* footerLayout = new QHBoxLayout(footer);
+    footerLayout->setContentsMargins(15, 10, 15, 10);
+    footerLayout->addStretch(1);
+    QPushButton* cancelButton = new QPushButton(QString::fromUtf8("取消"), footer);
+    QPushButton* applyButton = new QPushButton(QString::fromUtf8("应用并保存配置"), footer);
+    applyButton->setObjectName("applyButton");
+    footerLayout->addWidget(cancelButton);
+    footerLayout->addWidget(applyButton);
+    root->addWidget(footer);
+
+    connect(cancelButton, &QPushButton::clicked, &dialog, &QDialog::reject);
+    connect(applyButton, &QPushButton::clicked, &dialog, [&]() {
+        runnerEdit_->setText(runnerCopy->text());
+        geoEastRootEdit_->setText(geoEastRootCopy->text());
+        geoEastDataRootEdit_->setText(dataRootCopy->text());
+        pgHostEdit_->setText(hostCopy->text());
+        pgPortEdit_->setText(portCopy->text());
+        databaseEdit_->setText(databaseCopy->text());
+        projectEdit_->setText(projectCopy->text());
+        userEdit_->setText(userCopy->text());
+        passwordEdit_->setText(passwordCopy->text());
+        saveSettings();
+        updateStatusContext();
+        appendLog(QString::fromUtf8("底层配置已更新并保存。"));
+        dialog.accept();
+    });
+
+    dialog.exec();
+}
+
+void FaultTraceDialog::saveCurrentPreset() {
+    saveSettings();
+    updateStatusContext();
+    appendLog(QString::fromUtf8("预设参数和界面配置已保存。"));
+}
+
+void FaultTraceDialog::showHelpHint() {
+    appendLog(QString::fromUtf8("帮助文档：docs/用户操作手册.md；异机交付说明：docs/评审交付与异机运行说明.md。"));
 }
 
 void FaultTraceDialog::loadSettings() {
@@ -1014,6 +1623,10 @@ void FaultTraceDialog::setRunning(bool running) {
     refreshButton_->setEnabled(!running);
     runButton_->setEnabled(!running);
     stopButton_->setEnabled(running);
+    if (connectionLabel_) {
+        connectionLabel_->setText(running ? QString::fromUtf8("任务运行中") : QString::fromUtf8("数据库连接待验证"));
+    }
+    updateStatusContext();
 }
 
 void FaultTraceDialog::appendLog(const QString& text) {
@@ -1027,4 +1640,18 @@ void FaultTraceDialog::appendLog(const QString& text) {
 
 void FaultTraceDialog::appendStatus(const QString& text) {
     statusLabel_->setText(QDateTime::currentDateTime().toString("HH:mm:ss") + "  " + text);
+    updateStatusContext();
+}
+
+void FaultTraceDialog::updateStatusContext() {
+    if (projectStatusLabel_) {
+        projectStatusLabel_->setText(QString::fromUtf8("正在操作项目: %1").arg(projectEdit_ ? projectEdit_->text().trimmed() : QString()));
+    }
+    if (gridStatusLabel_) {
+        gridStatusLabel_->setText(QString::fromUtf8("当前网格: %1").arg(gridCombo_ ? gridCombo_->currentText().trimmed() : QString()));
+    }
+    if (connectionLabel_ && process_ && process_->state() == QProcess::NotRunning) {
+        const QString db = databaseEdit_ ? databaseEdit_->text().trimmed() : QString();
+        connectionLabel_->setText(db.isEmpty() ? QString::fromUtf8("数据库未配置") : QString::fromUtf8("数据库连接待验证: %1").arg(db));
+    }
 }
