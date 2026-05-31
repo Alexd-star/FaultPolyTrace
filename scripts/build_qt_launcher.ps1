@@ -24,14 +24,27 @@ if ([string]::IsNullOrWhiteSpace($QMake) -or !(Test-Path -LiteralPath $QMake)) {
     throw "Cannot find qmake.exe. Set FPT_QMAKE or install GeoEast Qt / D:\Qt\Qt5.14.2."
 }
 
+$qtBin = Split-Path -Parent $QMake
+$windeployQt = Join-Path $qtBin "windeployqt.exe"
+$launcherExe = Join-Path $launcherDir "faultpolytrace_launcher.exe"
+
 $command = @"
-call "$VcVars" && cd /d "$launcherDir" && "$QMake" FaultPolyTraceLauncher.pro -spec win32-msvc && nmake
+call "$VcVars" && set "PATH=$qtBin;!PATH!" && cd /d "$launcherDir" && "$QMake" FaultPolyTraceLauncher.pro -spec win32-msvc && nmake
 "@
 
-cmd /c $command
+cmd /v:on /c $command
 
 if ($LASTEXITCODE -ne 0) {
     throw "Qt launcher build failed with exit code $LASTEXITCODE."
 }
 
-Write-Host "Qt launcher built:" (Join-Path $launcherDir "faultpolytrace_launcher.exe")
+if (Test-Path -LiteralPath $windeployQt) {
+    & $windeployQt --force $launcherExe
+    if ($LASTEXITCODE -ne 0) {
+        throw "windeployqt failed with exit code $LASTEXITCODE."
+    }
+} else {
+    Write-Warning "windeployqt.exe was not found next to qmake.exe: $windeployQt"
+}
+
+Write-Host "Qt launcher built and deployed:" $launcherExe

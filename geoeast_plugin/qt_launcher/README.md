@@ -44,6 +44,8 @@ faultpolytrace_geoeast_runner.exe
 .\scripts\build_qt_launcher.ps1
 ```
 
+构建脚本会优先使用 GeoEast 自带 Qt 5.15.2，并在编译完成后自动调用同一套 Qt 的 `windeployqt` 部署运行库。不要把 Qt 5.14.2、Qt 5.15.2 或其它来源的 `Qt5*.dll` 手工混放到启动器目录，否则双击时可能出现“无法定位程序输入点”一类入口错误。
+
 ## 运行
 
 从项目根目录运行：
@@ -52,11 +54,13 @@ faultpolytrace_geoeast_runner.exe
 .\geoeast_plugin\qt_launcher\faultpolytrace_launcher.exe
 ```
 
-如果把启动器复制到新机器，需要部署一次 Qt 运行库：
+如果把启动器复制到新机器，需要用构建时同一套 Qt 部署运行库。本项目在 GeoEast 环境下推荐使用：
 
 ```powershell
-& "D:\Qt\Qt5.14.2\5.14.2\msvc2017_64\bin\windeployqt.exe" .\geoeast_plugin\qt_launcher\faultpolytrace_launcher.exe
+& "C:\Users\26312\GeoEast\NGP\Qt\Qt5.15.2\5.15.2\msvc2019_64\bin\windeployqt.exe" --force .\geoeast_plugin\qt_launcher\faultpolytrace_launcher.exe
 ```
+
+如果运行的是复制到 `C:\Users\26312\GeoEast\GeoEast-RC\bin` 下的副本，也要对那个副本执行同样的 `windeployqt`，或直接重新运行部署脚本，确保 exe 旁边的 `Qt5Core.dll`、`Qt5Gui.dll`、`Qt5Widgets.dll` 和 `platforms\qwindows.dll` 来自同一个 Qt 版本。
 
 ## 比赛演示流程
 
