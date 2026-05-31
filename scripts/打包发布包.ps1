@@ -49,6 +49,7 @@ $scriptsDir = Join-Path $packageDir "scripts"
 $srcDir = Join-Path $packageDir "src"
 $geoeastDir = Join-Path $packageDir "geoeast_plugin"
 $prerequisitesDir = Join-Path $packageDir "prerequisites"
+$figureDir = Join-Path $packageDir "figure"
 
 Copy-FileRequired (Join-Path $repoRoot "build\faultpolytrace.exe") (Join-Path $binDir "faultpolytrace.exe")
 
@@ -113,6 +114,10 @@ foreach ($name in @("FaultPolyTraceMainframePlugin.dll", "manifest.xml")) {
 }
 
 Copy-Item -LiteralPath (Join-Path $repoRoot "docs") -Destination $docsDir -Recurse -Force
+$releaseFigureDir = Join-Path $releaseRoot "figure"
+if (Test-Path -LiteralPath $releaseFigureDir) {
+    Copy-Item -LiteralPath $releaseFigureDir -Destination $figureDir -Recurse -Force
+}
 Copy-Item -LiteralPath (Join-Path $repoRoot "examples\outputs\official") -Destination (Join-Path $examplesDir "outputs\official") -Recurse -Force
 Copy-Item -LiteralPath (Join-Path $repoRoot "examples\synthetic") -Destination (Join-Path $examplesDir "synthetic") -Recurse -Force
 
@@ -160,6 +165,7 @@ $manifest += '- `01_打开图形界面.cmd`：评审推荐图形入口'
 $manifest += '- `02_运行离线演示.cmd`：无需 GeoEast 的双击离线演示'
 $manifest += '- `03_查看命令行帮助.cmd`：命令行参数帮助'
 $manifest += '- `docs/`：中文交付文档'
+$manifest += '- `figure/`：界面样式截图和 GeoEast 参考截图'
 $manifest += '- `examples/outputs/official/`：官方数据结果、图件、报告依据'
 $manifest += '- `scripts/`：运行、可视化、报告脚本'
 $manifest += '- `src/`：核心源码'

@@ -14,6 +14,7 @@ class QLineEdit;
 class QPushButton;
 class QSpinBox;
 class QTextEdit;
+class QWidget;
 
 class FaultTraceDialog : public QDialog {
     Q_OBJECT
@@ -116,6 +117,7 @@ private:
     QLabel* connectionLabel_ = nullptr;
     QLabel* projectStatusLabel_ = nullptr;
     QLabel* gridStatusLabel_ = nullptr;
+    QWidget* renderViewWidget_ = nullptr;
 
     QProcess* process_ = nullptr;
     bool refreshingGrids_ = false;
