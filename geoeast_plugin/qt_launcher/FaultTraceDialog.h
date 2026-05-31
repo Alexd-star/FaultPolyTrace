@@ -15,6 +15,7 @@ class QPushButton;
 class QSpinBox;
 class QTextEdit;
 class QWidget;
+class QAction;
 
 class FaultTraceDialog : public QDialog {
     Q_OBJECT
@@ -51,6 +52,7 @@ private:
     void applyParameterPreset(const QString& presetName);
     void setPolygonColor(const QColor& color);
     void updateStatusContext();
+    void updateOptionControls();
     QString defaultRunnerPath() const;
     QString defaultOfficialDatPath() const;
 
@@ -111,6 +113,9 @@ private:
     QPushButton* refreshButton_ = nullptr;
     QPushButton* runButton_ = nullptr;
     QPushButton* stopButton_ = nullptr;
+    QAction* refreshGridAction_ = nullptr;
+    QAction* runTraceAction_ = nullptr;
+    QAction* stopTraceAction_ = nullptr;
     QTextEdit* logEdit_ = nullptr;
     QLabel* statusLabel_ = nullptr;
     QLabel* coordinateLabel_ = nullptr;

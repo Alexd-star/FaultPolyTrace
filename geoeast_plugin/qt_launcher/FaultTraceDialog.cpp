@@ -26,7 +26,9 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QMessageBox>
+#include <QMouseEvent>
 #include <QPainter>
+#include <QPainterPath>
 #include <QPixmap>
 #include <QPolygonF>
 #include <QProcessEnvironment>
@@ -40,6 +42,8 @@
 #include <QToolBar>
 #include <QUrl>
 #include <QVBoxLayout>
+
+#include <functional>
 
 namespace {
 
@@ -188,10 +192,12 @@ public:
     explicit RenderViewWidget(QWidget* parent = nullptr) : QWidget(parent) {
         setMinimumSize(560, 420);
         setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+        setMouseTracking(true);
     }
 
     void setPanMode(bool enabled) {
         panMode_ = enabled;
+        setCursor(enabled ? Qt::OpenHandCursor : Qt::ArrowCursor);
         update();
     }
 
@@ -208,7 +214,44 @@ public:
     void resetView() {
         panMode_ = false;
         zoom_ = 1.0;
+        setCursor(Qt::ArrowCursor);
         update();
+    }
+
+    void setContext(const QString& database,
+                    const QString& project,
+                    const QString& grid,
+                    const QString& output,
+                    const QString& preset,
+                    const QString& traceMode,
+                    const QString& thresholdMode,
+                    double percentile,
+                    double threshold,
+                    double minArea,
+                    const QColor& polygonColor,
+                    double polygonLineWidth) {
+        database_ = database;
+        project_ = project;
+        grid_ = grid;
+        output_ = output;
+        preset_ = preset;
+        traceMode_ = traceMode;
+        thresholdMode_ = thresholdMode;
+        percentile_ = percentile;
+        threshold_ = threshold;
+        minArea_ = minArea;
+        polygonColor_ = polygonColor.isValid() ? polygonColor : QColor("#00FFFF");
+        polygonLineWidth_ = polygonLineWidth;
+        update();
+    }
+
+    void setActivity(const QString& activity) {
+        activity_ = activity;
+        update();
+    }
+
+    void setCoordinateCallback(std::function<void(const QPointF&)> callback) {
+        coordinateCallback_ = std::move(callback);
     }
 
 protected:
@@ -232,27 +275,93 @@ protected:
         titleFont.setPointSize(16);
         titleFont.setBold(true);
         painter.setFont(titleFont);
-        painter.setPen(QColor("#9B9B9B"));
-        painter.drawText(QPoint(26, 38), QString::fromUtf8("[渲染视图区] GeoEast Basemap View"));
+        painter.setPen(QColor("#7A7A7A"));
+        painter.drawText(QPoint(26, 38), QString::fromUtf8("[任务视图区] GeoEast Basemap 参数预览"));
 
         QFont hintFont = painter.font();
         hintFont.setPointSize(10);
         hintFont.setBold(false);
         painter.setFont(hintFont);
-        painter.setPen(QColor("#B6B6B6"));
-        painter.drawText(rect().adjusted(26, 58, -26, -26), Qt::AlignLeft | Qt::AlignTop,
-                         QString::fromUtf8("运行后可在 GeoEast 底图中叠加查看输入断层属性与输出闭合多边形；本区域预留为结果预览与质控图显示。"));
+        painter.setPen(QColor("#666666"));
+        const QString thresholdText = thresholdMode_ == "fixed"
+            ? QString::fromUtf8("固定阈值 %1").arg(threshold_, 0, 'f', 4)
+            : QString::fromUtf8("分位数 %1").arg(percentile_, 0, 'f', 4);
+        const QStringList lines = {
+            QString::fromUtf8("数据库：%1    项目：%2").arg(database_.isEmpty() ? QString::fromUtf8("未配置") : database_,
+                                                        project_.isEmpty() ? QString::fromUtf8("未配置") : project_),
+            QString::fromUtf8("输入网格：%1").arg(grid_.isEmpty() ? QString::fromUtf8("未选择") : grid_),
+            QString::fromUtf8("输出多边形：%1").arg(output_.isEmpty() ? QString::fromUtf8("未命名") : output_),
+            QString::fromUtf8("方案：%1    模式：%2    阈值：%3").arg(preset_, traceMode_, thresholdText),
+            QString::fromUtf8("面积过滤：小于 %1 的多边形不输出    结果线宽：%2").arg(minArea_, 0, 'f', 2).arg(polygonLineWidth_, 0, 'f', 3),
+            QString::fromUtf8("当前状态：%1").arg(activity_.isEmpty() ? QString::fromUtf8("等待运行") : activity_)
+        };
+        painter.drawText(rect().adjusted(26, 60, -26, -26), Qt::AlignLeft | Qt::AlignTop, lines.join('\n'));
+
+        const QRectF previewRect(width() - 300, height() - 190, 250, 130);
+        if (previewRect.left() > 360 && previewRect.top() > 170) {
+            painter.setPen(QPen(QColor("#C8C8C8"), 1));
+            painter.setBrush(QColor("#FBFBFB"));
+            painter.drawRect(previewRect);
+            painter.setPen(QPen(QColor("#E6E6E6"), 1));
+            for (int i = 1; i < 5; ++i) {
+                const qreal x = previewRect.left() + previewRect.width() * i / 5.0;
+                painter.drawLine(QPointF(x, previewRect.top()), QPointF(x, previewRect.bottom()));
+            }
+            for (int i = 1; i < 4; ++i) {
+                const qreal y = previewRect.top() + previewRect.height() * i / 4.0;
+                painter.drawLine(QPointF(previewRect.left(), y), QPointF(previewRect.right(), y));
+            }
+            painter.setPen(QPen(polygonColor_, qMax(1.5, polygonLineWidth_ * 40.0), Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+            QPainterPath path;
+            path.moveTo(previewRect.left() + 24, previewRect.bottom() - 28);
+            path.cubicTo(previewRect.left() + 80, previewRect.top() + 88,
+                         previewRect.left() + 142, previewRect.top() + 36,
+                         previewRect.right() - 28, previewRect.top() + 24);
+            painter.drawPath(path);
+            painter.setFont(hintFont);
+            painter.setPen(QColor("#666666"));
+            painter.drawText(previewRect.adjusted(8, 8, -8, -8), Qt::AlignLeft | Qt::AlignTop,
+                             QString::fromUtf8("样式预览"));
+        }
 
         painter.setPen(QColor("#8A8A8A"));
         painter.drawText(QRect(width() - 210, 18, 180, 20), Qt::AlignRight,
                          QString::fromUtf8("%1  缩放 %2%")
-                             .arg(panMode_ ? QString::fromUtf8("平移模式") : QString::fromUtf8("选择对象"))
+                             .arg(panMode_ ? QString::fromUtf8("平移模式") : QString::fromUtf8("查看模式"))
                              .arg(qRound(zoom_ * 100)));
+    }
+
+    void mouseMoveEvent(QMouseEvent* event) override {
+        if (coordinateCallback_) {
+            coordinateCallback_(QPointF(event->pos().x() / zoom_, event->pos().y() / zoom_));
+        }
+        QWidget::mouseMoveEvent(event);
+    }
+
+    void leaveEvent(QEvent* event) override {
+        if (coordinateCallback_) {
+            coordinateCallback_(QPointF(-1.0, -1.0));
+        }
+        QWidget::leaveEvent(event);
     }
 
 private:
     double zoom_ = 1.0;
     bool panMode_ = false;
+    QString database_;
+    QString project_;
+    QString grid_;
+    QString output_;
+    QString preset_ = QString::fromUtf8("防黏连增强");
+    QString traceMode_ = "ridge-belt";
+    QString thresholdMode_ = "percentile";
+    QString activity_ = QString::fromUtf8("等待运行");
+    double percentile_ = 0.98;
+    double threshold_ = 0.95;
+    double minArea_ = 120.0;
+    QColor polygonColor_ = QColor("#00FFFF");
+    double polygonLineWidth_ = 0.03;
+    std::function<void(const QPointF&)> coordinateCallback_;
 };
 
 class ColorBarWidget : public QWidget {
@@ -274,7 +383,7 @@ protected:
         QFont labelFont = painter.font();
         labelFont.setPointSize(8);
         painter.setFont(labelFont);
-        painter.drawText(QRect(4, 12, 48, 16), Qt::AlignCenter, "100");
+        painter.drawText(QRect(4, 8, 48, 28), Qt::AlignCenter | Qt::TextWordWrap, QString::fromUtf8("属性\n1.0"));
 
         QLinearGradient gradient(barRect.topLeft(), barRect.bottomLeft());
         gradient.setColorAt(0.00, QColor("#0B35FF"));
@@ -287,7 +396,7 @@ protected:
         painter.drawRect(barRect.adjusted(0, 0, -1, -1));
 
         painter.setPen(QColor("#DC143C"));
-        painter.drawText(QRect(4, barRect.bottom() + 6, 48, 16), Qt::AlignCenter, "0");
+        painter.drawText(QRect(4, barRect.bottom() + 6, 48, 16), Qt::AlignCenter, "0.0");
     }
 };
 
@@ -655,11 +764,6 @@ void FaultTraceDialog::buildUi() {
                 font-weight: bold;
                 color: #111111;
             }
-            QLabel#sidebarClose {
-                color: #777777;
-                font-weight: bold;
-                font-size: 13px;
-            }
             QScrollArea#sidebarScroll {
                 border: 0;
                 background: #F0F0F0;
@@ -777,8 +881,7 @@ void FaultTraceDialog::buildUi() {
         auto openLocalDir = [this](const QString& relativePath) {
             const QString path = QDir(repoRootFromAppDir()).absoluteFilePath(relativePath);
             if (!QDir(path).exists()) {
-                appendLog(QString::fromUtf8("目录不存在：%1").arg(QDir::toNativeSeparators(path)));
-                return;
+                QDir().mkpath(path);
             }
             if (!QDesktopServices::openUrl(QUrl::fromLocalFile(path))) {
                 appendLog(QString::fromUtf8("无法打开目录：%1").arg(QDir::toNativeSeparators(path)));
@@ -793,8 +896,8 @@ void FaultTraceDialog::buildUi() {
         QMenu* geoEastMenu = menuBar->addMenu(QString::fromUtf8("GeoEast(G)"));
         QAction* configAction = geoEastMenu->addAction(makeToolIcon(ToolIconKind::Database), QString::fromUtf8("数据库与环境底层配置..."));
         connect(configAction, &QAction::triggered, this, &FaultTraceDialog::showDatabaseConfigDialog);
-        QAction* refreshMenuAction = geoEastMenu->addAction(makeToolIcon(ToolIconKind::Database), QString::fromUtf8("刷新网格列表"));
-        connect(refreshMenuAction, &QAction::triggered, this, &FaultTraceDialog::refreshGrids);
+        refreshGridAction_ = geoEastMenu->addAction(makeToolIcon(ToolIconKind::Database), QString::fromUtf8("刷新网格列表"));
+        connect(refreshGridAction_, &QAction::triggered, this, &FaultTraceDialog::refreshGrids);
         geoEastMenu->addSeparator();
         QAction* exitAction = geoEastMenu->addAction(QString::fromUtf8("关闭启动器"));
         connect(exitAction, &QAction::triggered, this, &FaultTraceDialog::close);
@@ -856,22 +959,24 @@ void FaultTraceDialog::buildUi() {
         });
 
         QMenu* faultMenu = menuBar->addMenu(QString::fromUtf8("断层(L)"));
-        QAction* runTraceAction = faultMenu->addAction(makeToolIcon(ToolIconKind::Run), QString::fromUtf8("开始追踪"));
-        connect(runTraceAction, &QAction::triggered, this, &FaultTraceDialog::runTrace);
-        QAction* stopTraceAction = faultMenu->addAction(makeToolIcon(ToolIconKind::Stop), QString::fromUtf8("停止追踪"));
-        connect(stopTraceAction, &QAction::triggered, this, &FaultTraceDialog::stopProcess);
+        runTraceAction_ = faultMenu->addAction(makeToolIcon(ToolIconKind::Run), QString::fromUtf8("开始追踪"));
+        connect(runTraceAction_, &QAction::triggered, this, &FaultTraceDialog::runTrace);
+        stopTraceAction_ = faultMenu->addAction(makeToolIcon(ToolIconKind::Stop), QString::fromUtf8("停止追踪"));
+        stopTraceAction_->setEnabled(false);
+        connect(stopTraceAction_, &QAction::triggered, this, &FaultTraceDialog::stopProcess);
         faultMenu->addSeparator();
         QAction* colorAction = faultMenu->addAction(QString::fromUtf8("选择结果颜色..."));
         connect(colorAction, &QAction::triggered, this, &FaultTraceDialog::choosePolygonColor);
 
         QMenu* horizonMenu = menuBar->addMenu(QString::fromUtf8("层位(H)"));
-        QAction* horizonInfoAction = horizonMenu->addAction(QString::fromUtf8("层位数据说明"));
-        connect(horizonInfoAction, &QAction::triggered, this, [this]() {
-            appendLog(QString::fromUtf8("本工具直接处理平面断层属性网格，不修改层位解释对象；结果可在 GeoEast 底图中与层位、断层和断层多边形叠合查看。"));
+        QAction* horizonInfoAction = horizonMenu->addAction(QString::fromUtf8("打开叠合查看指南"));
+        connect(horizonInfoAction, &QAction::triggered, this, [this, openLocalFile]() {
+            appendLog(QString::fromUtf8("本工具直接处理平面断层属性网格，不修改层位解释对象；正在打开 GeoEast 叠合查看指南。"));
+            openLocalFile("docs/GeoEast使用指南.md");
         });
 
         QMenu* toolMenu = menuBar->addMenu(QString::fromUtf8("工具(T)"));
-        QAction* savePresetAction = toolMenu->addAction(makeToolIcon(ToolIconKind::Preset), QString::fromUtf8("保存预设"));
+        QAction* savePresetAction = toolMenu->addAction(makeToolIcon(ToolIconKind::Preset), QString::fromUtf8("保存当前参数"));
         connect(savePresetAction, &QAction::triggered, this, &FaultTraceDialog::saveCurrentPreset);
         QAction* userManualToolAction = toolMenu->addAction(QString::fromUtf8("打开用户操作手册"));
         connect(userManualToolAction, &QAction::triggered, this, [openLocalFile]() { openLocalFile("docs/用户操作手册.md"); });
@@ -924,13 +1029,7 @@ void FaultTraceDialog::buildUi() {
         sidebarHeaderLayout->setContentsMargins(12, 0, 8, 0);
         QLabel* sidebarTitle = new QLabel(QString::fromUtf8("FaultPolyTrace 断层多边形自动追踪"), sidebarHeader);
         sidebarTitle->setObjectName("sidebarTitle");
-        QLabel* sidebarClose = new QLabel("X", sidebarHeader);
-        sidebarClose->setObjectName("sidebarClose");
-        sidebarClose->setFixedSize(24, 22);
-        sidebarClose->setAlignment(Qt::AlignCenter);
-        sidebarClose->setToolTip(QString::fromUtf8("参数面板固定显示"));
         sidebarHeaderLayout->addWidget(sidebarTitle, 1);
-        sidebarHeaderLayout->addWidget(sidebarClose);
         sidebarRoot->addWidget(sidebarHeader);
 
         QScrollArea* sidebarScroll = new QScrollArea(sidebar);
@@ -1053,6 +1152,18 @@ void FaultTraceDialog::buildUi() {
         canvasLayout->setSpacing(0);
         RenderViewWidget* renderViewWidget = new RenderViewWidget(canvasRow);
         renderViewWidget_ = renderViewWidget;
+        renderViewWidget->setCoordinateCallback([this](const QPointF& point) {
+            if (!coordinateLabel_) {
+                return;
+            }
+            if (point.x() < 0.0 || point.y() < 0.0) {
+                coordinateLabel_->setText(QString::fromUtf8("视图 X: --   |   Y: --"));
+                return;
+            }
+            coordinateLabel_->setText(QString::fromUtf8("视图 X: %1   |   Y: %2")
+                                          .arg(point.x(), 0, 'f', 1)
+                                          .arg(point.y(), 0, 'f', 1));
+        });
         canvasLayout->addWidget(renderViewWidget, 1);
         canvasLayout->addWidget(new ColorBarWidget(canvasRow));
         workspaceLayout->addWidget(canvasRow, 1);
@@ -1086,7 +1197,7 @@ void FaultTraceDialog::buildUi() {
         QHBoxLayout* statusLayout = new QHBoxLayout(statusBar);
         statusLayout->setContentsMargins(12, 0, 12, 0);
         statusLayout->setSpacing(16);
-        coordinateLabel_ = new QLabel(QString::fromUtf8("X: 2380.12   |   Y: 3769.63"), statusBar);
+        coordinateLabel_ = new QLabel(QString::fromUtf8("视图 X: --   |   Y: --"), statusBar);
         connectionLabel_ = new QLabel(QString::fromUtf8("数据库连接待验证"), statusBar);
         projectStatusLabel_ = new QLabel(statusBar);
         gridStatusLabel_ = new QLabel(statusBar);
@@ -1112,6 +1223,13 @@ void FaultTraceDialog::buildUi() {
         connect(projectEdit_, &QLineEdit::textChanged, this, &FaultTraceDialog::updateStatusContext);
         connect(databaseEdit_, &QLineEdit::textChanged, this, &FaultTraceDialog::updateStatusContext);
         connect(gridCombo_, &QComboBox::currentTextChanged, this, &FaultTraceDialog::updateStatusContext);
+        connect(outputEdit_, &QLineEdit::textChanged, this, &FaultTraceDialog::updateStatusContext);
+        connect(traceModeCombo_, &QComboBox::currentTextChanged, this, &FaultTraceDialog::updateStatusContext);
+        connect(thresholdModeCombo_, &QComboBox::currentTextChanged, this, &FaultTraceDialog::updateOptionControls);
+        connect(rootAntiMergeCheck_, &QCheckBox::toggled, this, &FaultTraceDialog::updateOptionControls);
+        connect(localAntiMergeCheck_, &QCheckBox::toggled, this, &FaultTraceDialog::updateOptionControls);
+        connect(residualTraceCheck_, &QCheckBox::toggled, this, &FaultTraceDialog::updateOptionControls);
+        connect(importDatCheck_, &QCheckBox::toggled, this, &FaultTraceDialog::updateOptionControls);
 
         presetCombo_->setCurrentText(QString::fromUtf8("防黏连增强"));
         applyParameterPreset(QString::fromUtf8("防黏连增强"));
@@ -1344,11 +1462,19 @@ void FaultTraceDialog::showDatabaseConfigDialog() {
 void FaultTraceDialog::saveCurrentPreset() {
     saveSettings();
     updateStatusContext();
-    appendLog(QString::fromUtf8("预设参数和界面配置已保存。"));
+    appendLog(QString::fromUtf8("当前参数和界面配置已保存。"));
 }
 
 void FaultTraceDialog::showHelpHint() {
     appendLog(QString::fromUtf8("帮助文档：docs/用户操作手册.md；异机交付说明：docs/评审交付与异机运行说明.md。"));
+    QMessageBox::information(this,
+                             QString::fromUtf8("FaultPolyTrace 帮助提示"),
+                             QString::fromUtf8("常用流程：\n"
+                                               "1. 在【数据库与环境底层配置】中确认 GeoEast 根目录、项目、用户和 Runner。\n"
+                                               "2. 点击【刷新网格】读取 GeoEast 中的 BOMapGrid 对象。\n"
+                                               "3. 设置输入网格、输出多边形、结果颜色和必要参数。\n"
+                                               "4. 点击【开始追踪】，完成后到 GeoEast 底图叠加查看结果。\n\n"
+                                               "详细说明见 docs/用户操作手册.md 和 docs/评审交付与异机运行说明.md。"));
 }
 
 void FaultTraceDialog::loadSettings() {
@@ -1361,12 +1487,34 @@ void FaultTraceDialog::loadSettings() {
     databaseEdit_->setText(settings.value("database", databaseEdit_->text()).toString());
     projectEdit_->setText(settings.value("project", projectEdit_->text()).toString());
     userEdit_->setText(settings.value("user", userEdit_->text()).toString());
+    presetCombo_->setCurrentText(settings.value("preset", presetCombo_->currentText()).toString());
     gridCombo_->setCurrentText(settings.value("grid", gridCombo_->currentText()).toString());
     outputEdit_->setText(settings.value("output", outputEdit_->text()).toString());
     datFileEdit_->setText(settings.value("datFile", datFileEdit_->text()).toString());
+    importDatCheck_->setChecked(settings.value("importDat", importDatCheck_->isChecked()).toBool());
+    overwriteGridCheck_->setChecked(settings.value("overwriteGrid", overwriteGridCheck_->isChecked()).toBool());
     polygonColorEdit_->setText(settings.value("polygonColor", polygonColorEdit_->text()).toString());
     setPolygonColor(QColor(polygonColorEdit_->text()));
     polygonLineWidthSpin_->setValue(settings.value("polygonLineWidth", polygonLineWidthSpin_->value()).toDouble());
+    traceModeCombo_->setCurrentText(settings.value("traceMode", traceModeCombo_->currentText()).toString());
+    thresholdModeCombo_->setCurrentText(settings.value("thresholdMode", thresholdModeCombo_->currentText()).toString());
+    thresholdSpin_->setValue(settings.value("threshold", thresholdSpin_->value()).toDouble());
+    percentileSpin_->setValue(settings.value("percentile", percentileSpin_->value()).toDouble());
+    minAreaSpin_->setValue(settings.value("minArea", minAreaSpin_->value()).toDouble());
+    closeRadiusSpin_->setValue(settings.value("closeRadius", closeRadiusSpin_->value()).toInt());
+    weakPercentileSpin_->setValue(settings.value("weakPercentile", weakPercentileSpin_->value()).toDouble());
+    weakConnectRadiusSpin_->setValue(settings.value("weakConnectRadius", weakConnectRadiusSpin_->value()).toInt());
+    beltRadiusSpin_->setValue(settings.value("beltRadius", beltRadiusSpin_->value()).toInt());
+    postBeltCloseRadiusSpin_->setValue(settings.value("postBeltCloseRadius", postBeltCloseRadiusSpin_->value()).toInt());
+    attributeConstrainedBeltCheck_->setChecked(settings.value("attributeConstrainedBelt", attributeConstrainedBeltCheck_->isChecked()).toBool());
+    attributeEnvelopeRadiusSpin_->setValue(settings.value("attributeEnvelopeRadius", attributeEnvelopeRadiusSpin_->value()).toInt());
+    minBranchLengthSpin_->setValue(settings.value("minBranchLength", minBranchLengthSpin_->value()).toInt());
+    minJunctionBranchLengthSpin_->setValue(settings.value("minJunctionBranchLength", minJunctionBranchLengthSpin_->value()).toInt());
+    minJunctionBranchMeanSpin_->setValue(settings.value("minJunctionBranchMean", minJunctionBranchMeanSpin_->value()).toDouble());
+    maxGapDistanceSpin_->setValue(settings.value("maxGapDistance", maxGapDistanceSpin_->value()).toInt());
+    maxGapAngleSpin_->setValue(settings.value("maxGapAngle", maxGapAngleSpin_->value()).toDouble());
+    simplifyToleranceSpin_->setValue(settings.value("simplifyTolerance", simplifyToleranceSpin_->value()).toDouble());
+    smoothIterationsSpin_->setValue(settings.value("smoothIterations", smoothIterationsSpin_->value()).toInt());
     rootAntiMergeCheck_->setChecked(settings.value("rootAntiMerge", rootAntiMergeCheck_->isChecked()).toBool());
     rootAntiMergeRadiusSpin_->setValue(settings.value("rootAntiMergeRadius", rootAntiMergeRadiusSpin_->value()).toInt());
     rootAntiMergeSupportRatioSpin_->setValue(settings.value("rootAntiMergeSupportRatio", rootAntiMergeSupportRatioSpin_->value()).toDouble());
@@ -1384,6 +1532,8 @@ void FaultTraceDialog::loadSettings() {
     residualTraceCheck_->setChecked(settings.value("residualTrace", residualTraceCheck_->isChecked()).toBool());
     residualTraceMinLengthSpin_->setValue(settings.value("residualTraceMinLength", residualTraceMinLengthSpin_->value()).toInt());
     residualTraceMaxCellsSpin_->setValue(settings.value("residualTraceMaxCells", residualTraceMaxCellsSpin_->value()).toInt());
+    updateOptionControls();
+    updateStatusContext();
 }
 
 void FaultTraceDialog::saveSettings() const {
@@ -1396,11 +1546,33 @@ void FaultTraceDialog::saveSettings() const {
     settings.setValue("database", databaseEdit_->text());
     settings.setValue("project", projectEdit_->text());
     settings.setValue("user", userEdit_->text());
+    settings.setValue("preset", presetCombo_->currentText());
     settings.setValue("grid", gridCombo_->currentText());
     settings.setValue("output", outputEdit_->text());
     settings.setValue("datFile", datFileEdit_->text());
+    settings.setValue("importDat", importDatCheck_->isChecked());
+    settings.setValue("overwriteGrid", overwriteGridCheck_->isChecked());
     settings.setValue("polygonColor", polygonColorEdit_->text());
     settings.setValue("polygonLineWidth", polygonLineWidthSpin_->value());
+    settings.setValue("traceMode", traceModeCombo_->currentText());
+    settings.setValue("thresholdMode", thresholdModeCombo_->currentText());
+    settings.setValue("threshold", thresholdSpin_->value());
+    settings.setValue("percentile", percentileSpin_->value());
+    settings.setValue("minArea", minAreaSpin_->value());
+    settings.setValue("closeRadius", closeRadiusSpin_->value());
+    settings.setValue("weakPercentile", weakPercentileSpin_->value());
+    settings.setValue("weakConnectRadius", weakConnectRadiusSpin_->value());
+    settings.setValue("beltRadius", beltRadiusSpin_->value());
+    settings.setValue("postBeltCloseRadius", postBeltCloseRadiusSpin_->value());
+    settings.setValue("attributeConstrainedBelt", attributeConstrainedBeltCheck_->isChecked());
+    settings.setValue("attributeEnvelopeRadius", attributeEnvelopeRadiusSpin_->value());
+    settings.setValue("minBranchLength", minBranchLengthSpin_->value());
+    settings.setValue("minJunctionBranchLength", minJunctionBranchLengthSpin_->value());
+    settings.setValue("minJunctionBranchMean", minJunctionBranchMeanSpin_->value());
+    settings.setValue("maxGapDistance", maxGapDistanceSpin_->value());
+    settings.setValue("maxGapAngle", maxGapAngleSpin_->value());
+    settings.setValue("simplifyTolerance", simplifyToleranceSpin_->value());
+    settings.setValue("smoothIterations", smoothIterationsSpin_->value());
     settings.setValue("rootAntiMerge", rootAntiMergeCheck_->isChecked());
     settings.setValue("rootAntiMergeRadius", rootAntiMergeRadiusSpin_->value());
     settings.setValue("rootAntiMergeSupportRatio", rootAntiMergeSupportRatioSpin_->value());
@@ -1438,6 +1610,62 @@ void FaultTraceDialog::setPolygonColor(const QColor& color) {
         .arg(effective.name(QColor::HexRgb))
         .arg(effective.lightness() < 128 ? "#FFFFFF" : "#000000");
     polygonColorEdit_->setStyleSheet(style);
+    updateStatusContext();
+}
+
+void FaultTraceDialog::updateOptionControls() {
+    const bool fixedThreshold = thresholdModeCombo_ && thresholdModeCombo_->currentText() == "fixed";
+    if (thresholdSpin_) {
+        thresholdSpin_->setEnabled(fixedThreshold);
+    }
+    if (percentileSpin_) {
+        percentileSpin_->setEnabled(!fixedThreshold);
+    }
+
+    const bool importDat = importDatCheck_ && importDatCheck_->isChecked();
+    if (datFileEdit_) {
+        datFileEdit_->setEnabled(importDat);
+    }
+    if (overwriteGridCheck_) {
+        overwriteGridCheck_->setEnabled(importDat);
+    }
+
+    const bool rootEnabled = rootAntiMergeCheck_ && rootAntiMergeCheck_->isChecked();
+    for (QWidget* widget : {
+             static_cast<QWidget*>(rootAntiMergeRadiusSpin_),
+             static_cast<QWidget*>(rootAntiMergeSupportRatioSpin_),
+             static_cast<QWidget*>(rootAntiMergeMinPartCellsSpin_),
+             static_cast<QWidget*>(rootAntiMergeMinPartRatioSpin_),
+             static_cast<QWidget*>(rootAntiMergeWeakGuardThresholdSpin_),
+             static_cast<QWidget*>(rootAntiMergeWeakGuardRadiusSpin_)}) {
+        if (widget) {
+            widget->setEnabled(rootEnabled);
+        }
+    }
+
+    const bool localEnabled = localAntiMergeCheck_ && localAntiMergeCheck_->isChecked();
+    for (QWidget* widget : {
+             static_cast<QWidget*>(localAntiMergeLowThresholdSpin_),
+             static_cast<QWidget*>(localAntiMergeBridgeRadiusSpin_),
+             static_cast<QWidget*>(localAntiMergeMinPartCellsSpin_),
+             static_cast<QWidget*>(localAntiMergeMinPartRatioSpin_),
+             static_cast<QWidget*>(localAntiMergeMinBridgeCellsSpin_),
+             static_cast<QWidget*>(localAntiMergeMinLowRatioSpin_)}) {
+        if (widget) {
+            widget->setEnabled(localEnabled);
+        }
+    }
+
+    const bool residualEnabled = residualTraceCheck_ && residualTraceCheck_->isChecked();
+    for (QWidget* widget : {
+             static_cast<QWidget*>(residualTraceMinLengthSpin_),
+             static_cast<QWidget*>(residualTraceMaxCellsSpin_)}) {
+        if (widget) {
+            widget->setEnabled(residualEnabled);
+        }
+    }
+
+    updateStatusContext();
 }
 
 void FaultTraceDialog::configureGeoEastEnvironment(QProcessEnvironment& environment) const {
@@ -1767,6 +1995,8 @@ void FaultTraceDialog::applyParameterPreset(const QString& presetName) {
         residualTraceMinLengthSpin_->setValue(6);
         residualTraceMaxCellsSpin_->setValue(80);
     }
+    updateOptionControls();
+    updateStatusContext();
 }
 
 void FaultTraceDialog::refreshGrids() {
@@ -1785,6 +2015,9 @@ void FaultTraceDialog::refreshGrids() {
     QStringList args = commonConnectionArgs();
     args << "--list-grids";
     appendStatus(QString::fromUtf8("正在刷新 GeoEast 网格对象..."));
+    if (renderViewWidget_) {
+        static_cast<RenderViewWidget*>(renderViewWidget_)->setActivity(QString::fromUtf8("正在刷新 GeoEast 网格对象"));
+    }
     appendLog("> " + runner + " " + quoteForLog(args));
 
     QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
@@ -1813,6 +2046,9 @@ void FaultTraceDialog::runTrace() {
     logEdit_->clear();
     QStringList args = traceArgs();
     appendStatus(QString::fromUtf8("正在追踪断层多边形..."));
+    if (renderViewWidget_) {
+        static_cast<RenderViewWidget*>(renderViewWidget_)->setActivity(QString::fromUtf8("正在追踪断层多边形"));
+    }
     appendLog("> " + runner + " " + quoteForLog(args));
 
     QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
@@ -1867,14 +2103,23 @@ void FaultTraceDialog::onProcessFinished(int exitCode, QProcess::ExitStatus stat
             }
         }
         appendStatus(QString::fromUtf8("网格对象刷新完成"));
+        if (renderViewWidget_) {
+            static_cast<RenderViewWidget*>(renderViewWidget_)->setActivity(QString::fromUtf8("网格对象刷新完成"));
+        }
         refreshingGrids_ = false;
         return;
     }
 
     if (exitCode == 0 && status == QProcess::NormalExit) {
         appendStatus(QString::fromUtf8("追踪完成，结果已写入 GeoEast 数据库"));
+        if (renderViewWidget_) {
+            static_cast<RenderViewWidget*>(renderViewWidget_)->setActivity(QString::fromUtf8("追踪完成，结果已写入 GeoEast 数据库"));
+        }
     } else {
         appendStatus(QString::fromUtf8("运行失败，请查看日志"));
+        if (renderViewWidget_) {
+            static_cast<RenderViewWidget*>(renderViewWidget_)->setActivity(QString::fromUtf8("运行失败，请查看日志"));
+        }
     }
     refreshingGrids_ = false;
 }
@@ -1882,6 +2127,9 @@ void FaultTraceDialog::onProcessFinished(int exitCode, QProcess::ExitStatus stat
 void FaultTraceDialog::onProcessError(QProcess::ProcessError error) {
     appendLog(QString::fromUtf8("进程错误：%1").arg(static_cast<int>(error)));
     appendStatus(QString::fromUtf8("进程启动或运行异常"));
+    if (renderViewWidget_) {
+        static_cast<RenderViewWidget*>(renderViewWidget_)->setActivity(QString::fromUtf8("进程启动或运行异常"));
+    }
     setRunning(false);
 }
 
@@ -1889,6 +2137,15 @@ void FaultTraceDialog::setRunning(bool running) {
     refreshButton_->setEnabled(!running);
     runButton_->setEnabled(!running);
     stopButton_->setEnabled(running);
+    if (refreshGridAction_) {
+        refreshGridAction_->setEnabled(!running);
+    }
+    if (runTraceAction_) {
+        runTraceAction_->setEnabled(!running);
+    }
+    if (stopTraceAction_) {
+        stopTraceAction_->setEnabled(running);
+    }
     if (connectionLabel_) {
         connectionLabel_->setText(running ? QString::fromUtf8("任务运行中") : QString::fromUtf8("数据库连接待验证"));
     }
@@ -1919,5 +2176,20 @@ void FaultTraceDialog::updateStatusContext() {
     if (connectionLabel_ && process_ && process_->state() == QProcess::NotRunning) {
         const QString db = databaseEdit_ ? databaseEdit_->text().trimmed() : QString();
         connectionLabel_->setText(db.isEmpty() ? QString::fromUtf8("数据库未配置") : QString::fromUtf8("数据库连接待验证: %1").arg(db));
+    }
+    if (renderViewWidget_) {
+        static_cast<RenderViewWidget*>(renderViewWidget_)->setContext(
+            databaseEdit_ ? databaseEdit_->text().trimmed() : QString(),
+            projectEdit_ ? projectEdit_->text().trimmed() : QString(),
+            gridCombo_ ? gridCombo_->currentText().trimmed() : QString(),
+            outputEdit_ ? outputEdit_->text().trimmed() : QString(),
+            presetCombo_ ? presetCombo_->currentText() : QString(),
+            traceModeCombo_ ? traceModeCombo_->currentText() : QString(),
+            thresholdModeCombo_ ? thresholdModeCombo_->currentText() : QString(),
+            percentileSpin_ ? percentileSpin_->value() : 0.0,
+            thresholdSpin_ ? thresholdSpin_->value() : 0.0,
+            minAreaSpin_ ? minAreaSpin_->value() : 0.0,
+            polygonColorEdit_ ? QColor(polygonColorEdit_->text()) : QColor("#00FFFF"),
+            polygonLineWidthSpin_ ? polygonLineWidthSpin_->value() : 0.03);
     }
 }
