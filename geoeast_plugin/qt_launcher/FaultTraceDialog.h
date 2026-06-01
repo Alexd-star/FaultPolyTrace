@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QDialog>
+#include <QJsonObject>
 #include <QProcess>
 #include <QString>
 
@@ -25,13 +26,23 @@ public:
 
 private slots:
     void browseRunner();
+    void browseCoreRunner();
+    void browseInputData();
     void browseDatFile();
+    void browseStandaloneInput();
+    void browseStandaloneOutputDir();
     void browseGeoEastRoot();
     void browseGeoEastDataRoot();
     void choosePolygonColor();
     void showDatabaseConfigDialog();
     void saveCurrentPreset();
+    void saveParameterTemplate();
+    void loadParameterTemplate();
+    void restoreDefaultConfiguration();
     void showHelpHint();
+    void updateRunMode();
+    void updatePreviewMode();
+    void refreshInputPreview();
     void refreshGrids();
     void runTrace();
     void stopProcess();
@@ -49,13 +60,25 @@ private:
     void configureGeoEastEnvironment(QProcessEnvironment& environment) const;
     QStringList commonConnectionArgs() const;
     QStringList traceArgs() const;
+    QStringList standaloneTraceArgs() const;
+    QString currentStandaloneOutputCsv() const;
+    QString defaultCoreRunnerPath() const;
     void applyParameterPreset(const QString& presetName);
+    QJsonObject parameterTemplateJson() const;
+    void applyParameterTemplateJson(const QJsonObject& object);
     void setPolygonColor(const QColor& color);
     void updateStatusContext();
     void updateOptionControls();
+    void loadLatestStandaloneResult();
+    void ensureProductDefaults();
+    QString settingsFilePath() const;
     QString defaultRunnerPath() const;
     QString defaultOfficialDatPath() const;
+    QString defaultStandaloneInputPath() const;
+    QString defaultStandaloneOutputDir() const;
 
+    QComboBox* runModeCombo_ = nullptr;
+    QLineEdit* coreRunnerEdit_ = nullptr;
     QLineEdit* runnerEdit_ = nullptr;
     QLineEdit* geoEastRootEdit_ = nullptr;
     QLineEdit* geoEastDataRootEdit_ = nullptr;
@@ -72,6 +95,11 @@ private:
     QDoubleSpinBox* polygonLineWidthSpin_ = nullptr;
     QCheckBox* importDatCheck_ = nullptr;
     QLineEdit* datFileEdit_ = nullptr;
+    QLineEdit* standaloneInputEdit_ = nullptr;
+    QLineEdit* standaloneOutputDirEdit_ = nullptr;
+    QLineEdit* standaloneOutputNameEdit_ = nullptr;
+    QComboBox* inputFormatCombo_ = nullptr;
+    QComboBox* previewModeCombo_ = nullptr;
     QCheckBox* overwriteGridCheck_ = nullptr;
     QComboBox* presetCombo_ = nullptr;
     QComboBox* traceModeCombo_ = nullptr;
@@ -122,8 +150,12 @@ private:
     QLabel* connectionLabel_ = nullptr;
     QLabel* projectStatusLabel_ = nullptr;
     QLabel* gridStatusLabel_ = nullptr;
+    QLabel* elapsedLabel_ = nullptr;
     QWidget* renderViewWidget_ = nullptr;
 
     QProcess* process_ = nullptr;
     bool refreshingGrids_ = false;
+    bool standaloneRun_ = false;
+    qint64 processStartMs_ = 0;
+    QString lastStandaloneOutputCsv_;
 };

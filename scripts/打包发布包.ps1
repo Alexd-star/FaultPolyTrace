@@ -1,6 +1,6 @@
 param(
     [string]$Version = "v0.9.0",
-    [string]$GeoEastRoot = $(if ($env:FPT_GEOEAST_ROOT) { $env:FPT_GEOEAST_ROOT } else { "C:\Users\26312\GeoEast" }),
+    [string]$GeoEastRoot = $(if ($env:FPT_GEOEAST_ROOT) { $env:FPT_GEOEAST_ROOT } elseif ($env:USERPROFILE) { Join-Path $env:USERPROFILE "GeoEast" } else { "C:\GeoEast" }),
     [switch]$SkipBuild
 )
 
@@ -27,6 +27,23 @@ function Copy-FileOptional {
         return $true
     }
     return $false
+}
+
+function Sanitize-PackageTextFiles {
+    param([string]$Root)
+    Get-ChildItem -LiteralPath $Root -Recurse -File -Include *.md,*.txt,*.ini,*.ps1,*.cmd,*.py | ForEach-Object {
+        $text = Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8
+        $text = $text -replace 'C:\\Users\\[^\\]+\\Documents\\BGPCup\\FaultPolyTrace', "<安装目录>\FaultPolyTrace"
+        $text = $text -replace 'C:/Users/[^/]+/Documents/BGPCup/FaultPolyTrace', "<安装目录>/FaultPolyTrace"
+        $text = $text -replace 'C:\\Users\\[^\\]+\\GeoEast', "<GeoEast安装根目录>"
+        $text = $text -replace 'C:/Users/[^/]+/GeoEast', "<GeoEast安装根目录>"
+        $text = $text -replace '[A-Za-z]:[\\/]+BaiduNetdiskDownload', "<数据目录>"
+        if ($env:USERNAME) {
+            $escapedUser = [regex]::Escape($env:USERNAME)
+            $text = $text -replace "(?<!\d)$escapedUser(?!\d)", '<GeoEast用户名>'
+        }
+        Set-Content -LiteralPath $_.FullName -Value $text -Encoding UTF8
+    }
 }
 
 if (!$SkipBuild) {
@@ -80,6 +97,19 @@ foreach ($subdir in @("platforms", "imageformats", "iconengines", "styles", "tra
     $src = Join-Path $launcherSource $subdir
     if (Test-Path -LiteralPath $src) {
         Copy-Item -LiteralPath $src -Destination (Join-Path $launcherDir $subdir) -Recurse -Force
+    }
+}
+
+# 发布包根目录提供一个面向普通用户的 GUI exe 入口，避免评审误双击命令行核心。
+# Qt 在 Windows 上默认从 exe 同级查找运行库，因此根目录入口也复制必要 Qt 运行文件。
+Copy-FileOptional (Join-Path $launcherDir "faultpolytrace_launcher.exe") (Join-Path $packageDir "FaultPolyTrace.exe") | Out-Null
+foreach ($name in @("qt.conf", "Qt5Core.dll", "Qt5Gui.dll", "Qt5Widgets.dll", "Qt5Svg.dll", "libEGL.dll", "libGLESv2.dll", "D3Dcompiler_47.dll", "opengl32sw.dll", "msvcp140.dll", "vcruntime140.dll", "vcruntime140_1.dll", "concrt140.dll")) {
+    Copy-FileOptional (Join-Path $launcherDir $name) (Join-Path $packageDir $name) | Out-Null
+}
+foreach ($subdir in @("platforms", "imageformats", "iconengines", "styles")) {
+    $src = Join-Path $launcherDir $subdir
+    if (Test-Path -LiteralPath $src) {
+        Copy-Item -LiteralPath $src -Destination (Join-Path $packageDir $subdir) -Recurse -Force
     }
 }
 
@@ -161,6 +191,7 @@ $manifest += "## 包含内容"
 $manifest += ""
 $manifest += '- `bin/faultpolytrace.exe`：离线算法程序'
 $manifest += '- `qt_launcher/faultpolytrace_launcher.exe`：Qt 用户界面'
+$manifest += '- `FaultPolyTrace.exe`：独立软件图形入口，适合普通用户直接双击'
 $manifest += '- `01_打开图形界面.cmd`：评审推荐图形入口'
 $manifest += '- `02_运行离线演示.cmd`：无需 GeoEast 的双击离线演示'
 $manifest += '- `03_查看命令行帮助.cmd`：命令行参数帮助'
@@ -188,13 +219,15 @@ $manifest += ""
 $manifest += "## 推荐入口"
 $manifest += ""
 $manifest += '1. 先读 `README_先打开我.md`。'
-$manifest += '2. 双击 `01_打开图形界面.cmd` 查看图形界面。'
+$manifest += '2. 双击 `FaultPolyTrace.exe` 或 `01_打开图形界面.cmd` 查看图形界面。'
 $manifest += '3. 没有 GeoEast 环境时，双击 `02_运行离线演示.cmd` 验证算法独立运行能力。'
 $manifest += '4. 有 GeoEast 环境时，按 `docs/用户操作手册.md` 连接数据库、选择网格并写入结果。'
 $manifest += '5. 查看 `docs/官方数据最新验收报告.md`。'
 $manifest += '6. 修改代码后运行 `scripts/一键总验收.ps1 -SkipGeoEastBuild -SkipPackage`，确认官方数据仍满足覆盖、防黏连、拓扑和性能门禁。'
 
 Set-Content -LiteralPath (Join-Path $packageDir "发布包清单.md") -Value ($manifest -join "`n") -Encoding UTF8
+
+Sanitize-PackageTextFiles $packageDir
 
 $zipPath = Join-Path $releaseRoot ("FaultPolyTrace_" + $Version + ".zip")
 if (Test-Path -LiteralPath $zipPath) {
