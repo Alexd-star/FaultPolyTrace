@@ -12,7 +12,6 @@
 #include <QDesktopServices>
 #include <QDir>
 #include <QDoubleSpinBox>
-#include <QElapsedTimer>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFile>
@@ -21,8 +20,6 @@
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
-#include <QJsonDocument>
-#include <QJsonObject>
 #include <QLinearGradient>
 #include <QMenu>
 #include <QMenuBar>
@@ -36,23 +33,17 @@
 #include <QPolygonF>
 #include <QProcessEnvironment>
 #include <QPushButton>
-#include <QRegularExpression>
 #include <QScrollArea>
 #include <QSettings>
 #include <QSizePolicy>
 #include <QSpinBox>
-#include <QStandardPaths>
 #include <QTextEdit>
 #include <QTextCursor>
-#include <QTextStream>
 #include <QToolBar>
 #include <QUrl>
-#include <QVector>
 #include <QVBoxLayout>
 
-#include <algorithm>
 #include <functional>
-#include <limits>
 
 namespace {
 
@@ -72,76 +63,6 @@ QString repoRootFromAppDir() {
 QString envOrDefault(const char* name, const QString& fallback) {
     const QByteArray value = qgetenv(name);
     return value.isEmpty() ? fallback : QString::fromLocal8Bit(value);
-}
-
-QString firstExistingFile(const QStringList& paths, const QString& fallback = QString()) {
-    for (const QString& path : paths) {
-        if (!path.isEmpty() && QFileInfo::exists(path)) {
-            return QDir::toNativeSeparators(path);
-        }
-    }
-    return QDir::toNativeSeparators(fallback);
-}
-
-QString firstExistingDir(const QStringList& paths, const QString& fallback = QString()) {
-    for (const QString& path : paths) {
-        if (!path.isEmpty() && QDir(path).exists()) {
-            return QDir::toNativeSeparators(path);
-        }
-    }
-    return QDir::toNativeSeparators(fallback);
-}
-
-QString productConfigDir() {
-    QString dir = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
-    if (dir.isEmpty()) {
-        dir = QDir(QCoreApplication::applicationDirPath()).absoluteFilePath("config");
-    }
-    QDir().mkpath(dir);
-    return dir;
-}
-
-QString defaultGeoEastRootPath() {
-    const QString explicitRoot = envOrDefault("FPT_GEOEAST_ROOT", "");
-    if (!explicitRoot.isEmpty()) {
-        return QDir::toNativeSeparators(explicitRoot);
-    }
-    const QString geoeastEnv = envOrDefault("GEOEAST", "");
-    if (!geoeastEnv.isEmpty()) {
-        QDir dir(geoeastEnv);
-        if (dir.dirName().compare("GeoEast-RC", Qt::CaseInsensitive) == 0 && dir.cdUp()) {
-            return QDir::toNativeSeparators(dir.absolutePath());
-        }
-    }
-    return firstExistingDir({
-        "C:/GeoEast",
-        "D:/GeoEast"
-    });
-}
-
-QString defaultGeoEastDataRootPath() {
-    const QString fromEnv = envOrDefault("FPT_GEOEAST_DATA_ROOT", "");
-    if (!fromEnv.isEmpty()) {
-        return QDir::toNativeSeparators(fromEnv);
-    }
-    const QString root = defaultGeoEastRootPath();
-    if (!root.isEmpty()) {
-        return firstExistingDir({
-            QDir(root).absoluteFilePath("GeoEastData"),
-            QDir(root).absoluteFilePath("Data/GeoEastData")
-        });
-    }
-    return QString();
-}
-
-QString defaultUserName() {
-    return envOrDefault("FPT_GEOEAST_USER", envOrDefault("USERNAME", envOrDefault("USER", "")));
-}
-
-QString elapsedText(qint64 elapsedMs) {
-    return QString::fromUtf8("%1 ms (%2 s)")
-        .arg(elapsedMs)
-        .arg(elapsedMs / 1000.0, 0, 'f', elapsedMs < 1000 ? 3 : 2);
 }
 
 QString quoteForLog(const QStringList& args) {
@@ -268,12 +189,6 @@ QIcon makeToolIcon(ToolIconKind kind) {
 
 class RenderViewWidget : public QWidget {
 public:
-    enum class ViewMode {
-        Raw,
-        Result,
-        Overlay
-    };
-
     explicit RenderViewWidget(QWidget* parent = nullptr) : QWidget(parent) {
         setMinimumSize(560, 420);
         setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
@@ -335,229 +250,6 @@ public:
         update();
     }
 
-    void setViewMode(ViewMode mode) {
-        viewMode_ = mode;
-        update();
-    }
-
-    bool loadGridFile(const QString& path, const QString& formatHint, QString* errorMessage = nullptr) {
-        gridValues_.clear();
-        gridNx_ = 0;
-        gridNy_ = 0;
-        gridMin_ = 0.0;
-        gridMax_ = 1.0;
-        gridXMin_ = 0.0;
-        gridYMin_ = 0.0;
-        gridXMax_ = 1.0;
-        gridYMax_ = 1.0;
-
-        QFile file(path);
-        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-            if (errorMessage) {
-                *errorMessage = QString::fromUtf8("无法打开输入文件：%1").arg(path);
-            }
-            update();
-            return false;
-        }
-
-        const QString text = QString::fromLocal8Bit(file.readAll());
-        const QStringList lines = text.split(QRegularExpression("[\r\n]+"), Qt::SkipEmptyParts);
-        if (lines.isEmpty()) {
-            if (errorMessage) {
-                *errorMessage = QString::fromUtf8("输入文件为空。");
-            }
-            update();
-            return false;
-        }
-
-        auto splitNumbers = [](const QString& line) {
-            QVector<double> numbers;
-            for (const QString& token : line.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts)) {
-                bool ok = false;
-                const double value = token.toDouble(&ok);
-                if (ok) {
-                    numbers.push_back(value);
-                }
-            }
-            return numbers;
-        };
-
-        const QString format = formatHint.trimmed().toLower();
-        const QVector<double> first = splitNumbers(lines.value(0));
-        const QVector<double> second = splitNumbers(lines.value(1));
-        const QVector<double> third = splitNumbers(lines.value(2));
-        const bool matrixLike = (format == "matrix") ||
-            (format == "auto" && first.size() == 2 && second.size() == 2 && third.size() == 2 && lines.size() > 3);
-
-        if (matrixLike) {
-            const int nx = qRound(first[0]);
-            const int ny = qRound(first[1]);
-            if (nx <= 0 || ny <= 0) {
-                if (errorMessage) {
-                    *errorMessage = QString::fromUtf8("矩阵网格头中的行列数无效。");
-                }
-                update();
-                return false;
-            }
-            QVector<double> values;
-            values.reserve(nx * ny);
-            for (int i = 3; i < lines.size(); ++i) {
-                const QVector<double> rowValues = splitNumbers(lines[i]);
-                for (double value : rowValues) {
-                    values.push_back(value);
-                }
-            }
-            if (values.size() < nx * ny) {
-                if (errorMessage) {
-                    *errorMessage = QString::fromUtf8("矩阵网格数值数量不足，无法预览。");
-                }
-                update();
-                return false;
-            }
-            values.resize(nx * ny);
-            gridNx_ = nx;
-            gridNy_ = ny;
-            gridValues_ = values;
-            gridXMin_ = second[0];
-            gridYMin_ = second[1];
-            const double dx = third[0] == 0.0 ? 1.0 : third[0];
-            const double dy = third[1] == 0.0 ? 1.0 : third[1];
-            gridXMax_ = gridXMin_ + dx * qMax(1, nx - 1);
-            gridYMax_ = gridYMin_ + dy * qMax(1, ny - 1);
-        } else {
-            struct DatSample {
-                double line = 0.0;
-                double cmp = 0.0;
-                double x = 0.0;
-                double y = 0.0;
-                double value = 0.0;
-            };
-            QVector<DatSample> samples;
-            QVector<double> lineKeys;
-            QVector<double> cmpKeys;
-            for (const QString& line : lines) {
-                const QVector<double> values = splitNumbers(line);
-                if (values.size() < 5) {
-                    continue;
-                }
-                DatSample sample{values[0], values[1], values[2], values[3], values[4]};
-                samples.push_back(sample);
-                lineKeys.push_back(sample.line);
-                cmpKeys.push_back(sample.cmp);
-            }
-            auto sortUnique = [](QVector<double>& values) {
-                std::sort(values.begin(), values.end());
-                values.erase(std::unique(values.begin(), values.end(), [](double a, double b) {
-                    return qAbs(a - b) < 1e-9;
-                }), values.end());
-            };
-            sortUnique(lineKeys);
-            sortUnique(cmpKeys);
-            if (samples.isEmpty() || lineKeys.isEmpty() || cmpKeys.isEmpty()) {
-                if (errorMessage) {
-                    *errorMessage = QString::fromUtf8("未识别到 GeoEast DAT 五列采样数据。");
-                }
-                update();
-                return false;
-            }
-            gridNx_ = cmpKeys.size();
-            gridNy_ = lineKeys.size();
-            gridValues_.fill(0.0, gridNx_ * gridNy_);
-            gridXMin_ = std::numeric_limits<double>::max();
-            gridYMin_ = std::numeric_limits<double>::max();
-            gridXMax_ = -std::numeric_limits<double>::max();
-            gridYMax_ = -std::numeric_limits<double>::max();
-            for (const DatSample& sample : samples) {
-                const int row = std::lower_bound(lineKeys.begin(), lineKeys.end(), sample.line) - lineKeys.begin();
-                const int col = std::lower_bound(cmpKeys.begin(), cmpKeys.end(), sample.cmp) - cmpKeys.begin();
-                if (row >= 0 && row < gridNy_ && col >= 0 && col < gridNx_) {
-                    gridValues_[row * gridNx_ + col] = sample.value;
-                }
-                gridXMin_ = qMin(gridXMin_, sample.x);
-                gridYMin_ = qMin(gridYMin_, sample.y);
-                gridXMax_ = qMax(gridXMax_, sample.x);
-                gridYMax_ = qMax(gridYMax_, sample.y);
-            }
-            if (qFuzzyCompare(gridXMin_, gridXMax_) || qFuzzyCompare(gridYMin_, gridYMax_)) {
-                gridXMin_ = 0.0;
-                gridYMin_ = 0.0;
-                gridXMax_ = qMax(1, gridNx_ - 1);
-                gridYMax_ = qMax(1, gridNy_ - 1);
-            }
-        }
-
-        gridMin_ = std::numeric_limits<double>::max();
-        gridMax_ = -std::numeric_limits<double>::max();
-        for (double value : gridValues_) {
-            gridMin_ = qMin(gridMin_, value);
-            gridMax_ = qMax(gridMax_, value);
-        }
-        if (qFuzzyCompare(gridMin_, gridMax_)) {
-            gridMax_ = gridMin_ + 1.0;
-        }
-        activity_ = QString::fromUtf8("已载入原始网格预览：%1 x %2").arg(gridNx_).arg(gridNy_);
-        update();
-        return true;
-    }
-
-    bool loadPolygonCsv(const QString& path, QString* errorMessage = nullptr) {
-        polygonRings_.clear();
-        QFile file(path);
-        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-            if (errorMessage) {
-                *errorMessage = QString::fromUtf8("无法打开结果 CSV：%1").arg(path);
-            }
-            update();
-            return false;
-        }
-        const QString text = QString::fromLocal8Bit(file.readAll());
-        const QStringList lines = text.split(QRegularExpression("[\r\n]+"), Qt::SkipEmptyParts);
-        QRegularExpression numberRe("[-+]?\\d*\\.?\\d+(?:[eE][-+]?\\d+)?");
-        double pxMin = std::numeric_limits<double>::max();
-        double pyMin = std::numeric_limits<double>::max();
-        double pxMax = -std::numeric_limits<double>::max();
-        double pyMax = -std::numeric_limits<double>::max();
-        for (const QString& line : lines) {
-            if (!line.contains("POLYGON", Qt::CaseInsensitive) || !line.contains("kept", Qt::CaseInsensitive)) {
-                continue;
-            }
-            const int start = line.indexOf("POLYGON", 0, Qt::CaseInsensitive);
-            const QString wkt = line.mid(start);
-            QVector<double> numbers;
-            QRegularExpressionMatchIterator iterator = numberRe.globalMatch(wkt);
-            while (iterator.hasNext()) {
-                bool ok = false;
-                const double value = iterator.next().captured(0).toDouble(&ok);
-                if (ok) {
-                    numbers.push_back(value);
-                }
-            }
-            QPolygonF ring;
-            for (int i = 0; i + 1 < numbers.size(); i += 2) {
-                const QPointF point(numbers[i], numbers[i + 1]);
-                ring << point;
-                pxMin = qMin(pxMin, point.x());
-                pyMin = qMin(pyMin, point.y());
-                pxMax = qMax(pxMax, point.x());
-                pyMax = qMax(pyMax, point.y());
-            }
-            if (ring.size() >= 3) {
-                polygonRings_ << ring;
-            }
-        }
-        if (gridValues_.isEmpty() && !polygonRings_.isEmpty()) {
-            gridXMin_ = pxMin;
-            gridYMin_ = pyMin;
-            gridXMax_ = pxMax;
-            gridYMax_ = pyMax;
-        }
-        activity_ = polygonRings_.isEmpty()
-            ? QString::fromUtf8("结果 CSV 已读取，但未发现保留多边形")
-            : QString::fromUtf8("已载入结果多边形：%1 个").arg(polygonRings_.size());
-        update();
-        return !polygonRings_.isEmpty();
-    }
-
     void setCoordinateCallback(std::function<void(const QPointF&)> callback) {
         coordinateCallback_ = std::move(callback);
     }
@@ -579,24 +271,12 @@ protected:
         painter.setPen(QPen(QColor("#E7E7E7"), 1));
         painter.drawRect(rect().adjusted(0, 0, -1, -1));
 
-        const QRectF viewRect = rect().adjusted(26, 60, -74, -34);
-        if (!gridValues_.isEmpty()) {
-            drawGridPreview(painter, viewRect);
-        }
-        if (!polygonRings_.isEmpty() && (viewMode_ == ViewMode::Result || viewMode_ == ViewMode::Overlay)) {
-            drawPolygonPreview(painter, viewRect);
-        }
-
         QFont titleFont = painter.font();
         titleFont.setPointSize(16);
         titleFont.setBold(true);
         painter.setFont(titleFont);
         painter.setPen(QColor("#7A7A7A"));
-        const QString viewTitle = viewMode_ == ViewMode::Raw
-            ? QString::fromUtf8("[渲染视图区] 原始网格属性")
-            : (viewMode_ == ViewMode::Result ? QString::fromUtf8("[渲染视图区] 断层多边形结果")
-                                              : QString::fromUtf8("[渲染视图区] 原始属性与结果叠加"));
-        painter.drawText(QPoint(26, 38), viewTitle);
+        painter.drawText(QPoint(26, 38), QString::fromUtf8("[任务视图区] GeoEast Basemap 参数预览"));
 
         QFont hintFont = painter.font();
         hintFont.setPointSize(10);
@@ -615,12 +295,10 @@ protected:
             QString::fromUtf8("面积过滤：小于 %1 的多边形不输出    结果线宽：%2").arg(minArea_, 0, 'f', 2).arg(polygonLineWidth_, 0, 'f', 3),
             QString::fromUtf8("当前状态：%1").arg(activity_.isEmpty() ? QString::fromUtf8("等待运行") : activity_)
         };
-        if (gridValues_.isEmpty() && polygonRings_.isEmpty()) {
-            painter.drawText(rect().adjusted(26, 60, -26, -26), Qt::AlignLeft | Qt::AlignTop, lines.join('\n'));
-        }
+        painter.drawText(rect().adjusted(26, 60, -26, -26), Qt::AlignLeft | Qt::AlignTop, lines.join('\n'));
 
         const QRectF previewRect(width() - 300, height() - 190, 250, 130);
-        if (gridValues_.isEmpty() && polygonRings_.isEmpty() && previewRect.left() > 360 && previewRect.top() > 170) {
+        if (previewRect.left() > 360 && previewRect.top() > 170) {
             painter.setPen(QPen(QColor("#C8C8C8"), 1));
             painter.setBrush(QColor("#FBFBFB"));
             painter.drawRect(previewRect);
@@ -668,84 +346,8 @@ protected:
     }
 
 private:
-    QColor heatColor(double value) const {
-        const double t = qBound(0.0, (value - gridMin_) / (gridMax_ - gridMin_), 1.0);
-        if (t < 0.25) {
-            const double k = t / 0.25;
-            return QColor::fromRgbF(1.0, k, 0.0);
-        }
-        if (t < 0.50) {
-            const double k = (t - 0.25) / 0.25;
-            return QColor::fromRgbF(1.0 - k, 1.0, 0.0);
-        }
-        if (t < 0.75) {
-            const double k = (t - 0.50) / 0.25;
-            return QColor::fromRgbF(0.0, 1.0, k);
-        }
-        const double k = (t - 0.75) / 0.25;
-        return QColor::fromRgbF(0.0, 1.0 - k, 1.0);
-    }
-
-    QRectF fittedDataRect(const QRectF& available) const {
-        if (available.width() <= 10 || available.height() <= 10) {
-            return available;
-        }
-        const double dataWidth = qMax(1e-9, qAbs(gridXMax_ - gridXMin_));
-        const double dataHeight = qMax(1e-9, qAbs(gridYMax_ - gridYMin_));
-        const double scale = qMin(available.width() / dataWidth, available.height() / dataHeight) * zoom_;
-        const double width = dataWidth * scale;
-        const double height = dataHeight * scale;
-        return QRectF(available.center().x() - width / 2.0,
-                      available.center().y() - height / 2.0,
-                      width,
-                      height);
-    }
-
-    QPointF mapDataPoint(const QPointF& point, const QRectF& dataRect) const {
-        const double xRange = qMax(1e-9, gridXMax_ - gridXMin_);
-        const double yRange = qMax(1e-9, gridYMax_ - gridYMin_);
-        const double x = dataRect.left() + (point.x() - gridXMin_) / xRange * dataRect.width();
-        const double y = dataRect.bottom() - (point.y() - gridYMin_) / yRange * dataRect.height();
-        return QPointF(x, y);
-    }
-
-    void drawGridPreview(QPainter& painter, const QRectF& available) const {
-        if (gridNx_ <= 0 || gridNy_ <= 0 || gridValues_.isEmpty() || viewMode_ == ViewMode::Result) {
-            return;
-        }
-        QImage image(gridNx_, gridNy_, QImage::Format_RGB32);
-        for (int y = 0; y < gridNy_; ++y) {
-            for (int x = 0; x < gridNx_; ++x) {
-                image.setPixelColor(x, gridNy_ - 1 - y, heatColor(gridValues_[y * gridNx_ + x]));
-            }
-        }
-        const QRectF dataRect = fittedDataRect(available);
-        painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
-        painter.drawImage(dataRect, image);
-        painter.setRenderHint(QPainter::Antialiasing, true);
-        painter.setPen(QPen(QColor("#222222"), 1));
-        painter.setBrush(Qt::NoBrush);
-        painter.drawRect(dataRect);
-    }
-
-    void drawPolygonPreview(QPainter& painter, const QRectF& available) const {
-        const QRectF dataRect = fittedDataRect(available);
-        painter.setRenderHint(QPainter::Antialiasing, true);
-        painter.setBrush(Qt::NoBrush);
-        painter.setPen(QPen(polygonColor_, qMax(1.2, polygonLineWidth_ * 42.0), Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-        for (const QPolygonF& ring : polygonRings_) {
-            QPolygonF mapped;
-            mapped.reserve(ring.size());
-            for (const QPointF& point : ring) {
-                mapped << mapDataPoint(point, dataRect);
-            }
-            painter.drawPolygon(mapped);
-        }
-    }
-
     double zoom_ = 1.0;
     bool panMode_ = false;
-    ViewMode viewMode_ = ViewMode::Overlay;
     QString database_;
     QString project_;
     QString grid_;
@@ -759,16 +361,6 @@ private:
     double minArea_ = 120.0;
     QColor polygonColor_ = QColor("#00FFFF");
     double polygonLineWidth_ = 0.03;
-    int gridNx_ = 0;
-    int gridNy_ = 0;
-    QVector<double> gridValues_;
-    double gridMin_ = 0.0;
-    double gridMax_ = 1.0;
-    double gridXMin_ = 0.0;
-    double gridYMin_ = 0.0;
-    double gridXMax_ = 1.0;
-    double gridYMax_ = 1.0;
-    QVector<QPolygonF> polygonRings_;
     std::function<void(const QPointF&)> coordinateCallback_;
 };
 
@@ -840,13 +432,8 @@ void addFormRow(QGridLayout* layout, int row, const QString& label, QWidget* edi
 } // namespace
 
 FaultTraceDialog::FaultTraceDialog(QWidget* parent) : QDialog(parent), process_(new QProcess(this)) {
-    setWindowFlags((windowFlags() & ~Qt::WindowContextHelpButtonHint) |
-                   Qt::WindowMinimizeButtonHint |
-                   Qt::WindowCloseButtonHint);
     buildUi();
     loadSettings();
-    ensureProductDefaults();
-    updateRunMode();
     updateStatusContext();
 
     connect(process_, &QProcess::readyReadStandardOutput, this, &FaultTraceDialog::onReadyRead);
@@ -860,20 +447,14 @@ void FaultTraceDialog::buildUi() {
     setWindowTitle(QString::fromUtf8("FaultPolyTrace 断层多边形自动追踪"));
     resize(980, 720);
 
-    runModeCombo_ = new QComboBox(this);
-    runModeCombo_->addItem(QString::fromUtf8("独立文件模式"));
-    runModeCombo_->addItem(QString::fromUtf8("GeoEast 集成模式"));
-
-    coreRunnerEdit_ = new QLineEdit(defaultCoreRunnerPath(), this);
-    QPushButton* browseCoreRunnerButton = new QPushButton(QString::fromUtf8("浏览"), this);
-    connect(browseCoreRunnerButton, &QPushButton::clicked, this, &FaultTraceDialog::browseCoreRunner);
-
     runnerEdit_ = new QLineEdit(defaultRunnerPath(), this);
     QPushButton* browseRunnerButton = new QPushButton(QString::fromUtf8("浏览"), this);
     connect(browseRunnerButton, &QPushButton::clicked, this, &FaultTraceDialog::browseRunner);
 
-    geoEastRootEdit_ = new QLineEdit(defaultGeoEastRootPath(), this);
-    geoEastDataRootEdit_ = new QLineEdit(defaultGeoEastDataRootPath(), this);
+    geoEastRootEdit_ = new QLineEdit(envOrDefault("FPT_GEOEAST_ROOT", "C:/Users/26312/GeoEast"), this);
+    geoEastDataRootEdit_ = new QLineEdit(envOrDefault(
+        "FPT_GEOEAST_DATA_ROOT",
+        "D:/BaiduNetdiskDownload/BGPCup2025/GeoEast-RC/GeoEastData.DataModel+SQLITE.20230728/GeoEastData"), this);
     pgHostEdit_ = new QLineEdit(envOrDefault("FPT_GEOEAST_PG_HOST", "127.0.0.1"), this);
     pgPortEdit_ = new QLineEdit(envOrDefault("FPT_GEOEAST_PG_PORT", "5433"), this);
     QPushButton* browseGeoEastRootButton = new QPushButton(QString::fromUtf8("浏览"), this);
@@ -899,8 +480,8 @@ void FaultTraceDialog::buildUi() {
 
     QGroupBox* connectionBox = new QGroupBox(QString::fromUtf8("GeoEast 数据库"), this);
     databaseEdit_ = new QLineEdit(envOrDefault("FPT_GEOEAST_DB", "ndp"), this);
-    projectEdit_ = new QLineEdit(envOrDefault("FPT_GEOEAST_PROJECT", ""), this);
-    userEdit_ = new QLineEdit(defaultUserName(), this);
+    projectEdit_ = new QLineEdit(envOrDefault("FPT_GEOEAST_PROJECT", "BGPCup2026_Test7"), this);
+    userEdit_ = new QLineEdit(envOrDefault("FPT_GEOEAST_USER", "26312"), this);
     passwordEdit_ = new QLineEdit("", this);
     passwordEdit_->setEchoMode(QLineEdit::Password);
 
@@ -942,23 +523,6 @@ void FaultTraceDialog::buildUi() {
     overwriteGridCheck_ = new QCheckBox(QString::fromUtf8("覆盖同名 BOMapGrid"), this);
     overwriteGridCheck_->setChecked(true);
     connect(browseDatButton, &QPushButton::clicked, this, &FaultTraceDialog::browseDatFile);
-
-    standaloneInputEdit_ = new QLineEdit(defaultStandaloneInputPath(), this);
-    standaloneInputEdit_->setPlaceholderText(QString::fromUtf8("选择外部网格文件，支持矩阵 TXT/DAT 或 GeoEast DAT"));
-    QPushButton* browseStandaloneInputButton = new QPushButton(QString::fromUtf8("浏览"), this);
-    connect(browseStandaloneInputButton, &QPushButton::clicked, this, &FaultTraceDialog::browseStandaloneInput);
-    standaloneOutputDirEdit_ = new QLineEdit(defaultStandaloneOutputDir(), this);
-    QPushButton* browseStandaloneOutputButton = new QPushButton(QString::fromUtf8("浏览"), this);
-    connect(browseStandaloneOutputButton, &QPushButton::clicked, this, &FaultTraceDialog::browseStandaloneOutputDir);
-    standaloneOutputNameEdit_ = new QLineEdit("FaultPolyTrace_Result", this);
-    inputFormatCombo_ = new QComboBox(this);
-    inputFormatCombo_->addItem("auto");
-    inputFormatCombo_->addItem("matrix");
-    inputFormatCombo_->addItem("geoeast-dat");
-    previewModeCombo_ = new QComboBox(this);
-    previewModeCombo_->addItem(QString::fromUtf8("叠加视图"));
-    previewModeCombo_->addItem(QString::fromUtf8("原始网格"));
-    previewModeCombo_->addItem(QString::fromUtf8("结果多边形"));
 
     QHBoxLayout* gridLayout = new QHBoxLayout;
     gridLayout->addWidget(gridCombo_);
@@ -1339,22 +903,12 @@ void FaultTraceDialog::buildUi() {
         connect(exitAction, &QAction::triggered, this, &FaultTraceDialog::close);
 
         QMenu* fileMenu = menuBar->addMenu(QString::fromUtf8("文件(F)"));
-        QAction* openAction = fileMenu->addAction(makeToolIcon(ToolIconKind::Open), QString::fromUtf8("打开输入数据..."));
-        connect(openAction, &QAction::triggered, this, &FaultTraceDialog::browseInputData);
+        QAction* openAction = fileMenu->addAction(makeToolIcon(ToolIconKind::Open), QString::fromUtf8("打开 DAT 文件..."));
+        connect(openAction, &QAction::triggered, this, &FaultTraceDialog::browseDatFile);
         QAction* saveAction = fileMenu->addAction(makeToolIcon(ToolIconKind::Save), QString::fromUtf8("保存当前配置"));
         connect(saveAction, &QAction::triggered, this, &FaultTraceDialog::saveCurrentPreset);
-        QAction* saveTemplateFileAction = fileMenu->addAction(QString::fromUtf8("导出参数模板..."));
-        connect(saveTemplateFileAction, &QAction::triggered, this, &FaultTraceDialog::saveParameterTemplate);
-        QAction* loadTemplateFileAction = fileMenu->addAction(QString::fromUtf8("导入参数模板..."));
-        connect(loadTemplateFileAction, &QAction::triggered, this, &FaultTraceDialog::loadParameterTemplate);
         QAction* outputDirAction = fileMenu->addAction(QString::fromUtf8("打开输出目录"));
-        connect(outputDirAction, &QAction::triggered, this, [this, openLocalDir]() {
-            if (runModeCombo_ && runModeCombo_->currentIndex() == 0 && !standaloneOutputDirEdit_->text().trimmed().isEmpty()) {
-                QDesktopServices::openUrl(QUrl::fromLocalFile(standaloneOutputDirEdit_->text().trimmed()));
-            } else {
-                openLocalDir("examples/outputs");
-            }
-        });
+        connect(outputDirAction, &QAction::triggered, this, [openLocalDir]() { openLocalDir("examples/outputs"); });
         fileMenu->addSeparator();
         fileMenu->addAction(exitAction);
 
@@ -1403,8 +957,6 @@ void FaultTraceDialog::buildUi() {
             panAction->setChecked(false);
             appendStatus(QString::fromUtf8("视图区已重置"));
         });
-        QAction* refreshPreviewAction = viewMenu->addAction(QString::fromUtf8("刷新输入预览"));
-        connect(refreshPreviewAction, &QAction::triggered, this, &FaultTraceDialog::refreshInputPreview);
 
         QMenu* faultMenu = menuBar->addMenu(QString::fromUtf8("断层(L)"));
         runTraceAction_ = faultMenu->addAction(makeToolIcon(ToolIconKind::Run), QString::fromUtf8("开始追踪"));
@@ -1426,8 +978,6 @@ void FaultTraceDialog::buildUi() {
         QMenu* toolMenu = menuBar->addMenu(QString::fromUtf8("工具(T)"));
         QAction* savePresetAction = toolMenu->addAction(makeToolIcon(ToolIconKind::Preset), QString::fromUtf8("保存当前参数"));
         connect(savePresetAction, &QAction::triggered, this, &FaultTraceDialog::saveCurrentPreset);
-        QAction* restoreDefaultAction = toolMenu->addAction(makeToolIcon(ToolIconKind::Reset), QString::fromUtf8("恢复默认配置"));
-        connect(restoreDefaultAction, &QAction::triggered, this, &FaultTraceDialog::restoreDefaultConfiguration);
         QAction* userManualToolAction = toolMenu->addAction(QString::fromUtf8("打开用户操作手册"));
         connect(userManualToolAction, &QAction::triggered, this, [openLocalFile]() { openLocalFile("docs/用户操作手册.md"); });
         QAction* packageGuideAction = toolMenu->addAction(QString::fromUtf8("打开异机运行说明"));
@@ -1494,17 +1044,8 @@ void FaultTraceDialog::buildUi() {
 
         QGroupBox* dataGroup = new QGroupBox(QString::fromUtf8("数据管理"), sidebarContent);
         QGridLayout* dataLayoutNew = makeGroupLayout(dataGroup);
-        addFormRow(dataLayoutNew, 0, QString::fromUtf8("运行模式"), runModeCombo_, dataGroup);
-        QWidget* coreRunnerLineWidget = new QWidget(dataGroup);
-        QHBoxLayout* coreRunnerLineLayout = new QHBoxLayout(coreRunnerLineWidget);
-        coreRunnerLineLayout->setContentsMargins(0, 0, 0, 0);
-        coreRunnerLineLayout->setSpacing(5);
-        coreRunnerLineLayout->addWidget(coreRunnerEdit_, 1);
-        coreRunnerLineLayout->addWidget(browseCoreRunnerButton);
-        browseCoreRunnerButton->setFixedWidth(52);
-        addFormRow(dataLayoutNew, 1, QString::fromUtf8("算法程序"), coreRunnerLineWidget, dataGroup);
-        addFormRow(dataLayoutNew, 2, QString::fromUtf8("输入网格"), gridCombo_, dataGroup);
-        addFormRow(dataLayoutNew, 3, QString::fromUtf8("输出多边形"), outputEdit_, dataGroup);
+        addFormRow(dataLayoutNew, 0, QString::fromUtf8("输入网格"), gridCombo_, dataGroup);
+        addFormRow(dataLayoutNew, 1, QString::fromUtf8("输出多边形"), outputEdit_, dataGroup);
         QWidget* colorLineWidget = new QWidget(dataGroup);
         QHBoxLayout* colorLineLayout = new QHBoxLayout(colorLineWidget);
         colorLineLayout->setContentsMargins(0, 0, 0, 0);
@@ -1512,35 +1053,16 @@ void FaultTraceDialog::buildUi() {
         colorLineLayout->addWidget(polygonColorEdit_, 1);
         colorLineLayout->addWidget(polygonColorButton_);
         colorLineLayout->addWidget(polygonLineWidthSpin_);
-        addFormRow(dataLayoutNew, 4, QString::fromUtf8("结果样式 / 线宽"), colorLineWidget, dataGroup);
+        addFormRow(dataLayoutNew, 2, QString::fromUtf8("结果样式 / 线宽"), colorLineWidget, dataGroup);
         QWidget* datLineWidget = new QWidget(dataGroup);
         QHBoxLayout* datLineLayout = new QHBoxLayout(datLineWidget);
         datLineLayout->setContentsMargins(0, 0, 0, 0);
         datLineLayout->setSpacing(5);
         datLineLayout->addWidget(datFileEdit_, 1);
         datLineLayout->addWidget(browseDatButton);
-        addFormRow(dataLayoutNew, 5, QString::fromUtf8("DAT 文件"), datLineWidget, dataGroup);
-        QWidget* inputLineWidget = new QWidget(dataGroup);
-        QHBoxLayout* inputLineLayout = new QHBoxLayout(inputLineWidget);
-        inputLineLayout->setContentsMargins(0, 0, 0, 0);
-        inputLineLayout->setSpacing(5);
-        inputLineLayout->addWidget(standaloneInputEdit_, 1);
-        inputLineLayout->addWidget(browseStandaloneInputButton);
-        browseStandaloneInputButton->setFixedWidth(52);
-        addFormRow(dataLayoutNew, 6, QString::fromUtf8("外部文件"), inputLineWidget, dataGroup);
-        QWidget* outLineWidget = new QWidget(dataGroup);
-        QHBoxLayout* outLineLayout = new QHBoxLayout(outLineWidget);
-        outLineLayout->setContentsMargins(0, 0, 0, 0);
-        outLineLayout->setSpacing(5);
-        outLineLayout->addWidget(standaloneOutputDirEdit_, 1);
-        outLineLayout->addWidget(browseStandaloneOutputButton);
-        browseStandaloneOutputButton->setFixedWidth(52);
-        addFormRow(dataLayoutNew, 7, QString::fromUtf8("输出目录"), outLineWidget, dataGroup);
-        addFormRow(dataLayoutNew, 8, QString::fromUtf8("输出名称"), standaloneOutputNameEdit_, dataGroup);
-        addFormRow(dataLayoutNew, 9, QString::fromUtf8("输入格式"), inputFormatCombo_, dataGroup);
-        addFormRow(dataLayoutNew, 10, QString::fromUtf8("视图内容"), previewModeCombo_, dataGroup);
-        dataLayoutNew->addWidget(overwriteGridCheck_, 11, 0, 1, 2);
-        dataLayoutNew->addWidget(importDatCheck_, 12, 0, 1, 2);
+        addFormRow(dataLayoutNew, 3, QString::fromUtf8("DAT 文件"), datLineWidget, dataGroup);
+        dataLayoutNew->addWidget(overwriteGridCheck_, 4, 0, 1, 2);
+        dataLayoutNew->addWidget(importDatCheck_, 5, 0, 1, 2);
         sidebarContentLayout->addWidget(dataGroup);
 
         QGroupBox* traceGroup = new QGroupBox(QString::fromUtf8("追踪参数"), sidebarContent);
@@ -1679,9 +1201,8 @@ void FaultTraceDialog::buildUi() {
         connectionLabel_ = new QLabel(QString::fromUtf8("数据库连接待验证"), statusBar);
         projectStatusLabel_ = new QLabel(statusBar);
         gridStatusLabel_ = new QLabel(statusBar);
-        elapsedLabel_ = new QLabel(QString::fromUtf8("耗时: --"), statusBar);
         statusLabel_ = new QLabel(QString::fromUtf8("就绪"), statusBar);
-        for (QLabel* label : {coordinateLabel_, connectionLabel_, projectStatusLabel_, gridStatusLabel_, elapsedLabel_, statusLabel_}) {
+        for (QLabel* label : {coordinateLabel_, connectionLabel_, projectStatusLabel_, gridStatusLabel_, statusLabel_}) {
             label->setObjectName("statusText");
         }
         statusLayout->addWidget(coordinateLabel_);
@@ -1689,7 +1210,6 @@ void FaultTraceDialog::buildUi() {
         statusLayout->addWidget(connectionLabel_);
         statusLayout->addWidget(projectStatusLabel_);
         statusLayout->addWidget(gridStatusLabel_);
-        statusLayout->addWidget(elapsedLabel_);
         statusLayout->addWidget(statusLabel_);
 
         QVBoxLayout* rootLayout = new QVBoxLayout(this);
@@ -1704,10 +1224,6 @@ void FaultTraceDialog::buildUi() {
         connect(databaseEdit_, &QLineEdit::textChanged, this, &FaultTraceDialog::updateStatusContext);
         connect(gridCombo_, &QComboBox::currentTextChanged, this, &FaultTraceDialog::updateStatusContext);
         connect(outputEdit_, &QLineEdit::textChanged, this, &FaultTraceDialog::updateStatusContext);
-        connect(runModeCombo_, &QComboBox::currentTextChanged, this, &FaultTraceDialog::updateRunMode);
-        connect(previewModeCombo_, &QComboBox::currentTextChanged, this, &FaultTraceDialog::updatePreviewMode);
-        connect(standaloneInputEdit_, &QLineEdit::editingFinished, this, &FaultTraceDialog::refreshInputPreview);
-        connect(inputFormatCombo_, &QComboBox::currentTextChanged, this, &FaultTraceDialog::refreshInputPreview);
         connect(traceModeCombo_, &QComboBox::currentTextChanged, this, &FaultTraceDialog::updateStatusContext);
         connect(thresholdModeCombo_, &QComboBox::currentTextChanged, this, &FaultTraceDialog::updateOptionControls);
         connect(rootAntiMergeCheck_, &QCheckBox::toggled, this, &FaultTraceDialog::updateOptionControls);
@@ -1746,66 +1262,9 @@ QString FaultTraceDialog::defaultRunnerPath() const {
 }
 
 QString FaultTraceDialog::defaultOfficialDatPath() const {
-    const QString fromEnv = envOrDefault("FPT_OFFICIAL_DAT", "");
-    if (!fromEnv.isEmpty()) {
-        return QDir::toNativeSeparators(fromEnv);
-    }
-    return defaultStandaloneInputPath();
-}
-
-QString FaultTraceDialog::defaultCoreRunnerPath() const {
-    const QString fromEnv = envOrDefault("FPT_CORE_RUNNER", "");
-    if (!fromEnv.isEmpty()) {
-        return QDir::toNativeSeparators(fromEnv);
-    }
-    const QDir appDir(QCoreApplication::applicationDirPath());
-    const QString appLocal = appDir.absoluteFilePath("faultpolytrace.exe");
-    QDir parentDir(appDir);
-    QString parentBin;
-    if (parentDir.cdUp()) {
-        parentBin = parentDir.absoluteFilePath("bin/faultpolytrace.exe");
-    }
-    const QDir root(repoRootFromAppDir());
-    return firstExistingFile({
-        appLocal,
-        parentBin,
-        root.absoluteFilePath("build/faultpolytrace.exe"),
-        root.absoluteFilePath("bin/faultpolytrace.exe")
-    }, root.absoluteFilePath("build/faultpolytrace.exe"));
-}
-
-QString FaultTraceDialog::defaultStandaloneInputPath() const {
-    const QString fromEnv = envOrDefault("FPT_INPUT", "");
-    if (!fromEnv.isEmpty()) {
-        return QDir::toNativeSeparators(fromEnv);
-    }
-    const QDir appDir(QCoreApplication::applicationDirPath());
-    QDir parentDir(appDir);
-    QString packagedExample;
-    if (parentDir.cdUp()) {
-        packagedExample = parentDir.absoluteFilePath("examples/synthetic/broken_ridge_fault_grid.txt");
-    }
-    const QDir root(repoRootFromAppDir());
-    return firstExistingFile({
-        packagedExample,
-        root.absoluteFilePath("examples/synthetic/broken_ridge_fault_grid.txt"),
-        root.absoluteFilePath("examples/synthetic/ridge_fault_grid.txt")
-    });
-}
-
-QString FaultTraceDialog::defaultStandaloneOutputDir() const {
-    const QString fromEnv = envOrDefault("FPT_OUTPUT_DIR", "");
-    if (!fromEnv.isEmpty()) {
-        QDir().mkpath(fromEnv);
-        return QDir::toNativeSeparators(fromEnv);
-    }
-    QString docs = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
-    if (docs.isEmpty()) {
-        docs = QCoreApplication::applicationDirPath();
-    }
-    const QString dir = QDir(docs).absoluteFilePath("FaultPolyTraceOutputs");
-    QDir().mkpath(dir);
-    return QDir::toNativeSeparators(dir);
+    return envOrDefault(
+        "FPT_OFFICIAL_DAT",
+        QString::fromUtf8("D:/BaiduNetdiskDownload/BGPCup2025/赛题7-基于平面断层属性的断层多边形自动追踪/test.dat"));
 }
 
 void FaultTraceDialog::browseRunner() {
@@ -1817,47 +1276,12 @@ void FaultTraceDialog::browseRunner() {
     }
 }
 
-void FaultTraceDialog::browseCoreRunner() {
-    const QString path = QFileDialog::getOpenFileName(
-        this, QString::fromUtf8("选择独立算法程序"), QFileInfo(coreRunnerEdit_->text()).absolutePath(),
-        QString::fromUtf8("可执行文件 (*.exe);;所有文件 (*.*)"));
-    if (!path.isEmpty()) {
-        coreRunnerEdit_->setText(QDir::toNativeSeparators(path));
-    }
-}
-
-void FaultTraceDialog::browseInputData() {
-    if (runModeCombo_ && runModeCombo_->currentIndex() == 0) {
-        browseStandaloneInput();
-    } else {
-        browseDatFile();
-    }
-}
-
 void FaultTraceDialog::browseDatFile() {
     const QString path = QFileDialog::getOpenFileName(
         this, QString::fromUtf8("选择官方 DAT 文件"), QFileInfo(datFileEdit_->text()).absolutePath(),
         QString::fromUtf8("DAT 文件 (*.dat);;所有文件 (*.*)"));
     if (!path.isEmpty()) {
         datFileEdit_->setText(QDir::toNativeSeparators(path));
-    }
-}
-
-void FaultTraceDialog::browseStandaloneInput() {
-    const QString path = QFileDialog::getOpenFileName(
-        this, QString::fromUtf8("选择外部平面断层属性网格"), QFileInfo(standaloneInputEdit_->text()).absolutePath(),
-        QString::fromUtf8("网格文件 (*.txt *.dat *.csv);;所有文件 (*.*)"));
-    if (!path.isEmpty()) {
-        standaloneInputEdit_->setText(QDir::toNativeSeparators(path));
-        refreshInputPreview();
-    }
-}
-
-void FaultTraceDialog::browseStandaloneOutputDir() {
-    const QString path = QFileDialog::getExistingDirectory(
-        this, QString::fromUtf8("选择独立软件输出目录"), standaloneOutputDirEdit_->text());
-    if (!path.isEmpty()) {
-        standaloneOutputDirEdit_->setText(QDir::toNativeSeparators(path));
     }
 }
 
@@ -2038,177 +1462,7 @@ void FaultTraceDialog::showDatabaseConfigDialog() {
 void FaultTraceDialog::saveCurrentPreset() {
     saveSettings();
     updateStatusContext();
-    appendLog(QString::fromUtf8("当前参数和界面配置已保存：%1").arg(QDir::toNativeSeparators(settingsFilePath())));
-}
-
-QJsonObject FaultTraceDialog::parameterTemplateJson() const {
-    QJsonObject object;
-    object["version"] = "1.0";
-    object["preset"] = presetCombo_->currentText();
-    object["traceMode"] = traceModeCombo_->currentText();
-    object["thresholdMode"] = thresholdModeCombo_->currentText();
-    object["threshold"] = thresholdSpin_->value();
-    object["percentile"] = percentileSpin_->value();
-    object["minArea"] = minAreaSpin_->value();
-    object["closeRadius"] = closeRadiusSpin_->value();
-    object["weakPercentile"] = weakPercentileSpin_->value();
-    object["weakConnectRadius"] = weakConnectRadiusSpin_->value();
-    object["beltRadius"] = beltRadiusSpin_->value();
-    object["postBeltCloseRadius"] = postBeltCloseRadiusSpin_->value();
-    object["attributeConstrainedBelt"] = attributeConstrainedBeltCheck_->isChecked();
-    object["attributeEnvelopeRadius"] = attributeEnvelopeRadiusSpin_->value();
-    object["minBranchLength"] = minBranchLengthSpin_->value();
-    object["minJunctionBranchLength"] = minJunctionBranchLengthSpin_->value();
-    object["minJunctionBranchMean"] = minJunctionBranchMeanSpin_->value();
-    object["maxGapDistance"] = maxGapDistanceSpin_->value();
-    object["maxGapAngle"] = maxGapAngleSpin_->value();
-    object["rootAntiMerge"] = rootAntiMergeCheck_->isChecked();
-    object["rootAntiMergeRadius"] = rootAntiMergeRadiusSpin_->value();
-    object["rootAntiMergeSupportRatio"] = rootAntiMergeSupportRatioSpin_->value();
-    object["rootAntiMergeMinPartCells"] = rootAntiMergeMinPartCellsSpin_->value();
-    object["rootAntiMergeMinPartRatio"] = rootAntiMergeMinPartRatioSpin_->value();
-    object["rootAntiMergeWeakGuardThreshold"] = rootAntiMergeWeakGuardThresholdSpin_->value();
-    object["rootAntiMergeWeakGuardRadius"] = rootAntiMergeWeakGuardRadiusSpin_->value();
-    object["localAntiMerge"] = localAntiMergeCheck_->isChecked();
-    object["localAntiMergeLowThreshold"] = localAntiMergeLowThresholdSpin_->value();
-    object["localAntiMergeBridgeRadius"] = localAntiMergeBridgeRadiusSpin_->value();
-    object["localAntiMergeMinPartCells"] = localAntiMergeMinPartCellsSpin_->value();
-    object["localAntiMergeMinPartRatio"] = localAntiMergeMinPartRatioSpin_->value();
-    object["localAntiMergeMinBridgeCells"] = localAntiMergeMinBridgeCellsSpin_->value();
-    object["localAntiMergeMinLowRatio"] = localAntiMergeMinLowRatioSpin_->value();
-    object["simplifyTolerance"] = simplifyToleranceSpin_->value();
-    object["smoothIterations"] = smoothIterationsSpin_->value();
-    object["residualTrace"] = residualTraceCheck_->isChecked();
-    object["residualTraceMinLength"] = residualTraceMinLengthSpin_->value();
-    object["residualTraceMaxCells"] = residualTraceMaxCellsSpin_->value();
-    return object;
-}
-
-void FaultTraceDialog::applyParameterTemplateJson(const QJsonObject& object) {
-    auto setDouble = [&](const char* key, QDoubleSpinBox* widget) {
-        if (object.contains(key) && widget) {
-            widget->setValue(object.value(key).toDouble(widget->value()));
-        }
-    };
-    auto setInt = [&](const char* key, QSpinBox* widget) {
-        if (object.contains(key) && widget) {
-            widget->setValue(object.value(key).toInt(widget->value()));
-        }
-    };
-    auto setBool = [&](const char* key, QCheckBox* widget) {
-        if (object.contains(key) && widget) {
-            widget->setChecked(object.value(key).toBool(widget->isChecked()));
-        }
-    };
-    if (object.contains("preset")) {
-        presetCombo_->setCurrentText(object.value("preset").toString(presetCombo_->currentText()));
-    }
-    if (object.contains("traceMode")) {
-        traceModeCombo_->setCurrentText(object.value("traceMode").toString(traceModeCombo_->currentText()));
-    }
-    if (object.contains("thresholdMode")) {
-        thresholdModeCombo_->setCurrentText(object.value("thresholdMode").toString(thresholdModeCombo_->currentText()));
-    }
-    setDouble("threshold", thresholdSpin_);
-    setDouble("percentile", percentileSpin_);
-    setDouble("minArea", minAreaSpin_);
-    setInt("closeRadius", closeRadiusSpin_);
-    setDouble("weakPercentile", weakPercentileSpin_);
-    setInt("weakConnectRadius", weakConnectRadiusSpin_);
-    setInt("beltRadius", beltRadiusSpin_);
-    setInt("postBeltCloseRadius", postBeltCloseRadiusSpin_);
-    setBool("attributeConstrainedBelt", attributeConstrainedBeltCheck_);
-    setInt("attributeEnvelopeRadius", attributeEnvelopeRadiusSpin_);
-    setInt("minBranchLength", minBranchLengthSpin_);
-    setInt("minJunctionBranchLength", minJunctionBranchLengthSpin_);
-    setDouble("minJunctionBranchMean", minJunctionBranchMeanSpin_);
-    setInt("maxGapDistance", maxGapDistanceSpin_);
-    setDouble("maxGapAngle", maxGapAngleSpin_);
-    setBool("rootAntiMerge", rootAntiMergeCheck_);
-    setInt("rootAntiMergeRadius", rootAntiMergeRadiusSpin_);
-    setDouble("rootAntiMergeSupportRatio", rootAntiMergeSupportRatioSpin_);
-    setInt("rootAntiMergeMinPartCells", rootAntiMergeMinPartCellsSpin_);
-    setDouble("rootAntiMergeMinPartRatio", rootAntiMergeMinPartRatioSpin_);
-    setDouble("rootAntiMergeWeakGuardThreshold", rootAntiMergeWeakGuardThresholdSpin_);
-    setInt("rootAntiMergeWeakGuardRadius", rootAntiMergeWeakGuardRadiusSpin_);
-    setBool("localAntiMerge", localAntiMergeCheck_);
-    setDouble("localAntiMergeLowThreshold", localAntiMergeLowThresholdSpin_);
-    setInt("localAntiMergeBridgeRadius", localAntiMergeBridgeRadiusSpin_);
-    setInt("localAntiMergeMinPartCells", localAntiMergeMinPartCellsSpin_);
-    setDouble("localAntiMergeMinPartRatio", localAntiMergeMinPartRatioSpin_);
-    setInt("localAntiMergeMinBridgeCells", localAntiMergeMinBridgeCellsSpin_);
-    setDouble("localAntiMergeMinLowRatio", localAntiMergeMinLowRatioSpin_);
-    setDouble("simplifyTolerance", simplifyToleranceSpin_);
-    setInt("smoothIterations", smoothIterationsSpin_);
-    setBool("residualTrace", residualTraceCheck_);
-    setInt("residualTraceMinLength", residualTraceMinLengthSpin_);
-    setInt("residualTraceMaxCells", residualTraceMaxCellsSpin_);
-    updateOptionControls();
-    updateStatusContext();
-}
-
-void FaultTraceDialog::saveParameterTemplate() {
-    const QString path = QFileDialog::getSaveFileName(
-        this, QString::fromUtf8("导出参数模板"), QDir(defaultStandaloneOutputDir()).absoluteFilePath("FaultPolyTrace_参数模板.json"),
-        QString::fromUtf8("参数模板 (*.json);;所有文件 (*.*)"));
-    if (path.isEmpty()) {
-        return;
-    }
-    QFile file(path);
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-        QMessageBox::warning(this, QString::fromUtf8("无法保存模板"), path);
-        return;
-    }
-    file.write(QJsonDocument(parameterTemplateJson()).toJson(QJsonDocument::Indented));
-    appendLog(QString::fromUtf8("参数模板已导出：%1").arg(QDir::toNativeSeparators(path)));
-}
-
-void FaultTraceDialog::loadParameterTemplate() {
-    const QString path = QFileDialog::getOpenFileName(
-        this, QString::fromUtf8("导入参数模板"), defaultStandaloneOutputDir(),
-        QString::fromUtf8("参数模板 (*.json);;所有文件 (*.*)"));
-    if (path.isEmpty()) {
-        return;
-    }
-    QFile file(path);
-    if (!file.open(QIODevice::ReadOnly)) {
-        QMessageBox::warning(this, QString::fromUtf8("无法读取模板"), path);
-        return;
-    }
-    const QJsonDocument document = QJsonDocument::fromJson(file.readAll());
-    if (!document.isObject()) {
-        QMessageBox::warning(this, QString::fromUtf8("模板格式错误"), QString::fromUtf8("请选择 FaultPolyTrace 参数模板 JSON 文件。"));
-        return;
-    }
-    applyParameterTemplateJson(document.object());
-    saveSettings();
-    appendLog(QString::fromUtf8("参数模板已导入：%1").arg(QDir::toNativeSeparators(path)));
-}
-
-void FaultTraceDialog::restoreDefaultConfiguration() {
-    runModeCombo_->setCurrentText(QString::fromUtf8("独立文件模式"));
-    coreRunnerEdit_->setText(defaultCoreRunnerPath());
-    runnerEdit_->setText(defaultRunnerPath());
-    geoEastRootEdit_->setText(defaultGeoEastRootPath());
-    geoEastDataRootEdit_->setText(defaultGeoEastDataRootPath());
-    databaseEdit_->setText("ndp");
-    projectEdit_->setText("");
-    userEdit_->setText(defaultUserName());
-    gridCombo_->setCurrentText("test7_fault_attribute_bo");
-    outputEdit_->setText("FaultPolyTrace_Result");
-    standaloneInputEdit_->setText(defaultStandaloneInputPath());
-    standaloneOutputDirEdit_->setText(defaultStandaloneOutputDir());
-    standaloneOutputNameEdit_->setText("FaultPolyTrace_Result");
-    inputFormatCombo_->setCurrentText("auto");
-    previewModeCombo_->setCurrentText(QString::fromUtf8("叠加视图"));
-    setPolygonColor(QColor("#00FFFF"));
-    polygonLineWidthSpin_->setValue(0.03);
-    presetCombo_->setCurrentText(QString::fromUtf8("防黏连增强"));
-    applyParameterPreset(QString::fromUtf8("防黏连增强"));
-    saveSettings();
-    updateRunMode();
-    refreshInputPreview();
-    appendLog(QString::fromUtf8("已恢复默认配置。"));
+    appendLog(QString::fromUtf8("当前参数和界面配置已保存。"));
 }
 
 void FaultTraceDialog::showHelpHint() {
@@ -2223,17 +1477,8 @@ void FaultTraceDialog::showHelpHint() {
                                                "详细说明见 docs/用户操作手册.md 和 docs/评审交付与异机运行说明.md。"));
 }
 
-QString FaultTraceDialog::settingsFilePath() const {
-    return QDir(productConfigDir()).absoluteFilePath("faultpolytrace_launcher.ini");
-}
-
 void FaultTraceDialog::loadSettings() {
-    const QString newPath = settingsFilePath();
-    const QString legacyPath = QCoreApplication::applicationDirPath() + "/faultpolytrace_launcher.ini";
-    const QString readPath = QFileInfo::exists(newPath) ? newPath : legacyPath;
-    QSettings settings(readPath, QSettings::IniFormat);
-    runModeCombo_->setCurrentText(settings.value("runMode", runModeCombo_->currentText()).toString());
-    coreRunnerEdit_->setText(settings.value("coreRunner", coreRunnerEdit_->text()).toString());
+    QSettings settings(QCoreApplication::applicationDirPath() + "/faultpolytrace_launcher.ini", QSettings::IniFormat);
     runnerEdit_->setText(settings.value("runner", runnerEdit_->text()).toString());
     geoEastRootEdit_->setText(settings.value("geoEastRoot", geoEastRootEdit_->text()).toString());
     geoEastDataRootEdit_->setText(settings.value("geoEastDataRoot", geoEastDataRootEdit_->text()).toString());
@@ -2246,12 +1491,6 @@ void FaultTraceDialog::loadSettings() {
     gridCombo_->setCurrentText(settings.value("grid", gridCombo_->currentText()).toString());
     outputEdit_->setText(settings.value("output", outputEdit_->text()).toString());
     datFileEdit_->setText(settings.value("datFile", datFileEdit_->text()).toString());
-    standaloneInputEdit_->setText(settings.value("standaloneInput", standaloneInputEdit_->text()).toString());
-    standaloneOutputDirEdit_->setText(settings.value("standaloneOutputDir", standaloneOutputDirEdit_->text()).toString());
-    standaloneOutputNameEdit_->setText(settings.value("standaloneOutputName", standaloneOutputNameEdit_->text()).toString());
-    inputFormatCombo_->setCurrentText(settings.value("inputFormat", inputFormatCombo_->currentText()).toString());
-    previewModeCombo_->setCurrentText(settings.value("previewMode", previewModeCombo_->currentText()).toString());
-    lastStandaloneOutputCsv_ = settings.value("lastStandaloneOutputCsv", lastStandaloneOutputCsv_).toString();
     importDatCheck_->setChecked(settings.value("importDat", importDatCheck_->isChecked()).toBool());
     overwriteGridCheck_->setChecked(settings.value("overwriteGrid", overwriteGridCheck_->isChecked()).toBool());
     polygonColorEdit_->setText(settings.value("polygonColor", polygonColorEdit_->text()).toString());
@@ -2298,9 +1537,7 @@ void FaultTraceDialog::loadSettings() {
 }
 
 void FaultTraceDialog::saveSettings() const {
-    QSettings settings(settingsFilePath(), QSettings::IniFormat);
-    settings.setValue("runMode", runModeCombo_->currentText());
-    settings.setValue("coreRunner", coreRunnerEdit_->text());
+    QSettings settings(QCoreApplication::applicationDirPath() + "/faultpolytrace_launcher.ini", QSettings::IniFormat);
     settings.setValue("runner", runnerEdit_->text());
     settings.setValue("geoEastRoot", geoEastRootEdit_->text());
     settings.setValue("geoEastDataRoot", geoEastDataRootEdit_->text());
@@ -2313,12 +1550,6 @@ void FaultTraceDialog::saveSettings() const {
     settings.setValue("grid", gridCombo_->currentText());
     settings.setValue("output", outputEdit_->text());
     settings.setValue("datFile", datFileEdit_->text());
-    settings.setValue("standaloneInput", standaloneInputEdit_->text());
-    settings.setValue("standaloneOutputDir", standaloneOutputDirEdit_->text());
-    settings.setValue("standaloneOutputName", standaloneOutputNameEdit_->text());
-    settings.setValue("inputFormat", inputFormatCombo_->currentText());
-    settings.setValue("previewMode", previewModeCombo_->currentText());
-    settings.setValue("lastStandaloneOutputCsv", lastStandaloneOutputCsv_);
     settings.setValue("importDat", importDatCheck_->isChecked());
     settings.setValue("overwriteGrid", overwriteGridCheck_->isChecked());
     settings.setValue("polygonColor", polygonColorEdit_->text());
@@ -2434,96 +1665,7 @@ void FaultTraceDialog::updateOptionControls() {
         }
     }
 
-    const bool standalone = runModeCombo_ && runModeCombo_->currentIndex() == 0;
-    if (standalone) {
-        for (QWidget* widget : {
-                 static_cast<QWidget*>(gridCombo_),
-                 static_cast<QWidget*>(outputEdit_),
-                 static_cast<QWidget*>(datFileEdit_),
-                 static_cast<QWidget*>(overwriteGridCheck_),
-                 static_cast<QWidget*>(importDatCheck_)}) {
-            if (widget) {
-                widget->setEnabled(false);
-            }
-        }
-    }
-
     updateStatusContext();
-}
-
-void FaultTraceDialog::updateRunMode() {
-    const bool standalone = runModeCombo_ && runModeCombo_->currentIndex() == 0;
-    for (QWidget* widget : {
-             static_cast<QWidget*>(coreRunnerEdit_),
-             static_cast<QWidget*>(standaloneInputEdit_),
-             static_cast<QWidget*>(standaloneOutputDirEdit_),
-             static_cast<QWidget*>(standaloneOutputNameEdit_),
-             static_cast<QWidget*>(inputFormatCombo_),
-             static_cast<QWidget*>(previewModeCombo_)}) {
-        if (widget) {
-            widget->setEnabled(standalone);
-        }
-    }
-    for (QWidget* widget : {
-             static_cast<QWidget*>(gridCombo_),
-             static_cast<QWidget*>(outputEdit_),
-             static_cast<QWidget*>(importDatCheck_),
-             static_cast<QWidget*>(datFileEdit_),
-             static_cast<QWidget*>(overwriteGridCheck_),
-             static_cast<QWidget*>(runnerEdit_),
-             static_cast<QWidget*>(geoEastRootEdit_),
-             static_cast<QWidget*>(geoEastDataRootEdit_),
-             static_cast<QWidget*>(pgHostEdit_),
-             static_cast<QWidget*>(pgPortEdit_),
-             static_cast<QWidget*>(databaseEdit_),
-             static_cast<QWidget*>(projectEdit_),
-             static_cast<QWidget*>(userEdit_),
-             static_cast<QWidget*>(passwordEdit_)}) {
-        if (widget) {
-            widget->setEnabled(!standalone);
-        }
-    }
-    refreshButton_->setEnabled(!standalone && process_->state() == QProcess::NotRunning);
-    updateOptionControls();
-    updatePreviewMode();
-    if (standalone) {
-        refreshInputPreview();
-    }
-}
-
-void FaultTraceDialog::updatePreviewMode() {
-    if (!renderViewWidget_ || !previewModeCombo_) {
-        return;
-    }
-    auto* view = static_cast<RenderViewWidget*>(renderViewWidget_);
-    const QString text = previewModeCombo_->currentText();
-    if (text == QString::fromUtf8("原始网格")) {
-        view->setViewMode(RenderViewWidget::ViewMode::Raw);
-    } else if (text == QString::fromUtf8("结果多边形")) {
-        view->setViewMode(RenderViewWidget::ViewMode::Result);
-    } else {
-        view->setViewMode(RenderViewWidget::ViewMode::Overlay);
-    }
-}
-
-void FaultTraceDialog::refreshInputPreview() {
-    if (!renderViewWidget_ || !standaloneInputEdit_) {
-        return;
-    }
-    const QString input = standaloneInputEdit_->text().trimmed();
-    if (input.isEmpty() || !QFileInfo::exists(input)) {
-        static_cast<RenderViewWidget*>(renderViewWidget_)->setActivity(QString::fromUtf8("请选择可读取的外部网格文件"));
-        updateStatusContext();
-        return;
-    }
-    QString error;
-    if (static_cast<RenderViewWidget*>(renderViewWidget_)->loadGridFile(input, inputFormatCombo_->currentText(), &error)) {
-        appendStatus(QString::fromUtf8("原始网格预览已刷新"));
-        loadLatestStandaloneResult();
-    } else if (!error.isEmpty()) {
-        appendLog(error);
-        appendStatus(QString::fromUtf8("原始网格预览失败"));
-    }
 }
 
 void FaultTraceDialog::configureGeoEastEnvironment(QProcessEnvironment& environment) const {
@@ -2654,81 +1796,6 @@ QStringList FaultTraceDialog::traceArgs() const {
     } else {
         args << "--no-residual-trace";
     }
-    return args;
-}
-
-QString FaultTraceDialog::currentStandaloneOutputCsv() const {
-    QString outputName = standaloneOutputNameEdit_ ? standaloneOutputNameEdit_->text().trimmed() : QString();
-    if (outputName.isEmpty()) {
-        outputName = "FaultPolyTrace_Result";
-    }
-    if (!outputName.endsWith(".csv", Qt::CaseInsensitive)) {
-        outputName += ".csv";
-    }
-    QString outputDir = standaloneOutputDirEdit_ ? standaloneOutputDirEdit_->text().trimmed() : QString();
-    if (outputDir.isEmpty()) {
-        outputDir = defaultStandaloneOutputDir();
-    }
-    QDir().mkpath(outputDir);
-    return QDir(outputDir).absoluteFilePath(outputName);
-}
-
-QStringList FaultTraceDialog::standaloneTraceArgs() const {
-    const QString outputCsv = currentStandaloneOutputCsv();
-    const QFileInfo outputInfo(outputCsv);
-    QStringList args;
-    args << "--input" << standaloneInputEdit_->text().trimmed()
-         << "--input-format" << inputFormatCombo_->currentText()
-         << "--output" << outputCsv
-         << "--diagnostics" << outputInfo.absolutePath() + "/" + outputInfo.completeBaseName() + ".diagnostics.json"
-         << "--branches-output" << outputInfo.absolutePath() + "/" + outputInfo.completeBaseName() + ".branches.csv"
-         << "--topology-output" << outputInfo.absolutePath() + "/" + outputInfo.completeBaseName() + ".topology.csv"
-         << "--trace-mode" << traceModeCombo_->currentText()
-         << "--threshold-mode" << thresholdModeCombo_->currentText()
-         << "--threshold" << QString::number(thresholdSpin_->value(), 'g', 12)
-         << "--percentile" << QString::number(percentileSpin_->value(), 'g', 12)
-         << "--close-radius" << QString::number(closeRadiusSpin_->value())
-         << "--weak-percentile" << QString::number(weakPercentileSpin_->value(), 'g', 12)
-         << "--weak-connect-radius" << QString::number(weakConnectRadiusSpin_->value())
-         << "--belt-radius" << QString::number(beltRadiusSpin_->value())
-         << "--post-belt-close-radius" << QString::number(postBeltCloseRadiusSpin_->value())
-         << "--attribute-envelope-radius" << QString::number(attributeEnvelopeRadiusSpin_->value())
-         << "--min-branch-length" << QString::number(minBranchLengthSpin_->value())
-         << "--min-junction-branch-length" << QString::number(minJunctionBranchLengthSpin_->value())
-         << "--min-junction-branch-mean" << QString::number(minJunctionBranchMeanSpin_->value(), 'g', 12)
-         << "--max-gap-distance" << QString::number(maxGapDistanceSpin_->value())
-         << "--max-gap-angle" << QString::number(maxGapAngleSpin_->value(), 'g', 12)
-         << "--min-gap-support-ratio" << "0.25"
-         << "--no-separate-branch-belts"
-         << "--root-anti-merge-radius" << QString::number(rootAntiMergeRadiusSpin_->value())
-         << "--root-anti-merge-support-ratio" << QString::number(rootAntiMergeSupportRatioSpin_->value(), 'g', 12)
-         << "--root-anti-merge-max-bridge-value" << "1e-12"
-         << "--root-anti-merge-min-part-cells" << QString::number(rootAntiMergeMinPartCellsSpin_->value())
-         << "--root-anti-merge-min-part-ratio" << QString::number(rootAntiMergeMinPartRatioSpin_->value(), 'g', 12)
-         << "--root-anti-merge-weak-guard-threshold" << QString::number(rootAntiMergeWeakGuardThresholdSpin_->value(), 'g', 12)
-         << "--root-anti-merge-weak-guard-radius" << QString::number(rootAntiMergeWeakGuardRadiusSpin_->value())
-         << "--local-anti-merge-low-threshold" << QString::number(localAntiMergeLowThresholdSpin_->value(), 'g', 12)
-         << "--local-anti-merge-bridge-radius" << QString::number(localAntiMergeBridgeRadiusSpin_->value())
-         << "--local-anti-merge-min-part-cells" << QString::number(localAntiMergeMinPartCellsSpin_->value())
-         << "--local-anti-merge-min-part-ratio" << QString::number(localAntiMergeMinPartRatioSpin_->value(), 'g', 12)
-         << "--local-anti-merge-min-bridge-cells" << QString::number(localAntiMergeMinBridgeCellsSpin_->value())
-         << "--local-anti-merge-min-low-ratio" << QString::number(localAntiMergeMinLowRatioSpin_->value(), 'g', 12)
-         << "--residual-percentile" << "0.955"
-         << "--residual-fill-radius" << "4"
-         << "--residual-edge-fill-radius" << "2"
-         << "--residual-edge-fill-min-value-ratio" << "0.97"
-         << "--residual-edge-fill-max-patch-span" << "5"
-         << "--residual-min-cells" << "2"
-         << "--residual-trace-min-length" << QString::number(residualTraceMinLengthSpin_->value())
-         << "--residual-trace-max-cells" << QString::number(residualTraceMaxCellsSpin_->value())
-         << "--residual-covered-guard-radius" << "0"
-         << "--simplify-tolerance" << QString::number(simplifyToleranceSpin_->value(), 'g', 12)
-         << "--smooth-iterations" << QString::number(smoothIterationsSpin_->value())
-         << "--min-area" << QString::number(minAreaSpin_->value(), 'g', 12);
-    args << (attributeConstrainedBeltCheck_->isChecked() ? "--attribute-constrained-belt" : "--no-attribute-constrained-belt");
-    args << (rootAntiMergeCheck_->isChecked() ? "--root-anti-merge" : "--no-root-anti-merge");
-    args << (localAntiMergeCheck_->isChecked() ? "--local-anti-merge" : "--no-local-anti-merge");
-    args << (residualTraceCheck_->isChecked() ? "--residual-trace" : "--no-residual-trace");
     return args;
 }
 
@@ -2936,10 +2003,6 @@ void FaultTraceDialog::refreshGrids() {
     if (process_->state() != QProcess::NotRunning) {
         return;
     }
-    if (runModeCombo_ && runModeCombo_->currentIndex() == 0) {
-        refreshInputPreview();
-        return;
-    }
     saveSettings();
     const QString runner = runnerEdit_->text().trimmed();
     if (!QFileInfo::exists(runner)) {
@@ -2969,47 +2032,29 @@ void FaultTraceDialog::runTrace() {
         return;
     }
     saveSettings();
-    standaloneRun_ = runModeCombo_ && runModeCombo_->currentIndex() == 0;
-    const QString runner = standaloneRun_ ? coreRunnerEdit_->text().trimmed() : runnerEdit_->text().trimmed();
+    const QString runner = runnerEdit_->text().trimmed();
     if (!QFileInfo::exists(runner)) {
-        QMessageBox::warning(this, QString::fromUtf8("可执行文件不存在"), runner);
+        QMessageBox::warning(this, QString::fromUtf8("Runner 不存在"), runner);
         return;
     }
-    if (standaloneRun_) {
-        if (standaloneInputEdit_->text().trimmed().isEmpty() || !QFileInfo::exists(standaloneInputEdit_->text().trimmed())) {
-            QMessageBox::warning(this, QString::fromUtf8("输入文件无效"), QString::fromUtf8("请选择可读取的外部网格文件。"));
-            return;
-        }
-        if (standaloneOutputNameEdit_->text().trimmed().isEmpty()) {
-            QMessageBox::warning(this, QString::fromUtf8("输出名称为空"), QString::fromUtf8("请填写输出结果名称。"));
-            return;
-        }
-    } else {
-        if (gridCombo_->currentText().trimmed().isEmpty() || outputEdit_->text().trimmed().isEmpty()) {
-            QMessageBox::warning(this, QString::fromUtf8("参数不完整"), QString::fromUtf8("输入网格和输出多边形名称不能为空。"));
-            return;
-        }
+    if (gridCombo_->currentText().trimmed().isEmpty() || outputEdit_->text().trimmed().isEmpty()) {
+        QMessageBox::warning(this, QString::fromUtf8("参数不完整"), QString::fromUtf8("输入网格和输出多边形名称不能为空。"));
+        return;
     }
 
     refreshingGrids_ = false;
     logEdit_->clear();
-    QStringList args = standaloneRun_ ? standaloneTraceArgs() : traceArgs();
-    appendStatus(standaloneRun_ ? QString::fromUtf8("正在独立追踪断层多边形...") : QString::fromUtf8("正在追踪断层多边形..."));
-    if (elapsedLabel_) {
-        elapsedLabel_->setText(QString::fromUtf8("耗时: 计算中"));
-    }
+    QStringList args = traceArgs();
+    appendStatus(QString::fromUtf8("正在追踪断层多边形..."));
     if (renderViewWidget_) {
         static_cast<RenderViewWidget*>(renderViewWidget_)->setActivity(QString::fromUtf8("正在追踪断层多边形"));
     }
     appendLog("> " + runner + " " + quoteForLog(args));
 
     QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
-    if (!standaloneRun_) {
-        configureGeoEastEnvironment(environment);
-    }
+    configureGeoEastEnvironment(environment);
     process_->setProcessEnvironment(environment);
     setRunning(true);
-    processStartMs_ = QDateTime::currentMSecsSinceEpoch();
     process_->start(runner, args);
 }
 
@@ -3033,10 +2078,6 @@ void FaultTraceDialog::onReadyRead() {
 void FaultTraceDialog::onProcessFinished(int exitCode, QProcess::ExitStatus status) {
     onReadyRead();
     setRunning(false);
-    const qint64 elapsedMs = processStartMs_ > 0 ? QDateTime::currentMSecsSinceEpoch() - processStartMs_ : 0;
-    if (elapsedLabel_ && processStartMs_ > 0) {
-        elapsedLabel_->setText(QString::fromUtf8("耗时: %1").arg(elapsedText(elapsedMs)));
-    }
 
     if (refreshingGrids_ && exitCode == 0 && status == QProcess::NormalExit) {
         const QString text = logEdit_->toPlainText();
@@ -3070,19 +2111,9 @@ void FaultTraceDialog::onProcessFinished(int exitCode, QProcess::ExitStatus stat
     }
 
     if (exitCode == 0 && status == QProcess::NormalExit) {
-        if (standaloneRun_) {
-            lastStandaloneOutputCsv_ = currentStandaloneOutputCsv();
-            saveSettings();
-            loadLatestStandaloneResult();
-            appendStatus(QString::fromUtf8("独立追踪完成，结果已保存"));
-            appendLog(QString::fromUtf8("结果文件：%1").arg(QDir::toNativeSeparators(lastStandaloneOutputCsv_)));
-        } else {
-            appendStatus(QString::fromUtf8("追踪完成，结果已写入 GeoEast 数据库"));
-        }
+        appendStatus(QString::fromUtf8("追踪完成，结果已写入 GeoEast 数据库"));
         if (renderViewWidget_) {
-            static_cast<RenderViewWidget*>(renderViewWidget_)->setActivity(
-                standaloneRun_ ? QString::fromUtf8("追踪完成，已载入独立结果")
-                               : QString::fromUtf8("追踪完成，结果已写入 GeoEast 数据库"));
+            static_cast<RenderViewWidget*>(renderViewWidget_)->setActivity(QString::fromUtf8("追踪完成，结果已写入 GeoEast 数据库"));
         }
     } else {
         appendStatus(QString::fromUtf8("运行失败，请查看日志"));
@@ -3096,9 +2127,6 @@ void FaultTraceDialog::onProcessFinished(int exitCode, QProcess::ExitStatus stat
 void FaultTraceDialog::onProcessError(QProcess::ProcessError error) {
     appendLog(QString::fromUtf8("进程错误：%1").arg(static_cast<int>(error)));
     appendStatus(QString::fromUtf8("进程启动或运行异常"));
-    if (elapsedLabel_ && processStartMs_ > 0) {
-        elapsedLabel_->setText(QString::fromUtf8("耗时: %1").arg(elapsedText(QDateTime::currentMSecsSinceEpoch() - processStartMs_)));
-    }
     if (renderViewWidget_) {
         static_cast<RenderViewWidget*>(renderViewWidget_)->setActivity(QString::fromUtf8("进程启动或运行异常"));
     }
@@ -3106,8 +2134,7 @@ void FaultTraceDialog::onProcessError(QProcess::ProcessError error) {
 }
 
 void FaultTraceDialog::setRunning(bool running) {
-    const bool standalone = runModeCombo_ && runModeCombo_->currentIndex() == 0;
-    refreshButton_->setEnabled(!running && !standalone);
+    refreshButton_->setEnabled(!running);
     runButton_->setEnabled(!running);
     stopButton_->setEnabled(running);
     if (refreshGridAction_) {
@@ -3139,73 +2166,23 @@ void FaultTraceDialog::appendStatus(const QString& text) {
     updateStatusContext();
 }
 
-void FaultTraceDialog::loadLatestStandaloneResult() {
-    if (!renderViewWidget_) {
-        return;
-    }
-    QString result = lastStandaloneOutputCsv_;
-    if (result.isEmpty()) {
-        result = currentStandaloneOutputCsv();
-    }
-    if (QFileInfo::exists(result)) {
-        QString error;
-        if (!static_cast<RenderViewWidget*>(renderViewWidget_)->loadPolygonCsv(result, &error) && !error.isEmpty()) {
-            appendLog(error);
-        }
-    }
-}
-
-void FaultTraceDialog::ensureProductDefaults() {
-    if (runModeCombo_ && runModeCombo_->currentText().isEmpty()) {
-        runModeCombo_->setCurrentText(QString::fromUtf8("独立文件模式"));
-    }
-    if (coreRunnerEdit_ && coreRunnerEdit_->text().trimmed().isEmpty()) {
-        coreRunnerEdit_->setText(defaultCoreRunnerPath());
-    }
-    if (standaloneOutputDirEdit_ && standaloneOutputDirEdit_->text().trimmed().isEmpty()) {
-        standaloneOutputDirEdit_->setText(defaultStandaloneOutputDir());
-    }
-    if (standaloneOutputNameEdit_ && standaloneOutputNameEdit_->text().trimmed().isEmpty()) {
-        standaloneOutputNameEdit_->setText("FaultPolyTrace_Result");
-    }
-    if (standaloneInputEdit_ && standaloneInputEdit_->text().trimmed().isEmpty()) {
-        standaloneInputEdit_->setText(defaultStandaloneInputPath());
-    }
-    if (projectEdit_ && projectEdit_->text().trimmed().isEmpty()) {
-        projectEdit_->setPlaceholderText(QString::fromUtf8("GeoEast 工区项目名，集成运行时自动带入或手动填写"));
-    }
-}
-
 void FaultTraceDialog::updateStatusContext() {
     if (projectStatusLabel_) {
-        if (runModeCombo_ && runModeCombo_->currentIndex() == 0) {
-            projectStatusLabel_->setText(QString::fromUtf8("独立输出: %1").arg(standaloneOutputDirEdit_ ? standaloneOutputDirEdit_->text().trimmed() : QString()));
-        } else {
-            projectStatusLabel_->setText(QString::fromUtf8("正在操作项目: %1").arg(projectEdit_ ? projectEdit_->text().trimmed() : QString()));
-        }
+        projectStatusLabel_->setText(QString::fromUtf8("正在操作项目: %1").arg(projectEdit_ ? projectEdit_->text().trimmed() : QString()));
     }
     if (gridStatusLabel_) {
-        if (runModeCombo_ && runModeCombo_->currentIndex() == 0) {
-            gridStatusLabel_->setText(QString::fromUtf8("当前文件: %1").arg(standaloneInputEdit_ ? QFileInfo(standaloneInputEdit_->text()).fileName() : QString()));
-        } else {
-            gridStatusLabel_->setText(QString::fromUtf8("当前网格: %1").arg(gridCombo_ ? gridCombo_->currentText().trimmed() : QString()));
-        }
+        gridStatusLabel_->setText(QString::fromUtf8("当前网格: %1").arg(gridCombo_ ? gridCombo_->currentText().trimmed() : QString()));
     }
     if (connectionLabel_ && process_ && process_->state() == QProcess::NotRunning) {
-        if (runModeCombo_ && runModeCombo_->currentIndex() == 0) {
-            connectionLabel_->setText(QString::fromUtf8("独立文件模式"));
-        } else {
-            const QString db = databaseEdit_ ? databaseEdit_->text().trimmed() : QString();
-            connectionLabel_->setText(db.isEmpty() ? QString::fromUtf8("数据库未配置") : QString::fromUtf8("数据库连接待验证: %1").arg(db));
-        }
+        const QString db = databaseEdit_ ? databaseEdit_->text().trimmed() : QString();
+        connectionLabel_->setText(db.isEmpty() ? QString::fromUtf8("数据库未配置") : QString::fromUtf8("数据库连接待验证: %1").arg(db));
     }
     if (renderViewWidget_) {
-        const bool standalone = runModeCombo_ && runModeCombo_->currentIndex() == 0;
         static_cast<RenderViewWidget*>(renderViewWidget_)->setContext(
-            standalone ? QString::fromUtf8("独立文件") : (databaseEdit_ ? databaseEdit_->text().trimmed() : QString()),
-            standalone ? QString::fromUtf8("本机处理") : (projectEdit_ ? projectEdit_->text().trimmed() : QString()),
-            standalone ? (standaloneInputEdit_ ? QFileInfo(standaloneInputEdit_->text()).fileName() : QString()) : (gridCombo_ ? gridCombo_->currentText().trimmed() : QString()),
-            standalone ? QFileInfo(currentStandaloneOutputCsv()).fileName() : (outputEdit_ ? outputEdit_->text().trimmed() : QString()),
+            databaseEdit_ ? databaseEdit_->text().trimmed() : QString(),
+            projectEdit_ ? projectEdit_->text().trimmed() : QString(),
+            gridCombo_ ? gridCombo_->currentText().trimmed() : QString(),
+            outputEdit_ ? outputEdit_->text().trimmed() : QString(),
             presetCombo_ ? presetCombo_->currentText() : QString(),
             traceModeCombo_ ? traceModeCombo_->currentText() : QString(),
             thresholdModeCombo_ ? thresholdModeCombo_->currentText() : QString(),

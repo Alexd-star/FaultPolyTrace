@@ -2,29 +2,29 @@
 
 ## 1. 建设目标
 
-FaultPolyTrace 需要同时满足两类交付场景：一类是评审或用户在没有 GeoEast 环境的电脑上直接运行独立软件，完成外部网格文件读取、断层多边形追踪、结果查看和文件导出；另一类是在 GeoEast 平台内作为集成工具使用，读取 GeoEast 数据库中的 BOMapGrid 对象，并将闭合断层多边形写回数据库。两种场景共用同一套算法参数、同一套质量约束和同一套可视化风格，避免形成两个割裂的软件。
+FaultPolyTrace 需要同时满足两类交付场景：一类是评审或用户在没有 GeoEast 环境的电脑上直接运行独立软件，完成外部网格文件读取、断层多边形追踪、结果查看和文件导出；另一类是在 GeoEast 平台内作为集成工具使用，读取 GeoEast 数据库中的 BOMapGrid 对象，并将闭合断层多边形写回数据库。
 
-本轮产品化改造的原则是：算法核心不拆分、不绕开原有验收链路；Qt 图形层承担用户交互、参数管理、预览展示和运行编排；GeoEast runner 继续承担数据库读写；命令行核心继续承担独立文件计算和自动化回归测试。
+本轮产品化改造的原则是：算法核心共用，界面外壳拆分。独立桌面软件和 GeoEast 集成控件不再放在同一个 Qt 窗口里，也不再通过“运行模式”切换混合职责。独立软件只面对外部文件、结果预览、历史记录和文件导出；GeoEast 集成控件只面对 GeoEast 数据库、BOMapGrid 选择、BOFaultPolygon 写回和平台内操作提示。这样可以避免界面拥挤、路径混乱、评审双击入口误判和后续维护时互相污染。
 
 ## 2. 产品形态
 
 ### 2.1 独立软件形态
 
-独立软件入口为发布包根目录的 `FaultPolyTrace.exe`，同时保留 `01_打开图形界面.cmd` 作为兼容入口。用户打开后默认进入【独立文件模式】，界面会自动定位发布包内的 `bin/faultpolytrace.exe` 和示例网格文件。用户可以选择外部网格文件，设置输出目录和结果名称，点击【开始追踪】后生成 CSV 多边形、诊断 JSON、拓扑 CSV 和枝干 CSV，并可在界面中切换【原始网格】、【结果多边形】和【叠加视图】。
+独立软件入口为发布包根目录的 `FaultPolyTrace.exe`，源码位于 `standalone_app/qt_desktop`。同时保留 `01_打开图形界面.cmd` 作为兼容入口。用户打开后只看到独立文件处理相关内容，界面会自动定位发布包内的 `bin/faultpolytrace.exe` 和示例网格文件。用户可以选择外部网格文件，设置输出目录和结果名称，点击【开始追踪】后生成 CSV 多边形、GeoJSON、诊断 JSON、拓扑 CSV 和枝干 CSV，并可在界面中切换【原始网格】、【结果多边形】和【叠加视图】。
 
 独立模式不依赖 GeoEast 数据库，适合评审快速验证算法模块可独立运行，也适合后续扩展为正式安装版软件。
 
 ### 2.2 GeoEast 集成形态
 
-GeoEast 集成模式使用 `geoeast_plugin/bo_runner/faultpolytrace_geoeast_runner.exe` 与 GeoEast 数据库交互。用户在界面中切换到【GeoEast 集成模式】后，可配置 GeoEast 根目录、数据根目录、数据库、项目、用户、输入网格和输出多边形名称。点击【刷新网格】可读取数据库中的 BOMapGrid 列表，点击【开始追踪】后结果写回 GeoEast 数据库，随后在 GeoEast 底图、平面成图或工区底图中叠加查看。
+GeoEast 集成控件入口为 `geoeast_plugin/qt_launcher/faultpolytrace_launcher.exe`，源码仍位于 `geoeast_plugin/qt_launcher`。它通过 `geoeast_plugin/bo_runner/faultpolytrace_geoeast_runner.exe` 与 GeoEast 数据库交互。用户在 GeoEast 菜单中点击“断层多边形追踪”后，看到的是数据库连接、输入网格、输出多边形、显示样式和必要算法参数。点击【刷新网格】可读取数据库中的 BOMapGrid 列表，点击【开始追踪】后结果写回 GeoEast 数据库，随后在 GeoEast 底图、平面成图或工区底图中叠加查看。
 
-集成模式保留环境变量自动配置能力，优先读取 `FPT_GEOEAST_ROOT`、`FPT_GEOEAST_DATA_ROOT`、`FPT_GEOEAST_USER`、`FPT_GEOEAST_DB`、`FPT_GEOEAST_PROJECT` 等变量。没有变量时，界面允许用户手动填写，并保存到用户级配置目录。
+集成控件保留环境变量和安装目录自动配置能力，优先读取 `FPT_GEOEAST_ROOT`、`FPT_GEOEAST_DATA_ROOT`、`FPT_GEOEAST_USER`、`FPT_GEOEAST_DB`、`FPT_GEOEAST_PROJECT` 等变量。没有变量时，界面允许用户手动填写，并保存到配置文件。独立软件不显示这些数据库字段，避免普通用户误以为必须安装 GeoEast 才能运行。
 
 ## 3. 关键能力
 
 ### 3.1 配置记忆
 
-软件关闭后会保存当前运行模式、可执行程序路径、输入输出、GeoEast 连接信息、颜色线宽和算法参数。再次打开时自动恢复上次配置，避免每次重新填写。配置文件位于系统用户配置目录，而不是程序安装目录，因此更适合普通用户权限和发布包只读目录。
+独立软件关闭后会保存输入文件、输出目录、输出名称、视图模式、颜色线宽、透明度和算法参数。再次打开时自动恢复上次配置，避免每次重新填写。配置文件位于系统用户配置目录，而不是程序安装目录，因此更适合普通用户权限和发布包只读目录。GeoEast 集成控件继续使用自己的配置文件保存数据库和工程相关信息，两者互不覆盖。
 
 ### 3.2 参数模板
 
@@ -40,7 +40,7 @@ GeoEast 集成模式使用 `geoeast_plugin/bo_runner/faultpolytrace_geoeast_runn
 
 ### 3.5 发布包去个人化
 
-发布脚本会在打包阶段清理文档、脚本和配置中的个人路径、用户名和本机数据路径。发布包内示例配置使用相对路径，例如 `../bin/faultpolytrace.exe` 和 `../examples/synthetic/broken_ridge_fault_grid.txt`，保证换电脑后不会因为硬编码路径导致启动失败。
+发布脚本会在打包阶段清理文档、脚本和配置中的个人路径、用户名和本机数据路径。发布包根目录的 `FaultPolyTrace.exe` 来自 `standalone_app/qt_desktop`；`qt_launcher/faultpolytrace_launcher.exe` 来自 `geoeast_plugin/qt_launcher`。二者都携带各自需要的 Qt 运行库和 `qt.conf`，保证换电脑后不会因为硬编码路径或 Qt DLL 混用导致启动失败。
 
 ## 4. 已验证内容
 

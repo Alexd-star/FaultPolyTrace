@@ -48,6 +48,7 @@ function Sanitize-PackageTextFiles {
 
 if (!$SkipBuild) {
     & (Join-Path $PSScriptRoot "build.ps1")
+    & (Join-Path $PSScriptRoot "build_desktop_app.ps1") -GeoEastRoot $GeoEastRoot
     & (Join-Path $PSScriptRoot "build_qt_launcher.ps1") -GeoEastRoot $GeoEastRoot
     & (Join-Path $PSScriptRoot "build_geoeast_bo_runner.ps1") -GeoEastRoot $GeoEastRoot
     & (Join-Path $PSScriptRoot "build_geoeast_mainframe_plugin.ps1") -GeoEastRoot $GeoEastRoot
@@ -64,11 +65,39 @@ $docsDir = Join-Path $packageDir "docs"
 $examplesDir = Join-Path $packageDir "examples"
 $scriptsDir = Join-Path $packageDir "scripts"
 $srcDir = Join-Path $packageDir "src"
+$standaloneDir = Join-Path $packageDir "standalone_app"
 $geoeastDir = Join-Path $packageDir "geoeast_plugin"
 $prerequisitesDir = Join-Path $packageDir "prerequisites"
 $figureDir = Join-Path $packageDir "figure"
 
 Copy-FileRequired (Join-Path $repoRoot "build\faultpolytrace.exe") (Join-Path $binDir "faultpolytrace.exe")
+
+$desktopSource = Join-Path $repoRoot "standalone_app\qt_desktop"
+$desktopExe = Join-Path $desktopSource "FaultPolyTrace.exe"
+Copy-FileRequired $desktopExe (Join-Path $packageDir "FaultPolyTrace.exe")
+foreach ($name in @(
+    "qt.conf",
+    "Qt5Core.dll",
+    "Qt5Gui.dll",
+    "Qt5Widgets.dll",
+    "Qt5Svg.dll",
+    "libEGL.dll",
+    "libGLESv2.dll",
+    "D3Dcompiler_47.dll",
+    "opengl32sw.dll",
+    "msvcp140.dll",
+    "vcruntime140.dll",
+    "vcruntime140_1.dll",
+    "concrt140.dll"
+)) {
+    Copy-FileOptional (Join-Path $desktopSource $name) (Join-Path $packageDir $name) | Out-Null
+}
+foreach ($subdir in @("platforms", "imageformats", "iconengines", "styles", "translations")) {
+    $src = Join-Path $desktopSource $subdir
+    if (Test-Path -LiteralPath $src) {
+        Copy-Item -LiteralPath $src -Destination (Join-Path $packageDir $subdir) -Recurse -Force
+    }
+}
 
 $launcherSource = Join-Path $repoRoot "geoeast_plugin\qt_launcher"
 New-Item -ItemType Directory -Force -Path $launcherDir | Out-Null
@@ -97,19 +126,6 @@ foreach ($subdir in @("platforms", "imageformats", "iconengines", "styles", "tra
     $src = Join-Path $launcherSource $subdir
     if (Test-Path -LiteralPath $src) {
         Copy-Item -LiteralPath $src -Destination (Join-Path $launcherDir $subdir) -Recurse -Force
-    }
-}
-
-# 发布包根目录提供一个面向普通用户的 GUI exe 入口，避免评审误双击命令行核心。
-# Qt 在 Windows 上默认从 exe 同级查找运行库，因此根目录入口也复制必要 Qt 运行文件。
-Copy-FileOptional (Join-Path $launcherDir "faultpolytrace_launcher.exe") (Join-Path $packageDir "FaultPolyTrace.exe") | Out-Null
-foreach ($name in @("qt.conf", "Qt5Core.dll", "Qt5Gui.dll", "Qt5Widgets.dll", "Qt5Svg.dll", "libEGL.dll", "libGLESv2.dll", "D3Dcompiler_47.dll", "opengl32sw.dll", "msvcp140.dll", "vcruntime140.dll", "vcruntime140_1.dll", "concrt140.dll")) {
-    Copy-FileOptional (Join-Path $launcherDir $name) (Join-Path $packageDir $name) | Out-Null
-}
-foreach ($subdir in @("platforms", "imageformats", "iconengines", "styles")) {
-    $src = Join-Path $launcherDir $subdir
-    if (Test-Path -LiteralPath $src) {
-        Copy-Item -LiteralPath $src -Destination (Join-Path $packageDir $subdir) -Recurse -Force
     }
 }
 
@@ -144,6 +160,10 @@ foreach ($name in @("FaultPolyTraceMainframePlugin.dll", "manifest.xml")) {
 }
 
 Copy-Item -LiteralPath (Join-Path $repoRoot "docs") -Destination $docsDir -Recurse -Force
+$standalonePackageDir = New-Item -ItemType Directory -Force -Path (Join-Path $standaloneDir "qt_desktop")
+foreach ($name in @("FaultPolyTraceDesktop.pro", "main.cpp", "FaultPolyTraceWindow.cpp", "FaultPolyTraceWindow.h")) {
+    Copy-FileOptional (Join-Path $repoRoot "standalone_app\qt_desktop\$name") (Join-Path $standalonePackageDir $name) | Out-Null
+}
 $releaseFigureDir = Join-Path $releaseRoot "figure"
 if (Test-Path -LiteralPath $releaseFigureDir) {
     Copy-Item -LiteralPath $releaseFigureDir -Destination $figureDir -Recurse -Force
@@ -157,6 +177,7 @@ foreach ($script in @(
     "run_official_benchmark.ps1",
     "build_geoeast_bo_runner.ps1",
     "build_geoeast_mainframe_plugin.ps1",
+    "build_desktop_app.ps1",
     "build_qt_launcher.ps1",
     "部署到GeoEast.ps1",
     "一键总验收.ps1",
@@ -190,8 +211,8 @@ $manifest += ""
 $manifest += "## 包含内容"
 $manifest += ""
 $manifest += '- `bin/faultpolytrace.exe`：离线算法程序'
-$manifest += '- `qt_launcher/faultpolytrace_launcher.exe`：Qt 用户界面'
-$manifest += '- `FaultPolyTrace.exe`：独立软件图形入口，适合普通用户直接双击'
+$manifest += '- `FaultPolyTrace.exe`：独立桌面软件，处理外部网格文件，不包含 GeoEast 数据库配置'
+$manifest += '- `qt_launcher/faultpolytrace_launcher.exe`：GeoEast 集成控件，用于数据库读写和平台入口'
 $manifest += '- `01_打开图形界面.cmd`：评审推荐图形入口'
 $manifest += '- `02_运行离线演示.cmd`：无需 GeoEast 的双击离线演示'
 $manifest += '- `03_查看命令行帮助.cmd`：命令行参数帮助'
@@ -200,13 +221,15 @@ $manifest += '- `figure/`：界面样式截图和 GeoEast 参考截图'
 $manifest += '- `examples/outputs/official/`：官方数据结果、图件、报告依据'
 $manifest += '- `scripts/`：运行、可视化、报告脚本'
 $manifest += '- `src/`：核心源码'
-$manifest += '- `geoeast_plugin/`：GeoEast runner、Qt 启动器联动入口和主控插件'
+$manifest += '- `standalone_app/`：独立桌面软件 Qt 工程源码'
+$manifest += '- `geoeast_plugin/`：GeoEast runner、集成控件和主控插件'
 $manifest += '- `prerequisites/`：可选运行库安装包'
 $manifest += ""
 $manifest += "## 当前状态"
 $manifest += ""
 $manifest += "- 离线 CLI：已构建"
-$manifest += "- Qt 启动器：已构建"
+$manifest += "- 独立桌面软件：已构建"
+$manifest += "- GeoEast 集成控件：已构建"
 $manifest += '- GeoEast 数据库读写：已验证过 `FaultPolyTrace_Result=465`'
 if ($runnerIncluded) {
     $manifest += '- GeoEast runner exe：已包含'
@@ -219,9 +242,9 @@ $manifest += ""
 $manifest += "## 推荐入口"
 $manifest += ""
 $manifest += '1. 先读 `README_先打开我.md`。'
-$manifest += '2. 双击 `FaultPolyTrace.exe` 或 `01_打开图形界面.cmd` 查看图形界面。'
+$manifest += '2. 双击 `FaultPolyTrace.exe` 或 `01_打开图形界面.cmd` 打开独立桌面软件。'
 $manifest += '3. 没有 GeoEast 环境时，双击 `02_运行离线演示.cmd` 验证算法独立运行能力。'
-$manifest += '4. 有 GeoEast 环境时，按 `docs/用户操作手册.md` 连接数据库、选择网格并写入结果。'
+$manifest += '4. 有 GeoEast 环境时，按 `docs/用户操作手册.md` 或 `docs/GeoEast使用指南.md` 使用 GeoEast 菜单入口，入口程序是 `qt_launcher/faultpolytrace_launcher.exe`。'
 $manifest += '5. 查看 `docs/官方数据最新验收报告.md`。'
 $manifest += '6. 修改代码后运行 `scripts/一键总验收.ps1 -SkipGeoEastBuild -SkipPackage`，确认官方数据仍满足覆盖、防黏连、拓扑和性能门禁。'
 

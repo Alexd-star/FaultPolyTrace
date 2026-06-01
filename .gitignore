@@ -31,3 +31,13 @@ geoeast_plugin/**/platforms/
 geoeast_plugin/**/styles/
 geoeast_plugin/**/imageformats/
 geoeast_plugin/**/iconengines/
+standalone_app/**/.obj/
+standalone_app/**/.moc/
+standalone_app/**/debug/
+standalone_app/**/release/
+standalone_app/**/translations/
+standalone_app/**/platforms/
+standalone_app/**/styles/
+standalone_app/**/imageformats/
+standalone_app/**/iconengines/
+standalone_app/**/qt.conf

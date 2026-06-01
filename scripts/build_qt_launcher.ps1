@@ -1,5 +1,5 @@
 param(
-    [string]$GeoEastRoot = $(if ($env:FPT_GEOEAST_ROOT) { $env:FPT_GEOEAST_ROOT } else { "C:\Users\26312\GeoEast" }),
+    [string]$GeoEastRoot = $(if ($env:FPT_GEOEAST_ROOT) { $env:FPT_GEOEAST_ROOT } elseif ($env:USERPROFILE) { Join-Path $env:USERPROFILE "GeoEast" } else { "C:\GeoEast" }),
     [string]$QMake = $env:FPT_QMAKE,
     [string]$VcVars = "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars64.bat"
 )
@@ -49,6 +49,17 @@ function Copy-VcRuntimeIfAvailable {
     }
 }
 
+function Write-QtConf {
+    param([string]$DestinationDir)
+
+    Set-Content -LiteralPath (Join-Path $DestinationDir "qt.conf") -Value @(
+        "[Paths]",
+        "Prefix=.",
+        "Plugins=.",
+        "Translations=translations"
+    ) -Encoding ASCII
+}
+
 $command = @"
 call "$VcVars" && set "PATH=$qtBin;!PATH!" && cd /d "$launcherDir" && "$QMake" FaultPolyTraceLauncher.pro -spec win32-msvc && nmake
 "@
@@ -65,8 +76,10 @@ if (Test-Path -LiteralPath $windeployQt) {
         throw "windeployqt failed with exit code $LASTEXITCODE."
     }
     Copy-VcRuntimeIfAvailable $launcherDir
+    Write-QtConf $launcherDir
 } else {
     Write-Warning "windeployqt.exe was not found next to qmake.exe: $windeployQt"
+    Write-QtConf $launcherDir
 }
 
 Write-Host "Qt launcher built and deployed:" $launcherExe
