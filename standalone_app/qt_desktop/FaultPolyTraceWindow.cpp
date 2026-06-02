@@ -28,6 +28,7 @@
 #include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPolygonF>
@@ -47,8 +48,10 @@
 #include <QToolBar>
 #include <QUrl>
 #include <QVBoxLayout>
+#include <QWheelEvent>
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 
 namespace {
@@ -101,7 +104,7 @@ QVector<double> splitNumbers(const QString& line) {
 
 QLabel* formLabel(const QString& text, QWidget* parent) {
     QLabel* label = new QLabel(text, parent);
-    label->setFixedWidth(76);
+    label->setFixedWidth(92);
     label->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     return label;
 }
@@ -116,8 +119,59 @@ void configureFormGrid(QGridLayout* layout) {
     layout->setContentsMargins(10, 14, 10, 10);
     layout->setHorizontalSpacing(8);
     layout->setVerticalSpacing(6);
-    layout->setColumnMinimumWidth(0, 76);
+    layout->setColumnMinimumWidth(0, 92);
     layout->setColumnStretch(1, 1);
+}
+
+void configureSmallButton(QPushButton* button) {
+    button->setFixedWidth(56);
+    button->setMinimumHeight(24);
+}
+
+enum class ToolIconKind {
+    Pan,
+    ZoomIn,
+    ZoomOut,
+    Reset
+};
+
+QIcon makeToolIcon(ToolIconKind kind) {
+    QPixmap pixmap(24, 24);
+    pixmap.fill(Qt::transparent);
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+
+    const QColor blue("#1685D9");
+    const QColor darkBlue("#005A9E");
+    painter.setPen(QPen(darkBlue, 1.7, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter.setBrush(QColor("#EAF6FF"));
+
+    if (kind == ToolIconKind::Pan) {
+        painter.drawRoundedRect(QRectF(5, 5, 14, 14), 2, 2);
+        painter.drawLine(QPointF(12, 3), QPointF(12, 21));
+        painter.drawLine(QPointF(3, 12), QPointF(21, 12));
+        painter.setBrush(blue);
+        painter.drawPolygon(QPolygonF({QPointF(12, 1), QPointF(9, 5), QPointF(15, 5)}));
+        painter.drawPolygon(QPolygonF({QPointF(12, 23), QPointF(9, 19), QPointF(15, 19)}));
+        painter.drawPolygon(QPolygonF({QPointF(1, 12), QPointF(5, 9), QPointF(5, 15)}));
+        painter.drawPolygon(QPolygonF({QPointF(23, 12), QPointF(19, 9), QPointF(19, 15)}));
+    } else if (kind == ToolIconKind::ZoomIn || kind == ToolIconKind::ZoomOut) {
+        painter.drawEllipse(QRectF(4, 4, 11, 11));
+        painter.drawLine(QPointF(13, 13), QPointF(20, 20));
+        painter.setPen(QPen(darkBlue, 1.8, Qt::SolidLine, Qt::RoundCap));
+        painter.drawLine(QPointF(7, 9.5), QPointF(12, 9.5));
+        if (kind == ToolIconKind::ZoomIn) {
+            painter.drawLine(QPointF(9.5, 7), QPointF(9.5, 12));
+        }
+    } else {
+        painter.setBrush(Qt::NoBrush);
+        painter.drawArc(QRectF(5, 5, 14, 14), 40 * 16, 280 * 16);
+        painter.setBrush(blue);
+        painter.drawPolygon(QPolygonF({QPointF(17, 5), QPointF(21, 5), QPointF(20, 9)}));
+        painter.drawLine(QPointF(8, 12), QPointF(16, 12));
+    }
+
+    return QIcon(pixmap);
 }
 
 } // namespace
@@ -150,6 +204,31 @@ public:
 
     void setTaskSummary(const QStringList& lines) {
         taskLines_ = lines;
+        update();
+    }
+
+    void setPanMode(bool enabled) {
+        panMode_ = enabled;
+        setCursor(enabled ? Qt::OpenHandCursor : Qt::ArrowCursor);
+        update();
+    }
+
+    void zoomIn() {
+        zoom_ = qMin(4.0, zoom_ * 1.25);
+        update();
+    }
+
+    void zoomOut() {
+        zoom_ = qMax(0.35, zoom_ / 1.25);
+        update();
+    }
+
+    void resetView() {
+        zoom_ = 1.0;
+        panOffset_ = QPointF(0, 0);
+        panMode_ = false;
+        dragging_ = false;
+        setCursor(Qt::ArrowCursor);
         update();
     }
 
@@ -349,10 +428,13 @@ protected:
         QPainter painter(this);
         painter.fillRect(rect(), QColor("#FFFFFF"));
         painter.setPen(QPen(QColor("#EEEEEE"), 1));
-        for (int x = 0; x < width(); x += 48) {
+        const int gridStep = qMax(20, qRound(48 * zoom_));
+        const int xStart = qRound(std::fmod(panOffset_.x(), gridStep));
+        const int yStart = qRound(std::fmod(panOffset_.y(), gridStep));
+        for (int x = xStart; x < width(); x += gridStep) {
             painter.drawLine(x, 0, x, height());
         }
-        for (int y = 0; y < height(); y += 48) {
+        for (int y = yStart; y < height(); y += gridStep) {
             painter.drawLine(0, y, width(), y);
         }
 
@@ -361,12 +443,16 @@ protected:
             drawTaskPreview(painter, canvas);
             return;
         }
+        const QRectF contentCanvas = transformedCanvas(canvas);
+        painter.save();
+        painter.setClipRect(canvas);
         if (!grid_.isEmpty() && mode_ != Mode::Result) {
-            drawGrid(painter, canvas);
+            drawGrid(painter, contentCanvas);
         }
         if (!polygons_.isEmpty() && mode_ != Mode::Raw) {
-            drawPolygons(painter, canvas);
+            drawPolygons(painter, contentCanvas);
         }
+        painter.restore();
 
         QFont title = painter.font();
         title.setPointSize(15);
@@ -379,8 +465,42 @@ protected:
         painter.setFont(QFont(painter.font().family(), 9));
         painter.setPen(QColor("#777777"));
         painter.drawText(QRect(width() - 280, 18, 250, 20), Qt::AlignRight, status_);
+        painter.drawText(QRect(width() - 280, 38, 250, 20), Qt::AlignRight,
+                         QString::fromUtf8("缩放 %1%").arg(qRound(zoom_ * 100)));
         if (grid_.isEmpty() && polygons_.isEmpty()) {
             painter.drawText(canvas, Qt::AlignCenter, QString::fromUtf8("请选择输入网格，或载入历史结果。"));
+        }
+    }
+
+    void mousePressEvent(QMouseEvent* event) override {
+        if (panMode_ && event->button() == Qt::LeftButton) {
+            dragging_ = true;
+            lastDragPos_ = event->pos();
+            setCursor(Qt::ClosedHandCursor);
+        }
+    }
+
+    void mouseMoveEvent(QMouseEvent* event) override {
+        if (dragging_) {
+            const QPointF delta = event->pos() - lastDragPos_;
+            panOffset_ += delta;
+            lastDragPos_ = event->pos();
+            update();
+        }
+    }
+
+    void mouseReleaseEvent(QMouseEvent* event) override {
+        if (event->button() == Qt::LeftButton && dragging_) {
+            dragging_ = false;
+            setCursor(panMode_ ? Qt::OpenHandCursor : Qt::ArrowCursor);
+        }
+    }
+
+    void wheelEvent(QWheelEvent* event) override {
+        if (event->angleDelta().y() > 0) {
+            zoomIn();
+        } else if (event->angleDelta().y() < 0) {
+            zoomOut();
         }
     }
 
@@ -406,6 +526,14 @@ private:
         const double w = dataWidth * scale;
         const double h = dataHeight * scale;
         return QRectF(available.center().x() - w / 2.0, available.center().y() - h / 2.0, w, h);
+    }
+
+    QRectF transformedCanvas(const QRectF& canvas) const {
+        const QPointF center = canvas.center() + panOffset_;
+        return QRectF(center.x() - canvas.width() * zoom_ / 2.0,
+                      center.y() - canvas.height() * zoom_ / 2.0,
+                      canvas.width() * zoom_,
+                      canvas.height() * zoom_);
     }
 
     QPointF mapPoint(const QPointF& point, const QRectF& target) const {
@@ -495,7 +623,7 @@ private:
 
         painter.setPen(QColor("#8A8A8A"));
         painter.drawText(QRect(width() - 210, 18, 180, 20), Qt::AlignRight,
-                         QString::fromUtf8("查看模式  缩放 100%"));
+                         QString::fromUtf8("查看模式  缩放 %1%").arg(qRound(zoom_ * 100)));
     }
 
     Mode mode_ = Mode::Task;
@@ -512,6 +640,11 @@ private:
     QColor color_ = QColor("#00FFFF");
     double lineWidth_ = 0.03;
     double alpha_ = 1.0;
+    double zoom_ = 1.0;
+    QPointF panOffset_ = QPointF(0, 0);
+    QPoint lastDragPos_;
+    bool panMode_ = false;
+    bool dragging_ = false;
     QString status_ = QString::fromUtf8("等待数据");
     QStringList taskLines_;
 };
@@ -519,7 +652,7 @@ private:
 class ColorBarWidget : public QWidget {
 public:
     explicit ColorBarWidget(QWidget* parent = nullptr) : QWidget(parent) {
-        setFixedWidth(56);
+        setFixedWidth(64);
         setMinimumHeight(360);
     }
 
@@ -530,7 +663,7 @@ protected:
         painter.setPen(QColor("#A0A0A0"));
         painter.drawLine(0, 0, 0, height());
 
-        const QRect bar(width() / 2 - 8, 34, 16, qMax(120, height() - 84));
+        const QRect bar(width() / 2 - 8, 56, 16, qMax(120, height() - 118));
         QLinearGradient gradient(bar.left(), bar.bottom(), bar.left(), bar.top());
         gradient.setColorAt(0.00, QColor("#FF0000"));
         gradient.setColorAt(0.25, QColor("#FFFF00"));
@@ -544,9 +677,9 @@ protected:
         painter.setPen(QColor("#333333"));
         painter.drawText(QRect(4, 8, width() - 8, 18), Qt::AlignCenter, QString::fromUtf8("属性"));
         painter.setPen(QColor("#004CFF"));
-        painter.drawText(QRect(4, bar.top() - 20, width() - 8, 18), Qt::AlignCenter, QString::fromUtf8("1.0"));
+        painter.drawText(QRect(4, 32, width() - 8, 18), Qt::AlignCenter, QString::fromUtf8("1.0"));
         painter.setPen(QColor("#FF0000"));
-        painter.drawText(QRect(4, bar.bottom() + 6, width() - 8, 18), Qt::AlignCenter, QString::fromUtf8("0.0"));
+        painter.drawText(QRect(4, bar.bottom() + 8, width() - 8, 18), Qt::AlignCenter, QString::fromUtf8("0.0"));
     }
 };
 
@@ -557,6 +690,7 @@ FaultPolyTraceWindow::FaultPolyTraceWindow(QWidget* parent)
     refreshHistory();
     refreshInputPreview();
     updateTaskPreview();
+    appendLog(QString::fromUtf8("[系统就绪] 等待参数输入及任务执行。"));
     connect(process_, &QProcess::readyReadStandardOutput, this, &FaultPolyTraceWindow::onReadyRead);
     connect(process_, &QProcess::readyReadStandardError, this, &FaultPolyTraceWindow::onReadyRead);
     connect(process_, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this, &FaultPolyTraceWindow::onFinished);
@@ -564,7 +698,7 @@ FaultPolyTraceWindow::FaultPolyTraceWindow(QWidget* parent)
 }
 
 void FaultPolyTraceWindow::buildUi() {
-    setWindowTitle(QString::fromUtf8("FaultPolyTrace"));
+    setWindowTitle(QString::fromUtf8("FaultPolyTrace 断层多边形自动追踪"));
     setMinimumSize(1100, 700);
     resize(1280, 780);
     setStyleSheet(QString::fromUtf8(R"(
@@ -585,6 +719,7 @@ void FaultPolyTraceWindow::buildUi() {
         QPushButton { background: #E1E1E1; border: 1px solid #A0A0A0; border-radius: 2px; min-height: 24px; padding: 2px 10px; }
         QPushButton:hover { background: #E5F1FB; border-color: #0078D7; }
         QPushButton#runButton { background: #0078D7; color: white; border-color: #005A9E; font-weight: bold; min-height: 30px; }
+        QLabel#logHeader { background: #E6E6E6; border-top: 1px solid #A8A8A8; border-bottom: 1px solid #C8C8C8; padding-left: 10px; font-weight: bold; }
         QTextEdit { background: #F8F9FA; border-top: 1px solid #B8B8B8; font-family: Consolas, "Courier New"; }
     )"));
 
@@ -613,9 +748,6 @@ void FaultPolyTraceWindow::buildUi() {
     helpAction->setToolTip(QString::fromUtf8("查看独立软件使用说明"));
     connect(helpAction, &QAction::triggered, this, &FaultPolyTraceWindow::openHelp);
 
-    QMenu* geoEastMenu = menuBar()->addMenu(QString::fromUtf8("GeoEast(&G)"));
-    geoEastMenu->addAction(helpAction);
-
     QMenu* fileMenu = menuBar()->addMenu(QString::fromUtf8("文件(&F)"));
     fileMenu->addAction(openAction);
     fileMenu->addAction(pngAction);
@@ -635,6 +767,37 @@ void FaultPolyTraceWindow::buildUi() {
     connect(resultViewAction, &QAction::triggered, this, [this]() { viewModeCombo_->setCurrentText(QString::fromUtf8("结果多边形")); });
     QAction* overlayViewAction = viewMenu->addAction(QString::fromUtf8("叠加结果"));
     connect(overlayViewAction, &QAction::triggered, this, [this]() { viewModeCombo_->setCurrentText(QString::fromUtf8("叠加结果")); });
+    viewMenu->addSeparator();
+    QAction* panAction = viewMenu->addAction(makeToolIcon(ToolIconKind::Pan), QString::fromUtf8("平移模式"));
+    panAction->setCheckable(true);
+    connect(panAction, &QAction::toggled, this, [this](bool checked) {
+        if (view_) {
+            view_->setPanMode(checked);
+        }
+        updateStatus(checked ? QString::fromUtf8("视图区已切换为平移模式") : QString::fromUtf8("视图区已切换为选择模式"));
+    });
+    QAction* zoomInAction = viewMenu->addAction(makeToolIcon(ToolIconKind::ZoomIn), QString::fromUtf8("放大"));
+    connect(zoomInAction, &QAction::triggered, this, [this]() {
+        if (view_) {
+            view_->zoomIn();
+        }
+        updateStatus(QString::fromUtf8("视图区已放大"));
+    });
+    QAction* zoomOutAction = viewMenu->addAction(makeToolIcon(ToolIconKind::ZoomOut), QString::fromUtf8("缩小"));
+    connect(zoomOutAction, &QAction::triggered, this, [this]() {
+        if (view_) {
+            view_->zoomOut();
+        }
+        updateStatus(QString::fromUtf8("视图区已缩小"));
+    });
+    QAction* resetViewAction = viewMenu->addAction(makeToolIcon(ToolIconKind::Reset), QString::fromUtf8("重置视图"));
+    connect(resetViewAction, &QAction::triggered, this, [this, panAction]() {
+        if (view_) {
+            view_->resetView();
+        }
+        panAction->setChecked(false);
+        updateStatus(QString::fromUtf8("视图区已重置"));
+    });
 
     QMenu* faultMenu = menuBar()->addMenu(QString::fromUtf8("断层(&L)"));
     faultMenu->addAction(runAction);
@@ -656,6 +819,11 @@ void FaultPolyTraceWindow::buildUi() {
     toolbar->addAction(openAction);
     toolbar->addAction(saveTplAction);
     toolbar->addSeparator();
+    toolbar->addAction(panAction);
+    toolbar->addAction(zoomInAction);
+    toolbar->addAction(zoomOutAction);
+    toolbar->addAction(resetViewAction);
+    toolbar->addSeparator();
     toolbar->addAction(resetAction);
     toolbar->addAction(pngAction);
     toolbar->addSeparator();
@@ -670,7 +838,7 @@ void FaultPolyTraceWindow::buildUi() {
     rootLayout->setSpacing(0);
 
     QWidget* leftPane = new QWidget(root);
-    leftPane->setFixedWidth(372);
+    leftPane->setFixedWidth(392);
     QVBoxLayout* leftLayout = new QVBoxLayout(leftPane);
     leftLayout->setContentsMargins(10, 10, 10, 8);
     leftLayout->setSpacing(8);
@@ -680,7 +848,7 @@ void FaultPolyTraceWindow::buildUi() {
     sidebarScroll->setFrameShape(QFrame::NoFrame);
     sidebarScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     QWidget* sidebarContent = new QWidget(sidebarScroll);
-    sidebarContent->setMinimumWidth(336);
+    sidebarContent->setMinimumWidth(356);
     QVBoxLayout* sidebarLayout = new QVBoxLayout(sidebarContent);
     sidebarLayout->setContentsMargins(0, 0, 4, 0);
     sidebarLayout->setSpacing(8);
@@ -691,10 +859,12 @@ void FaultPolyTraceWindow::buildUi() {
     inputEdit_ = new QLineEdit(dataBox);
     inputEdit_->setToolTip(QString::fromUtf8("外部断层属性网格文件路径"));
     QPushButton* inputButton = new QPushButton(QString::fromUtf8("浏览"), dataBox);
+    configureSmallButton(inputButton);
     connect(inputButton, &QPushButton::clicked, this, &FaultPolyTraceWindow::browseInput);
     QWidget* inputRow = new QWidget(dataBox);
     QHBoxLayout* inputRowLayout = new QHBoxLayout(inputRow);
     inputRowLayout->setContentsMargins(0, 0, 0, 0);
+    inputRowLayout->setSpacing(6);
     inputRowLayout->addWidget(inputEdit_, 1);
     inputRowLayout->addWidget(inputButton);
     addRow(dataLayout, 0, QString::fromUtf8("输入文件"), inputRow, dataBox);
@@ -704,10 +874,12 @@ void FaultPolyTraceWindow::buildUi() {
     outputDirEdit_ = new QLineEdit(dataBox);
     outputDirEdit_->setToolTip(QString::fromUtf8("结果文件输出目录"));
     QPushButton* outputButton = new QPushButton(QString::fromUtf8("浏览"), dataBox);
+    configureSmallButton(outputButton);
     connect(outputButton, &QPushButton::clicked, this, &FaultPolyTraceWindow::browseOutputDir);
     QWidget* outputRow = new QWidget(dataBox);
     QHBoxLayout* outputRowLayout = new QHBoxLayout(outputRow);
     outputRowLayout->setContentsMargins(0, 0, 0, 0);
+    outputRowLayout->setSpacing(6);
     outputRowLayout->addWidget(outputDirEdit_, 1);
     outputRowLayout->addWidget(outputButton);
     addRow(dataLayout, 2, QString::fromUtf8("输出目录"), outputRow, dataBox);
@@ -724,10 +896,12 @@ void FaultPolyTraceWindow::buildUi() {
     colorEdit_ = new QLineEdit("#00FFFF", styleBox);
     colorEdit_->setReadOnly(true);
     QPushButton* colorButton = new QPushButton(QString::fromUtf8("颜色"), styleBox);
+    configureSmallButton(colorButton);
     connect(colorButton, &QPushButton::clicked, this, &FaultPolyTraceWindow::chooseColor);
     QWidget* colorRow = new QWidget(styleBox);
     QHBoxLayout* colorRowLayout = new QHBoxLayout(colorRow);
     colorRowLayout->setContentsMargins(0, 0, 0, 0);
+    colorRowLayout->setSpacing(6);
     colorRowLayout->addWidget(colorEdit_, 1);
     colorRowLayout->addWidget(colorButton);
     addRow(styleLayout, 0, QString::fromUtf8("颜色"), colorRow, styleBox);
@@ -743,30 +917,45 @@ void FaultPolyTraceWindow::buildUi() {
     addRow(styleLayout, 2, QString::fromUtf8("透明度"), alphaSpin_, styleBox);
     sidebarLayout->addWidget(styleBox);
 
-    QGroupBox* basicBox = new QGroupBox(QString::fromUtf8("基础追踪参数"), sidebarContent);
+    QGroupBox* basicBox = new QGroupBox(QString::fromUtf8("追踪参数"), sidebarContent);
     QGridLayout* basicLayout = new QGridLayout(basicBox);
     configureFormGrid(basicLayout);
     presetCombo_ = new QComboBox(basicBox);
-    presetCombo_->addItems({QString::fromUtf8("防黏连增强"), QString::fromUtf8("高召回"), QString::fromUtf8("保守高精度")});
-    addRow(basicLayout, 0, QString::fromUtf8("预设"), presetCombo_, basicBox);
+    presetCombo_->addItems({
+        QString::fromUtf8("全覆盖优先"),
+        QString::fromUtf8("贴合融合推荐"),
+        QString::fromUtf8("防黏连增强"),
+        QString::fromUtf8("均衡推荐"),
+        QString::fromUtf8("保守高精度"),
+        QString::fromUtf8("弱响应高召回"),
+        QString::fromUtf8("宽断层带"),
+        QString::fromUtf8("细碎断裂")
+    });
+    addRow(basicLayout, 0, QString::fromUtf8("预设模板"), presetCombo_, basicBox);
+    traceModeCombo_ = new QComboBox(basicBox);
+    traceModeCombo_->addItems({"ridge-belt", "region"});
+    addRow(basicLayout, 1, QString::fromUtf8("追踪模式"), traceModeCombo_, basicBox);
     thresholdModeCombo_ = new QComboBox(basicBox);
     thresholdModeCombo_->addItems({"percentile", "positive-percentile", "fixed"});
-    addRow(basicLayout, 1, QString::fromUtf8("阈值模式"), thresholdModeCombo_, basicBox);
+    addRow(basicLayout, 2, QString::fromUtf8("阈值模式"), thresholdModeCombo_, basicBox);
     percentileSpin_ = new QDoubleSpinBox(basicBox);
     percentileSpin_->setRange(0.0, 1.0);
     percentileSpin_->setDecimals(4);
+    percentileSpin_->setSingleStep(0.005);
     percentileSpin_->setValue(0.98);
-    addRow(basicLayout, 2, QString::fromUtf8("分位数"), percentileSpin_, basicBox);
+    addRow(basicLayout, 3, QString::fromUtf8("分位数"), percentileSpin_, basicBox);
     thresholdSpin_ = new QDoubleSpinBox(basicBox);
     thresholdSpin_->setRange(0.0, 1.0);
     thresholdSpin_->setDecimals(4);
+    thresholdSpin_->setSingleStep(0.01);
     thresholdSpin_->setValue(0.95);
-    addRow(basicLayout, 3, QString::fromUtf8("固定阈值"), thresholdSpin_, basicBox);
+    addRow(basicLayout, 4, QString::fromUtf8("固定阈值"), thresholdSpin_, basicBox);
     minAreaSpin_ = new QDoubleSpinBox(basicBox);
     minAreaSpin_->setRange(0, 1000000000);
     minAreaSpin_->setDecimals(2);
+    minAreaSpin_->setSingleStep(50.0);
     minAreaSpin_->setValue(120.0);
-    addRow(basicLayout, 4, QString::fromUtf8("最小面积"), minAreaSpin_, basicBox);
+    addRow(basicLayout, 5, QString::fromUtf8("最小面积"), minAreaSpin_, basicBox);
     sidebarLayout->addWidget(basicBox);
 
     QGroupBox* topologyBox = new QGroupBox(QString::fromUtf8("形态与拓扑约束"), sidebarContent);
@@ -780,23 +969,149 @@ void FaultPolyTraceWindow::buildUi() {
     beltRadiusSpin_->setRange(0, 20);
     beltRadiusSpin_->setValue(3);
     addRow(topologyLayout, 1, QString::fromUtf8("带宽半径"), beltRadiusSpin_, topologyBox);
+    postBeltCloseRadiusSpin_ = new QSpinBox(topologyBox);
+    postBeltCloseRadiusSpin_->setRange(0, 20);
+    postBeltCloseRadiusSpin_->setValue(1);
+    addRow(topologyLayout, 2, QString::fromUtf8("带后闭合"), postBeltCloseRadiusSpin_, topologyBox);
+    attributeConstrainedBeltCheck_ = new QCheckBox(QString::fromUtf8("属性约束断层带"), topologyBox);
+    attributeConstrainedBeltCheck_->setChecked(true);
+    topologyLayout->addWidget(attributeConstrainedBeltCheck_, 3, 0, 1, 2);
+    attributeEnvelopeRadiusSpin_ = new QSpinBox(topologyBox);
+    attributeEnvelopeRadiusSpin_->setRange(0, 20);
+    attributeEnvelopeRadiusSpin_->setValue(1);
+    addRow(topologyLayout, 4, QString::fromUtf8("属性包络半径"), attributeEnvelopeRadiusSpin_, topologyBox);
     maxGapDistanceSpin_ = new QSpinBox(topologyBox);
     maxGapDistanceSpin_->setRange(0, 1000);
     maxGapDistanceSpin_->setValue(12);
-    addRow(topologyLayout, 2, QString::fromUtf8("最大断距"), maxGapDistanceSpin_, topologyBox);
+    addRow(topologyLayout, 5, QString::fromUtf8("最大断距"), maxGapDistanceSpin_, topologyBox);
     maxGapAngleSpin_ = new QDoubleSpinBox(topologyBox);
     maxGapAngleSpin_->setRange(0, 180);
+    maxGapAngleSpin_->setDecimals(1);
     maxGapAngleSpin_->setValue(55.0);
-    addRow(topologyLayout, 3, QString::fromUtf8("最大夹角"), maxGapAngleSpin_, topologyBox);
+    addRow(topologyLayout, 6, QString::fromUtf8("最大夹角"), maxGapAngleSpin_, topologyBox);
     smoothIterationsSpin_ = new QSpinBox(topologyBox);
     smoothIterationsSpin_->setRange(0, 5);
     smoothIterationsSpin_->setValue(1);
-    addRow(topologyLayout, 4, QString::fromUtf8("平滑次数"), smoothIterationsSpin_, topologyBox);
+    addRow(topologyLayout, 7, QString::fromUtf8("平滑次数"), smoothIterationsSpin_, topologyBox);
     simplifyToleranceSpin_ = new QDoubleSpinBox(topologyBox);
     simplifyToleranceSpin_->setRange(0, 1000);
+    simplifyToleranceSpin_->setDecimals(2);
+    simplifyToleranceSpin_->setSingleStep(1.0);
     simplifyToleranceSpin_->setValue(2.0);
-    addRow(topologyLayout, 5, QString::fromUtf8("简化容差"), simplifyToleranceSpin_, topologyBox);
+    addRow(topologyLayout, 8, QString::fromUtf8("简化容差"), simplifyToleranceSpin_, topologyBox);
     sidebarLayout->addWidget(topologyBox);
+
+    QGroupBox* branchBox = new QGroupBox(QString::fromUtf8("枝干细节与修补"), sidebarContent);
+    QGridLayout* branchLayout = new QGridLayout(branchBox);
+    configureFormGrid(branchLayout);
+    weakPercentileSpin_ = new QDoubleSpinBox(branchBox);
+    weakPercentileSpin_->setRange(0.0, 0.9999);
+    weakPercentileSpin_->setDecimals(4);
+    weakPercentileSpin_->setSingleStep(0.005);
+    weakPercentileSpin_->setValue(0.965);
+    addRow(branchLayout, 0, QString::fromUtf8("弱响应分位"), weakPercentileSpin_, branchBox);
+    weakConnectRadiusSpin_ = new QSpinBox(branchBox);
+    weakConnectRadiusSpin_->setRange(0, 20);
+    weakConnectRadiusSpin_->setValue(1);
+    addRow(branchLayout, 1, QString::fromUtf8("弱延伸半径"), weakConnectRadiusSpin_, branchBox);
+    minBranchLengthSpin_ = new QSpinBox(branchBox);
+    minBranchLengthSpin_->setRange(0, 1000);
+    minBranchLengthSpin_->setValue(4);
+    addRow(branchLayout, 2, QString::fromUtf8("最短分支"), minBranchLengthSpin_, branchBox);
+    minJunctionBranchLengthSpin_ = new QSpinBox(branchBox);
+    minJunctionBranchLengthSpin_->setRange(1, 1000);
+    minJunctionBranchLengthSpin_->setValue(2);
+    addRow(branchLayout, 3, QString::fromUtf8("交切短枝"), minJunctionBranchLengthSpin_, branchBox);
+    minJunctionBranchMeanSpin_ = new QDoubleSpinBox(branchBox);
+    minJunctionBranchMeanSpin_->setRange(0.0, 1.0);
+    minJunctionBranchMeanSpin_->setDecimals(4);
+    minJunctionBranchMeanSpin_->setSingleStep(0.01);
+    minJunctionBranchMeanSpin_->setValue(0.94);
+    addRow(branchLayout, 4, QString::fromUtf8("交切均值"), minJunctionBranchMeanSpin_, branchBox);
+    residualTraceCheck_ = new QCheckBox(QString::fromUtf8("启用残余二次追踪"), branchBox);
+    residualTraceCheck_->setChecked(false);
+    branchLayout->addWidget(residualTraceCheck_, 5, 0, 1, 2);
+    residualTraceMinLengthSpin_ = new QSpinBox(branchBox);
+    residualTraceMinLengthSpin_->setRange(1, 1000);
+    residualTraceMinLengthSpin_->setValue(6);
+    addRow(branchLayout, 6, QString::fromUtf8("补追最短"), residualTraceMinLengthSpin_, branchBox);
+    residualTraceMaxCellsSpin_ = new QSpinBox(branchBox);
+    residualTraceMaxCellsSpin_->setRange(0, 1000000);
+    residualTraceMaxCellsSpin_->setValue(80);
+    addRow(branchLayout, 7, QString::fromUtf8("补追上限"), residualTraceMaxCellsSpin_, branchBox);
+    sidebarLayout->addWidget(branchBox);
+
+    QGroupBox* antiMergeBox = new QGroupBox(QString::fromUtf8("防黏连参数"), sidebarContent);
+    QGridLayout* antiMergeLayout = new QGridLayout(antiMergeBox);
+    configureFormGrid(antiMergeLayout);
+    rootAntiMergeCheck_ = new QCheckBox(QString::fromUtf8("启用根系防黏连"), antiMergeBox);
+    rootAntiMergeCheck_->setChecked(true);
+    antiMergeLayout->addWidget(rootAntiMergeCheck_, 0, 0, 1, 2);
+    rootAntiMergeRadiusSpin_ = new QSpinBox(antiMergeBox);
+    rootAntiMergeRadiusSpin_->setRange(0, 10);
+    rootAntiMergeRadiusSpin_->setValue(1);
+    addRow(antiMergeLayout, 1, QString::fromUtf8("根系半径"), rootAntiMergeRadiusSpin_, antiMergeBox);
+    rootAntiMergeSupportRatioSpin_ = new QDoubleSpinBox(antiMergeBox);
+    rootAntiMergeSupportRatioSpin_->setRange(0.0, 1.0);
+    rootAntiMergeSupportRatioSpin_->setDecimals(3);
+    rootAntiMergeSupportRatioSpin_->setSingleStep(0.01);
+    rootAntiMergeSupportRatioSpin_->setValue(0.25);
+    addRow(antiMergeLayout, 2, QString::fromUtf8("支撑比例"), rootAntiMergeSupportRatioSpin_, antiMergeBox);
+    rootAntiMergeMinPartCellsSpin_ = new QSpinBox(antiMergeBox);
+    rootAntiMergeMinPartCellsSpin_->setRange(0, 1000000);
+    rootAntiMergeMinPartCellsSpin_->setSpecialValueText(QString::fromUtf8("自动"));
+    rootAntiMergeMinPartCellsSpin_->setValue(0);
+    addRow(antiMergeLayout, 3, QString::fromUtf8("主体点数"), rootAntiMergeMinPartCellsSpin_, antiMergeBox);
+    rootAntiMergeMinPartRatioSpin_ = new QDoubleSpinBox(antiMergeBox);
+    rootAntiMergeMinPartRatioSpin_->setRange(0.0, 0.5);
+    rootAntiMergeMinPartRatioSpin_->setDecimals(3);
+    rootAntiMergeMinPartRatioSpin_->setSingleStep(0.01);
+    rootAntiMergeMinPartRatioSpin_->setValue(0.12);
+    addRow(antiMergeLayout, 4, QString::fromUtf8("主体比例"), rootAntiMergeMinPartRatioSpin_, antiMergeBox);
+    rootAntiMergeWeakGuardThresholdSpin_ = new QDoubleSpinBox(antiMergeBox);
+    rootAntiMergeWeakGuardThresholdSpin_->setRange(0.0, 1.0);
+    rootAntiMergeWeakGuardThresholdSpin_->setDecimals(3);
+    rootAntiMergeWeakGuardThresholdSpin_->setSingleStep(0.01);
+    rootAntiMergeWeakGuardThresholdSpin_->setValue(0.66);
+    addRow(antiMergeLayout, 5, QString::fromUtf8("弱保护阈值"), rootAntiMergeWeakGuardThresholdSpin_, antiMergeBox);
+    rootAntiMergeWeakGuardRadiusSpin_ = new QSpinBox(antiMergeBox);
+    rootAntiMergeWeakGuardRadiusSpin_->setRange(0, 20);
+    rootAntiMergeWeakGuardRadiusSpin_->setValue(0);
+    addRow(antiMergeLayout, 6, QString::fromUtf8("弱保护半径"), rootAntiMergeWeakGuardRadiusSpin_, antiMergeBox);
+    localAntiMergeCheck_ = new QCheckBox(QString::fromUtf8("启用局部桥防黏连"), antiMergeBox);
+    localAntiMergeCheck_->setChecked(false);
+    antiMergeLayout->addWidget(localAntiMergeCheck_, 7, 0, 1, 2);
+    localAntiMergeLowThresholdSpin_ = new QDoubleSpinBox(antiMergeBox);
+    localAntiMergeLowThresholdSpin_->setRange(0.0, 1.0);
+    localAntiMergeLowThresholdSpin_->setDecimals(4);
+    localAntiMergeLowThresholdSpin_->setSingleStep(0.01);
+    localAntiMergeLowThresholdSpin_->setValue(0.05);
+    addRow(antiMergeLayout, 8, QString::fromUtf8("低值阈值"), localAntiMergeLowThresholdSpin_, antiMergeBox);
+    localAntiMergeBridgeRadiusSpin_ = new QSpinBox(antiMergeBox);
+    localAntiMergeBridgeRadiusSpin_->setRange(0, 20);
+    localAntiMergeBridgeRadiusSpin_->setValue(2);
+    addRow(antiMergeLayout, 9, QString::fromUtf8("桥半径"), localAntiMergeBridgeRadiusSpin_, antiMergeBox);
+    localAntiMergeMinPartCellsSpin_ = new QSpinBox(antiMergeBox);
+    localAntiMergeMinPartCellsSpin_->setRange(1, 1000000);
+    localAntiMergeMinPartCellsSpin_->setValue(80);
+    addRow(antiMergeLayout, 10, QString::fromUtf8("局部主体"), localAntiMergeMinPartCellsSpin_, antiMergeBox);
+    localAntiMergeMinPartRatioSpin_ = new QDoubleSpinBox(antiMergeBox);
+    localAntiMergeMinPartRatioSpin_->setRange(0.0, 0.5);
+    localAntiMergeMinPartRatioSpin_->setDecimals(3);
+    localAntiMergeMinPartRatioSpin_->setSingleStep(0.01);
+    localAntiMergeMinPartRatioSpin_->setValue(0.08);
+    addRow(antiMergeLayout, 11, QString::fromUtf8("局部比例"), localAntiMergeMinPartRatioSpin_, antiMergeBox);
+    localAntiMergeMinBridgeCellsSpin_ = new QSpinBox(antiMergeBox);
+    localAntiMergeMinBridgeCellsSpin_->setRange(1, 1000000);
+    localAntiMergeMinBridgeCellsSpin_->setValue(6);
+    addRow(antiMergeLayout, 12, QString::fromUtf8("桥点下限"), localAntiMergeMinBridgeCellsSpin_, antiMergeBox);
+    localAntiMergeMinLowRatioSpin_ = new QDoubleSpinBox(antiMergeBox);
+    localAntiMergeMinLowRatioSpin_->setRange(0.0, 1.0);
+    localAntiMergeMinLowRatioSpin_->setDecimals(3);
+    localAntiMergeMinLowRatioSpin_->setSingleStep(0.01);
+    localAntiMergeMinLowRatioSpin_->setValue(0.55);
+    addRow(antiMergeLayout, 13, QString::fromUtf8("低值比例"), localAntiMergeMinLowRatioSpin_, antiMergeBox);
+    sidebarLayout->addWidget(antiMergeBox);
 
     QGroupBox* historyBox = new QGroupBox(QString::fromUtf8("历史记录"), sidebarContent);
     QGridLayout* historyLayout = new QGridLayout(historyBox);
@@ -837,11 +1152,20 @@ void FaultPolyTraceWindow::buildUi() {
     ColorBarWidget* colorBar = new ColorBarWidget(viewStrip);
     viewStripLayout->addWidget(view_, 1);
     viewStripLayout->addWidget(colorBar);
-    logEdit_ = new QTextEdit(right);
+    QWidget* logPanel = new QWidget(right);
+    QVBoxLayout* logLayout = new QVBoxLayout(logPanel);
+    logLayout->setContentsMargins(0, 0, 0, 0);
+    logLayout->setSpacing(0);
+    QLabel* logHeader = new QLabel(QString::fromUtf8("运行日志与输出信息"), logPanel);
+    logHeader->setObjectName("logHeader");
+    logHeader->setFixedHeight(24);
+    logEdit_ = new QTextEdit(logPanel);
     logEdit_->setReadOnly(true);
-    logEdit_->setFixedHeight(120);
+    logEdit_->setFixedHeight(86);
+    logLayout->addWidget(logHeader);
+    logLayout->addWidget(logEdit_);
     rightLayout->addWidget(viewStrip, 1);
-    rightLayout->addWidget(logEdit_);
+    rightLayout->addWidget(logPanel);
     rootLayout->addWidget(leftPane);
     rootLayout->addWidget(right, 1);
     setCentralWidget(root);
@@ -877,10 +1201,45 @@ void FaultPolyTraceWindow::buildUi() {
     connect(outputNameEdit_, &QLineEdit::textChanged, this, &FaultPolyTraceWindow::updateTaskPreview);
     connect(inputFormatCombo_, &QComboBox::currentTextChanged, this, &FaultPolyTraceWindow::updateTaskPreview);
     connect(presetCombo_, &QComboBox::currentTextChanged, this, &FaultPolyTraceWindow::updateTaskPreview);
+    connect(traceModeCombo_, &QComboBox::currentTextChanged, this, &FaultPolyTraceWindow::updateTaskPreview);
     connect(thresholdModeCombo_, &QComboBox::currentTextChanged, this, &FaultPolyTraceWindow::updateTaskPreview);
+    connect(thresholdModeCombo_, &QComboBox::currentTextChanged, this, &FaultPolyTraceWindow::updateOptionControls);
     connect(percentileSpin_, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &FaultPolyTraceWindow::updateTaskPreview);
     connect(thresholdSpin_, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &FaultPolyTraceWindow::updateTaskPreview);
     connect(minAreaSpin_, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &FaultPolyTraceWindow::updateTaskPreview);
+    connect(rootAntiMergeCheck_, &QCheckBox::toggled, this, &FaultPolyTraceWindow::updateOptionControls);
+    connect(localAntiMergeCheck_, &QCheckBox::toggled, this, &FaultPolyTraceWindow::updateOptionControls);
+    connect(residualTraceCheck_, &QCheckBox::toggled, this, &FaultPolyTraceWindow::updateOptionControls);
+    connect(attributeConstrainedBeltCheck_, &QCheckBox::toggled, this, &FaultPolyTraceWindow::updateOptionControls);
+
+    const QList<QSpinBox*> intParamSpins = {
+        closeRadiusSpin_, weakConnectRadiusSpin_, beltRadiusSpin_, postBeltCloseRadiusSpin_,
+        attributeEnvelopeRadiusSpin_, minBranchLengthSpin_, minJunctionBranchLengthSpin_,
+        maxGapDistanceSpin_, rootAntiMergeRadiusSpin_, rootAntiMergeMinPartCellsSpin_,
+        rootAntiMergeWeakGuardRadiusSpin_, localAntiMergeBridgeRadiusSpin_,
+        localAntiMergeMinPartCellsSpin_, localAntiMergeMinBridgeCellsSpin_,
+        residualTraceMinLengthSpin_, residualTraceMaxCellsSpin_, smoothIterationsSpin_
+    };
+    for (QSpinBox* spin : intParamSpins) {
+        connect(spin, QOverload<int>::of(&QSpinBox::valueChanged), this, &FaultPolyTraceWindow::updateTaskPreview);
+    }
+    const QList<QDoubleSpinBox*> doubleParamSpins = {
+        weakPercentileSpin_, minJunctionBranchMeanSpin_, maxGapAngleSpin_,
+        rootAntiMergeSupportRatioSpin_, rootAntiMergeMinPartRatioSpin_,
+        rootAntiMergeWeakGuardThresholdSpin_, localAntiMergeLowThresholdSpin_,
+        localAntiMergeMinPartRatioSpin_, localAntiMergeMinLowRatioSpin_,
+        simplifyToleranceSpin_
+    };
+    for (QDoubleSpinBox* spin : doubleParamSpins) {
+        if (spin) {
+            connect(spin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &FaultPolyTraceWindow::updateTaskPreview);
+        }
+    }
+    connect(attributeConstrainedBeltCheck_, &QCheckBox::toggled, this, &FaultPolyTraceWindow::updateTaskPreview);
+    connect(rootAntiMergeCheck_, &QCheckBox::toggled, this, &FaultPolyTraceWindow::updateTaskPreview);
+    connect(localAntiMergeCheck_, &QCheckBox::toggled, this, &FaultPolyTraceWindow::updateTaskPreview);
+    connect(residualTraceCheck_, &QCheckBox::toggled, this, &FaultPolyTraceWindow::updateTaskPreview);
+    updateOptionControls();
 }
 
 QString FaultPolyTraceWindow::coreRunnerPath() const {
@@ -962,22 +1321,53 @@ void FaultPolyTraceWindow::loadSettings() {
     outputDirEdit_->setText(settings.value("outputDir", defaultOutputDir()).toString());
     outputNameEdit_->setText(settings.value("outputName", outputNameEdit_->text()).toString());
     inputFormatCombo_->setCurrentText(settings.value("inputFormat", "auto").toString());
-    viewModeCombo_->setCurrentText(QString::fromUtf8("任务预览"));
+    viewModeCombo_->setCurrentText(settings.value("viewMode", QString::fromUtf8("任务预览")).toString());
     presetCombo_->setCurrentText(settings.value("preset", presetCombo_->currentText()).toString());
+    traceModeCombo_->setCurrentText(settings.value("traceMode", traceModeCombo_->currentText()).toString());
     thresholdModeCombo_->setCurrentText(settings.value("thresholdMode", thresholdModeCombo_->currentText()).toString());
     percentileSpin_->setValue(settings.value("percentile", percentileSpin_->value()).toDouble());
     thresholdSpin_->setValue(settings.value("threshold", thresholdSpin_->value()).toDouble());
     minAreaSpin_->setValue(settings.value("minArea", minAreaSpin_->value()).toDouble());
     closeRadiusSpin_->setValue(settings.value("closeRadius", closeRadiusSpin_->value()).toInt());
+    weakPercentileSpin_->setValue(settings.value("weakPercentile", weakPercentileSpin_->value()).toDouble());
+    weakConnectRadiusSpin_->setValue(settings.value("weakConnectRadius", weakConnectRadiusSpin_->value()).toInt());
     beltRadiusSpin_->setValue(settings.value("beltRadius", beltRadiusSpin_->value()).toInt());
+    postBeltCloseRadiusSpin_->setValue(settings.value("postBeltCloseRadius", postBeltCloseRadiusSpin_->value()).toInt());
+    attributeConstrainedBeltCheck_->setChecked(settings.value("attributeConstrainedBelt", attributeConstrainedBeltCheck_->isChecked()).toBool());
+    attributeEnvelopeRadiusSpin_->setValue(settings.value("attributeEnvelopeRadius", attributeEnvelopeRadiusSpin_->value()).toInt());
+    minBranchLengthSpin_->setValue(settings.value("minBranchLength", minBranchLengthSpin_->value()).toInt());
+    minJunctionBranchLengthSpin_->setValue(settings.value("minJunctionBranchLength", minJunctionBranchLengthSpin_->value()).toInt());
+    minJunctionBranchMeanSpin_->setValue(settings.value("minJunctionBranchMean", minJunctionBranchMeanSpin_->value()).toDouble());
     maxGapDistanceSpin_->setValue(settings.value("maxGapDistance", maxGapDistanceSpin_->value()).toInt());
     maxGapAngleSpin_->setValue(settings.value("maxGapAngle", maxGapAngleSpin_->value()).toDouble());
+    rootAntiMergeCheck_->setChecked(settings.value("rootAntiMerge", rootAntiMergeCheck_->isChecked()).toBool());
+    rootAntiMergeRadiusSpin_->setValue(settings.value("rootAntiMergeRadius", rootAntiMergeRadiusSpin_->value()).toInt());
+    rootAntiMergeSupportRatioSpin_->setValue(settings.value("rootAntiMergeSupportRatio", rootAntiMergeSupportRatioSpin_->value()).toDouble());
+    rootAntiMergeMinPartCellsSpin_->setValue(settings.value("rootAntiMergeMinPartCells", rootAntiMergeMinPartCellsSpin_->value()).toInt());
+    rootAntiMergeMinPartRatioSpin_->setValue(settings.value("rootAntiMergeMinPartRatio", rootAntiMergeMinPartRatioSpin_->value()).toDouble());
+    rootAntiMergeWeakGuardThresholdSpin_->setValue(settings.value("rootAntiMergeWeakGuardThreshold", rootAntiMergeWeakGuardThresholdSpin_->value()).toDouble());
+    rootAntiMergeWeakGuardRadiusSpin_->setValue(settings.value("rootAntiMergeWeakGuardRadius", rootAntiMergeWeakGuardRadiusSpin_->value()).toInt());
+    localAntiMergeCheck_->setChecked(settings.value("localAntiMerge", localAntiMergeCheck_->isChecked()).toBool());
+    localAntiMergeLowThresholdSpin_->setValue(settings.value("localAntiMergeLowThreshold", localAntiMergeLowThresholdSpin_->value()).toDouble());
+    localAntiMergeBridgeRadiusSpin_->setValue(settings.value("localAntiMergeBridgeRadius", localAntiMergeBridgeRadiusSpin_->value()).toInt());
+    localAntiMergeMinPartCellsSpin_->setValue(settings.value("localAntiMergeMinPartCells", localAntiMergeMinPartCellsSpin_->value()).toInt());
+    localAntiMergeMinPartRatioSpin_->setValue(settings.value("localAntiMergeMinPartRatio", localAntiMergeMinPartRatioSpin_->value()).toDouble());
+    localAntiMergeMinBridgeCellsSpin_->setValue(settings.value("localAntiMergeMinBridgeCells", localAntiMergeMinBridgeCellsSpin_->value()).toInt());
+    localAntiMergeMinLowRatioSpin_->setValue(settings.value("localAntiMergeMinLowRatio", localAntiMergeMinLowRatioSpin_->value()).toDouble());
+    residualTraceCheck_->setChecked(settings.value("residualTrace", residualTraceCheck_->isChecked()).toBool());
+    residualTraceMinLengthSpin_->setValue(settings.value("residualTraceMinLength", residualTraceMinLengthSpin_->value()).toInt());
+    residualTraceMaxCellsSpin_->setValue(settings.value("residualTraceMaxCells", residualTraceMaxCellsSpin_->value()).toInt());
     smoothIterationsSpin_->setValue(settings.value("smoothIterations", smoothIterationsSpin_->value()).toInt());
     simplifyToleranceSpin_->setValue(settings.value("simplifyTolerance", simplifyToleranceSpin_->value()).toDouble());
     colorEdit_->setText(settings.value("color", colorEdit_->text()).toString());
     lineWidthSpin_->setValue(settings.value("lineWidth", lineWidthSpin_->value()).toDouble());
     alphaSpin_->setValue(settings.value("alpha", alphaSpin_->value()).toDouble());
     lastOutputCsv_ = settings.value("lastOutputCsv").toString();
+    inputEdit_->setCursorPosition(0);
+    outputDirEdit_->setCursorPosition(0);
+    inputEdit_->setToolTip(inputEdit_->text());
+    outputDirEdit_->setToolTip(outputDirEdit_->text());
+    updateOptionControls();
 }
 
 void FaultPolyTraceWindow::saveSettings() const {
@@ -988,14 +1378,40 @@ void FaultPolyTraceWindow::saveSettings() const {
     settings.setValue("inputFormat", inputFormatCombo_->currentText());
     settings.setValue("viewMode", viewModeCombo_->currentText());
     settings.setValue("preset", presetCombo_->currentText());
+    settings.setValue("traceMode", traceModeCombo_->currentText());
     settings.setValue("thresholdMode", thresholdModeCombo_->currentText());
     settings.setValue("percentile", percentileSpin_->value());
     settings.setValue("threshold", thresholdSpin_->value());
     settings.setValue("minArea", minAreaSpin_->value());
     settings.setValue("closeRadius", closeRadiusSpin_->value());
+    settings.setValue("weakPercentile", weakPercentileSpin_->value());
+    settings.setValue("weakConnectRadius", weakConnectRadiusSpin_->value());
     settings.setValue("beltRadius", beltRadiusSpin_->value());
+    settings.setValue("postBeltCloseRadius", postBeltCloseRadiusSpin_->value());
+    settings.setValue("attributeConstrainedBelt", attributeConstrainedBeltCheck_->isChecked());
+    settings.setValue("attributeEnvelopeRadius", attributeEnvelopeRadiusSpin_->value());
+    settings.setValue("minBranchLength", minBranchLengthSpin_->value());
+    settings.setValue("minJunctionBranchLength", minJunctionBranchLengthSpin_->value());
+    settings.setValue("minJunctionBranchMean", minJunctionBranchMeanSpin_->value());
     settings.setValue("maxGapDistance", maxGapDistanceSpin_->value());
     settings.setValue("maxGapAngle", maxGapAngleSpin_->value());
+    settings.setValue("rootAntiMerge", rootAntiMergeCheck_->isChecked());
+    settings.setValue("rootAntiMergeRadius", rootAntiMergeRadiusSpin_->value());
+    settings.setValue("rootAntiMergeSupportRatio", rootAntiMergeSupportRatioSpin_->value());
+    settings.setValue("rootAntiMergeMinPartCells", rootAntiMergeMinPartCellsSpin_->value());
+    settings.setValue("rootAntiMergeMinPartRatio", rootAntiMergeMinPartRatioSpin_->value());
+    settings.setValue("rootAntiMergeWeakGuardThreshold", rootAntiMergeWeakGuardThresholdSpin_->value());
+    settings.setValue("rootAntiMergeWeakGuardRadius", rootAntiMergeWeakGuardRadiusSpin_->value());
+    settings.setValue("localAntiMerge", localAntiMergeCheck_->isChecked());
+    settings.setValue("localAntiMergeLowThreshold", localAntiMergeLowThresholdSpin_->value());
+    settings.setValue("localAntiMergeBridgeRadius", localAntiMergeBridgeRadiusSpin_->value());
+    settings.setValue("localAntiMergeMinPartCells", localAntiMergeMinPartCellsSpin_->value());
+    settings.setValue("localAntiMergeMinPartRatio", localAntiMergeMinPartRatioSpin_->value());
+    settings.setValue("localAntiMergeMinBridgeCells", localAntiMergeMinBridgeCellsSpin_->value());
+    settings.setValue("localAntiMergeMinLowRatio", localAntiMergeMinLowRatioSpin_->value());
+    settings.setValue("residualTrace", residualTraceCheck_->isChecked());
+    settings.setValue("residualTraceMinLength", residualTraceMinLengthSpin_->value());
+    settings.setValue("residualTraceMaxCells", residualTraceMaxCellsSpin_->value());
     settings.setValue("smoothIterations", smoothIterationsSpin_->value());
     settings.setValue("simplifyTolerance", simplifyToleranceSpin_->value());
     settings.setValue("color", colorEdit_->text());
@@ -1026,10 +1442,16 @@ void FaultPolyTraceWindow::updateTaskPreview() {
         QString::fromUtf8("输入文件：%1").arg(inputText),
         QString::fromUtf8("输出名称：%1").arg(outputText),
         QString::fromUtf8("输出目录：%1").arg(outputDirText),
-        QString::fromUtf8("方案：%1    模式：ridge-belt    阈值：%2").arg(presetCombo_->currentText(), thresholdText),
+        QString::fromUtf8("方案：%1    模式：%2    阈值：%3")
+            .arg(presetCombo_->currentText(), traceModeCombo_->currentText(), thresholdText),
         QString::fromUtf8("面积过滤：小于 %1 的多边形不输出    结果线宽：%2")
             .arg(minAreaSpin_->value(), 0, 'f', 2)
             .arg(lineWidthSpin_->value(), 0, 'f', 3),
+        QString::fromUtf8("弱响应：分位 %1 / 半径 %2    根系防黏连：%3    残余补追：%4")
+            .arg(weakPercentileSpin_->value(), 0, 'f', 4)
+            .arg(weakConnectRadiusSpin_->value())
+            .arg(rootAntiMergeCheck_->isChecked() ? QString::fromUtf8("启用") : QString::fromUtf8("关闭"))
+            .arg(residualTraceCheck_->isChecked() ? QString::fromUtf8("启用") : QString::fromUtf8("关闭")),
         QString::fromUtf8("当前状态：等待参数输入及任务执行")
     });
 }
@@ -1042,43 +1464,52 @@ QStringList FaultPolyTraceWindow::traceArgs() const {
          << "--diagnostics" << outputBasePath() + ".diagnostics.json"
          << "--branches-output" << outputBasePath() + ".branches.csv"
          << "--topology-output" << outputBasePath() + ".topology.csv"
-         << "--trace-mode" << "ridge-belt"
+         << "--trace-mode" << traceModeCombo_->currentText()
          << "--threshold-mode" << thresholdModeCombo_->currentText()
          << "--threshold" << QString::number(thresholdSpin_->value(), 'g', 12)
          << "--percentile" << QString::number(percentileSpin_->value(), 'g', 12)
          << "--min-area" << QString::number(minAreaSpin_->value(), 'g', 12)
          << "--close-radius" << QString::number(closeRadiusSpin_->value())
          << "--belt-radius" << QString::number(beltRadiusSpin_->value())
-         << "--post-belt-close-radius" << "1"
-         << "--weak-percentile" << "0.965"
-         << "--weak-connect-radius" << "1"
-         << "--attribute-constrained-belt"
-         << "--attribute-envelope-radius" << "1"
-         << "--min-branch-length" << "4"
-         << "--min-junction-branch-length" << "2"
-         << "--min-junction-branch-mean" << "0.94"
+         << "--post-belt-close-radius" << QString::number(postBeltCloseRadiusSpin_->value())
+         << "--weak-percentile" << QString::number(weakPercentileSpin_->value(), 'g', 12)
+         << "--weak-connect-radius" << QString::number(weakConnectRadiusSpin_->value())
+         << "--attribute-envelope-radius" << QString::number(attributeEnvelopeRadiusSpin_->value())
+         << "--min-branch-length" << QString::number(minBranchLengthSpin_->value())
+         << "--min-junction-branch-length" << QString::number(minJunctionBranchLengthSpin_->value())
+         << "--min-junction-branch-mean" << QString::number(minJunctionBranchMeanSpin_->value(), 'g', 12)
          << "--max-gap-distance" << QString::number(maxGapDistanceSpin_->value())
          << "--max-gap-angle" << QString::number(maxGapAngleSpin_->value(), 'g', 12)
          << "--min-gap-support-ratio" << "0.25"
-         << "--no-separate-branch-belts"
-         << "--root-anti-merge"
-         << "--root-anti-merge-radius" << "1"
-         << "--root-anti-merge-support-ratio" << "0.25"
+         << "--no-separate-branch-belts";
+
+    args << (attributeConstrainedBeltCheck_->isChecked() ? "--attribute-constrained-belt" : "--no-attribute-constrained-belt");
+    args << (rootAntiMergeCheck_->isChecked() ? "--root-anti-merge" : "--no-root-anti-merge")
+         << "--root-anti-merge-radius" << QString::number(rootAntiMergeRadiusSpin_->value())
+         << "--root-anti-merge-support-ratio" << QString::number(rootAntiMergeSupportRatioSpin_->value(), 'g', 12)
          << "--root-anti-merge-max-bridge-value" << "1e-12"
-         << "--root-anti-merge-min-part-cells" << "0"
-         << "--root-anti-merge-min-part-ratio" << "0.12"
-         << "--root-anti-merge-weak-guard-threshold" << "0.66"
-         << "--root-anti-merge-weak-guard-radius" << "0"
-         << "--no-local-anti-merge"
-         << "--no-residual-trace"
+         << "--root-anti-merge-min-part-cells" << QString::number(rootAntiMergeMinPartCellsSpin_->value())
+         << "--root-anti-merge-min-part-ratio" << QString::number(rootAntiMergeMinPartRatioSpin_->value(), 'g', 12)
+         << "--root-anti-merge-weak-guard-threshold" << QString::number(rootAntiMergeWeakGuardThresholdSpin_->value(), 'g', 12)
+         << "--root-anti-merge-weak-guard-radius" << QString::number(rootAntiMergeWeakGuardRadiusSpin_->value());
+
+    args << (localAntiMergeCheck_->isChecked() ? "--local-anti-merge" : "--no-local-anti-merge")
+         << "--local-anti-merge-low-threshold" << QString::number(localAntiMergeLowThresholdSpin_->value(), 'g', 12)
+         << "--local-anti-merge-bridge-radius" << QString::number(localAntiMergeBridgeRadiusSpin_->value())
+         << "--local-anti-merge-min-part-cells" << QString::number(localAntiMergeMinPartCellsSpin_->value())
+         << "--local-anti-merge-min-part-ratio" << QString::number(localAntiMergeMinPartRatioSpin_->value(), 'g', 12)
+         << "--local-anti-merge-min-bridge-cells" << QString::number(localAntiMergeMinBridgeCellsSpin_->value())
+         << "--local-anti-merge-min-low-ratio" << QString::number(localAntiMergeMinLowRatioSpin_->value(), 'g', 12);
+
+    args << (residualTraceCheck_->isChecked() ? "--residual-trace" : "--no-residual-trace")
          << "--residual-percentile" << "0.955"
          << "--residual-fill-radius" << "4"
          << "--residual-edge-fill-radius" << "2"
          << "--residual-edge-fill-min-value-ratio" << "0.97"
          << "--residual-edge-fill-max-patch-span" << "5"
          << "--residual-min-cells" << "2"
-         << "--residual-trace-min-length" << "6"
-         << "--residual-trace-max-cells" << "80"
+         << "--residual-trace-min-length" << QString::number(residualTraceMinLengthSpin_->value())
+         << "--residual-trace-max-cells" << QString::number(residualTraceMaxCellsSpin_->value())
          << "--residual-covered-guard-radius" << "0"
          << "--simplify-tolerance" << QString::number(simplifyToleranceSpin_->value(), 'g', 12)
          << "--smooth-iterations" << QString::number(smoothIterationsSpin_->value());
@@ -1220,29 +1651,228 @@ void FaultPolyTraceWindow::updateStatus(const QString& text) {
     statusLabel_->setText(QDateTime::currentDateTime().toString("HH:mm:ss  ") + text);
 }
 
+void FaultPolyTraceWindow::updateOptionControls() {
+    const bool fixedThreshold = thresholdModeCombo_ && thresholdModeCombo_->currentText() == "fixed";
+    if (thresholdSpin_) {
+        thresholdSpin_->setEnabled(fixedThreshold);
+    }
+    if (percentileSpin_) {
+        percentileSpin_->setEnabled(!fixedThreshold);
+    }
+
+    const bool attributeEnabled = attributeConstrainedBeltCheck_ && attributeConstrainedBeltCheck_->isChecked();
+    if (attributeEnvelopeRadiusSpin_) {
+        attributeEnvelopeRadiusSpin_->setEnabled(attributeEnabled);
+    }
+
+    const bool rootEnabled = rootAntiMergeCheck_ && rootAntiMergeCheck_->isChecked();
+    for (QWidget* widget : {
+             static_cast<QWidget*>(rootAntiMergeRadiusSpin_),
+             static_cast<QWidget*>(rootAntiMergeSupportRatioSpin_),
+             static_cast<QWidget*>(rootAntiMergeMinPartCellsSpin_),
+             static_cast<QWidget*>(rootAntiMergeMinPartRatioSpin_),
+             static_cast<QWidget*>(rootAntiMergeWeakGuardThresholdSpin_),
+             static_cast<QWidget*>(rootAntiMergeWeakGuardRadiusSpin_)}) {
+        if (widget) {
+            widget->setEnabled(rootEnabled);
+        }
+    }
+
+    const bool localEnabled = localAntiMergeCheck_ && localAntiMergeCheck_->isChecked();
+    for (QWidget* widget : {
+             static_cast<QWidget*>(localAntiMergeLowThresholdSpin_),
+             static_cast<QWidget*>(localAntiMergeBridgeRadiusSpin_),
+             static_cast<QWidget*>(localAntiMergeMinPartCellsSpin_),
+             static_cast<QWidget*>(localAntiMergeMinPartRatioSpin_),
+             static_cast<QWidget*>(localAntiMergeMinBridgeCellsSpin_),
+             static_cast<QWidget*>(localAntiMergeMinLowRatioSpin_)}) {
+        if (widget) {
+            widget->setEnabled(localEnabled);
+        }
+    }
+
+    const bool residualEnabled = residualTraceCheck_ && residualTraceCheck_->isChecked();
+    for (QWidget* widget : {
+             static_cast<QWidget*>(residualTraceMinLengthSpin_),
+             static_cast<QWidget*>(residualTraceMaxCellsSpin_)}) {
+        if (widget) {
+            widget->setEnabled(residualEnabled);
+        }
+    }
+}
+
 void FaultPolyTraceWindow::applyPreset(const QString& preset) {
-    if (preset == QString::fromUtf8("高召回")) {
+    traceModeCombo_->setCurrentText("ridge-belt");
+    thresholdModeCombo_->setCurrentText("percentile");
+    thresholdSpin_->setValue(0.95);
+
+    auto setLocalAntiMergePreset = [&](bool enabled) {
+        localAntiMergeCheck_->setChecked(enabled);
+        localAntiMergeLowThresholdSpin_->setValue(0.05);
+        localAntiMergeBridgeRadiusSpin_->setValue(2);
+        localAntiMergeMinPartCellsSpin_->setValue(80);
+        localAntiMergeMinPartRatioSpin_->setValue(0.08);
+        localAntiMergeMinBridgeCellsSpin_->setValue(6);
+        localAntiMergeMinLowRatioSpin_->setValue(0.55);
+    };
+
+    auto setRootAntiMergePreset = [&](bool enabled) {
+        rootAntiMergeCheck_->setChecked(enabled);
+        rootAntiMergeRadiusSpin_->setValue(1);
+        rootAntiMergeSupportRatioSpin_->setValue(0.25);
+        rootAntiMergeMinPartCellsSpin_->setValue(0);
+        rootAntiMergeMinPartRatioSpin_->setValue(0.12);
+        rootAntiMergeWeakGuardThresholdSpin_->setValue(0.66);
+        rootAntiMergeWeakGuardRadiusSpin_->setValue(0);
+    };
+
+    setLocalAntiMergePreset(false);
+    setRootAntiMergePreset(false);
+
+    if (preset == QString::fromUtf8("全覆盖优先")) {
+        percentileSpin_->setValue(0.975);
+        minAreaSpin_->setValue(120);
+        closeRadiusSpin_->setValue(1);
+        weakPercentileSpin_->setValue(0.955);
+        weakConnectRadiusSpin_->setValue(1);
+        beltRadiusSpin_->setValue(3);
+        postBeltCloseRadiusSpin_->setValue(1);
+        attributeConstrainedBeltCheck_->setChecked(true);
+        attributeEnvelopeRadiusSpin_->setValue(1);
+        minBranchLengthSpin_->setValue(3);
+        minJunctionBranchLengthSpin_->setValue(2);
+        minJunctionBranchMeanSpin_->setValue(0.90);
+        maxGapDistanceSpin_->setValue(12);
+        maxGapAngleSpin_->setValue(60.0);
+        residualTraceCheck_->setChecked(true);
+        residualTraceMinLengthSpin_->setValue(5);
+        residualTraceMaxCellsSpin_->setValue(120);
+        simplifyToleranceSpin_->setValue(1.5);
+        smoothIterationsSpin_->setValue(0);
+    } else if (preset == QString::fromUtf8("弱响应高召回") || preset == QString::fromUtf8("高召回")) {
         percentileSpin_->setValue(0.975);
         minAreaSpin_->setValue(80);
+        closeRadiusSpin_->setValue(1);
+        weakPercentileSpin_->setValue(0.965);
+        weakConnectRadiusSpin_->setValue(1);
         beltRadiusSpin_->setValue(3);
+        postBeltCloseRadiusSpin_->setValue(1);
+        attributeConstrainedBeltCheck_->setChecked(true);
+        attributeEnvelopeRadiusSpin_->setValue(1);
+        minBranchLengthSpin_->setValue(4);
+        minJunctionBranchLengthSpin_->setValue(2);
+        minJunctionBranchMeanSpin_->setValue(0.94);
         maxGapDistanceSpin_->setValue(14);
+        maxGapAngleSpin_->setValue(55.0);
+        residualTraceCheck_->setChecked(true);
+        residualTraceMinLengthSpin_->setValue(5);
+        residualTraceMaxCellsSpin_->setValue(120);
         simplifyToleranceSpin_->setValue(1.5);
         smoothIterationsSpin_->setValue(0);
     } else if (preset == QString::fromUtf8("保守高精度")) {
         percentileSpin_->setValue(0.985);
         minAreaSpin_->setValue(250);
+        closeRadiusSpin_->setValue(1);
+        weakPercentileSpin_->setValue(0.0);
+        weakConnectRadiusSpin_->setValue(0);
         beltRadiusSpin_->setValue(2);
+        postBeltCloseRadiusSpin_->setValue(0);
+        attributeConstrainedBeltCheck_->setChecked(false);
+        attributeEnvelopeRadiusSpin_->setValue(1);
+        minBranchLengthSpin_->setValue(6);
+        minJunctionBranchLengthSpin_->setValue(6);
+        minJunctionBranchMeanSpin_->setValue(1.0);
         maxGapDistanceSpin_->setValue(8);
+        maxGapAngleSpin_->setValue(45.0);
+        residualTraceCheck_->setChecked(false);
+        residualTraceMinLengthSpin_->setValue(8);
+        residualTraceMaxCellsSpin_->setValue(40);
         simplifyToleranceSpin_->setValue(3.0);
+        smoothIterationsSpin_->setValue(1);
+    } else if (preset == QString::fromUtf8("宽断层带")) {
+        percentileSpin_->setValue(0.97);
+        minAreaSpin_->setValue(300);
+        closeRadiusSpin_->setValue(2);
+        weakPercentileSpin_->setValue(0.0);
+        weakConnectRadiusSpin_->setValue(0);
+        beltRadiusSpin_->setValue(3);
+        postBeltCloseRadiusSpin_->setValue(1);
+        attributeConstrainedBeltCheck_->setChecked(false);
+        attributeEnvelopeRadiusSpin_->setValue(1);
+        minBranchLengthSpin_->setValue(5);
+        minJunctionBranchLengthSpin_->setValue(5);
+        minJunctionBranchMeanSpin_->setValue(1.0);
+        maxGapDistanceSpin_->setValue(14);
+        maxGapAngleSpin_->setValue(60.0);
+        residualTraceCheck_->setChecked(false);
+        residualTraceMinLengthSpin_->setValue(8);
+        residualTraceMaxCellsSpin_->setValue(60);
+        simplifyToleranceSpin_->setValue(6.0);
+        smoothIterationsSpin_->setValue(1);
+    } else if (preset == QString::fromUtf8("细碎断裂")) {
+        percentileSpin_->setValue(0.98);
+        minAreaSpin_->setValue(120);
+        closeRadiusSpin_->setValue(1);
+        weakPercentileSpin_->setValue(0.0);
+        weakConnectRadiusSpin_->setValue(0);
+        beltRadiusSpin_->setValue(1);
+        postBeltCloseRadiusSpin_->setValue(0);
+        attributeConstrainedBeltCheck_->setChecked(true);
+        attributeEnvelopeRadiusSpin_->setValue(1);
+        minBranchLengthSpin_->setValue(3);
+        minJunctionBranchLengthSpin_->setValue(3);
+        minJunctionBranchMeanSpin_->setValue(1.0);
+        maxGapDistanceSpin_->setValue(8);
+        maxGapAngleSpin_->setValue(50.0);
+        residualTraceCheck_->setChecked(false);
+        residualTraceMinLengthSpin_->setValue(4);
+        residualTraceMaxCellsSpin_->setValue(80);
+        simplifyToleranceSpin_->setValue(3.0);
+        smoothIterationsSpin_->setValue(1);
+    } else if (preset == QString::fromUtf8("防黏连增强")) {
+        percentileSpin_->setValue(0.98);
+        minAreaSpin_->setValue(120);
+        closeRadiusSpin_->setValue(1);
+        weakPercentileSpin_->setValue(0.965);
+        weakConnectRadiusSpin_->setValue(1);
+        beltRadiusSpin_->setValue(3);
+        postBeltCloseRadiusSpin_->setValue(1);
+        attributeConstrainedBeltCheck_->setChecked(true);
+        attributeEnvelopeRadiusSpin_->setValue(1);
+        minBranchLengthSpin_->setValue(4);
+        minJunctionBranchLengthSpin_->setValue(2);
+        minJunctionBranchMeanSpin_->setValue(0.94);
+        maxGapDistanceSpin_->setValue(12);
+        maxGapAngleSpin_->setValue(55.0);
+        setRootAntiMergePreset(true);
+        residualTraceCheck_->setChecked(false);
+        residualTraceMinLengthSpin_->setValue(6);
+        residualTraceMaxCellsSpin_->setValue(80);
+        simplifyToleranceSpin_->setValue(2.0);
         smoothIterationsSpin_->setValue(1);
     } else {
         percentileSpin_->setValue(0.98);
         minAreaSpin_->setValue(120);
+        closeRadiusSpin_->setValue(1);
+        weakPercentileSpin_->setValue(0.965);
+        weakConnectRadiusSpin_->setValue(1);
         beltRadiusSpin_->setValue(3);
+        postBeltCloseRadiusSpin_->setValue(1);
+        attributeConstrainedBeltCheck_->setChecked(true);
+        attributeEnvelopeRadiusSpin_->setValue(1);
+        minBranchLengthSpin_->setValue(4);
+        minJunctionBranchLengthSpin_->setValue(2);
+        minJunctionBranchMeanSpin_->setValue(0.94);
         maxGapDistanceSpin_->setValue(12);
+        maxGapAngleSpin_->setValue(55.0);
+        residualTraceCheck_->setChecked(false);
+        residualTraceMinLengthSpin_->setValue(6);
+        residualTraceMaxCellsSpin_->setValue(80);
         simplifyToleranceSpin_->setValue(2.0);
         smoothIterationsSpin_->setValue(1);
     }
+    updateOptionControls();
+    updateTaskPreview();
 }
 
 void FaultPolyTraceWindow::exportPng() {
@@ -1262,14 +1892,40 @@ void FaultPolyTraceWindow::saveTemplate() {
     }
     QJsonObject obj;
     obj["preset"] = presetCombo_->currentText();
+    obj["traceMode"] = traceModeCombo_->currentText();
     obj["thresholdMode"] = thresholdModeCombo_->currentText();
     obj["percentile"] = percentileSpin_->value();
     obj["threshold"] = thresholdSpin_->value();
     obj["minArea"] = minAreaSpin_->value();
     obj["closeRadius"] = closeRadiusSpin_->value();
+    obj["weakPercentile"] = weakPercentileSpin_->value();
+    obj["weakConnectRadius"] = weakConnectRadiusSpin_->value();
     obj["beltRadius"] = beltRadiusSpin_->value();
+    obj["postBeltCloseRadius"] = postBeltCloseRadiusSpin_->value();
+    obj["attributeConstrainedBelt"] = attributeConstrainedBeltCheck_->isChecked();
+    obj["attributeEnvelopeRadius"] = attributeEnvelopeRadiusSpin_->value();
+    obj["minBranchLength"] = minBranchLengthSpin_->value();
+    obj["minJunctionBranchLength"] = minJunctionBranchLengthSpin_->value();
+    obj["minJunctionBranchMean"] = minJunctionBranchMeanSpin_->value();
     obj["maxGapDistance"] = maxGapDistanceSpin_->value();
     obj["maxGapAngle"] = maxGapAngleSpin_->value();
+    obj["rootAntiMerge"] = rootAntiMergeCheck_->isChecked();
+    obj["rootAntiMergeRadius"] = rootAntiMergeRadiusSpin_->value();
+    obj["rootAntiMergeSupportRatio"] = rootAntiMergeSupportRatioSpin_->value();
+    obj["rootAntiMergeMinPartCells"] = rootAntiMergeMinPartCellsSpin_->value();
+    obj["rootAntiMergeMinPartRatio"] = rootAntiMergeMinPartRatioSpin_->value();
+    obj["rootAntiMergeWeakGuardThreshold"] = rootAntiMergeWeakGuardThresholdSpin_->value();
+    obj["rootAntiMergeWeakGuardRadius"] = rootAntiMergeWeakGuardRadiusSpin_->value();
+    obj["localAntiMerge"] = localAntiMergeCheck_->isChecked();
+    obj["localAntiMergeLowThreshold"] = localAntiMergeLowThresholdSpin_->value();
+    obj["localAntiMergeBridgeRadius"] = localAntiMergeBridgeRadiusSpin_->value();
+    obj["localAntiMergeMinPartCells"] = localAntiMergeMinPartCellsSpin_->value();
+    obj["localAntiMergeMinPartRatio"] = localAntiMergeMinPartRatioSpin_->value();
+    obj["localAntiMergeMinBridgeCells"] = localAntiMergeMinBridgeCellsSpin_->value();
+    obj["localAntiMergeMinLowRatio"] = localAntiMergeMinLowRatioSpin_->value();
+    obj["residualTrace"] = residualTraceCheck_->isChecked();
+    obj["residualTraceMinLength"] = residualTraceMinLengthSpin_->value();
+    obj["residualTraceMaxCells"] = residualTraceMaxCellsSpin_->value();
     obj["smoothIterations"] = smoothIterationsSpin_->value();
     obj["simplifyTolerance"] = simplifyToleranceSpin_->value();
     QFile file(path);
@@ -1289,16 +1945,44 @@ void FaultPolyTraceWindow::loadTemplate() {
     }
     const QJsonObject obj = QJsonDocument::fromJson(file.readAll()).object();
     presetCombo_->setCurrentText(obj.value("preset").toString(presetCombo_->currentText()));
+    traceModeCombo_->setCurrentText(obj.value("traceMode").toString(traceModeCombo_->currentText()));
     thresholdModeCombo_->setCurrentText(obj.value("thresholdMode").toString(thresholdModeCombo_->currentText()));
     percentileSpin_->setValue(obj.value("percentile").toDouble(percentileSpin_->value()));
     thresholdSpin_->setValue(obj.value("threshold").toDouble(thresholdSpin_->value()));
     minAreaSpin_->setValue(obj.value("minArea").toDouble(minAreaSpin_->value()));
     closeRadiusSpin_->setValue(obj.value("closeRadius").toInt(closeRadiusSpin_->value()));
+    weakPercentileSpin_->setValue(obj.value("weakPercentile").toDouble(weakPercentileSpin_->value()));
+    weakConnectRadiusSpin_->setValue(obj.value("weakConnectRadius").toInt(weakConnectRadiusSpin_->value()));
     beltRadiusSpin_->setValue(obj.value("beltRadius").toInt(beltRadiusSpin_->value()));
+    postBeltCloseRadiusSpin_->setValue(obj.value("postBeltCloseRadius").toInt(postBeltCloseRadiusSpin_->value()));
+    attributeConstrainedBeltCheck_->setChecked(obj.value("attributeConstrainedBelt").toBool(attributeConstrainedBeltCheck_->isChecked()));
+    attributeEnvelopeRadiusSpin_->setValue(obj.value("attributeEnvelopeRadius").toInt(attributeEnvelopeRadiusSpin_->value()));
+    minBranchLengthSpin_->setValue(obj.value("minBranchLength").toInt(minBranchLengthSpin_->value()));
+    minJunctionBranchLengthSpin_->setValue(obj.value("minJunctionBranchLength").toInt(minJunctionBranchLengthSpin_->value()));
+    minJunctionBranchMeanSpin_->setValue(obj.value("minJunctionBranchMean").toDouble(minJunctionBranchMeanSpin_->value()));
     maxGapDistanceSpin_->setValue(obj.value("maxGapDistance").toInt(maxGapDistanceSpin_->value()));
     maxGapAngleSpin_->setValue(obj.value("maxGapAngle").toDouble(maxGapAngleSpin_->value()));
+    rootAntiMergeCheck_->setChecked(obj.value("rootAntiMerge").toBool(rootAntiMergeCheck_->isChecked()));
+    rootAntiMergeRadiusSpin_->setValue(obj.value("rootAntiMergeRadius").toInt(rootAntiMergeRadiusSpin_->value()));
+    rootAntiMergeSupportRatioSpin_->setValue(obj.value("rootAntiMergeSupportRatio").toDouble(rootAntiMergeSupportRatioSpin_->value()));
+    rootAntiMergeMinPartCellsSpin_->setValue(obj.value("rootAntiMergeMinPartCells").toInt(rootAntiMergeMinPartCellsSpin_->value()));
+    rootAntiMergeMinPartRatioSpin_->setValue(obj.value("rootAntiMergeMinPartRatio").toDouble(rootAntiMergeMinPartRatioSpin_->value()));
+    rootAntiMergeWeakGuardThresholdSpin_->setValue(obj.value("rootAntiMergeWeakGuardThreshold").toDouble(rootAntiMergeWeakGuardThresholdSpin_->value()));
+    rootAntiMergeWeakGuardRadiusSpin_->setValue(obj.value("rootAntiMergeWeakGuardRadius").toInt(rootAntiMergeWeakGuardRadiusSpin_->value()));
+    localAntiMergeCheck_->setChecked(obj.value("localAntiMerge").toBool(localAntiMergeCheck_->isChecked()));
+    localAntiMergeLowThresholdSpin_->setValue(obj.value("localAntiMergeLowThreshold").toDouble(localAntiMergeLowThresholdSpin_->value()));
+    localAntiMergeBridgeRadiusSpin_->setValue(obj.value("localAntiMergeBridgeRadius").toInt(localAntiMergeBridgeRadiusSpin_->value()));
+    localAntiMergeMinPartCellsSpin_->setValue(obj.value("localAntiMergeMinPartCells").toInt(localAntiMergeMinPartCellsSpin_->value()));
+    localAntiMergeMinPartRatioSpin_->setValue(obj.value("localAntiMergeMinPartRatio").toDouble(localAntiMergeMinPartRatioSpin_->value()));
+    localAntiMergeMinBridgeCellsSpin_->setValue(obj.value("localAntiMergeMinBridgeCells").toInt(localAntiMergeMinBridgeCellsSpin_->value()));
+    localAntiMergeMinLowRatioSpin_->setValue(obj.value("localAntiMergeMinLowRatio").toDouble(localAntiMergeMinLowRatioSpin_->value()));
+    residualTraceCheck_->setChecked(obj.value("residualTrace").toBool(residualTraceCheck_->isChecked()));
+    residualTraceMinLengthSpin_->setValue(obj.value("residualTraceMinLength").toInt(residualTraceMinLengthSpin_->value()));
+    residualTraceMaxCellsSpin_->setValue(obj.value("residualTraceMaxCells").toInt(residualTraceMaxCellsSpin_->value()));
     smoothIterationsSpin_->setValue(obj.value("smoothIterations").toInt(smoothIterationsSpin_->value()));
     simplifyToleranceSpin_->setValue(obj.value("simplifyTolerance").toDouble(simplifyToleranceSpin_->value()));
+    updateOptionControls();
+    updateTaskPreview();
 }
 
 void FaultPolyTraceWindow::restoreDefaults() {
@@ -1311,6 +1995,9 @@ void FaultPolyTraceWindow::restoreDefaults() {
     colorEdit_->setText("#00FFFF");
     lineWidthSpin_->setValue(0.03);
     alphaSpin_->setValue(1.0);
+    traceModeCombo_->setCurrentText("ridge-belt");
+    updateOptionControls();
+    updateTaskPreview();
     refreshInputPreview();
 }
 

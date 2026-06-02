@@ -5,6 +5,7 @@
 #include <QString>
 
 class AttributeView;
+class QCheckBox;
 class QComboBox;
 class QDoubleSpinBox;
 class QLabel;
@@ -37,6 +38,7 @@ private slots:
     void loadHistory();
     void openOutputDir();
     void openHelp();
+    void updateOptionControls();
 
 protected:
     void closeEvent(QCloseEvent* event) override;
@@ -73,16 +75,42 @@ private:
     QComboBox* viewModeCombo_ = nullptr;
     QComboBox* historyCombo_ = nullptr;
     QComboBox* presetCombo_ = nullptr;
+    QComboBox* traceModeCombo_ = nullptr;
     QComboBox* thresholdModeCombo_ = nullptr;
     QDoubleSpinBox* percentileSpin_ = nullptr;
     QDoubleSpinBox* thresholdSpin_ = nullptr;
     QDoubleSpinBox* minAreaSpin_ = nullptr;
     QSpinBox* closeRadiusSpin_ = nullptr;
+    QDoubleSpinBox* weakPercentileSpin_ = nullptr;
+    QSpinBox* weakConnectRadiusSpin_ = nullptr;
     QSpinBox* beltRadiusSpin_ = nullptr;
+    QSpinBox* postBeltCloseRadiusSpin_ = nullptr;
+    QCheckBox* attributeConstrainedBeltCheck_ = nullptr;
+    QSpinBox* attributeEnvelopeRadiusSpin_ = nullptr;
+    QSpinBox* minBranchLengthSpin_ = nullptr;
+    QSpinBox* minJunctionBranchLengthSpin_ = nullptr;
+    QDoubleSpinBox* minJunctionBranchMeanSpin_ = nullptr;
     QSpinBox* maxGapDistanceSpin_ = nullptr;
     QDoubleSpinBox* maxGapAngleSpin_ = nullptr;
+    QCheckBox* rootAntiMergeCheck_ = nullptr;
+    QSpinBox* rootAntiMergeRadiusSpin_ = nullptr;
+    QDoubleSpinBox* rootAntiMergeSupportRatioSpin_ = nullptr;
+    QSpinBox* rootAntiMergeMinPartCellsSpin_ = nullptr;
+    QDoubleSpinBox* rootAntiMergeMinPartRatioSpin_ = nullptr;
+    QDoubleSpinBox* rootAntiMergeWeakGuardThresholdSpin_ = nullptr;
+    QSpinBox* rootAntiMergeWeakGuardRadiusSpin_ = nullptr;
+    QCheckBox* localAntiMergeCheck_ = nullptr;
+    QDoubleSpinBox* localAntiMergeLowThresholdSpin_ = nullptr;
+    QSpinBox* localAntiMergeBridgeRadiusSpin_ = nullptr;
+    QSpinBox* localAntiMergeMinPartCellsSpin_ = nullptr;
+    QDoubleSpinBox* localAntiMergeMinPartRatioSpin_ = nullptr;
+    QSpinBox* localAntiMergeMinBridgeCellsSpin_ = nullptr;
+    QDoubleSpinBox* localAntiMergeMinLowRatioSpin_ = nullptr;
     QSpinBox* smoothIterationsSpin_ = nullptr;
     QDoubleSpinBox* simplifyToleranceSpin_ = nullptr;
+    QCheckBox* residualTraceCheck_ = nullptr;
+    QSpinBox* residualTraceMinLengthSpin_ = nullptr;
+    QSpinBox* residualTraceMaxCellsSpin_ = nullptr;
     QLineEdit* colorEdit_ = nullptr;
     QDoubleSpinBox* lineWidthSpin_ = nullptr;
     QDoubleSpinBox* alphaSpin_ = nullptr;
