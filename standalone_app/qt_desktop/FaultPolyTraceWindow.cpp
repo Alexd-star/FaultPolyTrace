@@ -1244,15 +1244,28 @@ void FaultPolyTraceWindow::buildUi() {
 
 QString FaultPolyTraceWindow::coreRunnerPath() const {
     QDir app(QCoreApplication::applicationDirPath());
+    const QString self = QFileInfo(QCoreApplication::applicationFilePath()).absoluteFilePath();
+    const QString packagedInAppDir = app.absoluteFilePath("bin/faultpolytrace.exe");
     const QString local = app.absoluteFilePath("faultpolytrace.exe");
     QDir parent(app);
-    QString packaged;
+    QString packagedNextToAppDir;
     if (parent.cdUp()) {
-        packaged = parent.absoluteFilePath("bin/faultpolytrace.exe");
+        packagedNextToAppDir = parent.absoluteFilePath("bin/faultpolytrace.exe");
     }
     QDir root(repoRootFromAppDir());
-    for (const QString& path : {local, packaged, root.absoluteFilePath("build/faultpolytrace.exe"), root.absoluteFilePath("bin/faultpolytrace.exe")}) {
-        if (!path.isEmpty() && QFileInfo::exists(path)) {
+    const QStringList candidates = {
+        packagedInAppDir,
+        packagedNextToAppDir,
+        root.absoluteFilePath("build/faultpolytrace.exe"),
+        root.absoluteFilePath("bin/faultpolytrace.exe"),
+        local
+    };
+    for (const QString& path : candidates) {
+        if (path.isEmpty()) {
+            continue;
+        }
+        const QFileInfo info(path);
+        if (info.exists() && info.absoluteFilePath().compare(self, Qt::CaseInsensitive) != 0) {
             return QDir::toNativeSeparators(path);
         }
     }
@@ -1261,13 +1274,19 @@ QString FaultPolyTraceWindow::coreRunnerPath() const {
 
 QString FaultPolyTraceWindow::defaultInputPath() const {
     QDir app(QCoreApplication::applicationDirPath());
+    const QString packagedInAppDir = app.absoluteFilePath("examples/synthetic/broken_ridge_fault_grid.txt");
     QDir parent(app);
-    QString packaged;
+    QString packagedNextToAppDir;
     if (parent.cdUp()) {
-        packaged = parent.absoluteFilePath("examples/synthetic/broken_ridge_fault_grid.txt");
+        packagedNextToAppDir = parent.absoluteFilePath("examples/synthetic/broken_ridge_fault_grid.txt");
     }
     QDir root(repoRootFromAppDir());
-    for (const QString& path : {packaged, root.absoluteFilePath("examples/synthetic/broken_ridge_fault_grid.txt"), root.absoluteFilePath("examples/synthetic/ridge_fault_grid.txt")}) {
+    for (const QString& path : {
+             packagedInAppDir,
+             packagedNextToAppDir,
+             root.absoluteFilePath("examples/synthetic/broken_ridge_fault_grid.txt"),
+             root.absoluteFilePath("examples/synthetic/ridge_fault_grid.txt")
+         }) {
         if (!path.isEmpty() && QFileInfo::exists(path)) {
             return QDir::toNativeSeparators(path);
         }
@@ -1317,7 +1336,8 @@ QString FaultPolyTraceWindow::outputCsvPath() const {
 
 void FaultPolyTraceWindow::loadSettings() {
     QSettings settings(settingsPath(), QSettings::IniFormat);
-    inputEdit_->setText(settings.value("input", defaultInputPath()).toString());
+    const QString savedInput = settings.value("input", defaultInputPath()).toString();
+    inputEdit_->setText(QFileInfo::exists(savedInput) ? savedInput : defaultInputPath());
     outputDirEdit_->setText(settings.value("outputDir", defaultOutputDir()).toString());
     outputNameEdit_->setText(settings.value("outputName", outputNameEdit_->text()).toString());
     inputFormatCombo_->setCurrentText(settings.value("inputFormat", "auto").toString());
@@ -1573,6 +1593,14 @@ void FaultPolyTraceWindow::runTrace() {
     const QString runner = coreRunnerPath();
     if (!QFileInfo::exists(runner)) {
         QMessageBox::warning(this, QString::fromUtf8("算法程序不存在"), runner);
+        return;
+    }
+    const QString self = QFileInfo(QCoreApplication::applicationFilePath()).absoluteFilePath();
+    const QString resolvedRunner = QFileInfo(runner).absoluteFilePath();
+    if (resolvedRunner.compare(self, Qt::CaseInsensitive) == 0) {
+        QMessageBox::warning(this,
+                             QString::fromUtf8("算法程序定位错误"),
+                             QString::fromUtf8("独立软件不能把自身作为核心算法程序启动。请确认发布包中存在 bin/faultpolytrace.exe。"));
         return;
     }
     if (inputEdit_->text().trimmed().isEmpty() || !QFileInfo::exists(inputEdit_->text().trimmed())) {
