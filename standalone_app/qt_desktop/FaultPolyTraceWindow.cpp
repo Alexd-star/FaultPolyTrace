@@ -15,6 +15,7 @@
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QFrame>
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
@@ -23,6 +24,7 @@
 #include <QJsonObject>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QPainter>
@@ -30,11 +32,13 @@
 #include <QPixmap>
 #include <QPushButton>
 #include <QRegularExpression>
+#include <QScrollArea>
 #include <QSettings>
 #include <QSpinBox>
 #include <QSplitter>
 #include <QStandardPaths>
 #include <QStatusBar>
+#include <QStyle>
 #include <QTextEdit>
 #include <QTextCursor>
 #include <QTextStream>
@@ -95,7 +99,7 @@ QVector<double> splitNumbers(const QString& line) {
 
 QLabel* formLabel(const QString& text, QWidget* parent) {
     QLabel* label = new QLabel(text, parent);
-    label->setMinimumWidth(88);
+    label->setFixedWidth(76);
     label->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     return label;
 }
@@ -104,6 +108,14 @@ void addRow(QGridLayout* layout, int row, const QString& label, QWidget* widget,
     widget->setMinimumHeight(24);
     layout->addWidget(formLabel(label, parent), row, 0);
     layout->addWidget(widget, row, 1);
+}
+
+void configureFormGrid(QGridLayout* layout) {
+    layout->setContentsMargins(10, 14, 10, 10);
+    layout->setHorizontalSpacing(8);
+    layout->setVerticalSpacing(6);
+    layout->setColumnMinimumWidth(0, 76);
+    layout->setColumnStretch(1, 1);
 }
 
 } // namespace
@@ -459,33 +471,65 @@ void FaultPolyTraceWindow::buildUi() {
     resize(1280, 780);
     setStyleSheet(QString::fromUtf8(R"(
         QMainWindow, QWidget { background: #E8E8E8; color: #222; font-family: "Microsoft YaHei", "Segoe UI"; font-size: 12px; }
-        QMenuBar, QToolBar { background: #F0F0F0; border-bottom: 1px solid #A8A8A8; }
-        QGroupBox { background: #F0F0F0; border: 1px solid #B5B5B5; border-radius: 3px; margin-top: 9px; padding-top: 7px; }
+        QMenuBar { background: #F2F2F2; border-bottom: 1px solid #B0B0B0; padding: 2px 4px; }
+        QMenuBar::item { padding: 4px 10px; background: transparent; }
+        QMenuBar::item:selected { background: #DDECF8; }
+        QMenu { background: #F8F8F8; border: 1px solid #A8A8A8; }
+        QMenu::item { padding: 5px 28px 5px 24px; }
+        QMenu::item:selected { background: #DDECF8; }
+        QToolBar { background: #ECECEC; border-bottom: 1px solid #B0B0B0; spacing: 5px; padding: 4px 6px; }
+        QToolButton { background: transparent; border: 1px solid transparent; border-radius: 2px; padding: 3px; }
+        QToolButton:hover { background: #DDECF8; border-color: #8CBCE8; }
+        QGroupBox { background: #F0F0F0; border: 1px solid #B5B5B5; border-radius: 3px; margin-top: 10px; padding-top: 8px; }
         QGroupBox::title { subcontrol-origin: margin; left: 8px; padding: 0 5px; color: #005A9E; font-weight: bold; }
-        QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox { background: white; border: 1px solid #A0A0A0; border-radius: 2px; min-height: 22px; padding: 1px 5px; }
+        QLabel { background: transparent; }
+        QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox { background: white; border: 1px solid #A0A0A0; border-radius: 2px; min-height: 23px; padding: 1px 5px; }
         QPushButton { background: #E1E1E1; border: 1px solid #A0A0A0; border-radius: 2px; min-height: 24px; padding: 2px 10px; }
         QPushButton:hover { background: #E5F1FB; border-color: #0078D7; }
         QPushButton#runButton { background: #0078D7; color: white; border-color: #005A9E; font-weight: bold; min-height: 30px; }
-        QTextEdit { background: #F8F9FA; border: 0; font-family: Consolas, "Courier New"; }
+        QTextEdit { background: #F8F9FA; border-top: 1px solid #B8B8B8; font-family: Consolas, "Courier New"; }
     )"));
 
-    QAction* openAction = menuBar()->addAction(QString::fromUtf8("打开数据"));
+    QAction* openAction = new QAction(style()->standardIcon(QStyle::SP_DirOpenIcon), QString::fromUtf8("打开数据"), this);
+    openAction->setToolTip(QString::fromUtf8("选择外部断层属性网格文件"));
     connect(openAction, &QAction::triggered, this, &FaultPolyTraceWindow::browseInput);
-    QAction* runAction = menuBar()->addAction(QString::fromUtf8("开始追踪"));
+    QAction* runAction = new QAction(style()->standardIcon(QStyle::SP_MediaPlay), QString::fromUtf8("开始追踪"), this);
+    runAction->setToolTip(QString::fromUtf8("按当前参数运行断层多边形自动追踪"));
     connect(runAction, &QAction::triggered, this, &FaultPolyTraceWindow::runTrace);
-    QAction* pngAction = menuBar()->addAction(QString::fromUtf8("导出PNG"));
+    QAction* pngAction = new QAction(style()->standardIcon(QStyle::SP_DialogSaveButton), QString::fromUtf8("导出PNG"), this);
+    pngAction->setToolTip(QString::fromUtf8("导出当前视图区图像"));
     connect(pngAction, &QAction::triggered, this, &FaultPolyTraceWindow::exportPng);
-    QAction* saveTplAction = menuBar()->addAction(QString::fromUtf8("保存模板"));
+    QAction* saveTplAction = new QAction(style()->standardIcon(QStyle::SP_FileIcon), QString::fromUtf8("保存模板"), this);
+    saveTplAction->setToolTip(QString::fromUtf8("保存当前算法参数模板"));
     connect(saveTplAction, &QAction::triggered, this, &FaultPolyTraceWindow::saveTemplate);
-    QAction* loadTplAction = menuBar()->addAction(QString::fromUtf8("打开模板"));
+    QAction* loadTplAction = new QAction(style()->standardIcon(QStyle::SP_DialogOpenButton), QString::fromUtf8("打开模板"), this);
+    loadTplAction->setToolTip(QString::fromUtf8("读取已保存的参数模板"));
     connect(loadTplAction, &QAction::triggered, this, &FaultPolyTraceWindow::loadTemplate);
-    QAction* resetAction = menuBar()->addAction(QString::fromUtf8("恢复默认"));
+    QAction* resetAction = new QAction(style()->standardIcon(QStyle::SP_BrowserReload), QString::fromUtf8("恢复默认"), this);
+    resetAction->setToolTip(QString::fromUtf8("恢复推荐默认参数"));
     connect(resetAction, &QAction::triggered, this, &FaultPolyTraceWindow::restoreDefaults);
-    QAction* helpAction = menuBar()->addAction(QString::fromUtf8("帮助"));
+    QAction* helpAction = new QAction(style()->standardIcon(QStyle::SP_MessageBoxQuestion), QString::fromUtf8("帮助"), this);
+    helpAction->setToolTip(QString::fromUtf8("查看独立软件使用说明"));
     connect(helpAction, &QAction::triggered, this, &FaultPolyTraceWindow::openHelp);
+
+    QMenu* fileMenu = menuBar()->addMenu(QString::fromUtf8("文件(&F)"));
+    fileMenu->addAction(openAction);
+    fileMenu->addAction(pngAction);
+    fileMenu->addSeparator();
+    fileMenu->addAction(saveTplAction);
+    fileMenu->addAction(loadTplAction);
+
+    QMenu* traceMenu = menuBar()->addMenu(QString::fromUtf8("追踪(&T)"));
+    traceMenu->addAction(runAction);
+    traceMenu->addAction(resetAction);
+
+    QMenu* helpMenu = menuBar()->addMenu(QString::fromUtf8("帮助(&H)"));
+    helpMenu->addAction(helpAction);
 
     QToolBar* toolbar = addToolBar(QString::fromUtf8("工具栏"));
     toolbar->setMovable(false);
+    toolbar->setIconSize(QSize(22, 22));
+    toolbar->setToolButtonStyle(Qt::ToolButtonIconOnly);
     toolbar->addAction(openAction);
     toolbar->addAction(runAction);
     toolbar->addAction(pngAction);
@@ -501,16 +545,27 @@ void FaultPolyTraceWindow::buildUi() {
     rootLayout->setContentsMargins(0, 0, 0, 0);
     rootLayout->setSpacing(0);
 
-    QWidget* sidebar = new QWidget(root);
-    sidebar->setFixedWidth(350);
-    QVBoxLayout* sidebarLayout = new QVBoxLayout(sidebar);
-    sidebarLayout->setContentsMargins(10, 10, 10, 10);
-    sidebarLayout->setSpacing(10);
+    QWidget* leftPane = new QWidget(root);
+    leftPane->setFixedWidth(372);
+    QVBoxLayout* leftLayout = new QVBoxLayout(leftPane);
+    leftLayout->setContentsMargins(10, 10, 10, 8);
+    leftLayout->setSpacing(8);
 
-    QGroupBox* dataBox = new QGroupBox(QString::fromUtf8("数据与输出"), sidebar);
+    QScrollArea* sidebarScroll = new QScrollArea(leftPane);
+    sidebarScroll->setWidgetResizable(true);
+    sidebarScroll->setFrameShape(QFrame::NoFrame);
+    sidebarScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    QWidget* sidebarContent = new QWidget(sidebarScroll);
+    sidebarContent->setMinimumWidth(336);
+    QVBoxLayout* sidebarLayout = new QVBoxLayout(sidebarContent);
+    sidebarLayout->setContentsMargins(0, 0, 4, 0);
+    sidebarLayout->setSpacing(8);
+
+    QGroupBox* dataBox = new QGroupBox(QString::fromUtf8("数据与输出"), sidebarContent);
     QGridLayout* dataLayout = new QGridLayout(dataBox);
-    dataLayout->setColumnStretch(1, 1);
+    configureFormGrid(dataLayout);
     inputEdit_ = new QLineEdit(dataBox);
+    inputEdit_->setToolTip(QString::fromUtf8("外部断层属性网格文件路径"));
     QPushButton* inputButton = new QPushButton(QString::fromUtf8("浏览"), dataBox);
     connect(inputButton, &QPushButton::clicked, this, &FaultPolyTraceWindow::browseInput);
     QWidget* inputRow = new QWidget(dataBox);
@@ -523,6 +578,7 @@ void FaultPolyTraceWindow::buildUi() {
     inputFormatCombo_->addItems({"auto", "matrix", "geoeast-dat"});
     addRow(dataLayout, 1, QString::fromUtf8("输入格式"), inputFormatCombo_, dataBox);
     outputDirEdit_ = new QLineEdit(dataBox);
+    outputDirEdit_->setToolTip(QString::fromUtf8("结果文件输出目录"));
     QPushButton* outputButton = new QPushButton(QString::fromUtf8("浏览"), dataBox);
     connect(outputButton, &QPushButton::clicked, this, &FaultPolyTraceWindow::browseOutputDir);
     QWidget* outputRow = new QWidget(dataBox);
@@ -538,8 +594,9 @@ void FaultPolyTraceWindow::buildUi() {
     addRow(dataLayout, 4, QString::fromUtf8("视图内容"), viewModeCombo_, dataBox);
     sidebarLayout->addWidget(dataBox);
 
-    QGroupBox* styleBox = new QGroupBox(QString::fromUtf8("显示样式"), sidebar);
+    QGroupBox* styleBox = new QGroupBox(QString::fromUtf8("显示样式"), sidebarContent);
     QGridLayout* styleLayout = new QGridLayout(styleBox);
+    configureFormGrid(styleLayout);
     colorEdit_ = new QLineEdit("#00FFFF", styleBox);
     colorEdit_->setReadOnly(true);
     QPushButton* colorButton = new QPushButton(QString::fromUtf8("颜色"), styleBox);
@@ -562,57 +619,64 @@ void FaultPolyTraceWindow::buildUi() {
     addRow(styleLayout, 2, QString::fromUtf8("透明度"), alphaSpin_, styleBox);
     sidebarLayout->addWidget(styleBox);
 
-    QGroupBox* paramsBox = new QGroupBox(QString::fromUtf8("追踪参数"), sidebar);
-    QGridLayout* paramsLayout = new QGridLayout(paramsBox);
-    presetCombo_ = new QComboBox(paramsBox);
+    QGroupBox* basicBox = new QGroupBox(QString::fromUtf8("基础追踪参数"), sidebarContent);
+    QGridLayout* basicLayout = new QGridLayout(basicBox);
+    configureFormGrid(basicLayout);
+    presetCombo_ = new QComboBox(basicBox);
     presetCombo_->addItems({QString::fromUtf8("防黏连增强"), QString::fromUtf8("高召回"), QString::fromUtf8("保守高精度")});
-    addRow(paramsLayout, 0, QString::fromUtf8("预设"), presetCombo_, paramsBox);
-    thresholdModeCombo_ = new QComboBox(paramsBox);
+    addRow(basicLayout, 0, QString::fromUtf8("预设"), presetCombo_, basicBox);
+    thresholdModeCombo_ = new QComboBox(basicBox);
     thresholdModeCombo_->addItems({"percentile", "positive-percentile", "fixed"});
-    addRow(paramsLayout, 1, QString::fromUtf8("阈值模式"), thresholdModeCombo_, paramsBox);
-    percentileSpin_ = new QDoubleSpinBox(paramsBox);
+    addRow(basicLayout, 1, QString::fromUtf8("阈值模式"), thresholdModeCombo_, basicBox);
+    percentileSpin_ = new QDoubleSpinBox(basicBox);
     percentileSpin_->setRange(0.0, 1.0);
     percentileSpin_->setDecimals(4);
     percentileSpin_->setValue(0.98);
-    addRow(paramsLayout, 2, QString::fromUtf8("分位数"), percentileSpin_, paramsBox);
-    thresholdSpin_ = new QDoubleSpinBox(paramsBox);
+    addRow(basicLayout, 2, QString::fromUtf8("分位数"), percentileSpin_, basicBox);
+    thresholdSpin_ = new QDoubleSpinBox(basicBox);
     thresholdSpin_->setRange(0.0, 1.0);
     thresholdSpin_->setDecimals(4);
     thresholdSpin_->setValue(0.95);
-    addRow(paramsLayout, 3, QString::fromUtf8("固定阈值"), thresholdSpin_, paramsBox);
-    minAreaSpin_ = new QDoubleSpinBox(paramsBox);
+    addRow(basicLayout, 3, QString::fromUtf8("固定阈值"), thresholdSpin_, basicBox);
+    minAreaSpin_ = new QDoubleSpinBox(basicBox);
     minAreaSpin_->setRange(0, 1000000000);
     minAreaSpin_->setDecimals(2);
     minAreaSpin_->setValue(120.0);
-    addRow(paramsLayout, 4, QString::fromUtf8("最小面积"), minAreaSpin_, paramsBox);
-    closeRadiusSpin_ = new QSpinBox(paramsBox);
+    addRow(basicLayout, 4, QString::fromUtf8("最小面积"), minAreaSpin_, basicBox);
+    sidebarLayout->addWidget(basicBox);
+
+    QGroupBox* topologyBox = new QGroupBox(QString::fromUtf8("形态与拓扑约束"), sidebarContent);
+    QGridLayout* topologyLayout = new QGridLayout(topologyBox);
+    configureFormGrid(topologyLayout);
+    closeRadiusSpin_ = new QSpinBox(topologyBox);
     closeRadiusSpin_->setRange(0, 20);
     closeRadiusSpin_->setValue(1);
-    addRow(paramsLayout, 5, QString::fromUtf8("闭合半径"), closeRadiusSpin_, paramsBox);
-    beltRadiusSpin_ = new QSpinBox(paramsBox);
+    addRow(topologyLayout, 0, QString::fromUtf8("闭合半径"), closeRadiusSpin_, topologyBox);
+    beltRadiusSpin_ = new QSpinBox(topologyBox);
     beltRadiusSpin_->setRange(0, 20);
     beltRadiusSpin_->setValue(3);
-    addRow(paramsLayout, 6, QString::fromUtf8("带宽半径"), beltRadiusSpin_, paramsBox);
-    maxGapDistanceSpin_ = new QSpinBox(paramsBox);
+    addRow(topologyLayout, 1, QString::fromUtf8("带宽半径"), beltRadiusSpin_, topologyBox);
+    maxGapDistanceSpin_ = new QSpinBox(topologyBox);
     maxGapDistanceSpin_->setRange(0, 1000);
     maxGapDistanceSpin_->setValue(12);
-    addRow(paramsLayout, 7, QString::fromUtf8("最大断距"), maxGapDistanceSpin_, paramsBox);
-    maxGapAngleSpin_ = new QDoubleSpinBox(paramsBox);
+    addRow(topologyLayout, 2, QString::fromUtf8("最大断距"), maxGapDistanceSpin_, topologyBox);
+    maxGapAngleSpin_ = new QDoubleSpinBox(topologyBox);
     maxGapAngleSpin_->setRange(0, 180);
     maxGapAngleSpin_->setValue(55.0);
-    addRow(paramsLayout, 8, QString::fromUtf8("最大夹角"), maxGapAngleSpin_, paramsBox);
-    smoothIterationsSpin_ = new QSpinBox(paramsBox);
+    addRow(topologyLayout, 3, QString::fromUtf8("最大夹角"), maxGapAngleSpin_, topologyBox);
+    smoothIterationsSpin_ = new QSpinBox(topologyBox);
     smoothIterationsSpin_->setRange(0, 5);
     smoothIterationsSpin_->setValue(1);
-    addRow(paramsLayout, 9, QString::fromUtf8("平滑次数"), smoothIterationsSpin_, paramsBox);
-    simplifyToleranceSpin_ = new QDoubleSpinBox(paramsBox);
+    addRow(topologyLayout, 4, QString::fromUtf8("平滑次数"), smoothIterationsSpin_, topologyBox);
+    simplifyToleranceSpin_ = new QDoubleSpinBox(topologyBox);
     simplifyToleranceSpin_->setRange(0, 1000);
     simplifyToleranceSpin_->setValue(2.0);
-    addRow(paramsLayout, 10, QString::fromUtf8("简化容差"), simplifyToleranceSpin_, paramsBox);
-    sidebarLayout->addWidget(paramsBox);
+    addRow(topologyLayout, 5, QString::fromUtf8("简化容差"), simplifyToleranceSpin_, topologyBox);
+    sidebarLayout->addWidget(topologyBox);
 
-    QGroupBox* historyBox = new QGroupBox(QString::fromUtf8("历史记录"), sidebar);
+    QGroupBox* historyBox = new QGroupBox(QString::fromUtf8("历史记录"), sidebarContent);
     QGridLayout* historyLayout = new QGridLayout(historyBox);
+    configureFormGrid(historyLayout);
     historyCombo_ = new QComboBox(historyBox);
     addRow(historyLayout, 0, QString::fromUtf8("任务"), historyCombo_, historyBox);
     QPushButton* loadHistoryButton = new QPushButton(QString::fromUtf8("载入历史"), historyBox);
@@ -620,17 +684,22 @@ void FaultPolyTraceWindow::buildUi() {
     historyLayout->addWidget(loadHistoryButton, 1, 0, 1, 2);
     sidebarLayout->addWidget(historyBox);
 
-    runButton_ = new QPushButton(QString::fromUtf8("开始追踪"), sidebar);
+    sidebarLayout->addStretch(1);
+    sidebarScroll->setWidget(sidebarContent);
+    leftLayout->addWidget(sidebarScroll, 1);
+
+    runButton_ = new QPushButton(QString::fromUtf8("开始追踪"), leftPane);
     runButton_->setObjectName("runButton");
-    stopButton_ = new QPushButton(QString::fromUtf8("停止"), sidebar);
+    stopButton_ = new QPushButton(QString::fromUtf8("停止"), leftPane);
     stopButton_->setEnabled(false);
     connect(runButton_, &QPushButton::clicked, this, &FaultPolyTraceWindow::runTrace);
     connect(stopButton_, &QPushButton::clicked, this, &FaultPolyTraceWindow::stopTrace);
     QHBoxLayout* actionLayout = new QHBoxLayout;
+    actionLayout->setContentsMargins(0, 0, 0, 0);
+    actionLayout->setSpacing(10);
     actionLayout->addWidget(runButton_, 2);
     actionLayout->addWidget(stopButton_, 1);
-    sidebarLayout->addLayout(actionLayout);
-    sidebarLayout->addStretch(1);
+    leftLayout->addLayout(actionLayout);
 
     QWidget* right = new QWidget(root);
     QVBoxLayout* rightLayout = new QVBoxLayout(right);
@@ -642,7 +711,7 @@ void FaultPolyTraceWindow::buildUi() {
     logEdit_->setFixedHeight(120);
     rightLayout->addWidget(view_, 1);
     rightLayout->addWidget(logEdit_);
-    rootLayout->addWidget(sidebar);
+    rootLayout->addWidget(leftPane);
     rootLayout->addWidget(right, 1);
     setCentralWidget(root);
 
