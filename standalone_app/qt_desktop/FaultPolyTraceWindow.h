@@ -51,6 +51,7 @@ private:
     void applyPreset(const QString& preset);
     void refreshHistory();
     void appendHistory(qint64 elapsedMs);
+    void updateTaskPreview();
     QStringList traceArgs() const;
     QString outputCsvPath() const;
     QString outputBasePath() const;
