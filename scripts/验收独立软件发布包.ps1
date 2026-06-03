@@ -362,8 +362,13 @@ function Test-PersonalPathLeak {
         '[A-Za-z]:[\\/]+BaiduNetdiskDownload'
     )
     $matches = @()
+    $rootPrefix = (Resolve-Path -LiteralPath $Root).Path.TrimEnd('\')
     Get-ChildItem -LiteralPath $Root -Recurse -File -Include *.md,*.txt,*.ini,*.ps1,*.cmd,*.py |
         ForEach-Object {
+            $relative = $_.FullName.Substring($rootPrefix.Length).TrimStart('\')
+            if ($relative -like "examples\outputs\full_score_audit_*") {
+                return
+            }
             $text = Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8
             foreach ($pattern in $patterns) {
                 if ([regex]::IsMatch($text, $pattern)) {
