@@ -181,6 +181,7 @@ foreach ($script in @(
     "build_qt_launcher.ps1",
     "部署到GeoEast.ps1",
     "一键总验收.ps1",
+    "验收独立软件发布包.ps1",
     "性能回归检查.ps1",
     "visualize_official_result.py",
     "generate_official_quality_report.py",
@@ -246,7 +247,8 @@ $manifest += '2. 双击 `FaultPolyTrace.exe` 或 `01_打开图形界面.cmd` 打
 $manifest += '3. 没有 GeoEast 环境时，双击 `02_运行离线演示.cmd` 验证算法独立运行能力。'
 $manifest += '4. 有 GeoEast 环境时，按 `docs/用户操作手册.md` 或 `docs/GeoEast使用指南.md` 使用 GeoEast 菜单入口，入口程序是 `qt_launcher/faultpolytrace_launcher.exe`。'
 $manifest += '5. 查看 `docs/官方数据最新验收报告.md`。'
-$manifest += '6. 修改代码后运行 `scripts/一键总验收.ps1 -SkipGeoEastBuild -SkipPackage`，确认官方数据仍满足覆盖、防黏连、拓扑和性能门禁。'
+$manifest += '6. 修改独立软件或发布包后运行 `scripts/验收独立软件发布包.ps1 -PackageDir <发布包目录>`，确认 GUI、CLI、根目录转发和输出文件完整。'
+$manifest += '7. 修改算法后运行 `scripts/一键总验收.ps1 -SkipGeoEastBuild -SkipPackage`，确认官方数据仍满足覆盖、防黏连、拓扑和性能门禁。'
 
 Set-Content -LiteralPath (Join-Path $packageDir "发布包清单.md") -Value ($manifest -join "`n") -Encoding UTF8
 
