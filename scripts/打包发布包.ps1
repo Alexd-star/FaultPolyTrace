@@ -190,6 +190,7 @@ foreach ($script in @(
     "一键总验收.ps1",
     "验收独立软件发布包.ps1",
     "检查参数一致性.ps1",
+    "检查独立软件界面功能.ps1",
     "性能回归检查.ps1",
     "visualize_official_result.py",
     "generate_official_quality_report.py",
@@ -256,8 +257,9 @@ $manifest += '3. 没有 GeoEast 环境时，双击 `02_运行离线演示.cmd` �
 $manifest += '4. 有 GeoEast 环境时，按 `docs/用户操作手册.md` 或 `docs/GeoEast使用指南.md` 使用 GeoEast 菜单入口，入口程序是 `qt_launcher/faultpolytrace_launcher.exe`。'
 $manifest += '5. 查看 `docs/官方数据最新验收报告.md`。'
 $manifest += '6. 修改界面参数、模板参数、CLI 参数或 Runner 参数后运行 `scripts/检查参数一致性.ps1`，确认独立软件、GeoEast 控件、核心算法和发布包链路一致。'
-$manifest += '7. 修改独立软件或发布包后运行 `scripts/验收独立软件发布包.ps1 -PackageDir <发布包目录>`，确认 GUI、CLI、根目录转发和输出文件完整。'
-$manifest += '8. 修改算法后运行 `scripts/一键总验收.ps1 -SkipGeoEastBuild -SkipPackage`，确认官方数据仍满足覆盖、防黏连、拓扑和性能门禁。'
+$manifest += '7. 修改独立软件菜单、工具栏、视图切换或主操作按钮后运行 `scripts/检查独立软件界面功能.ps1`，确认没有空控件和漏联动。'
+$manifest += '8. 修改独立软件或发布包后运行 `scripts/验收独立软件发布包.ps1 -PackageDir <发布包目录>`，确认 GUI、CLI、根目录转发和输出文件完整。'
+$manifest += '9. 修改算法后运行 `scripts/一键总验收.ps1 -SkipGeoEastBuild -SkipPackage`，确认官方数据仍满足覆盖、防黏连、拓扑和性能门禁。'
 
 Set-Content -LiteralPath (Join-Path $packageDir "发布包清单.md") -Value ($manifest -join "`n") -Encoding UTF8
 

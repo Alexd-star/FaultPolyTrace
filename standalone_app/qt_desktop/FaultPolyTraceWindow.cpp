@@ -726,9 +726,13 @@ void FaultPolyTraceWindow::buildUi() {
     QAction* openAction = new QAction(style()->standardIcon(QStyle::SP_DirOpenIcon), QString::fromUtf8("打开 DAT 文件"), this);
     openAction->setToolTip(QString::fromUtf8("选择外部断层属性网格文件"));
     connect(openAction, &QAction::triggered, this, &FaultPolyTraceWindow::browseInput);
-    QAction* runAction = new QAction(style()->standardIcon(QStyle::SP_MediaPlay), QString::fromUtf8("开始追踪"), this);
-    runAction->setToolTip(QString::fromUtf8("按当前参数运行断层多边形自动追踪"));
-    connect(runAction, &QAction::triggered, this, &FaultPolyTraceWindow::runTrace);
+    runAction_ = new QAction(style()->standardIcon(QStyle::SP_MediaPlay), QString::fromUtf8("开始追踪"), this);
+    runAction_->setToolTip(QString::fromUtf8("按当前参数运行断层多边形自动追踪"));
+    connect(runAction_, &QAction::triggered, this, &FaultPolyTraceWindow::runTrace);
+    stopAction_ = new QAction(style()->standardIcon(QStyle::SP_MediaStop), QString::fromUtf8("停止"), this);
+    stopAction_->setToolTip(QString::fromUtf8("终止当前正在运行的追踪任务"));
+    stopAction_->setEnabled(false);
+    connect(stopAction_, &QAction::triggered, this, &FaultPolyTraceWindow::stopTrace);
     QAction* pngAction = new QAction(style()->standardIcon(QStyle::SP_DialogSaveButton), QString::fromUtf8("导出PNG"), this);
     pngAction->setToolTip(QString::fromUtf8("导出当前视图区图像"));
     connect(pngAction, &QAction::triggered, this, &FaultPolyTraceWindow::exportPng);
@@ -800,7 +804,8 @@ void FaultPolyTraceWindow::buildUi() {
     });
 
     QMenu* faultMenu = menuBar()->addMenu(QString::fromUtf8("断层(&L)"));
-    faultMenu->addAction(runAction);
+    faultMenu->addAction(runAction_);
+    faultMenu->addAction(stopAction_);
 
     QMenu* layerMenu = menuBar()->addMenu(QString::fromUtf8("层位(&H)"));
     layerMenu->addAction(outputDirAction);
@@ -824,10 +829,12 @@ void FaultPolyTraceWindow::buildUi() {
     toolbar->addAction(zoomOutAction);
     toolbar->addAction(resetViewAction);
     toolbar->addSeparator();
+    toolbar->addAction(runAction_);
+    toolbar->addAction(stopAction_);
+    toolbar->addSeparator();
     toolbar->addAction(resetAction);
     toolbar->addAction(pngAction);
     toolbar->addSeparator();
-    toolbar->addAction(loadTplAction);
     toolbar->addAction(outputDirAction);
     toolbar->addSeparator();
     toolbar->addAction(helpAction);
@@ -1667,6 +1674,12 @@ void FaultPolyTraceWindow::onProcessError(QProcess::ProcessError error) {
 void FaultPolyTraceWindow::setRunning(bool running) {
     runButton_->setEnabled(!running);
     stopButton_->setEnabled(running);
+    if (runAction_) {
+        runAction_->setEnabled(!running);
+    }
+    if (stopAction_) {
+        stopAction_->setEnabled(running);
+    }
 }
 
 void FaultPolyTraceWindow::appendLog(const QString& text) {

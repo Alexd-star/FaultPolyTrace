@@ -5,6 +5,7 @@
 #include <QString>
 
 class AttributeView;
+class QAction;
 class QCheckBox;
 class QComboBox;
 class QDoubleSpinBox;
@@ -116,6 +117,8 @@ private:
     QDoubleSpinBox* alphaSpin_ = nullptr;
     QPushButton* runButton_ = nullptr;
     QPushButton* stopButton_ = nullptr;
+    QAction* runAction_ = nullptr;
+    QAction* stopAction_ = nullptr;
     QTextEdit* logEdit_ = nullptr;
     QLabel* statusLabel_ = nullptr;
     QLabel* elapsedLabel_ = nullptr;
