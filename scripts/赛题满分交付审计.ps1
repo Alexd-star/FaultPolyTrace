@@ -90,12 +90,19 @@ function Test-RequiredDir {
 }
 
 function Find-LatestDirectory {
-    param([string]$BaseDir, [string]$Pattern)
+    param(
+        [string]$BaseDir,
+        [string]$Pattern,
+        [string]$RequiredFile = ""
+    )
     if (!(Test-Path -LiteralPath $BaseDir)) {
         return $null
     }
     return Get-ChildItem -LiteralPath $BaseDir -Directory |
-        Where-Object { $_.Name -like $Pattern } |
+        Where-Object {
+            $_.Name -like $Pattern -and
+            ([string]::IsNullOrWhiteSpace($RequiredFile) -or (Test-Path -LiteralPath (Join-Path $_.FullName $RequiredFile)))
+        } |
         Sort-Object LastWriteTime -Descending |
         Select-Object -First 1
 }
@@ -219,7 +226,7 @@ function Get-GeoEastEvidence {
 }
 
 if ([string]::IsNullOrWhiteSpace($AcceptanceDir)) {
-    $latestAcceptance = Find-LatestDirectory -BaseDir $outputsRoot -Pattern "acceptance_*_official_root_antimerge"
+    $latestAcceptance = Find-LatestDirectory -BaseDir $outputsRoot -Pattern "acceptance_*_official_root_antimerge" -RequiredFile "本次验收报告.md"
     if ($latestAcceptance) {
         $AcceptanceDir = $latestAcceptance.FullName
     }
@@ -232,7 +239,7 @@ if ([string]::IsNullOrWhiteSpace($ReleasePackageDir)) {
         $ReleasePackageDir = $root
     } else {
         $releaseRoot = Join-Path $root "release"
-        $latestPackage = Find-LatestDirectory -BaseDir $releaseRoot -Pattern "FaultPolyTrace_*"
+        $latestPackage = Find-LatestDirectory -BaseDir $releaseRoot -Pattern "FaultPolyTrace_*" -RequiredFile "发布包清单.md"
         if ($latestPackage) {
             $ReleasePackageDir = $latestPackage.FullName
         }
@@ -240,7 +247,7 @@ if ([string]::IsNullOrWhiteSpace($ReleasePackageDir)) {
 }
 
 if ([string]::IsNullOrWhiteSpace($StandaloneAcceptanceDir)) {
-    $latestStandalone = Find-LatestDirectory -BaseDir $outputsRoot -Pattern "standalone_acceptance_*"
+    $latestStandalone = Find-LatestDirectory -BaseDir $outputsRoot -Pattern "standalone_acceptance_*" -RequiredFile "独立软件发布包验收报告.md"
     if ($latestStandalone) {
         $StandaloneAcceptanceDir = $latestStandalone.FullName
     }
@@ -491,9 +498,9 @@ if ($geoEastEvidence.videoReady) {
     Add-Manual "评审交付" "演示视频或答辩截图" "建议准备双击独立软件、GeoEast 按钮、官方数据运行、结果叠加四类证据" "未找到完整截图或 09_演示视频。可按 GeoEast 现场证据包模板补齐。" $geoEastEvidence.dir
 }
 
-$passCount = ($script:auditResults | Where-Object { $_.status -eq "通过" }).Count
-$failCount = ($script:auditResults | Where-Object { $_.status -eq "失败" }).Count
-$manualCount = ($script:auditResults | Where-Object { $_.status -eq "待人工确认" }).Count
+$passCount = @($script:auditResults | Where-Object { $_.status -eq "通过" }).Count
+$failCount = @($script:auditResults | Where-Object { $_.status -eq "失败" }).Count
+$manualCount = @($script:auditResults | Where-Object { $_.status -eq "待人工确认" }).Count
 
 $reportPath = Join-Path $auditDir "赛题满分交付审计报告.md"
 $csvPath = Join-Path $auditDir "赛题满分交付审计明细.csv"

@@ -152,9 +152,9 @@ if ([string]::IsNullOrWhiteSpace($EvidenceDir)) {
     }
 }
 
-$passCount = ($results | Where-Object { $_.status -eq "通过" }).Count
-$failCount = ($results | Where-Object { $_.status -eq "失败" }).Count
-$pendingCount = ($results | Where-Object { $_.status -eq "待补充" }).Count
+$passCount = @($results | Where-Object { $_.status -eq "通过" }).Count
+$failCount = @($results | Where-Object { $_.status -eq "失败" }).Count
+$pendingCount = @($results | Where-Object { $_.status -eq "待补充" }).Count
 
 if (![string]::IsNullOrWhiteSpace($EvidenceDir)) {
     New-Item -ItemType Directory -Force -Path $EvidenceDir | Out-Null
