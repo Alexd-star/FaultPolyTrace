@@ -67,6 +67,26 @@ QString repoRootFromAppDir() {
     return QDir::currentPath();
 }
 
+QString locateBundledPath(const QString& relativePath) {
+    const QString normalized = QDir::fromNativeSeparators(relativePath);
+    QDir app(QCoreApplication::applicationDirPath());
+    QDir parent(app);
+    const QString parentPath = parent.cdUp() ? parent.absoluteFilePath(normalized) : QString();
+    const QStringList candidates = {
+        app.absoluteFilePath(normalized),
+        parentPath,
+        app.absoluteFilePath("FaultPolyTraceLauncher/" + normalized),
+        QDir(repoRootFromAppDir()).absoluteFilePath(normalized),
+        QDir(QDir::currentPath()).absoluteFilePath(normalized)
+    };
+    for (const QString& candidate : candidates) {
+        if (!candidate.isEmpty() && QFileInfo::exists(candidate)) {
+            return QDir::toNativeSeparators(candidate);
+        }
+    }
+    return QString();
+}
+
 QString envOrDefault(const char* name, const QString& fallback) {
     const QByteArray value = qgetenv(name);
     return value.isEmpty() ? fallback : QString::fromLocal8Bit(value);
@@ -1396,9 +1416,9 @@ void FaultTraceDialog::buildUi() {
         )"));
 
         auto openLocalFile = [this](const QString& relativePath) {
-            const QString path = QDir(repoRootFromAppDir()).absoluteFilePath(relativePath);
-            if (!QFileInfo::exists(path)) {
-                appendLog(QString::fromUtf8("文件不存在：%1").arg(QDir::toNativeSeparators(path)));
+            const QString path = locateBundledPath(relativePath);
+            if (path.isEmpty()) {
+                appendLog(QString::fromUtf8("文件不存在：%1。请确认 docs 目录已随发布包或 GeoEast 便携启动器部署。").arg(relativePath));
                 return;
             }
             if (!QDesktopServices::openUrl(QUrl::fromLocalFile(path))) {
@@ -1572,6 +1592,8 @@ void FaultTraceDialog::buildUi() {
         connect(helpAction, &QAction::triggered, this, &FaultTraceDialog::showHelpHint);
         QAction* manualAction = helpMenu->addAction(QString::fromUtf8("用户操作手册"));
         connect(manualAction, &QAction::triggered, this, [openLocalFile]() { openLocalFile("docs/用户操作手册.md"); });
+        QAction* projectStructureAction = helpMenu->addAction(QString::fromUtf8("项目目录结构"));
+        connect(projectStructureAction, &QAction::triggered, this, [openLocalFile]() { openLocalFile("docs/项目目录结构与文件说明.md"); });
         QAction* aboutAction = helpMenu->addAction(QString::fromUtf8("关于 FaultPolyTrace"));
         connect(aboutAction, &QAction::triggered, this, [this]() {
             QMessageBox::information(this, QString::fromUtf8("关于 FaultPolyTrace"),

@@ -164,6 +164,11 @@ Add-ContainsCheck -Rows $rows -Group "language" -Name "shared-localization" -Req
 Add-ContainsCheck -Rows $rows -Group "language" -Name "compile-localization-source" -Requirement "Launcher build includes the shared localization implementation." -Text $launcherPro -Needle "../../src/ui/UiLocalization.cpp" -Detail "$launcherProPath compiles UiLocalization.cpp"
 Add-ContainsCheck -Rows $rows -Group "language" -Name "include-localization-header" -Requirement "Launcher project includes the shared localization header." -Text $launcherPro -Needle "../../src/ui/UiLocalization.h" -Detail "$launcherProPath includes UiLocalization.h"
 
+Add-ContainsCheck -Rows $rows -Group "help-docs" -Name "portable-docs-deploy-source" -Requirement "GeoEast deployment must define the repository docs source." -Text $deployScript -Needle '$docsSource = Join-Path $repoRoot "docs"' -Detail "$deployScriptPath locates docs"
+Add-ContainsCheck -Rows $rows -Group "help-docs" -Name "portable-docs-deploy-target" -Requirement "GeoEast deployment must copy docs into the portable launcher directory." -Text $deployScript -Needle 'Join-Path $launcherTargetDir "docs"' -Detail "$deployScriptPath copies docs"
+Add-ContainsCheck -Rows $rows -Group "help-docs" -Name "relative-doc-locator" -Requirement "Launcher must locate documents relative to source, release package, or GeoEast portable launcher directory." -Text $dialogCpp -Needle "locateBundledPath" -Detail "$dialogCppPath uses locateBundledPath"
+Add-ContainsCheck -Rows $rows -Group "help-docs" -Name "project-structure-doc-link" -Requirement "Launcher help menu should expose project directory structure documentation." -Text $dialogCpp -Needle "docs/项目目录结构与文件说明.md" -Detail "$dialogCppPath links project structure doc"
+
 $failed = @($rows | Where-Object { $_.Status -eq "FAIL" })
 New-Item -ItemType Directory -Force -Path $reportDir | Out-Null
 $passCount = $rows.Count - $failed.Count

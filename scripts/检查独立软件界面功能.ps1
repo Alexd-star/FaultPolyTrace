@@ -76,11 +76,17 @@ $headerPath = "standalone_app\qt_desktop\FaultPolyTraceWindow.h"
 $mainPath = "standalone_app\qt_desktop\main.cpp"
 $proPath = "standalone_app\qt_desktop\FaultPolyTraceDesktop.pro"
 $packageScriptPath = "scripts\打包发布包.ps1"
+$userManualPath = "docs\用户操作手册.md"
+$productManualPath = "docs\企业级用户操作手册与产品说明书.md"
+$projectStructureDocPath = "docs\项目目录结构与文件说明.md"
 $cpp = Read-TextFile $cppPath
 $header = Read-TextFile $headerPath
 $main = Read-TextFile $mainPath
 $pro = Read-TextFile $proPath
 $packageScript = Read-TextFile $packageScriptPath
+$userManual = Read-TextFile $userManualPath
+$productManual = Read-TextFile $productManualPath
+$projectStructureDoc = Read-TextFile $projectStructureDocPath
 $rows = [System.Collections.Generic.List[object]]::new()
 
 Add-ContainsCheck -Rows $rows -Group "窗口与布局" -Name "默认窗口" -Requirement "最小窗口不低于规划值" -Text $cpp -Needle "setMinimumSize(1100, 700)" -Detail "$cppPath 设置最小窗口"
@@ -194,8 +200,20 @@ $supportFunctions = @(
     @{ Name="停止追踪"; Needle="void FaultPolyTraceWindow::stopTrace()" }
 )
 foreach ($function in $supportFunctions) {
-    Add-ContainsCheck -Rows $rows -Group "功能实现" -Name $function.Name -Requirement "槽函数实现存在" -Text $cpp -Needle $function.Needle -Detail "$cppPath 包含 $($function.Needle)"
+Add-ContainsCheck -Rows $rows -Group "功能实现" -Name $function.Name -Requirement "槽函数实现存在" -Text $cpp -Needle $function.Needle -Detail "$cppPath 包含 $($function.Needle)"
 }
+
+Add-ContainsCheck -Rows $rows -Group "帮助文档" -Name "用户操作手册入口" -Requirement "帮助菜单必须能打开完整用户操作手册" -Text $header -Needle "void openUserManual()" -Detail "$headerPath 声明 openUserManual"
+Add-ContainsCheck -Rows $rows -Group "帮助文档" -Name "产品说明书入口" -Requirement "帮助菜单必须能打开企业级产品说明书" -Text $header -Needle "void openProductManual()" -Detail "$headerPath 声明 openProductManual"
+Add-ContainsCheck -Rows $rows -Group "帮助文档" -Name "目录结构入口" -Requirement "帮助菜单必须能打开项目目录结构说明" -Text $header -Needle "void openProjectStructureDoc()" -Detail "$headerPath 声明 openProjectStructureDoc"
+Add-ContainsCheck -Rows $rows -Group "帮助文档" -Name "相对路径定位" -Requirement "文档定位不能写死用户电脑路径，必须相对发布包或源码根目录查找" -Text $header -Needle "QString locateBundledFile" -Detail "$headerPath 声明 locateBundledFile"
+Add-ContainsCheck -Rows $rows -Group "帮助文档" -Name "统一打开函数" -Requirement "文档打开失败时必须提示并引导用户检查发布包 docs 目录" -Text $header -Needle "bool openBundledDocument" -Detail "$headerPath 声明 openBundledDocument"
+Add-ContainsCheck -Rows $rows -Group "帮助文档" -Name "帮助菜单挂载用户手册" -Requirement "用户操作手册必须出现在帮助菜单" -Text $cpp -Needle "helpMenu->addAction(userManualAction)" -Detail "$cppPath 帮助菜单添加用户手册"
+Add-ContainsCheck -Rows $rows -Group "帮助文档" -Name "帮助菜单挂载产品说明书" -Requirement "产品说明书必须出现在帮助菜单" -Text $cpp -Needle "helpMenu->addAction(productManualAction)" -Detail "$cppPath 帮助菜单添加产品说明书"
+Add-ContainsCheck -Rows $rows -Group "帮助文档" -Name "帮助菜单挂载目录结构" -Requirement "目录结构说明必须出现在帮助菜单" -Text $cpp -Needle "helpMenu->addAction(projectStructureAction)" -Detail "$cppPath 帮助菜单添加目录结构说明"
+Add-ContainsCheck -Rows $rows -Group "帮助文档" -Name "用户手册内容" -Requirement "用户操作手册必须说明软件入口和前置提示" -Text $userManual -Needle "软件入口与随包文档" -Detail "$userManualPath 包含入口说明"
+Add-ContainsCheck -Rows $rows -Group "帮助文档" -Name "产品说明书内容" -Requirement "企业级产品说明书必须可作为帮助文档打开" -Text $productManual -Needle "企业级用户操作手册" -Detail "$productManualPath 内容存在"
+Add-ContainsCheck -Rows $rows -Group "帮助文档" -Name "目录结构文档内容" -Requirement "项目目录结构文档必须说明入口和目录作用" -Text $projectStructureDoc -Needle "独立软件入口" -Detail "$projectStructureDocPath 内容存在"
 
 Add-ContainsCheck -Rows $rows -Group "GeoEast数据库操作" -Name "配置自检声明" -Requirement "独立软件在读写 GeoEast 数据库前必须先校验配置完整性" -Text $header -Needle "bool ensureGeoEastConfigReady" -Detail "$headerPath 声明 ensureGeoEastConfigReady"
 Add-ContainsCheck -Rows $rows -Group "GeoEast数据库操作" -Name "缺失字段清单声明" -Requirement "配置不完整时必须明确列出缺失字段" -Text $header -Needle "QStringList missingGeoEastConfig" -Detail "$headerPath 声明 missingGeoEastConfig"

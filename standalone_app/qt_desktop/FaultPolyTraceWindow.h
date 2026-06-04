@@ -54,6 +54,9 @@ private slots:
     void loadHistory();
     void openOutputDir();
     void openHelp();
+    void openUserManual();
+    void openProductManual();
+    void openProjectStructureDoc();
     void updateOptionControls();
     void updateDataSourceMode();
     void updateLayerVisibility();
@@ -103,6 +106,8 @@ private:
     QString defaultGeoEastDataRoot() const;
     QString settingsPath() const;
     QString historyPath() const;
+    QString locateBundledFile(const QString& relativePath) const;
+    bool openBundledDocument(const QString& relativePath, const QString& displayName);
     bool writeGeoJson(const QString& csvPath, QString* geoJsonPath, QString* errorMessage) const;
     bool isGeoEastMode() const;
     void configureGeoEastEnvironment(QProcessEnvironment& environment) const;

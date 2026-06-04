@@ -79,6 +79,10 @@ foreach ($subdir in @("platforms", "imageformats", "iconengines", "styles", "tra
         Copy-Item -LiteralPath $source -Destination (Join-Path $launcherTargetDir $subdir) -Recurse -Force
     }
 }
+$docsSource = Join-Path $repoRoot "docs"
+if (Test-Path -LiteralPath $docsSource) {
+    Copy-Item -LiteralPath $docsSource -Destination (Join-Path $launcherTargetDir "docs") -Recurse -Force
+}
 Copy-Item -LiteralPath $runner -Destination (Join-Path $binTargetDir "faultpolytrace_geoeast_runner.exe") -Force
 Copy-Item -LiteralPath $runner -Destination (Join-Path $launcherTargetDir "faultpolytrace_geoeast_runner.exe") -Force
 Copy-Item -LiteralPath $manifest -Destination (Join-Path $pluginTargetDir "manifest.xml") -Force

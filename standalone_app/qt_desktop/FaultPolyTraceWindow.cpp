@@ -981,6 +981,15 @@ void FaultPolyTraceWindow::buildUi() {
     QAction* helpAction = new QAction(style()->standardIcon(QStyle::SP_MessageBoxQuestion), QString::fromUtf8("帮助提示"), this);
     helpAction->setToolTip(QString::fromUtf8("查看独立软件使用说明"));
     connect(helpAction, &QAction::triggered, this, &FaultPolyTraceWindow::openHelp);
+    QAction* userManualAction = new QAction(QString::fromUtf8("用户操作手册"), this);
+    userManualAction->setToolTip(QString::fromUtf8("打开完整中文用户操作手册"));
+    connect(userManualAction, &QAction::triggered, this, &FaultPolyTraceWindow::openUserManual);
+    QAction* productManualAction = new QAction(QString::fromUtf8("产品说明书"), this);
+    productManualAction->setToolTip(QString::fromUtf8("打开企业级用户操作手册与产品说明书"));
+    connect(productManualAction, &QAction::triggered, this, &FaultPolyTraceWindow::openProductManual);
+    QAction* projectStructureAction = new QAction(QString::fromUtf8("项目目录结构"), this);
+    projectStructureAction->setToolTip(QString::fromUtf8("打开项目目录结构与文件作用说明"));
+    connect(projectStructureAction, &QAction::triggered, this, &FaultPolyTraceWindow::openProjectStructureDoc);
 
     QMenu* fileMenu = menuBar()->addMenu(QString::fromUtf8("文件(&F)"));
     fileMenu->addAction(openAction);
@@ -1058,6 +1067,9 @@ void FaultPolyTraceWindow::buildUi() {
 
     QMenu* helpMenu = menuBar()->addMenu(QString::fromUtf8("帮助(&H)"));
     helpMenu->addAction(helpAction);
+    helpMenu->addAction(userManualAction);
+    helpMenu->addAction(productManualAction);
+    helpMenu->addAction(projectStructureAction);
 
     QToolBar* toolbar = addToolBar(QString::fromUtf8("工具栏"));
     toolbar->setMovable(false);
@@ -1686,6 +1698,50 @@ QString FaultPolyTraceWindow::historyPath() const {
     const QString dir = QDir(appConfigDir()).absoluteFilePath("history");
     QDir().mkpath(dir);
     return QDir(dir).absoluteFilePath("records.tsv");
+}
+
+QString FaultPolyTraceWindow::locateBundledFile(const QString& relativePath) const {
+    const QString normalized = QDir::fromNativeSeparators(relativePath);
+    QDir app(QCoreApplication::applicationDirPath());
+    QDir parent(app);
+    const QString parentPath = parent.cdUp() ? parent.absoluteFilePath(normalized) : QString();
+    const QStringList candidates = {
+        app.absoluteFilePath(normalized),
+        parentPath,
+        app.absoluteFilePath("FaultPolyTraceLauncher/" + normalized),
+        QDir(repoRootFromAppDir()).absoluteFilePath(normalized),
+        QDir(QDir::currentPath()).absoluteFilePath(normalized)
+    };
+    for (const QString& candidate : candidates) {
+        if (!candidate.isEmpty() && QFileInfo::exists(candidate)) {
+            return QDir::toNativeSeparators(candidate);
+        }
+    }
+    return QString();
+}
+
+bool FaultPolyTraceWindow::openBundledDocument(const QString& relativePath, const QString& displayName) {
+    const QString path = locateBundledFile(relativePath);
+    if (path.isEmpty()) {
+        QMessageBox::warning(
+            this,
+            uiText(QString::fromUtf8("文档未找到")),
+            uiText(QString::fromUtf8("未找到【%1】。\n\n请确认当前发布包包含 docs 目录，或重新运行发布包/GeoEast 部署脚本。")).arg(displayName));
+        appendLog(uiText(QString::fromUtf8("文档未找到：%1")).arg(relativePath));
+        updateStatus(QString::fromUtf8("文档未找到，请检查发布包 docs 目录"));
+        return false;
+    }
+    if (!QDesktopServices::openUrl(QUrl::fromLocalFile(path))) {
+        QMessageBox::warning(
+            this,
+            uiText(QString::fromUtf8("无法打开文档")),
+            uiText(QString::fromUtf8("系统未能打开【%1】。\n\n文件位置：%2\n\n请确认系统已关联 Markdown、PDF 或 Word 文档查看程序。")).arg(displayName, path));
+        appendLog(uiText(QString::fromUtf8("无法打开文档：%1")).arg(path));
+        updateStatus(QString::fromUtf8("无法打开文档，请检查系统文件关联"));
+        return false;
+    }
+    updateStatus(uiText(QString::fromUtf8("已打开文档：%1")).arg(displayName));
+    return true;
 }
 
 QString FaultPolyTraceWindow::outputBasePath() const {
@@ -3215,7 +3271,27 @@ void FaultPolyTraceWindow::openHelp() {
                                                        "3. 点击【刷新网格】读取 GeoEast 输入网格列表。\n"
                                                        "4. 设置输出多边形名称后点击【开始追踪】。\n"
                                                        "5. 结果写入 GeoEast 数据库，同时在本软件生成结果视图文件用于查看。\n\n"
-                                                       "在左侧【结果查看】中打开 CSV、GeoJSON、诊断 JSON 或输出目录，也可导出当前 PNG。")));
+                                                       "在左侧【结果查看】中打开 CSV、GeoJSON、诊断 JSON 或输出目录，也可导出当前 PNG。\n\n"
+                                                       "完整操作说明请打开【帮助】>【用户操作手册】。")));
+}
+
+void FaultPolyTraceWindow::openUserManual() {
+    openBundledDocument(QString::fromUtf8("docs/用户操作手册.md"), uiText(QString::fromUtf8("用户操作手册")));
+}
+
+void FaultPolyTraceWindow::openProductManual() {
+    const QString pdfPath = locateBundledFile(QString::fromUtf8("docs/FaultPolyTrace企业级用户操作手册与产品说明书_V1.0.0.pdf"));
+    if (!pdfPath.isEmpty()) {
+        if (QDesktopServices::openUrl(QUrl::fromLocalFile(pdfPath))) {
+            updateStatus(uiText(QString::fromUtf8("已打开文档：%1")).arg(uiText(QString::fromUtf8("产品说明书"))));
+            return;
+        }
+    }
+    openBundledDocument(QString::fromUtf8("docs/企业级用户操作手册与产品说明书.md"), uiText(QString::fromUtf8("产品说明书")));
+}
+
+void FaultPolyTraceWindow::openProjectStructureDoc() {
+    openBundledDocument(QString::fromUtf8("docs/项目目录结构与文件说明.md"), uiText(QString::fromUtf8("项目目录结构")));
 }
 
 void FaultPolyTraceWindow::closeEvent(QCloseEvent* event) {
