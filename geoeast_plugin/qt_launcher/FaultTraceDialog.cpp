@@ -70,6 +70,154 @@ QString envOrDefault(const char* name, const QString& fallback) {
     return value.isEmpty() ? fallback : QString::fromLocal8Bit(value);
 }
 
+QString envValue(const char* name) {
+    return QString::fromLocal8Bit(qgetenv(name)).trimmed();
+}
+
+QString firstExistingPath(const QStringList& candidates) {
+    for (const QString& candidate : candidates) {
+        const QString path = QDir::fromNativeSeparators(candidate.trimmed());
+        if (!path.isEmpty() && QFileInfo::exists(path)) {
+            return QDir::toNativeSeparators(path);
+        }
+    }
+    return QString();
+}
+
+QString geoEastRootFromPath(const QString& value) {
+    const QString path = QDir::fromNativeSeparators(value.trimmed());
+    if (path.isEmpty()) {
+        return QString();
+    }
+
+    QFileInfo info(path);
+    QDir dir(info.isDir() ? path : info.absolutePath());
+    for (int i = 0; i < 5; ++i) {
+        if (dir.exists("GeoEast-RC") || dir.exists("NGP")) {
+            return QDir::toNativeSeparators(dir.absolutePath());
+        }
+        const QString name = dir.dirName();
+        if (name.compare("GeoEast-RC", Qt::CaseInsensitive) == 0 ||
+            name.compare("NGP", Qt::CaseInsensitive) == 0 ||
+            name.compare("iECO", Qt::CaseInsensitive) == 0) {
+            QDir parent(dir);
+            if (parent.cdUp()) {
+                return QDir::toNativeSeparators(parent.absolutePath());
+            }
+        }
+        if (!dir.cdUp()) {
+            break;
+        }
+    }
+    return QString();
+}
+
+QString detectGeoEastRoot() {
+    for (const char* name : {"FPT_GEOEAST_ROOT", "GEOEAST_ROOT"}) {
+        const QString value = envValue(name);
+        if (!value.isEmpty()) {
+            return QDir::toNativeSeparators(value);
+        }
+    }
+
+    for (const char* name : {"GEOEAST", "NGP", "IECO", "IECO_ROOT", "NGP_ROOT"}) {
+        const QString root = geoEastRootFromPath(envValue(name));
+        if (!root.isEmpty()) {
+            return root;
+        }
+    }
+
+    const QString appRoot = geoEastRootFromPath(QCoreApplication::applicationDirPath());
+    if (!appRoot.isEmpty()) {
+        return appRoot;
+    }
+
+    const QString currentRoot = geoEastRootFromPath(QDir::currentPath());
+    if (!currentRoot.isEmpty()) {
+        return currentRoot;
+    }
+
+    const QString userProfile = envValue("USERPROFILE");
+    const QStringList candidates = {
+        userProfile.isEmpty() ? QString() : QDir(userProfile).absoluteFilePath("GeoEast"),
+        "C:/GeoEast",
+        "D:/GeoEast",
+        "C:/Program Files/GeoEast"
+    };
+    return firstExistingPath(candidates);
+}
+
+QString detectGeoEastDataRoot(const QString& geoEastRoot) {
+    for (const char* name : {"FPT_GEOEAST_DATA_ROOT", "GEOEAST_DATA_ROOT"}) {
+        const QString value = envValue(name);
+        if (!value.isEmpty()) {
+            return QDir::toNativeSeparators(value);
+        }
+    }
+
+    const QString dbData = envValue("NGP_DBDATA_PATH");
+    if (!dbData.isEmpty()) {
+        QDir dir(QDir::fromNativeSeparators(dbData));
+        if (dir.cdUp() && dir.cdUp()) {
+            return QDir::toNativeSeparators(dir.absolutePath());
+        }
+    }
+
+    const QString root = QDir::fromNativeSeparators(geoEastRoot);
+    if (root.isEmpty()) {
+        return QString();
+    }
+
+    const QString direct = firstExistingPath({
+        QDir(root).absoluteFilePath("GeoEast-RC/GeoEastData"),
+        QDir(root).absoluteFilePath("GeoEastData")
+    });
+    if (!direct.isEmpty()) {
+        return direct;
+    }
+
+    QDir rc(QDir(root).absoluteFilePath("GeoEast-RC"));
+    const QFileInfoList matches = rc.entryInfoList(QStringList() << "GeoEastData*", QDir::Dirs | QDir::NoDotAndDotDot);
+    for (const QFileInfo& info : matches) {
+        const QString nested = QDir(info.absoluteFilePath()).absoluteFilePath("GeoEastData");
+        return QFileInfo::exists(nested)
+            ? QDir::toNativeSeparators(nested)
+            : QDir::toNativeSeparators(info.absoluteFilePath());
+    }
+    return QString();
+}
+
+QString defaultUserName() {
+    const QString fromEnv = envValue("FPT_GEOEAST_USER");
+    if (!fromEnv.isEmpty()) {
+        return fromEnv;
+    }
+    const QString username = envValue("USERNAME");
+    return username.isEmpty() ? envValue("USER") : username;
+}
+
+QString defaultOfficialDatFromEnvironment() {
+    const QStringList candidates = {
+        envValue("FPT_OFFICIAL_DAT"),
+        envValue("FPT_INPUT_DAT")
+    };
+    return firstExistingPath(candidates);
+}
+
+bool isLegacyDeveloperDefault(const QString& value) {
+    const QString normalized = QDir::fromNativeSeparators(value).toLower();
+    return normalized.contains("baidunetdiskdownload/bgpcup2025") ||
+           normalized.contains("documents/bgpcup/faultpolytrace/geoeast_plugin/bo_runner") ||
+           normalized == "bgpcup2026_test7" ||
+           normalized == "test7_fault_attribute_bo" ||
+           normalized == "test7_fault_attribute";
+}
+
+QString settingOrCurrent(const QSettings& settings, const QString& key, const QString& current, int schemaVersion) {
+    const QString value = settings.value(key, current).toString();
+    return schemaVersion < 2 && isLegacyDeveloperDefault(value) ? current : value;
+}
+
 QString quoteForLog(const QStringList& args) {
     QStringList quoted;
     for (const QString& arg : args) {
@@ -794,10 +942,11 @@ void FaultTraceDialog::buildUi() {
     QPushButton* browseRunnerButton = new QPushButton(QString::fromUtf8("浏览"), this);
     connect(browseRunnerButton, &QPushButton::clicked, this, &FaultTraceDialog::browseRunner);
 
-    geoEastRootEdit_ = new QLineEdit(envOrDefault("FPT_GEOEAST_ROOT", "C:/Users/26312/GeoEast"), this);
-    geoEastDataRootEdit_ = new QLineEdit(envOrDefault(
-        "FPT_GEOEAST_DATA_ROOT",
-        "D:/BaiduNetdiskDownload/BGPCup2025/GeoEast-RC/GeoEastData.DataModel+SQLITE.20230728/GeoEastData"), this);
+    const QString detectedGeoEastRoot = detectGeoEastRoot();
+    geoEastRootEdit_ = new QLineEdit(detectedGeoEastRoot, this);
+    geoEastRootEdit_->setPlaceholderText(QString::fromUtf8("自动识别失败时请手动选择 GeoEast 安装根目录"));
+    geoEastDataRootEdit_ = new QLineEdit(detectGeoEastDataRoot(detectedGeoEastRoot), this);
+    geoEastDataRootEdit_->setPlaceholderText(QString::fromUtf8("自动识别失败时请手动选择 GeoEastData 根目录"));
     pgHostEdit_ = new QLineEdit(envOrDefault("FPT_GEOEAST_PG_HOST", "127.0.0.1"), this);
     pgPortEdit_ = new QLineEdit(envOrDefault("FPT_GEOEAST_PG_PORT", "5433"), this);
     QPushButton* browseGeoEastRootButton = new QPushButton(QString::fromUtf8("浏览"), this);
@@ -823,8 +972,10 @@ void FaultTraceDialog::buildUi() {
 
     QGroupBox* connectionBox = new QGroupBox(QString::fromUtf8("GeoEast 数据库"), this);
     databaseEdit_ = new QLineEdit(envOrDefault("FPT_GEOEAST_DB", "ndp"), this);
-    projectEdit_ = new QLineEdit(envOrDefault("FPT_GEOEAST_PROJECT", "BGPCup2026_Test7"), this);
-    userEdit_ = new QLineEdit(envOrDefault("FPT_GEOEAST_USER", "26312"), this);
+    projectEdit_ = new QLineEdit(envValue("FPT_GEOEAST_PROJECT"), this);
+    projectEdit_->setPlaceholderText(QString::fromUtf8("当前 GeoEast 项目名，未识别时请填写"));
+    userEdit_ = new QLineEdit(defaultUserName(), this);
+    userEdit_->setPlaceholderText(QString::fromUtf8("GeoEast 登录用户名"));
     passwordEdit_ = new QLineEdit("", this);
     passwordEdit_->setEchoMode(QLineEdit::Password);
 
@@ -841,10 +992,14 @@ void FaultTraceDialog::buildUi() {
     QGroupBox* dataBox = new QGroupBox(QString::fromUtf8("输入输出"), this);
     gridCombo_ = new QComboBox(this);
     gridCombo_->setEditable(true);
-    gridCombo_->addItem("test7_fault_attribute_bo");
-    gridCombo_->addItem("test7_fault_attribute");
-    gridCombo_->addItem("test");
-    gridCombo_->setCurrentText(envOrDefault("FPT_GEOEAST_GRID", "test7_fault_attribute_bo"));
+    const QString defaultGrid = envValue("FPT_GEOEAST_GRID");
+    if (!defaultGrid.isEmpty()) {
+        gridCombo_->addItem(defaultGrid);
+        gridCombo_->setCurrentText(defaultGrid);
+    }
+    if (gridCombo_->lineEdit()) {
+        gridCombo_->lineEdit()->setPlaceholderText(QString::fromUtf8("点击刷新网格或手动输入 BOMapGrid 名称"));
+    }
     outputEdit_ = new QLineEdit(envOrDefault("FPT_GEOEAST_OUTPUT", "FaultPolyTrace_Result"), this);
     polygonColorEdit_ = new QLineEdit(envOrDefault("FPT_POLYGON_COLOR", "#00FFFF"), this);
     polygonColorEdit_->setReadOnly(true);
@@ -862,6 +1017,7 @@ void FaultTraceDialog::buildUi() {
     importDatCheck_ = new QCheckBox(QString::fromUtf8("从官方 DAT 导入/覆盖输入网格"), this);
     importDatCheck_->setChecked(false);
     datFileEdit_ = new QLineEdit(defaultOfficialDatPath(), this);
+    datFileEdit_->setPlaceholderText(QString::fromUtf8("可选：选择需要导入或覆盖到 GeoEast 的 DAT 文件"));
     QPushButton* browseDatButton = new QPushButton(QString::fromUtf8("浏览"), this);
     overwriteGridCheck_ = new QCheckBox(QString::fromUtf8("覆盖同名 BOMapGrid"), this);
     overwriteGridCheck_->setChecked(true);
@@ -1686,36 +1842,39 @@ void FaultTraceDialog::buildUi() {
         applyParameterPreset(QString::fromUtf8("防黏连增强"));
         updateStatusContext();
         appendLog(QString::fromUtf8("[系统就绪] 等待参数输入及任务执行..."));
-        appendLog(QString::fromUtf8("加载项目配置：%1 成功。").arg(projectEdit_->text()));
+        if (projectEdit_ && !projectEdit_->text().trimmed().isEmpty()) {
+            appendLog(QString::fromUtf8("加载项目配置：%1 成功。").arg(projectEdit_->text().trimmed()));
+        } else {
+            appendLog(QString::fromUtf8("未检测到当前项目名，请在【数据库与环境底层配置】中确认项目，或点击【刷新网格】读取 GeoEast 数据库对象。"));
+        }
     }
 }
 
 QString FaultTraceDialog::defaultRunnerPath() const {
-    const QString fromEnv = envOrDefault("FPT_GEOEAST_RUNNER", "");
+    const QString fromEnv = envValue("FPT_GEOEAST_RUNNER");
     if (!fromEnv.isEmpty()) {
         return QDir::toNativeSeparators(fromEnv);
     }
     QDir appDir(QCoreApplication::applicationDirPath());
-    const QString localRunner = appDir.absoluteFilePath("faultpolytrace_geoeast_runner.exe");
-    if (QFileInfo::exists(localRunner)) {
-        return QDir::toNativeSeparators(localRunner);
-    }
     QDir parentDir(appDir);
+    QString parentRunner;
     if (parentDir.cdUp()) {
-        const QString parentRunner = parentDir.absoluteFilePath("faultpolytrace_geoeast_runner.exe");
-        if (QFileInfo::exists(parentRunner)) {
-            return QDir::toNativeSeparators(parentRunner);
-        }
+        parentRunner = parentDir.absoluteFilePath("faultpolytrace_geoeast_runner.exe");
     }
-    QDir root(repoRootFromAppDir());
-    const QString candidate = root.absoluteFilePath("geoeast_plugin/bo_runner/faultpolytrace_geoeast_runner.exe");
-    return QFileInfo::exists(candidate) ? QDir::toNativeSeparators(candidate) : candidate;
+    const QString geoEastRoot = detectGeoEastRoot();
+    const QString repoRunner = QDir(repoRootFromAppDir()).absoluteFilePath("geoeast_plugin/bo_runner/faultpolytrace_geoeast_runner.exe");
+    const QString detected = firstExistingPath({
+        appDir.absoluteFilePath("faultpolytrace_geoeast_runner.exe"),
+        appDir.absoluteFilePath("bin/faultpolytrace_geoeast_runner.exe"),
+        parentRunner,
+        geoEastRoot.isEmpty() ? QString() : QDir(geoEastRoot).absoluteFilePath("GeoEast-RC/bin/faultpolytrace_geoeast_runner.exe"),
+        repoRunner
+    });
+    return detected.isEmpty() ? QString() : detected;
 }
 
 QString FaultTraceDialog::defaultOfficialDatPath() const {
-    return envOrDefault(
-        "FPT_OFFICIAL_DAT",
-        QString::fromUtf8("D:/BaiduNetdiskDownload/BGPCup2025/赛题7-基于平面断层属性的断层多边形自动追踪/test.dat"));
+    return defaultOfficialDatFromEnvironment();
 }
 
 void FaultTraceDialog::browseRunner() {
@@ -1932,18 +2091,19 @@ void FaultTraceDialog::showHelpHint() {
 
 void FaultTraceDialog::loadSettings() {
     QSettings settings(QCoreApplication::applicationDirPath() + "/faultpolytrace_launcher.ini", QSettings::IniFormat);
-    runnerEdit_->setText(settings.value("runner", runnerEdit_->text()).toString());
-    geoEastRootEdit_->setText(settings.value("geoEastRoot", geoEastRootEdit_->text()).toString());
-    geoEastDataRootEdit_->setText(settings.value("geoEastDataRoot", geoEastDataRootEdit_->text()).toString());
+    const int schemaVersion = settings.value("configSchemaVersion", 0).toInt();
+    runnerEdit_->setText(settingOrCurrent(settings, "runner", runnerEdit_->text(), schemaVersion));
+    geoEastRootEdit_->setText(settingOrCurrent(settings, "geoEastRoot", geoEastRootEdit_->text(), schemaVersion));
+    geoEastDataRootEdit_->setText(settingOrCurrent(settings, "geoEastDataRoot", geoEastDataRootEdit_->text(), schemaVersion));
     pgHostEdit_->setText(settings.value("pgHost", pgHostEdit_->text()).toString());
     pgPortEdit_->setText(settings.value("pgPort", pgPortEdit_->text()).toString());
     databaseEdit_->setText(settings.value("database", databaseEdit_->text()).toString());
-    projectEdit_->setText(settings.value("project", projectEdit_->text()).toString());
-    userEdit_->setText(settings.value("user", userEdit_->text()).toString());
+    projectEdit_->setText(settingOrCurrent(settings, "project", projectEdit_->text(), schemaVersion));
+    userEdit_->setText(settingOrCurrent(settings, "user", userEdit_->text(), schemaVersion));
     presetCombo_->setCurrentText(settings.value("preset", presetCombo_->currentText()).toString());
-    gridCombo_->setCurrentText(settings.value("grid", gridCombo_->currentText()).toString());
+    gridCombo_->setCurrentText(settingOrCurrent(settings, "grid", gridCombo_->currentText(), schemaVersion));
     outputEdit_->setText(settings.value("output", outputEdit_->text()).toString());
-    datFileEdit_->setText(settings.value("datFile", datFileEdit_->text()).toString());
+    datFileEdit_->setText(settingOrCurrent(settings, "datFile", datFileEdit_->text(), schemaVersion));
     importDatCheck_->setChecked(settings.value("importDat", importDatCheck_->isChecked()).toBool());
     overwriteGridCheck_->setChecked(settings.value("overwriteGrid", overwriteGridCheck_->isChecked()).toBool());
     polygonColorEdit_->setText(settings.value("polygonColor", polygonColorEdit_->text()).toString());
@@ -1998,6 +2158,7 @@ void FaultTraceDialog::loadSettings() {
 
 void FaultTraceDialog::saveSettings() const {
     QSettings settings(QCoreApplication::applicationDirPath() + "/faultpolytrace_launcher.ini", QSettings::IniFormat);
+    settings.setValue("configSchemaVersion", 2);
     settings.setValue("runner", runnerEdit_->text());
     settings.setValue("geoEastRoot", geoEastRootEdit_->text());
     settings.setValue("geoEastDataRoot", geoEastDataRootEdit_->text());

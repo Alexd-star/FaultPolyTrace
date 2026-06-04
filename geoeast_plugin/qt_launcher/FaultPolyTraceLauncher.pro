@@ -8,6 +8,7 @@ QMAKE_CXXFLAGS += /utf-8
 win32 {
     DEFINES += NOMINMAX
     DEFINES += _HAS_STD_BYTE=0
+    RC_ICONS = ../../assets/icons/faultpolytrace.ico
 }
 
 DESTDIR = ./

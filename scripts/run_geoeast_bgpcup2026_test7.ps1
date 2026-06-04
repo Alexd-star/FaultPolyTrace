@@ -2,13 +2,13 @@
     [string]$GeoEastRoot = $env:FPT_GEOEAST_ROOT,
     [string]$GeoEastDataRoot = $env:FPT_GEOEAST_DATA_ROOT,
     [string]$Database = $(if ($env:FPT_GEOEAST_DB) { $env:FPT_GEOEAST_DB } else { "ndp" }),
-    [string]$Project = $(if ($env:FPT_GEOEAST_PROJECT) { $env:FPT_GEOEAST_PROJECT } else { "BGPCup2026_Test7" }),
-    [string]$User = $(if ($env:FPT_GEOEAST_USER) { $env:FPT_GEOEAST_USER } else { "26312" }),
+    [string]$Project = $env:FPT_GEOEAST_PROJECT,
+    [string]$User = $(if ($env:FPT_GEOEAST_USER) { $env:FPT_GEOEAST_USER } else { $env:USERNAME }),
     [string]$Password = $(if ($null -ne $env:FPT_GEOEAST_PASSWORD) { $env:FPT_GEOEAST_PASSWORD } else { "" }),
     [string]$PgHost = $(if ($env:FPT_GEOEAST_PG_HOST) { $env:FPT_GEOEAST_PG_HOST } else { "127.0.0.1" }),
     [string]$PgPort = $(if ($env:FPT_GEOEAST_PG_PORT) { $env:FPT_GEOEAST_PG_PORT } else { "5433" }),
     [string]$OfficialDat = $env:FPT_OFFICIAL_DAT,
-    [string]$Grid = $(if ($env:FPT_GEOEAST_GRID) { $env:FPT_GEOEAST_GRID } else { "test7_fault_attribute_bo" }),
+    [string]$Grid = $env:FPT_GEOEAST_GRID,
     [string]$Output = $(if ($env:FPT_GEOEAST_OUTPUT) { $env:FPT_GEOEAST_OUTPUT } else { "FaultPolyTrace_Result" }),
     [string]$Runner = $env:FPT_GEOEAST_RUNNER,
     [double]$Percentile = 0.98,
@@ -18,14 +18,107 @@
 
 $ErrorActionPreference = "Stop"
 
+function Find-GeoEastRoot {
+    if ($env:FPT_GEOEAST_ROOT) {
+        return $env:FPT_GEOEAST_ROOT
+    }
+    if ($env:NGP) {
+        $candidate = Split-Path -Parent $env:NGP
+        if (Test-Path -LiteralPath (Join-Path $candidate "GeoEast-RC")) {
+            return $candidate
+        }
+    }
+    if ($env:USERPROFILE) {
+        $candidate = Join-Path $env:USERPROFILE "GeoEast"
+        if (Test-Path -LiteralPath (Join-Path $candidate "GeoEast-RC")) {
+            return $candidate
+        }
+    }
+    if (Test-Path -LiteralPath "C:\GeoEast\GeoEast-RC") {
+        return "C:\GeoEast"
+    }
+    return $null
+}
+
+function Find-GeoEastDataRoot {
+    param([string]$Root)
+    if ($env:FPT_GEOEAST_DATA_ROOT) {
+        return $env:FPT_GEOEAST_DATA_ROOT
+    }
+    if ($env:NGP_DBDATA_PATH) {
+        $pgData = Split-Path -Parent $env:NGP_DBDATA_PATH
+        return Split-Path -Parent $pgData
+    }
+    if ([string]::IsNullOrWhiteSpace($Root)) {
+        return $null
+    }
+    foreach ($candidate in @(
+        (Join-Path $Root "GeoEast-RC\GeoEastData"),
+        (Join-Path $Root "GeoEastData")
+    )) {
+        if (Test-Path -LiteralPath $candidate) {
+            return $candidate
+        }
+    }
+    $rc = Join-Path $Root "GeoEast-RC"
+    if (Test-Path -LiteralPath $rc) {
+        $match = Get-ChildItem -LiteralPath $rc -Directory -Filter "GeoEastData*" -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($match) {
+            $nested = Join-Path $match.FullName "GeoEastData"
+            return $(if (Test-Path -LiteralPath $nested) { $nested } else { $match.FullName })
+        }
+    }
+    return $null
+}
+
+function Find-OfficialDat {
+    if ($env:FPT_OFFICIAL_DAT -and (Test-Path -LiteralPath $env:FPT_OFFICIAL_DAT)) {
+        return $env:FPT_OFFICIAL_DAT
+    }
+    $roots = @()
+    if ($env:FPT_OFFICIAL_DATA_ROOT) { $roots += $env:FPT_OFFICIAL_DATA_ROOT }
+    if ($env:USERPROFILE) { $roots += (Join-Path $env:USERPROFILE "Documents") }
+    $roots += (Join-Path (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")) "examples")
+    foreach ($root in $roots) {
+        if (!(Test-Path -LiteralPath $root)) {
+            continue
+        }
+        $match = Get-ChildItem -LiteralPath $root -Recurse -Filter "test.dat" -ErrorAction SilentlyContinue |
+            Sort-Object Length -Descending |
+            Select-Object -First 1
+        if ($match) {
+            return $match.FullName
+        }
+    }
+    return $null
+}
+
 if ([string]::IsNullOrWhiteSpace($GeoEastRoot)) {
-    $GeoEastRoot = "C:\Users\26312\GeoEast"
+    $GeoEastRoot = Find-GeoEastRoot
 }
 if ([string]::IsNullOrWhiteSpace($GeoEastDataRoot)) {
-    $GeoEastDataRoot = "D:\BaiduNetdiskDownload\BGPCup2025\GeoEast-RC\GeoEastData.DataModel+SQLITE.20230728\GeoEastData"
+    $GeoEastDataRoot = Find-GeoEastDataRoot -Root $GeoEastRoot
 }
 if ([string]::IsNullOrWhiteSpace($OfficialDat)) {
-    $OfficialDat = "D:\BaiduNetdiskDownload\BGPCup2025\赛题7-基于平面断层属性的断层多边形自动追踪\test.dat"
+    $OfficialDat = Find-OfficialDat
+}
+if ([string]::IsNullOrWhiteSpace($GeoEastRoot) -or !(Test-Path -LiteralPath (Join-Path $GeoEastRoot "GeoEast-RC"))) {
+    throw "Cannot locate GeoEast root. Pass -GeoEastRoot or set FPT_GEOEAST_ROOT."
+}
+if ([string]::IsNullOrWhiteSpace($GeoEastDataRoot) -or !(Test-Path -LiteralPath $GeoEastDataRoot)) {
+    throw "Cannot locate GeoEastData root. Pass -GeoEastDataRoot or set FPT_GEOEAST_DATA_ROOT."
+}
+if ([string]::IsNullOrWhiteSpace($Project)) {
+    throw "Missing GeoEast project. Pass -Project or set FPT_GEOEAST_PROJECT."
+}
+if ([string]::IsNullOrWhiteSpace($User)) {
+    throw "Missing GeoEast user. Pass -User or set FPT_GEOEAST_USER."
+}
+if ([string]::IsNullOrWhiteSpace($Grid)) {
+    throw "Missing input BOMapGrid. Pass -Grid or set FPT_GEOEAST_GRID."
+}
+if (!$NoImportDat -and ([string]::IsNullOrWhiteSpace($OfficialDat) -or !(Test-Path -LiteralPath $OfficialDat))) {
+    throw "Cannot locate official test.dat. Pass -OfficialDat or set FPT_OFFICIAL_DAT."
 }
 
 $env:NGP = Join-Path $GeoEastRoot "NGP"

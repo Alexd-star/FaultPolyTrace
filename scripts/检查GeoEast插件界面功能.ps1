@@ -70,16 +70,27 @@ function Add-NotContainsCheck {
 
 $dialogCppPath = "geoeast_plugin\qt_launcher\FaultTraceDialog.cpp"
 $dialogHeaderPath = "geoeast_plugin\qt_launcher\FaultTraceDialog.h"
+$launcherMainPath = "geoeast_plugin\qt_launcher\main.cpp"
+$launcherProPath = "geoeast_plugin\qt_launcher\FaultPolyTraceLauncher.pro"
+$deployScriptPath = "scripts\部署到GeoEast.ps1"
 $runnerMainPath = "geoeast_plugin\bo_runner\main.cpp"
 $adapterCppPath = "geoeast_plugin\bo_runner\GeoEastBoAdapter.cpp"
 $adapterHeaderPath = "geoeast_plugin\bo_runner\GeoEastBoAdapter.h"
 $dialogCpp = Read-TextFile $dialogCppPath
 $dialogHeader = Read-TextFile $dialogHeaderPath
+$launcherMain = Read-TextFile $launcherMainPath
+$launcherPro = Read-TextFile $launcherProPath
+$deployScript = Read-TextFile $deployScriptPath
 $runnerMain = Read-TextFile $runnerMainPath
 $adapterCpp = Read-TextFile $adapterCppPath
 $adapterHeader = Read-TextFile $adapterHeaderPath
 
 $rows = [System.Collections.Generic.List[object]]::new()
+
+Add-ContainsCheck -Rows $rows -Group "branding" -Name "runtime-icon" -Requirement "Launcher window/taskbar uses the product icon." -Text $launcherMain -Needle "app.setWindowIcon(locateApplicationIcon())" -Detail "$launcherMainPath sets application icon"
+Add-ContainsCheck -Rows $rows -Group "branding" -Name "exe-icon" -Requirement "Launcher exe embeds the product icon." -Text $launcherPro -Needle "RC_ICONS = ../../assets/icons/faultpolytrace.ico" -Detail "$launcherProPath sets RC_ICONS"
+Add-ContainsCheck -Rows $rows -Group "branding" -Name "deploy-icon" -Requirement "GeoEast deployment copies icon files beside the launcher." -Text $deployScript -Needle "FaultPolyTraceLauncher" -Detail "$deployScriptPath copies launcher files and icons"
+Add-ContainsCheck -Rows $rows -Group "branding" -Name "deploy-icon-file" -Requirement "GeoEast deployment includes faultpolytrace.ico." -Text $deployScript -Needle "faultpolytrace.ico" -Detail "$deployScriptPath copies faultpolytrace.ico"
 
 Add-ContainsCheck -Rows $rows -Group "result-management" -Name "delete-slot" -Requirement "Launcher provides a delete-output slot." -Text $dialogHeader -Needle "void deleteOutput()" -Detail "$dialogHeaderPath declares deleteOutput"
 Add-ContainsCheck -Rows $rows -Group "result-management" -Name "delete-button-member" -Requirement "Left panel has a real delete button member." -Text $dialogHeader -Needle "QPushButton* deleteOutputButton_" -Detail "$dialogHeaderPath declares deleteOutputButton_"

@@ -4,6 +4,7 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QFileInfo>
+#include <QIcon>
 #include <QProcess>
 #include <QStringList>
 
@@ -61,6 +62,32 @@ bool hasCliArguments(const QStringList& args) {
     return false;
 }
 
+QIcon locateApplicationIcon() {
+    QDir app(QCoreApplication::applicationDirPath());
+    QDir repo(app);
+    QString repoIcon;
+    for (int i = 0; i < 6; ++i) {
+        if (repo.exists("assets/icons/faultpolytrace.ico")) {
+            repoIcon = repo.absoluteFilePath("assets/icons/faultpolytrace.ico");
+            break;
+        }
+        if (!repo.cdUp()) {
+            break;
+        }
+    }
+    const QStringList candidates = {
+        app.absoluteFilePath("faultpolytrace.ico"),
+        app.absoluteFilePath("faultpolytrace.png"),
+        repoIcon
+    };
+    for (const QString& path : candidates) {
+        if (!path.isEmpty() && QFileInfo::exists(path)) {
+            return QIcon(path);
+        }
+    }
+    return QIcon();
+}
+
 int forwardToCoreRunner(const QStringList& args) {
 #ifdef Q_OS_WIN
     if (AttachConsole(ATTACH_PARENT_PROCESS)) {
@@ -95,6 +122,7 @@ int main(int argc, char* argv[]) {
     app.setApplicationName("FaultPolyTrace");
     app.setOrganizationName("BGPCup2026");
     app.setApplicationDisplayName(QString::fromUtf8("FaultPolyTrace 断层多边形自动追踪"));
+    app.setWindowIcon(locateApplicationIcon());
 
     if (hasCliArguments(app.arguments())) {
         return forwardToCoreRunner(app.arguments());

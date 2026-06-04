@@ -7,7 +7,11 @@
 $ErrorActionPreference = "Stop"
 
 if ([string]::IsNullOrWhiteSpace($GeoEastRoot)) {
-    $GeoEastRoot = "C:\Users\26312\GeoEast"
+    if ($env:USERPROFILE -and (Test-Path -LiteralPath (Join-Path $env:USERPROFILE "GeoEast"))) {
+        $GeoEastRoot = Join-Path $env:USERPROFILE "GeoEast"
+    } else {
+        $GeoEastRoot = "C:\GeoEast"
+    }
 }
 
 $env:NGP = Join-Path $GeoEastRoot "NGP"

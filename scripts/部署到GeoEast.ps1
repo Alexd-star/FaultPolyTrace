@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$GeoEastRoot = $(if ($env:FPT_GEOEAST_ROOT) { $env:FPT_GEOEAST_ROOT } else { "C:\Users\26312\GeoEast" }),
+    [string]$GeoEastRoot = $(if ($env:FPT_GEOEAST_ROOT) { $env:FPT_GEOEAST_ROOT } elseif ($env:USERPROFILE -and (Test-Path -LiteralPath (Join-Path $env:USERPROFILE "GeoEast"))) { Join-Path $env:USERPROFILE "GeoEast" } else { "C:\GeoEast" }),
     [switch]$SkipBuild
 )
 
@@ -27,7 +27,7 @@ if (!$SkipBuild) {
         & $iconScript
     }
     & (Join-Path $PSScriptRoot "build_geoeast_bo_runner.ps1") -GeoEastRoot $GeoEastRoot -UseVisualStudioProject
-    & (Join-Path $PSScriptRoot "build_qt_launcher.ps1")
+    & (Join-Path $PSScriptRoot "build_qt_launcher.ps1") -GeoEastRoot $GeoEastRoot
     $mainframeScript = Join-Path $PSScriptRoot "build_geoeast_mainframe_plugin.ps1"
     if (Test-Path -LiteralPath $mainframeScript) {
         & $mainframeScript -GeoEastRoot $GeoEastRoot
@@ -84,6 +84,8 @@ Copy-Item -LiteralPath $runner -Destination (Join-Path $launcherTargetDir "fault
 Copy-Item -LiteralPath $manifest -Destination (Join-Path $pluginTargetDir "manifest.xml") -Force
 Copy-Item -LiteralPath $iconIco -Destination (Join-Path $binTargetDir "faultpolytrace.ico") -Force
 Copy-Item -LiteralPath $iconPng -Destination (Join-Path $binTargetDir "faultpolytrace.png") -Force
+Copy-Item -LiteralPath $iconIco -Destination (Join-Path $launcherTargetDir "faultpolytrace.ico") -Force
+Copy-Item -LiteralPath $iconPng -Destination (Join-Path $launcherTargetDir "faultpolytrace.png") -Force
 
 $pluginDllSource = Join-Path $repoRoot "geoeast_plugin\mainframe_plugin\FaultPolyTraceMainframePlugin.dll"
 if (Test-Path -LiteralPath $pluginDllSource) {

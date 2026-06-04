@@ -207,11 +207,20 @@ void validateGeoEastEnvironment() {
 
 Options parseArgs(int argc, char** argv) {
     Options options;
-    options.databaseName = "ndp";
-    options.projectName = "BGPCup2026_Test7";
-    options.userName = "26312";
+    auto envOrEmpty = [](const char* name) -> std::string {
+        const char* value = std::getenv(name);
+        return value && *value ? value : "";
+    };
+    auto envOrDefault = [&](const char* name, const std::string& fallback) -> std::string {
+        const std::string value = envOrEmpty(name);
+        return value.empty() ? fallback : value;
+    };
+
+    options.databaseName = envOrDefault("FPT_GEOEAST_DB", "ndp");
+    options.projectName = envOrEmpty("FPT_GEOEAST_PROJECT");
+    options.userName = envOrDefault("FPT_GEOEAST_USER", envOrEmpty("USERNAME"));
     options.password = "";
-    options.gridName = "test";
+    options.gridName = envOrEmpty("FPT_GEOEAST_GRID");
     options.outputName = "FaultPolyTrace_Result";
     options.trace.traceMode = fpt::TraceMode::RidgeBelt;
     options.trace.thresholdMode = fpt::ThresholdMode::Percentile;
@@ -245,8 +254,7 @@ Options parseArgs(int argc, char** argv) {
     options.trace.smoothIterations = 1;
 
     if (argc == 1) {
-        debugLog("No command-line arguments supplied. Using local defaults and validating BOMapGrid 'test' first.");
-        return options;
+        throw std::runtime_error("No command-line arguments supplied. Use --help to view GeoEast runner usage.");
     }
 
     for (int i = 1; i < argc; ++i) {
@@ -566,13 +574,6 @@ int main(int argc, char** argv) {
             fpt_geoeast::deleteFaultPolygons(project, options.outputName);
             debugLog("BOFaultPolygon delete completed.");
             std::cout << "Deleted BOFaultPolygon: " << options.outputName << "\n";
-            return 0;
-        }
-
-        if (argc == 1) {
-            debugLog("Validating BOMapGrid without loading full data: " + options.gridName);
-            fpt_geoeast::validateMapGrid(project, options.gridName);
-            debugLog("Default validation completed. Set command arguments to run full tracing.");
             return 0;
         }
 

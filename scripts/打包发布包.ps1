@@ -77,12 +77,16 @@ $standaloneDir = Join-Path $packageDir "standalone_app"
 $geoeastDir = Join-Path $packageDir "geoeast_plugin"
 $prerequisitesDir = Join-Path $packageDir "prerequisites"
 $figureDir = Join-Path $packageDir "figure"
+$iconIco = Join-Path $repoRoot "assets\icons\faultpolytrace.ico"
+$iconPng = Join-Path $repoRoot "assets\icons\faultpolytrace_32.png"
 
 Copy-FileRequired (Join-Path $repoRoot "build\faultpolytrace.exe") (Join-Path $binDir "faultpolytrace.exe")
 
 $desktopSource = Join-Path $repoRoot "standalone_app\qt_desktop"
 $desktopExe = Join-Path $desktopSource "FaultPolyTrace.exe"
 Copy-FileRequired $desktopExe (Join-Path $packageDir "FaultPolyTrace.exe")
+Copy-FileRequired $iconIco (Join-Path $packageDir "faultpolytrace.ico")
+Copy-FileRequired $iconPng (Join-Path $packageDir "faultpolytrace.png")
 foreach ($name in @(
     "qt.conf",
     "Qt5Core.dll",
@@ -130,6 +134,8 @@ $launcherFiles = @(
 foreach ($name in $launcherFiles) {
     Copy-FileOptional (Join-Path $launcherSource $name) (Join-Path $launcherDir $name) | Out-Null
 }
+Copy-FileRequired $iconIco (Join-Path $launcherDir "faultpolytrace.ico")
+Copy-FileRequired $iconPng (Join-Path $launcherDir "faultpolytrace.png")
 foreach ($subdir in @("platforms", "imageformats", "iconengines", "styles", "translations")) {
     $src = Join-Path $launcherSource $subdir
     if (Test-Path -LiteralPath $src) {
@@ -222,6 +228,7 @@ foreach ($script in @(
     "检查参数一致性.ps1",
     "检查独立软件界面功能.ps1",
     "检查GeoEast插件界面功能.ps1",
+    "检查客户机硬编码.ps1",
     "检查GeoEast现场证据.ps1",
     "赛题满分交付审计.ps1",
     "生成答辩评审材料包.ps1",
@@ -255,7 +262,7 @@ $manifest += ""
 $manifest += "## 包含内容"
 $manifest += ""
 $manifest += '- `bin/faultpolytrace.exe`：离线算法程序'
-$manifest += '- `FaultPolyTrace.exe`：独立桌面软件，处理外部网格文件，不包含 GeoEast 数据库配置'
+$manifest += '- `FaultPolyTrace.exe`：独立桌面软件，支持外部网格文件，也可按客户环境配置 GeoEast 数据库连接'
 $manifest += '- `qt_launcher/faultpolytrace_launcher.exe`：GeoEast 集成控件，用于数据库读写和平台入口'
 $manifest += '- `01_打开图形界面.cmd`：评审推荐图形入口'
 $manifest += '- `02_运行离线演示.cmd`：无需 GeoEast 的双击离线演示'
@@ -296,10 +303,11 @@ $manifest += '5. 查看 `docs/官方数据最新验收报告.md`。'
 $manifest += '6. 修改界面参数、模板参数、CLI 参数或 Runner 参数后运行 `scripts/检查参数一致性.ps1`，确认独立软件、GeoEast 控件、核心算法和发布包链路一致。'
 $manifest += '7. 修改独立软件菜单、工具栏、视图切换或主操作按钮后运行 `scripts/检查独立软件界面功能.ps1`，确认没有空控件和漏联动。'
 $manifest += '8. 修改独立软件或发布包后运行 `scripts/验收独立软件发布包.ps1 -PackageDir <发布包目录>`，确认 GUI、CLI、根目录转发和输出文件完整。'
-$manifest += '9. 修改算法后运行 `scripts/一键总验收.ps1 -SkipGeoEastBuild -SkipPackage`，确认官方数据仍满足覆盖、防黏连、拓扑和性能门禁。'
-$manifest += '10. 在 GeoEast 现场截图前运行 `scripts/检查GeoEast现场证据.ps1 -Initialize`，按模板补齐截图和录屏后再运行该脚本校验。'
-$manifest += '11. 提交或打包前运行 `scripts/赛题满分交付审计.ps1`，汇总官方 DAT、独立软件、GeoEast 集成、文档和发布包证据。'
-$manifest += '12. 答辩或提交前查看 `答辩评审材料包/评分项证据索引.md`，也可运行 `scripts/生成答辩评审材料包.ps1` 重新生成材料包。'
+$manifest += '9. 修改默认配置、构建脚本或发布脚本后运行 `scripts/检查客户机硬编码.ps1`，确认客户可见链路不含开发机路径、固定用户名和固定测试对象。'
+$manifest += '10. 修改算法后运行 `scripts/一键总验收.ps1 -SkipGeoEastBuild -SkipPackage`，确认官方数据仍满足覆盖、防黏连、拓扑和性能门禁。'
+$manifest += '11. 在 GeoEast 现场截图前运行 `scripts/检查GeoEast现场证据.ps1 -Initialize`，按模板补齐截图和录屏后再运行该脚本校验。'
+$manifest += '12. 提交或打包前运行 `scripts/赛题满分交付审计.ps1`，汇总官方 DAT、独立软件、GeoEast 集成、文档和发布包证据。'
+$manifest += '13. 答辩或提交前查看 `答辩评审材料包/评分项证据索引.md`，也可运行 `scripts/生成答辩评审材料包.ps1` 重新生成材料包。'
 
 Set-Content -LiteralPath (Join-Path $packageDir "发布包清单.md") -Value ($manifest -join "`n") -Encoding UTF8
 

@@ -73,9 +73,13 @@ function Get-Section {
 
 $cppPath = "standalone_app\qt_desktop\FaultPolyTraceWindow.cpp"
 $headerPath = "standalone_app\qt_desktop\FaultPolyTraceWindow.h"
+$mainPath = "standalone_app\qt_desktop\main.cpp"
+$proPath = "standalone_app\qt_desktop\FaultPolyTraceDesktop.pro"
 $packageScriptPath = "scripts\打包发布包.ps1"
 $cpp = Read-TextFile $cppPath
 $header = Read-TextFile $headerPath
+$main = Read-TextFile $mainPath
+$pro = Read-TextFile $proPath
 $packageScript = Read-TextFile $packageScriptPath
 $rows = [System.Collections.Generic.List[object]]::new()
 
@@ -84,6 +88,9 @@ Add-ContainsCheck -Rows $rows -Group "窗口与布局" -Name "默认窗口" -Req
 Add-ContainsCheck -Rows $rows -Group "窗口与布局" -Name "工具栏图标" -Requirement "图标清晰且不使用过小尺寸" -Text $cpp -Needle "toolbar->setIconSize(QSize(20, 20))" -Detail "$cppPath 设置工具栏图标尺寸"
 Add-ContainsCheck -Rows $rows -Group "窗口与布局" -Name "工具栏文字" -Requirement "图标配合文字或工具提示" -Text $cpp -Needle "toolbar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon)" -Detail "$cppPath 设置工具栏图标文字样式"
 Add-ContainsCheck -Rows $rows -Group "窗口与布局" -Name "侧栏滚动" -Requirement "窗口缩小时参数区可滚动" -Text $cpp -Needle "sidebarScroll->setWidgetResizable(true)" -Detail "$cppPath 侧栏使用 QScrollArea"
+Add-ContainsCheck -Rows $rows -Group "窗口与布局" -Name "运行时图标" -Requirement "窗口和任务栏使用产品图标" -Text $main -Needle "app.setWindowIcon(locateApplicationIcon())" -Detail "$mainPath 设置运行时图标"
+Add-ContainsCheck -Rows $rows -Group "窗口与布局" -Name "EXE图标" -Requirement "Windows 可执行文件嵌入产品图标" -Text $pro -Needle "RC_ICONS = ../../assets/icons/faultpolytrace.ico" -Detail "$proPath 配置 RC_ICONS"
+Add-ContainsCheck -Rows $rows -Group "发布链路" -Name "发布图标" -Requirement "发布包根目录携带产品图标文件" -Text $packageScript -Needle 'faultpolytrace.ico' -Detail "$packageScriptPath 复制 faultpolytrace.ico"
 
 $menus = @(
     @{ Name="文件"; Needle="menuBar()->addMenu(QString::fromUtf8(`"文件(&F)`"))" },

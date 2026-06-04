@@ -8,6 +8,8 @@ $ErrorActionPreference = "Stop"
 
 $projectRoot = Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")
 $desktopDir = Join-Path $projectRoot "standalone_app\qt_desktop"
+$iconIco = Join-Path $projectRoot "assets\icons\faultpolytrace.ico"
+$iconPng = Join-Path $projectRoot "assets\icons\faultpolytrace_32.png"
 
 if ([string]::IsNullOrWhiteSpace($QMake)) {
     $qmakeCandidates = @(
@@ -80,6 +82,12 @@ if (Test-Path -LiteralPath $windeployQt) {
 } else {
     Write-Warning "windeployqt.exe was not found next to qmake.exe: $windeployQt"
     Write-QtConf $desktopDir
+}
+
+foreach ($icon in @($iconIco, $iconPng)) {
+    if (Test-Path -LiteralPath $icon) {
+        Copy-Item -LiteralPath $icon -Destination (Join-Path $desktopDir (Split-Path -Leaf $icon)) -Force
+    }
 }
 
 Write-Host "Desktop app built and deployed:" $desktopExe

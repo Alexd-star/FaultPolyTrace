@@ -41,3 +41,9 @@ standalone_app/**/styles/
 standalone_app/**/imageformats/
 standalone_app/**/iconengines/
 standalone_app/**/qt.conf
+standalone_app/qt_desktop/FaultPolyTrace_resource.rc
+standalone_app/qt_desktop/faultpolytrace.ico
+standalone_app/qt_desktop/faultpolytrace_32.png
+geoeast_plugin/qt_launcher/faultpolytrace_launcher_resource.rc
+geoeast_plugin/qt_launcher/faultpolytrace.ico
+geoeast_plugin/qt_launcher/faultpolytrace_32.png

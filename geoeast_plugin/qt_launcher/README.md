@@ -10,23 +10,23 @@ faultpolytrace_geoeast_runner.exe
 
 然后把 runner 的日志实时显示在界面中。
 
-## 默认演示设置
+## 默认配置原则
 
-```text
-数据库: ndp
-项目: BGPCup2026_Test7
-用户: 26312
-输入网格: test7_fault_attribute_bo
-输出多边形: FaultPolyTrace_Result
-```
+启动器面向不同客户机和不同 GeoEast 工区，不再内置某台开发机的项目、用户名、输入网格或数据盘路径。首次启动时会按以下顺序自动识别环境：
 
-启动器也可以在运行前把官方 `test.dat` 导入或覆盖为正确的 `BOMapGrid`。
+1. 读取 `FPT_GEOEAST_ROOT`、`FPT_GEOEAST_DATA_ROOT`、`FPT_GEOEAST_PROJECT`、`FPT_GEOEAST_USER`、`FPT_GEOEAST_GRID` 等环境变量。
+2. 根据启动器所在目录判断是否位于 `<GeoEast安装根目录>\GeoEast-RC\bin` 或其子目录。
+3. 根据 `NGP`、`IECO`、`GEOEAST`、`PG_HOME` 等 GeoEast 运行环境变量推断根目录和数据目录。
+4. 读取启动器旁边已保存的 `faultpolytrace_launcher.ini`。
+5. 仍无法识别时保留为空，并在界面中提示用户手动选择或填写。
+
+启动器也可以在运行前把用户选择的 DAT 文件导入或覆盖为指定 `BOMapGrid`。
 
 ## 配置方式
 
 - 启动器会在可执行文件旁边保存 `faultpolytrace_launcher.ini`。
 - `faultpolytrace_launcher.example.ini` 是配置示例。
-- 初次创建 ini 前，可以用环境变量覆盖默认值，例如：
+- 初次创建 ini 前，可以用环境变量提供默认值，例如：
   - `FPT_GEOEAST_ROOT`
   - `FPT_GEOEAST_DATA_ROOT`
   - `FPT_GEOEAST_PROJECT`
@@ -34,7 +34,7 @@ faultpolytrace_geoeast_runner.exe
   - `FPT_GEOEAST_GRID`
   - `FPT_OFFICIAL_DAT`
 
-本机默认值只是为了方便演示；runner 本身仍然支持命令行和环境变量驱动。
+保存后的 ini 只记录当前客户机自己的配置。示例配置文件不包含开发机路径。
 
 ## 构建
 
@@ -57,15 +57,15 @@ faultpolytrace_geoeast_runner.exe
 如果把启动器复制到新机器，需要用构建时同一套 Qt 部署运行库。本项目在 GeoEast 环境下推荐使用：
 
 ```powershell
-& "C:\Users\26312\GeoEast\NGP\Qt\Qt5.15.2\5.15.2\msvc2019_64\bin\windeployqt.exe" --force .\geoeast_plugin\qt_launcher\faultpolytrace_launcher.exe
+& "<GeoEast安装根目录>\NGP\Qt\Qt5.15.2\5.15.2\msvc2019_64\bin\windeployqt.exe" --force .\geoeast_plugin\qt_launcher\faultpolytrace_launcher.exe
 ```
 
-如果运行的是复制到 `C:\Users\26312\GeoEast\GeoEast-RC\bin` 下的副本，也要对那个副本执行同样的 `windeployqt`，或直接重新运行部署脚本，确保 exe 旁边的 `Qt5Core.dll`、`Qt5Gui.dll`、`Qt5Widgets.dll` 和 `platforms\qwindows.dll` 来自同一个 Qt 版本。
+如果运行的是复制到 `<GeoEast安装根目录>\GeoEast-RC\bin` 下的副本，也要对那个副本执行同样的 `windeployqt`，或直接重新运行部署脚本，确保 exe 旁边的 `Qt5Core.dll`、`Qt5Gui.dll`、`Qt5Widgets.dll` 和 `platforms\qwindows.dll` 来自同一个 Qt 版本。
 
 ## 比赛演示流程
 
 1. 点击 `刷新网格`，列出当前 GeoEast 项目里的 `BOMapGrid`。
-2. 选择 `test7_fault_attribute_bo`，或勾选 `从官方 DAT 导入/覆盖输入网格` 重新生成它。
+2. 选择需要处理的输入网格，或勾选 `从 DAT 导入/覆盖输入网格` 重新生成它。
 3. 设置 `输出多边形`，例如 `FaultPolyTrace_Result`。
 4. 检查 `最小面积`、阈值模式和 `ridge-belt` 参数。
 5. 点击 `开始追踪`。
