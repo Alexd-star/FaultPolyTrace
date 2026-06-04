@@ -33,17 +33,22 @@
 #include <QPolygonF>
 #include <QProcessEnvironment>
 #include <QPushButton>
+#include <QRegularExpression>
 #include <QScrollArea>
 #include <QSettings>
 #include <QSizePolicy>
 #include <QSpinBox>
+#include <QStandardPaths>
 #include <QTextEdit>
 #include <QTextCursor>
 #include <QToolBar>
 #include <QUrl>
 #include <QVBoxLayout>
+#include <QWheelEvent>
 
 #include <functional>
+#include <cmath>
+#include <limits>
 
 namespace {
 
@@ -71,6 +76,16 @@ QString quoteForLog(const QStringList& args) {
         quoted << (arg.contains(' ') ? QString("\"%1\"").arg(arg) : arg);
     }
     return quoted.join(' ');
+}
+
+QString sanitizeFileComponent(const QString& text, const QString& fallback) {
+    QString value = text.trimmed();
+    if (value.isEmpty()) {
+        value = fallback;
+    }
+    value.replace(QRegularExpression("[\\\\/:*?\"<>|\\s]+"), "_");
+    value = value.left(80);
+    return value.isEmpty() ? fallback : value;
 }
 
 enum class ToolIconKind {
@@ -213,7 +228,9 @@ public:
 
     void resetView() {
         panMode_ = false;
+        dragging_ = false;
         zoom_ = 1.0;
+        panOffset_ = QPointF(0, 0);
         setCursor(Qt::ArrowCursor);
         update();
     }
@@ -232,7 +249,7 @@ public:
                     double polygonLineWidth) {
         database_ = database;
         project_ = project;
-        grid_ = grid;
+        gridName_ = grid;
         output_ = output;
         preset_ = preset;
         traceMode_ = traceMode;
@@ -260,6 +277,190 @@ public:
         coordinateCallback_ = std::move(callback);
     }
 
+    bool loadGridFile(const QString& path, QString* error) {
+        grid_.clear();
+        nx_ = 0;
+        ny_ = 0;
+        xMin_ = 0.0;
+        yMin_ = 0.0;
+        xMax_ = 1.0;
+        yMax_ = 1.0;
+        valueMin_ = 0.0;
+        valueMax_ = 1.0;
+
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            if (error) {
+                *error = QString::fromUtf8("无法打开原始网格导出文件：%1").arg(path);
+            }
+            update();
+            return false;
+        }
+
+        const QStringList lines = QString::fromLocal8Bit(file.readAll())
+            .split(QRegularExpression("[\r\n]+"), Qt::SkipEmptyParts);
+        if (lines.size() < 4) {
+            if (error) {
+                *error = QString::fromUtf8("原始网格导出文件格式不完整。");
+            }
+            update();
+            return false;
+        }
+
+        auto splitNumbers = [](const QString& text) {
+            QVector<double> values;
+            QRegularExpression numberRe("[-+]?\\d*\\.?\\d+(?:[eE][-+]?\\d+)?");
+            QRegularExpressionMatchIterator it = numberRe.globalMatch(text);
+            while (it.hasNext()) {
+                values << it.next().captured(0).toDouble();
+            }
+            return values;
+        };
+
+        const QVector<double> dims = splitNumbers(lines[0]);
+        const QVector<double> origin = splitNumbers(lines[1]);
+        const QVector<double> spacing = splitNumbers(lines[2]);
+        if (dims.size() < 2 || origin.size() < 2 || spacing.size() < 2) {
+            if (error) {
+                *error = QString::fromUtf8("原始网格导出文件头无效。");
+            }
+            update();
+            return false;
+        }
+
+        nx_ = qRound(dims[0]);
+        ny_ = qRound(dims[1]);
+        if (nx_ <= 0 || ny_ <= 0) {
+            if (error) {
+                *error = QString::fromUtf8("原始网格尺寸无效。");
+            }
+            update();
+            return false;
+        }
+
+        grid_.reserve(nx_ * ny_);
+        for (int i = 3; i < lines.size(); ++i) {
+            const QVector<double> values = splitNumbers(lines[i]);
+            for (double value : values) {
+                grid_ << value;
+            }
+        }
+        if (grid_.size() < nx_ * ny_) {
+            if (error) {
+                *error = QString::fromUtf8("原始网格数值数量不足。");
+            }
+            update();
+            return false;
+        }
+        grid_.resize(nx_ * ny_);
+
+        const double dx = spacing[0] == 0.0 ? 1.0 : spacing[0];
+        const double dy = spacing[1] == 0.0 ? 1.0 : spacing[1];
+        xMin_ = origin[0];
+        yMin_ = origin[1];
+        xMax_ = xMin_ + dx * qMax(1, nx_ - 1);
+        yMax_ = yMin_ + dy * qMax(1, ny_ - 1);
+
+        valueMin_ = std::numeric_limits<double>::max();
+        valueMax_ = -std::numeric_limits<double>::max();
+        for (double value : grid_) {
+            if (!std::isfinite(value)) {
+                continue;
+            }
+            valueMin_ = qMin(valueMin_, value);
+            valueMax_ = qMax(valueMax_, value);
+        }
+        if (valueMin_ == std::numeric_limits<double>::max()) {
+            valueMin_ = 0.0;
+            valueMax_ = 1.0;
+        }
+        if (qFuzzyCompare(valueMin_, valueMax_)) {
+            valueMax_ = valueMin_ + 1.0;
+        }
+        dataStatus_ = QString::fromUtf8("原始网格：%1 x %2").arg(nx_).arg(ny_);
+        update();
+        return true;
+    }
+
+    bool loadPolygonCsv(const QString& path, QString* error) {
+        polygons_.clear();
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            if (error) {
+                *error = QString::fromUtf8("无法打开结果多边形导出文件：%1").arg(path);
+            }
+            update();
+            return false;
+        }
+
+        const QStringList lines = QString::fromLocal8Bit(file.readAll())
+            .split(QRegularExpression("[\r\n]+"), Qt::SkipEmptyParts);
+        QRegularExpression numberRe("[-+]?\\d*\\.?\\d+(?:[eE][-+]?\\d+)?");
+        double pxMin = std::numeric_limits<double>::max();
+        double pyMin = std::numeric_limits<double>::max();
+        double pxMax = -std::numeric_limits<double>::max();
+        double pyMax = -std::numeric_limits<double>::max();
+        int keptPolygonCount = 0;
+
+        auto parseRing = [&](const QString& ringText) {
+            QRegularExpressionMatchIterator it = numberRe.globalMatch(ringText);
+            QVector<double> numbers;
+            while (it.hasNext()) {
+                numbers << it.next().captured(0).toDouble();
+            }
+
+            QPolygonF ring;
+            for (int i = 0; i + 1 < numbers.size(); i += 2) {
+                const QPointF point(numbers[i], numbers[i + 1]);
+                ring << point;
+                pxMin = qMin(pxMin, point.x());
+                pyMin = qMin(pyMin, point.y());
+                pxMax = qMax(pxMax, point.x());
+                pyMax = qMax(pyMax, point.y());
+            }
+            if (ring.size() >= 3) {
+                polygons_ << ring;
+            }
+        };
+
+        for (const QString& line : lines) {
+            if (!line.contains("POLYGON", Qt::CaseInsensitive) ||
+                !line.contains("kept", Qt::CaseInsensitive)) {
+                continue;
+            }
+            const QString wkt = line.mid(line.indexOf("POLYGON", 0, Qt::CaseInsensitive));
+            const int start = wkt.indexOf("((");
+            const int end = wkt.lastIndexOf("))");
+            if (start < 0 || end <= start + 2) {
+                continue;
+            }
+            ++keptPolygonCount;
+            const QString body = wkt.mid(start + 2, end - start - 2);
+            const QStringList rings = body.split("),(", Qt::SkipEmptyParts);
+            for (const QString& ring : rings) {
+                parseRing(ring);
+            }
+        }
+
+        if (grid_.isEmpty() && !polygons_.isEmpty()) {
+            xMin_ = pxMin;
+            yMin_ = pyMin;
+            xMax_ = pxMax;
+            yMax_ = pyMax;
+        }
+        dataStatus_ = polygons_.isEmpty()
+            ? QString::fromUtf8("未发现保留多边形")
+            : QString::fromUtf8("结果多边形：%1 个，显示环：%2 条").arg(keptPolygonCount).arg(polygons_.size());
+        update();
+        return !polygons_.isEmpty();
+    }
+
+    bool savePng(const QString& path) {
+        QPixmap pixmap(size());
+        render(&pixmap);
+        return pixmap.save(path, "PNG");
+    }
+
 protected:
     void paintEvent(QPaintEvent*) override {
         QPainter painter(this);
@@ -277,89 +478,53 @@ protected:
         painter.setPen(QPen(QColor("#E7E7E7"), 1));
         painter.drawRect(rect().adjusted(0, 0, -1, -1));
 
+        const QRectF canvas = rect().adjusted(24, 56, -24, -24);
+        if (!grid_.isEmpty() || !polygons_.isEmpty()) {
+            const QRectF contentCanvas = transformedCanvas(canvas);
+            painter.save();
+            painter.setClipRect(canvas);
+            if (!grid_.isEmpty() && showInputLayer_) {
+                drawGrid(painter, contentCanvas);
+            }
+            if (!polygons_.isEmpty() && showResultLayer_) {
+                drawPolygons(painter, contentCanvas);
+            }
+            painter.restore();
+        }
+
         QFont titleFont = painter.font();
         titleFont.setPointSize(16);
         titleFont.setBold(true);
         painter.setFont(titleFont);
         painter.setPen(QColor("#7A7A7A"));
         const QString viewTitle = showInputLayer_ && showResultLayer_
-            ? QString::fromUtf8("[任务视图区] GeoEast Basemap 叠加预览")
-            : (showInputLayer_ ? QString::fromUtf8("[任务视图区] 原始网格预览")
-            : (showResultLayer_ ? QString::fromUtf8("[任务视图区] 结果多边形预览")
-            : QString::fromUtf8("[任务视图区] 图层预览已关闭")));
+            ? QString::fromUtf8("[结果视图区] 原始网格 + 结果多边形")
+            : (showInputLayer_ ? QString::fromUtf8("[结果视图区] 原始网格")
+            : (showResultLayer_ ? QString::fromUtf8("[结果视图区] 结果多边形")
+            : QString::fromUtf8("[结果视图区] 图层显示已关闭")));
         painter.drawText(QPoint(26, 38), viewTitle);
 
         QFont hintFont = painter.font();
         hintFont.setPointSize(10);
         hintFont.setBold(false);
-        painter.setFont(hintFont);
-        painter.setPen(QColor("#666666"));
-        const QString thresholdText = thresholdMode_ == "fixed"
-            ? QString::fromUtf8("固定阈值 %1").arg(threshold_, 0, 'f', 4)
-            : QString::fromUtf8("分位数 %1").arg(percentile_, 0, 'f', 4);
-        const QStringList lines = {
-            QString::fromUtf8("数据库：%1    项目：%2").arg(database_.isEmpty() ? QString::fromUtf8("未配置") : database_,
-                                                        project_.isEmpty() ? QString::fromUtf8("未配置") : project_),
-            QString::fromUtf8("输入网格：%1").arg(grid_.isEmpty() ? QString::fromUtf8("未选择") : grid_),
-            QString::fromUtf8("输出多边形：%1").arg(output_.isEmpty() ? QString::fromUtf8("未命名") : output_),
-            QString::fromUtf8("方案：%1    模式：%2    阈值：%3").arg(preset_, traceMode_, thresholdText),
-            QString::fromUtf8("面积过滤：小于 %1 的多边形不输出    结果线宽：%2").arg(minArea_, 0, 'f', 2).arg(polygonLineWidth_, 0, 'f', 3),
-            QString::fromUtf8("显示选择：原始网格 %1    结果多边形 %2")
-                .arg(showInputLayer_ ? QString::fromUtf8("开启") : QString::fromUtf8("关闭"),
-                     showResultLayer_ ? QString::fromUtf8("开启") : QString::fromUtf8("关闭")),
-            QString::fromUtf8("当前状态：%1").arg(activity_.isEmpty() ? QString::fromUtf8("等待运行") : activity_)
-        };
-        painter.drawText(rect().adjusted(26, 60, -26, -26), Qt::AlignLeft | Qt::AlignTop, lines.join('\n'));
-
-        const QRectF previewRect(width() - 300, height() - 190, 250, 130);
-        if (previewRect.left() > 360 && previewRect.top() > 170) {
-            painter.setPen(QPen(QColor("#C8C8C8"), 1));
-            painter.setBrush(showInputLayer_ ? QColor("#FFF8F4") : QColor("#FBFBFB"));
-            painter.drawRect(previewRect);
-            painter.setPen(QPen(QColor("#E6E6E6"), 1));
-            for (int i = 1; i < 5; ++i) {
-                const qreal x = previewRect.left() + previewRect.width() * i / 5.0;
-                painter.drawLine(QPointF(x, previewRect.top()), QPointF(x, previewRect.bottom()));
-            }
-            for (int i = 1; i < 4; ++i) {
-                const qreal y = previewRect.top() + previewRect.height() * i / 4.0;
-                painter.drawLine(QPointF(previewRect.left(), y), QPointF(previewRect.right(), y));
-            }
-
-            if (showInputLayer_) {
-                const QRectF belt(previewRect.left() + 28, previewRect.top() + 56, previewRect.width() - 56, 30);
-                QLinearGradient gradient(belt.left(), belt.center().y(), belt.right(), belt.center().y());
-                gradient.setColorAt(0.00, QColor("#F44336"));
-                gradient.setColorAt(0.20, QColor("#FFD21F"));
-                gradient.setColorAt(0.42, QColor("#1FEF77"));
-                gradient.setColorAt(0.52, QColor("#0A57E8"));
-                gradient.setColorAt(0.62, QColor("#1FEF77"));
-                gradient.setColorAt(0.80, QColor("#FFD21F"));
-                gradient.setColorAt(1.00, QColor("#F44336"));
-                painter.setPen(Qt::NoPen);
-                painter.setBrush(gradient);
-                painter.drawRoundedRect(belt, 8, 8);
-            }
-
-            QPainterPath path;
-            path.moveTo(previewRect.left() + 24, previewRect.bottom() - 28);
-            path.cubicTo(previewRect.left() + 80, previewRect.top() + 88,
-                         previewRect.left() + 142, previewRect.top() + 36,
-                         previewRect.right() - 28, previewRect.top() + 24);
-            if (showResultLayer_) {
-                painter.setPen(QPen(polygonColor_, qMax(1.5, polygonLineWidth_ * 40.0), Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-                painter.setBrush(Qt::NoBrush);
-                painter.drawPath(path);
-            }
+        if (grid_.isEmpty() && polygons_.isEmpty()) {
             painter.setFont(hintFont);
             painter.setPen(QColor("#666666"));
-            const QString previewText = showInputLayer_ && showResultLayer_
-                ? QString::fromUtf8("叠加预览")
-                : (showInputLayer_ ? QString::fromUtf8("原始网格")
-                : (showResultLayer_ ? QString::fromUtf8("结果边界")
-                : QString::fromUtf8("预览关闭")));
-            painter.drawText(previewRect.adjusted(8, 8, -8, -8), Qt::AlignLeft | Qt::AlignTop,
-                             previewText);
+            const QString thresholdText = thresholdMode_ == "fixed"
+                ? QString::fromUtf8("固定阈值 %1").arg(threshold_, 0, 'f', 4)
+                : QString::fromUtf8("分位数 %1").arg(percentile_, 0, 'f', 4);
+            const QStringList lines = {
+                QString::fromUtf8("数据库：%1    项目：%2").arg(database_.isEmpty() ? QString::fromUtf8("未配置") : database_,
+                                                            project_.isEmpty() ? QString::fromUtf8("未配置") : project_),
+                QString::fromUtf8("输入网格：%1").arg(gridName_.isEmpty() ? QString::fromUtf8("未选择") : gridName_),
+                QString::fromUtf8("输出多边形：%1").arg(output_.isEmpty() ? QString::fromUtf8("未命名") : output_),
+                QString::fromUtf8("方案：%1    模式：%2    阈值：%3").arg(preset_, traceMode_, thresholdText),
+                QString::fromUtf8("面积过滤：小于 %1 的多边形不输出    结果线宽：%2").arg(minArea_, 0, 'f', 2).arg(polygonLineWidth_, 0, 'f', 3),
+                QString::fromUtf8("真实查看：运行追踪后自动载入原始网格和结果多边形；也可点击【载入真实视图】读取缓存文件。"),
+                QString::fromUtf8("官方查看：点击【打开工区底图】或【打开平面成图】，在 GeoEast 图层树中加载 Grids 和 Fault Polygons。"),
+                QString::fromUtf8("当前状态：%1").arg(activity_.isEmpty() ? QString::fromUtf8("等待运行") : activity_)
+            };
+            painter.drawText(rect().adjusted(26, 62, -26, -26), Qt::AlignLeft | Qt::AlignTop, lines.join('\n'));
         }
 
         painter.setPen(QColor("#8A8A8A"));
@@ -367,13 +532,49 @@ protected:
                          QString::fromUtf8("%1  缩放 %2%")
                              .arg(panMode_ ? QString::fromUtf8("平移模式") : QString::fromUtf8("查看模式"))
                              .arg(qRound(zoom_ * 100)));
+        painter.setFont(hintFont);
+        painter.setPen(QColor("#666666"));
+        painter.drawText(QRect(width() - 360, 38, 330, 20), Qt::AlignRight,
+                         dataStatus_.isEmpty() ? activity_ : dataStatus_);
+    }
+
+    void mousePressEvent(QMouseEvent* event) override {
+        if (panMode_ && event->button() == Qt::LeftButton) {
+            dragging_ = true;
+            lastDragPos_ = event->pos();
+            setCursor(Qt::ClosedHandCursor);
+        }
+        QWidget::mousePressEvent(event);
     }
 
     void mouseMoveEvent(QMouseEvent* event) override {
         if (coordinateCallback_) {
-            coordinateCallback_(QPointF(event->pos().x() / zoom_, event->pos().y() / zoom_));
+            coordinateCallback_(viewToWorld(event->pos()));
+        }
+        if (dragging_) {
+            const QPointF delta = event->pos() - lastDragPos_;
+            panOffset_ += delta;
+            lastDragPos_ = event->pos();
+            update();
         }
         QWidget::mouseMoveEvent(event);
+    }
+
+    void mouseReleaseEvent(QMouseEvent* event) override {
+        if (event->button() == Qt::LeftButton && dragging_) {
+            dragging_ = false;
+            setCursor(panMode_ ? Qt::OpenHandCursor : Qt::ArrowCursor);
+        }
+        QWidget::mouseReleaseEvent(event);
+    }
+
+    void wheelEvent(QWheelEvent* event) override {
+        if (event->angleDelta().y() > 0) {
+            zoomIn();
+        } else if (event->angleDelta().y() < 0) {
+            zoomOut();
+        }
+        QWidget::wheelEvent(event);
     }
 
     void leaveEvent(QEvent* event) override {
@@ -384,18 +585,120 @@ protected:
     }
 
 private:
+    QColor heatColor(double value) const {
+        const double t = qBound(0.0, (value - valueMin_) / (valueMax_ - valueMin_), 1.0);
+        if (t < 0.25) {
+            return QColor::fromRgbF(1.0, t / 0.25, 0.0);
+        }
+        if (t < 0.50) {
+            return QColor::fromRgbF(1.0 - (t - 0.25) / 0.25, 1.0, 0.0);
+        }
+        if (t < 0.75) {
+            return QColor::fromRgbF(0.0, 1.0, (t - 0.50) / 0.25);
+        }
+        return QColor::fromRgbF(0.0, 1.0 - (t - 0.75) / 0.25, 1.0);
+    }
+
+    QRectF transformedCanvas(const QRectF& canvas) const {
+        const QPointF center = canvas.center() + panOffset_;
+        return QRectF(center.x() - canvas.width() * zoom_ / 2.0,
+                      center.y() - canvas.height() * zoom_ / 2.0,
+                      canvas.width() * zoom_,
+                      canvas.height() * zoom_);
+    }
+
+    QRectF fittedRect(const QRectF& available) const {
+        const double dataWidth = qMax(1e-9, xMax_ - xMin_);
+        const double dataHeight = qMax(1e-9, yMax_ - yMin_);
+        const double scale = qMin(available.width() / dataWidth, available.height() / dataHeight);
+        const double width = dataWidth * scale;
+        const double height = dataHeight * scale;
+        return QRectF(available.center().x() - width / 2.0,
+                      available.center().y() - height / 2.0,
+                      width,
+                      height);
+    }
+
+    QPointF mapPoint(const QPointF& point, const QRectF& target) const {
+        const double xRange = qMax(1e-9, xMax_ - xMin_);
+        const double yRange = qMax(1e-9, yMax_ - yMin_);
+        return QPointF(target.left() + (point.x() - xMin_) / xRange * target.width(),
+                       target.bottom() - (point.y() - yMin_) / yRange * target.height());
+    }
+
+    QPointF viewToWorld(const QPointF& point) const {
+        if (grid_.isEmpty() && polygons_.isEmpty()) {
+            return QPointF(point.x() / zoom_, point.y() / zoom_);
+        }
+        const QRectF canvas = rect().adjusted(24, 56, -24, -24);
+        const QRectF target = fittedRect(transformedCanvas(canvas));
+        if (!target.contains(point)) {
+            return QPointF(-1.0, -1.0);
+        }
+        const double x = xMin_ + (point.x() - target.left()) / target.width() * (xMax_ - xMin_);
+        const double y = yMin_ + (target.bottom() - point.y()) / target.height() * (yMax_ - yMin_);
+        return QPointF(x, y);
+    }
+
+    void drawGrid(QPainter& painter, const QRectF& available) const {
+        if (nx_ <= 0 || ny_ <= 0) {
+            return;
+        }
+        QImage image(nx_, ny_, QImage::Format_RGB32);
+        for (int y = 0; y < ny_; ++y) {
+            for (int x = 0; x < nx_; ++x) {
+                image.setPixelColor(x, ny_ - 1 - y, heatColor(grid_[y * nx_ + x]));
+            }
+        }
+        const QRectF target = fittedRect(available);
+        painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
+        painter.drawImage(target, image);
+        painter.setPen(QColor("#222222"));
+        painter.drawRect(target);
+    }
+
+    void drawPolygons(QPainter& painter, const QRectF& available) const {
+        QColor color = polygonColor_;
+        color.setAlphaF(1.0);
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        painter.setPen(QPen(color, qMax(1.2, polygonLineWidth_ * 42.0), Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        painter.setBrush(Qt::NoBrush);
+        const QRectF target = fittedRect(available);
+        for (const QPolygonF& polygon : polygons_) {
+            QPolygonF mapped;
+            for (const QPointF& point : polygon) {
+                mapped << mapPoint(point, target);
+            }
+            painter.drawPolygon(mapped);
+        }
+    }
+
     double zoom_ = 1.0;
     bool panMode_ = false;
+    bool dragging_ = false;
     bool showInputLayer_ = true;
     bool showResultLayer_ = true;
+    QPointF panOffset_;
+    QPointF lastDragPos_;
+    QVector<double> grid_;
+    QVector<QPolygonF> polygons_;
+    int nx_ = 0;
+    int ny_ = 0;
+    double valueMin_ = 0.0;
+    double valueMax_ = 1.0;
+    double xMin_ = 0.0;
+    double yMin_ = 0.0;
+    double xMax_ = 1.0;
+    double yMax_ = 1.0;
     QString database_;
     QString project_;
-    QString grid_;
+    QString gridName_;
     QString output_;
     QString preset_ = QString::fromUtf8("防黏连增强");
     QString traceMode_ = "ridge-belt";
     QString thresholdMode_ = "percentile";
     QString activity_ = QString::fromUtf8("等待运行");
+    QString dataStatus_;
     double percentile_ = 0.98;
     double threshold_ = 0.95;
     double minArea_ = 120.0;
@@ -956,6 +1259,11 @@ void FaultTraceDialog::buildUi() {
         deleteOutputAction_ = geoEastMenu->addAction(QString::fromUtf8("删除当前结果"));
         connect(deleteOutputAction_, &QAction::triggered, this, &FaultTraceDialog::deleteOutput);
         geoEastMenu->addSeparator();
+        openBasemapAction_ = geoEastMenu->addAction(QString::fromUtf8("打开工区底图"));
+        connect(openBasemapAction_, &QAction::triggered, this, &FaultTraceDialog::openGeoEastBasemap);
+        openMappingAction_ = geoEastMenu->addAction(QString::fromUtf8("打开平面成图"));
+        connect(openMappingAction_, &QAction::triggered, this, &FaultTraceDialog::openGeoEastMapping);
+        geoEastMenu->addSeparator();
         QAction* exitAction = geoEastMenu->addAction(QString::fromUtf8("关闭启动器"));
         connect(exitAction, &QAction::triggered, this, &FaultTraceDialog::close);
 
@@ -1015,7 +1323,7 @@ void FaultTraceDialog::buildUi() {
             appendStatus(QString::fromUtf8("视图区已重置"));
         });
         viewMenu->addSeparator();
-        showInputLayerAction_ = viewMenu->addAction(QString::fromUtf8("显示原始网格预览"));
+        showInputLayerAction_ = viewMenu->addAction(QString::fromUtf8("显示原始网格层"));
         showInputLayerAction_->setCheckable(true);
         showInputLayerAction_->setChecked(true);
         connect(showInputLayerAction_, &QAction::toggled, this, [this](bool checked) {
@@ -1025,7 +1333,7 @@ void FaultTraceDialog::buildUi() {
             }
             updateLayerVisibility();
         });
-        showResultLayerAction_ = viewMenu->addAction(QString::fromUtf8("显示结果多边形预览"));
+        showResultLayerAction_ = viewMenu->addAction(QString::fromUtf8("显示结果多边形层"));
         showResultLayerAction_->setCheckable(true);
         showResultLayerAction_->setChecked(true);
         connect(showResultLayerAction_, &QAction::toggled, this, [this](bool checked) {
@@ -1035,6 +1343,11 @@ void FaultTraceDialog::buildUi() {
             }
             updateLayerVisibility();
         });
+        viewMenu->addSeparator();
+        loadResultViewAction_ = viewMenu->addAction(QString::fromUtf8("载入真实图层视图"));
+        connect(loadResultViewAction_, &QAction::triggered, this, &FaultTraceDialog::loadResultView);
+        exportViewAction_ = viewMenu->addAction(QString::fromUtf8("导出当前视图 PNG"));
+        connect(exportViewAction_, &QAction::triggered, this, &FaultTraceDialog::exportResultViewPng);
 
         QMenu* faultMenu = menuBar->addMenu(QString::fromUtf8("断层(L)"));
         runTraceAction_ = faultMenu->addAction(makeToolIcon(ToolIconKind::Run), QString::fromUtf8("开始追踪"));
@@ -1087,6 +1400,7 @@ void FaultTraceDialog::buildUi() {
         toolbar->addSeparator();
         toolbar->addAction(configAction);
         toolbar->addWidget(refreshButton_);
+        toolbar->addAction(loadResultViewAction_);
         toolbar->addAction(savePresetAction);
         QWidget* toolbarSpacer = new QWidget(this);
         toolbarSpacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
@@ -1144,27 +1458,39 @@ void FaultTraceDialog::buildUi() {
         dataLayoutNew->addWidget(refreshButton_, 6, 0, 1, 2);
         sidebarContentLayout->addWidget(dataGroup);
 
-        QGroupBox* resultGroup = new QGroupBox(QString::fromUtf8("结果与显示"), sidebarContent);
+        QGroupBox* resultGroup = new QGroupBox(QString::fromUtf8("结果查看"), sidebarContent);
         QGridLayout* resultLayout = makeGroupLayout(resultGroup);
-        showInputLayerCheck_ = new QCheckBox(QString::fromUtf8("预览原始网格"), resultGroup);
-        showInputLayerCheck_->setToolTip(QString::fromUtf8("控制启动器中间视图区是否显示原始网格预览。GeoEast 实际图层请在平面成图图层树中勾选。"));
+        showInputLayerCheck_ = new QCheckBox(QString::fromUtf8("显示原始网格层"), resultGroup);
+        showInputLayerCheck_->setToolTip(QString::fromUtf8("控制本窗口真实图层视图区是否显示 runner 导出的原始网格。"));
         showInputLayerCheck_->setChecked(true);
-        showResultLayerCheck_ = new QCheckBox(QString::fromUtf8("预览结果多边形"), resultGroup);
-        showResultLayerCheck_->setToolTip(QString::fromUtf8("控制启动器中间视图区是否显示结果多边形预览。GeoEast 实际图层请在平面成图图层树中勾选。"));
+        showResultLayerCheck_ = new QCheckBox(QString::fromUtf8("显示结果多边形层"), resultGroup);
+        showResultLayerCheck_->setToolTip(QString::fromUtf8("控制本窗口真实图层视图区是否显示 runner 导出的保留多边形。"));
         showResultLayerCheck_->setChecked(true);
         resultLayout->addWidget(showInputLayerCheck_, 0, 0);
         resultLayout->addWidget(showResultLayerCheck_, 0, 1);
-        QPushButton* mappingGuideButton = new QPushButton(QString::fromUtf8("叠加查看步骤"), resultGroup);
+        loadResultViewButton_ = new QPushButton(QString::fromUtf8("载入真实视图"), resultGroup);
+        loadResultViewButton_->setToolTip(QString::fromUtf8("读取本次追踪导出的真实原始网格和结果多边形缓存。"));
+        exportViewButton_ = new QPushButton(QString::fromUtf8("导出PNG"), resultGroup);
+        exportViewButton_->setToolTip(QString::fromUtf8("导出当前真实图层视图区 PNG 图片。"));
+        resultLayout->addWidget(loadResultViewButton_, 1, 0);
+        resultLayout->addWidget(exportViewButton_, 1, 1);
+        openBasemapButton_ = new QPushButton(QString::fromUtf8("打开工区底图"), resultGroup);
+        openBasemapButton_->setToolTip(QString::fromUtf8("启动 GeoEast 自带 GeoBasemap，在官方图层树中查看原始网格和结果多边形。"));
+        openMappingButton_ = new QPushButton(QString::fromUtf8("打开平面成图"), resultGroup);
+        openMappingButton_->setToolTip(QString::fromUtf8("启动 GeoEast 自带 GeoMapping，在官方图层树中查看原始网格和结果多边形。"));
+        resultLayout->addWidget(openBasemapButton_, 2, 0);
+        resultLayout->addWidget(openMappingButton_, 2, 1);
+        QPushButton* mappingGuideButton = new QPushButton(QString::fromUtf8("查看步骤"), resultGroup);
         mappingGuideButton->setToolTip(QString::fromUtf8("打开 GeoEast 平面成图叠加查看操作指南"));
         deleteOutputButton_ = new QPushButton(QString::fromUtf8("删除当前结果"), resultGroup);
         deleteOutputButton_->setObjectName("dangerButton");
         deleteOutputButton_->setToolTip(QString::fromUtf8("删除当前输出名称对应的 BOFaultPolygon 结果对象"));
-        resultLayout->addWidget(mappingGuideButton, 1, 0);
-        resultLayout->addWidget(deleteOutputButton_, 1, 1);
-        QLabel* displayHint = new QLabel(QString::fromUtf8("提示：启动器内开关用于预览和操作提示；GeoEast 中实际显示/关闭图层，请在 GeoBasemap 或 GeoMapping 的图层树中勾选原始网格和结果多边形。"), resultGroup);
+        resultLayout->addWidget(mappingGuideButton, 3, 0);
+        resultLayout->addWidget(deleteOutputButton_, 3, 1);
+        QLabel* displayHint = new QLabel(QString::fromUtf8("提示：本窗口读取 runner 导出的真实网格和多边形缓存；GeoEast 官方窗口仍需在图层树中勾选 Grids 与 Fault Polygons。"), resultGroup);
         displayHint->setWordWrap(true);
         displayHint->setObjectName("displayHint");
-        resultLayout->addWidget(displayHint, 2, 0, 1, 2);
+        resultLayout->addWidget(displayHint, 4, 0, 1, 2);
         connect(showInputLayerCheck_, &QCheckBox::toggled, this, [this](bool checked) {
             if (showInputLayerAction_ && showInputLayerAction_->isChecked() != checked) {
                 showInputLayerAction_->setChecked(checked);
@@ -1180,9 +1506,13 @@ void FaultTraceDialog::buildUi() {
             updateLayerVisibility();
         });
         connect(mappingGuideButton, &QPushButton::clicked, this, [this, openLocalFile]() {
-            appendLog(QString::fromUtf8("正在打开 GeoEast 叠加查看步骤。实际显示/关闭图层请在 GeoEast 图层树中操作。"));
+            appendLog(QString::fromUtf8("正在打开 GeoEast 叠加查看步骤。官方显示/关闭图层请在 GeoEast 图层树中操作。"));
             openLocalFile("docs/GeoEast使用指南.md");
         });
+        connect(loadResultViewButton_, &QPushButton::clicked, this, &FaultTraceDialog::loadResultView);
+        connect(exportViewButton_, &QPushButton::clicked, this, &FaultTraceDialog::exportResultViewPng);
+        connect(openBasemapButton_, &QPushButton::clicked, this, &FaultTraceDialog::openGeoEastBasemap);
+        connect(openMappingButton_, &QPushButton::clicked, this, &FaultTraceDialog::openGeoEastMapping);
         connect(deleteOutputButton_, &QPushButton::clicked, this, &FaultTraceDialog::deleteOutput);
         sidebarContentLayout->addWidget(resultGroup);
 
@@ -1592,12 +1922,12 @@ void FaultTraceDialog::showHelpHint() {
                              QString::fromUtf8("FaultPolyTrace 帮助提示"),
                              QString::fromUtf8("常用流程：\n"
                                                "1. 在【数据库与环境底层配置】中确认 GeoEast 根目录、项目、用户和 Runner。\n"
-                                               "2. 点击【刷新网格】读取 GeoEast 中的 BOMapGrid 对象。\n"
-                                               "3. 设置输入网格、输出多边形、结果颜色和必要参数。\n"
-                                               "4. 点击【开始追踪】，完成后到 GeoEast 底图叠加查看结果。\n"
-                                               "5. 如需移除旧结果，在【结果与显示】中点击【删除当前结果】。\n"
-                                               "6. 如需显示或关闭原始网格、结果多边形，请在 GeoBasemap/GeoMapping 图层树中勾选对应图层；启动器内开关用于预览和操作提示。\n\n"
-                                               "详细说明见 docs/用户操作手册.md 和 docs/评审交付与异机运行说明.md。"));
+                                                "2. 点击【刷新网格】读取 GeoEast 中的 BOMapGrid 对象。\n"
+                                                "3. 设置输入网格、输出多边形、结果颜色和必要参数。\n"
+                                                "4. 点击【开始追踪】，完成后本窗口会载入真实原始网格和结果多边形。\n"
+                                                "5. 如需用 GeoEast 官方窗口查看，点击【打开工区底图】或【打开平面成图】，再在图层树中勾选 Grids 和 Fault Polygons。\n"
+                                                "6. 如需移除旧结果，在【结果查看】中点击【删除当前结果】。\n\n"
+                                                "详细说明见 docs/用户操作手册.md 和 docs/评审交付与异机运行说明.md。"));
 }
 
 void FaultTraceDialog::loadSettings() {
@@ -1858,8 +2188,60 @@ QStringList FaultTraceDialog::commonConnectionArgs() const {
     return args;
 }
 
+QString FaultTraceDialog::previewOutputDir() const {
+    QString base = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+    if (base.isEmpty()) {
+        base = QDir(QCoreApplication::applicationDirPath()).absoluteFilePath("FaultPolyTracePreviewCache");
+    }
+    const QString db = sanitizeFileComponent(databaseEdit_ ? databaseEdit_->text() : QString(), "database");
+    const QString project = sanitizeFileComponent(projectEdit_ ? projectEdit_->text() : QString(), "project");
+    return QDir(base).absoluteFilePath(QString("GeoEastPreview/%1/%2").arg(db, project));
+}
+
+QString FaultTraceDialog::previewGridPath() const {
+    const QString grid = sanitizeFileComponent(gridCombo_ ? gridCombo_->currentText() : QString(), "grid");
+    const QString output = sanitizeFileComponent(outputEdit_ ? outputEdit_->text() : QString(), "output");
+    return QDir(previewOutputDir()).absoluteFilePath(QString("%1_%2_grid.txt").arg(grid, output));
+}
+
+QString FaultTraceDialog::previewPolygonsPath() const {
+    const QString grid = sanitizeFileComponent(gridCombo_ ? gridCombo_->currentText() : QString(), "grid");
+    const QString output = sanitizeFileComponent(outputEdit_ ? outputEdit_->text() : QString(), "output");
+    return QDir(previewOutputDir()).absoluteFilePath(QString("%1_%2_polygons.csv").arg(grid, output));
+}
+
+bool FaultTraceDialog::launchGeoEastApp(const QString& exeName, const QString& displayName) {
+    const QString geoEastRoot = QDir::fromNativeSeparators(geoEastRootEdit_ ? geoEastRootEdit_->text().trimmed() : QString());
+    const QString exePath = QDir(geoEastRoot).absoluteFilePath("GeoEast-RC/bin/" + exeName);
+    if (!QFileInfo::exists(exePath)) {
+        QMessageBox::warning(this, QString::fromUtf8("GeoEast 程序不存在"),
+                             QString::fromUtf8("未找到 %1：\n%2").arg(displayName, QDir::toNativeSeparators(exePath)));
+        return false;
+    }
+
+    QProcess process;
+    QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
+    configureGeoEastEnvironment(environment);
+    process.setProgram(QDir::toNativeSeparators(exePath));
+    process.setWorkingDirectory(QFileInfo(exePath).absolutePath());
+    process.setProcessEnvironment(environment);
+    if (!process.startDetached()) {
+        QMessageBox::warning(this, QString::fromUtf8("启动失败"),
+                             QString::fromUtf8("无法启动 %1。请确认 GeoEast 环境和 license 可用。").arg(displayName));
+        return false;
+    }
+
+    appendLog(QString::fromUtf8("已启动 %1：%2").arg(displayName, QDir::toNativeSeparators(exePath)));
+    appendLog(QString::fromUtf8("官方窗口中请在图层树加载 Grids/%1 与 Fault Polygons/%2；本插件无法从外部进程强制勾选 GeoEast 内部图层。")
+                  .arg(gridCombo_ ? gridCombo_->currentText().trimmed() : QString(),
+                       outputEdit_ ? outputEdit_->text().trimmed() : QString()));
+    appendStatus(QString::fromUtf8("已打开 %1，按官方图层树查看结果").arg(displayName));
+    return true;
+}
+
 QStringList FaultTraceDialog::traceArgs() const {
     QStringList args = commonConnectionArgs();
+    QDir().mkpath(previewOutputDir());
     if (importDatCheck_->isChecked()) {
         args << "--import-geoeast-dat" << datFileEdit_->text().trimmed();
         if (overwriteGridCheck_->isChecked()) {
@@ -1909,9 +2291,11 @@ QStringList FaultTraceDialog::traceArgs() const {
          << "--residual-covered-guard-radius" << "0"
          << "--simplify-tolerance" << QString::number(simplifyToleranceSpin_->value(), 'g', 12)
          << "--smooth-iterations" << QString::number(smoothIterationsSpin_->value())
-         << "--polygon-color" << polygonColorEdit_->text()
-         << "--polygon-linewidth" << QString::number(polygonLineWidthSpin_->value(), 'g', 12)
-         << "--min-area" << QString::number(minAreaSpin_->value(), 'g', 12);
+          << "--polygon-color" << polygonColorEdit_->text()
+          << "--polygon-linewidth" << QString::number(polygonLineWidthSpin_->value(), 'g', 12)
+          << "--min-area" << QString::number(minAreaSpin_->value(), 'g', 12)
+          << "--view-grid-output" << previewGridPath()
+          << "--view-polygons-output" << previewPolygonsPath();
     if (attributeConstrainedBeltCheck_->isChecked()) {
         args << "--attribute-constrained-belt";
     } else {
@@ -2239,6 +2623,66 @@ void FaultTraceDialog::deleteOutput() {
     process_->start(runner, args);
 }
 
+void FaultTraceDialog::loadResultView() {
+    if (!renderViewWidget_) {
+        return;
+    }
+
+    QString error;
+    RenderViewWidget* view = static_cast<RenderViewWidget*>(renderViewWidget_);
+    const QString gridPath = previewGridPath();
+    const QString polygonPath = previewPolygonsPath();
+    const bool gridLoaded = view->loadGridFile(gridPath, &error);
+    if (!gridLoaded) {
+        appendLog(error);
+    } else {
+        appendLog(QString::fromUtf8("已载入真实原始网格视图：%1").arg(QDir::toNativeSeparators(gridPath)));
+    }
+
+    error.clear();
+    const bool polygonsLoaded = view->loadPolygonCsv(polygonPath, &error);
+    if (!polygonsLoaded) {
+        appendLog(error);
+    } else {
+        appendLog(QString::fromUtf8("已载入真实结果多边形视图：%1").arg(QDir::toNativeSeparators(polygonPath)));
+    }
+
+    if (gridLoaded || polygonsLoaded) {
+        view->setActivity(QString::fromUtf8("真实图层视图已载入"));
+        appendStatus(QString::fromUtf8("真实图层视图已载入"));
+    } else {
+        view->setActivity(QString::fromUtf8("未找到真实视图缓存，请先运行追踪"));
+        appendStatus(QString::fromUtf8("未找到真实视图缓存"));
+    }
+}
+
+void FaultTraceDialog::exportResultViewPng() {
+    if (!renderViewWidget_) {
+        return;
+    }
+    QDir().mkpath(previewOutputDir());
+    const QString fileName = QString("%1_%2_%3.png")
+        .arg(sanitizeFileComponent(gridCombo_ ? gridCombo_->currentText() : QString(), "grid"),
+             sanitizeFileComponent(outputEdit_ ? outputEdit_->text() : QString(), "output"),
+             QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss"));
+    const QString path = QDir(previewOutputDir()).absoluteFilePath(fileName);
+    if (static_cast<RenderViewWidget*>(renderViewWidget_)->savePng(path)) {
+        appendLog(QString::fromUtf8("真实视图 PNG 已导出：%1").arg(QDir::toNativeSeparators(path)));
+        appendStatus(QString::fromUtf8("真实视图 PNG 已导出"));
+    } else {
+        appendLog(QString::fromUtf8("真实视图 PNG 导出失败：%1").arg(QDir::toNativeSeparators(path)));
+        appendStatus(QString::fromUtf8("真实视图 PNG 导出失败"));
+    }
+}
+
+void FaultTraceDialog::openGeoEastBasemap() {
+    launchGeoEastApp("GeoBasemap.exe", QString::fromUtf8("GeoBasemap 工区底图"));
+}
+
+void FaultTraceDialog::openGeoEastMapping() {
+    launchGeoEastApp("GeoMapping.exe", QString::fromUtf8("GeoMapping 平面成图"));
+}
+
 void FaultTraceDialog::stopProcess() {
     if (process_->state() != QProcess::NotRunning) {
         process_->terminate();
@@ -2312,6 +2756,7 @@ void FaultTraceDialog::onProcessFinished(int exitCode, QProcess::ExitStatus stat
         if (renderViewWidget_) {
             static_cast<RenderViewWidget*>(renderViewWidget_)->setActivity(QString::fromUtf8("追踪完成，结果已写入 GeoEast 数据库"));
         }
+        loadResultView();
     } else {
         appendStatus(QString::fromUtf8("运行失败，请查看日志"));
         if (renderViewWidget_) {
@@ -2333,6 +2778,18 @@ void FaultTraceDialog::onProcessError(QProcess::ProcessError error) {
 
 void FaultTraceDialog::setRunning(bool running) {
     refreshButton_->setEnabled(!running);
+    if (loadResultViewButton_) {
+        loadResultViewButton_->setEnabled(!running);
+    }
+    if (exportViewButton_) {
+        exportViewButton_->setEnabled(!running);
+    }
+    if (openBasemapButton_) {
+        openBasemapButton_->setEnabled(!running);
+    }
+    if (openMappingButton_) {
+        openMappingButton_->setEnabled(!running);
+    }
     if (deleteOutputButton_) {
         deleteOutputButton_->setEnabled(!running);
     }
@@ -2343,6 +2800,18 @@ void FaultTraceDialog::setRunning(bool running) {
     }
     if (deleteOutputAction_) {
         deleteOutputAction_->setEnabled(!running);
+    }
+    if (loadResultViewAction_) {
+        loadResultViewAction_->setEnabled(!running);
+    }
+    if (exportViewAction_) {
+        exportViewAction_->setEnabled(!running);
+    }
+    if (openBasemapAction_) {
+        openBasemapAction_->setEnabled(!running);
+    }
+    if (openMappingAction_) {
+        openMappingAction_->setEnabled(!running);
     }
     if (runTraceAction_) {
         runTraceAction_->setEnabled(!running);

@@ -10,6 +10,7 @@
 #include <cstdlib>
 #include <exception>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <memory>
 #include <limits>
@@ -37,6 +38,8 @@ struct Options {
     std::string gridName;
     std::string outputName;
     std::string topologyOutputPath;
+    std::string previewGridOutputPath;
+    std::string previewPolygonsOutputPath;
     std::string importGeoEastDatPath;
     bool listGrids = false;
     bool validateGridOnly = false;
@@ -126,7 +129,11 @@ void printUsage() {
         << "  --smooth-iterations <count>\n"
         << "  --polygon-color <cyan|yellow|magenta|white|green|blue|red|R,G,B|#RRGGBB>\n"
         << "  --polygon-linewidth <value>\n"
-        << "  --topology-output <csv>\n";
+        << "  --topology-output <csv>\n"
+        << "  --view-grid-output <txt>\n"
+        << "  --view-polygons-output <csv>\n"
+        << "  --preview-grid-output <txt> (compatibility alias)\n"
+        << "  --preview-polygons-output <csv> (compatibility alias)\n";
 }
 
 int clampColor(int value) {
@@ -265,6 +272,10 @@ Options parseArgs(int argc, char** argv) {
             options.outputName = requireValue(arg);
         } else if (arg == "--topology-output") {
             options.topologyOutputPath = requireValue(arg);
+        } else if (arg == "--preview-grid-output" || arg == "--view-grid-output") {
+            options.previewGridOutputPath = requireValue(arg);
+        } else if (arg == "--preview-polygons-output" || arg == "--view-polygons-output") {
+            options.previewPolygonsOutputPath = requireValue(arg);
         } else if (arg == "--import-geoeast-dat") {
             options.importGeoEastDatPath = requireValue(arg);
         } else if (arg == "--list-grids") {
@@ -488,6 +499,31 @@ void printGridStats(const fpt::Grid2D& grid) {
     }
 }
 
+void writePreviewGrid(const std::string& path, const fpt::Grid2D& grid) {
+    if (path.empty()) {
+        return;
+    }
+
+    std::ofstream out(path);
+    if (!out) {
+        throw std::runtime_error("Failed to open real-view grid output: " + path);
+    }
+
+    out << grid.nx() << " " << grid.ny() << "\n";
+    out << std::fixed << std::setprecision(6);
+    out << grid.sx() << " " << grid.sy() << "\n";
+    out << grid.dx() << " " << grid.dy() << "\n";
+    for (int y = 0; y < grid.ny(); ++y) {
+        for (int x = 0; x < grid.nx(); ++x) {
+            if (x > 0) {
+                out << " ";
+            }
+            out << grid.value(x, y);
+        }
+        out << "\n";
+    }
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -556,13 +592,21 @@ int main(int argc, char** argv) {
         }
         if (options.validateGridOnly) {
             printGridStats(grid);
+            writePreviewGrid(options.previewGridOutputPath, grid);
+            if (!options.previewGridOutputPath.empty()) {
+                std::cout << "View grid: " << options.previewGridOutputPath << "\n";
+            }
             return 0;
         }
+        writePreviewGrid(options.previewGridOutputPath, grid);
         debugLog("Running FaultPolyTrace core.");
         fpt::TraceResult result = fpt::traceFaultPolygons(grid, options.trace);
         fpt::TopologyDiagnostics topology = fpt::diagnoseTopology(result.polygons, true);
         if (!options.topologyOutputPath.empty()) {
             fpt::writeTopologyDetailsCsv(options.topologyOutputPath, topology);
+        }
+        if (!options.previewPolygonsOutputPath.empty()) {
+            fpt::writePolygonCsv(options.previewPolygonsOutputPath, result.polygons);
         }
         debugLog("Writing BOFaultPolygon: " + options.outputName);
         fpt_geoeast::writeFaultPolygons(project, options.outputName, result.polygons, true, options.polygonStyle);
@@ -614,6 +658,12 @@ int main(int argc, char** argv) {
         std::cout << "Topology polygon intersections: " << topology.polygonIntersectionCount << "\n";
         if (!options.topologyOutputPath.empty()) {
             std::cout << "Topology details: " << options.topologyOutputPath << "\n";
+        }
+        if (!options.previewGridOutputPath.empty()) {
+            std::cout << "View grid: " << options.previewGridOutputPath << "\n";
+        }
+        if (!options.previewPolygonsOutputPath.empty()) {
+            std::cout << "View polygons: " << options.previewPolygonsOutputPath << "\n";
         }
         std::cout << "Output BOFaultPolygon: " << options.outputName << "\n";
         std::cout << "Elapsed: " << elapsedMs << " ms\n";

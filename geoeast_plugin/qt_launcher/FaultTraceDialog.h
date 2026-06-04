@@ -34,6 +34,10 @@ private slots:
     void showHelpHint();
     void refreshGrids();
     void deleteOutput();
+    void loadResultView();
+    void exportResultViewPng();
+    void openGeoEastBasemap();
+    void openGeoEastMapping();
     void runTrace();
     void stopProcess();
     void onReadyRead();
@@ -51,6 +55,10 @@ private:
     void configureGeoEastEnvironment(QProcessEnvironment& environment) const;
     QStringList commonConnectionArgs() const;
     QStringList traceArgs() const;
+    QString previewOutputDir() const;
+    QString previewGridPath() const;
+    QString previewPolygonsPath() const;
+    bool launchGeoEastApp(const QString& exeName, const QString& displayName);
     void applyParameterPreset(const QString& presetName);
     void setPolygonColor(const QColor& color);
     void updateStatusContext();
@@ -114,8 +122,16 @@ private:
     QSpinBox* residualTraceMaxCellsSpin_ = nullptr;
     QCheckBox* showInputLayerCheck_ = nullptr;
     QCheckBox* showResultLayerCheck_ = nullptr;
+    QPushButton* loadResultViewButton_ = nullptr;
+    QPushButton* exportViewButton_ = nullptr;
+    QPushButton* openBasemapButton_ = nullptr;
+    QPushButton* openMappingButton_ = nullptr;
     QPushButton* refreshButton_ = nullptr;
     QPushButton* deleteOutputButton_ = nullptr;
+    QAction* loadResultViewAction_ = nullptr;
+    QAction* exportViewAction_ = nullptr;
+    QAction* openBasemapAction_ = nullptr;
+    QAction* openMappingAction_ = nullptr;
     QPushButton* runButton_ = nullptr;
     QPushButton* stopButton_ = nullptr;
     QAction* showInputLayerAction_ = nullptr;

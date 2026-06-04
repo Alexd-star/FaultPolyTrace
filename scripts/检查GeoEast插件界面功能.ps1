@@ -54,6 +54,20 @@ function Add-ContainsCheck {
         -Passed $Text.Contains($Needle) -Detail $Detail
 }
 
+function Add-NotContainsCheck {
+    param(
+        [System.Collections.Generic.List[object]]$Rows,
+        [string]$Group,
+        [string]$Name,
+        [string]$Requirement,
+        [string]$Text,
+        [string]$Needle,
+        [string]$Detail
+    )
+    Add-Check -Rows $Rows -Group $Group -Name $Name -Requirement $Requirement `
+        -Passed (-not $Text.Contains($Needle)) -Detail $Detail
+}
+
 $dialogCppPath = "geoeast_plugin\qt_launcher\FaultTraceDialog.cpp"
 $dialogHeaderPath = "geoeast_plugin\qt_launcher\FaultTraceDialog.h"
 $runnerMainPath = "geoeast_plugin\bo_runner\main.cpp"
@@ -80,14 +94,27 @@ Add-ContainsCheck -Rows $rows -Group "runner-delete" -Name "call-adapter" -Requi
 Add-ContainsCheck -Rows $rows -Group "runner-delete" -Name "adapter-declaration" -Requirement "Adapter declares deleteFaultPolygons." -Text $adapterHeader -Needle "void deleteFaultPolygons" -Detail "$adapterHeaderPath declares deleteFaultPolygons"
 Add-ContainsCheck -Rows $rows -Group "runner-delete" -Name "adapter-implementation" -Requirement "Adapter deletes BOFaultPolygon." -Text $adapterCpp -Needle "eraseChild<geobo::BOFaultPolygon>" -Detail "$adapterCppPath calls eraseChild"
 
-Add-ContainsCheck -Rows $rows -Group "display-control" -Name "result-display-group" -Requirement "Result/display functions are separated from data management." -Text $dialogCpp -Needle 'new QGroupBox(QString::fromUtf8("' -Detail "$dialogCppPath contains a QGroupBox result/display area"
-Add-ContainsCheck -Rows $rows -Group "display-control" -Name "input-layer-checkbox" -Requirement "User can toggle input grid preview." -Text $dialogHeader -Needle "QCheckBox* showInputLayerCheck_" -Detail "$dialogHeaderPath declares showInputLayerCheck_"
-Add-ContainsCheck -Rows $rows -Group "display-control" -Name "result-layer-checkbox" -Requirement "User can toggle result polygon preview." -Text $dialogHeader -Needle "QCheckBox* showResultLayerCheck_" -Detail "$dialogHeaderPath declares showResultLayerCheck_"
-Add-ContainsCheck -Rows $rows -Group "display-control" -Name "view-menu-input-action" -Requirement "View menu can toggle input preview." -Text $dialogHeader -Needle "QAction* showInputLayerAction_" -Detail "$dialogHeaderPath declares showInputLayerAction_"
-Add-ContainsCheck -Rows $rows -Group "display-control" -Name "view-menu-result-action" -Requirement "View menu can toggle result preview." -Text $dialogHeader -Needle "QAction* showResultLayerAction_" -Detail "$dialogHeaderPath declares showResultLayerAction_"
+Add-ContainsCheck -Rows $rows -Group "display-control" -Name "result-display-group" -Requirement "Result/view functions are separated from data management." -Text $dialogHeader -Needle "QPushButton* loadResultViewButton_" -Detail "$dialogHeaderPath declares loadResultViewButton_"
+Add-ContainsCheck -Rows $rows -Group "display-control" -Name "input-layer-checkbox" -Requirement "User can toggle actual input grid layer in the launcher view." -Text $dialogHeader -Needle "QCheckBox* showInputLayerCheck_" -Detail "$dialogHeaderPath declares showInputLayerCheck_"
+Add-ContainsCheck -Rows $rows -Group "display-control" -Name "result-layer-checkbox" -Requirement "User can toggle actual result polygon layer in the launcher view." -Text $dialogHeader -Needle "QCheckBox* showResultLayerCheck_" -Detail "$dialogHeaderPath declares showResultLayerCheck_"
+Add-ContainsCheck -Rows $rows -Group "display-control" -Name "view-menu-input-action" -Requirement "View menu can toggle actual input grid layer." -Text $dialogHeader -Needle "QAction* showInputLayerAction_" -Detail "$dialogHeaderPath declares showInputLayerAction_"
+Add-ContainsCheck -Rows $rows -Group "display-control" -Name "view-menu-result-action" -Requirement "View menu can toggle actual result polygon layer." -Text $dialogHeader -Needle "QAction* showResultLayerAction_" -Detail "$dialogHeaderPath declares showResultLayerAction_"
 Add-ContainsCheck -Rows $rows -Group "display-control" -Name "visibility-sync" -Requirement "Layer visibility is synchronized." -Text $dialogCpp -Needle "void FaultTraceDialog::updateLayerVisibility()" -Detail "$dialogCppPath implements updateLayerVisibility"
-Add-ContainsCheck -Rows $rows -Group "display-control" -Name "render-widget-toggle" -Requirement "Preview rendering uses layer visibility flags." -Text $dialogCpp -Needle "setLayerVisibility(bool showInputLayer, bool showResultLayer)" -Detail "$dialogCppPath RenderViewWidget supports layer visibility"
+Add-ContainsCheck -Rows $rows -Group "display-control" -Name "render-widget-toggle" -Requirement "Real rendering uses layer visibility flags." -Text $dialogCpp -Needle "setLayerVisibility(bool showInputLayer, bool showResultLayer)" -Detail "$dialogCppPath RenderViewWidget supports layer visibility"
 Add-ContainsCheck -Rows $rows -Group "display-control" -Name "geoeast-layer-tree-note" -Requirement "UI does not pretend to directly control GeoEast layers." -Text $dialogCpp -Needle "GeoEast" -Detail "$dialogCppPath contains GeoEast layer guidance"
+Add-ContainsCheck -Rows $rows -Group "real-view" -Name "load-result-view-slot" -Requirement "Launcher can load actual exported grid and polygon files." -Text $dialogHeader -Needle "void loadResultView()" -Detail "$dialogHeaderPath declares loadResultView"
+Add-ContainsCheck -Rows $rows -Group "real-view" -Name "export-view-slot" -Requirement "Launcher can export the actual current view as PNG." -Text $dialogHeader -Needle "void exportResultViewPng()" -Detail "$dialogHeaderPath declares exportResultViewPng"
+Add-ContainsCheck -Rows $rows -Group "real-view" -Name "render-load-grid" -Requirement "RenderViewWidget reads actual grid export." -Text $dialogCpp -Needle "loadGridFile(const QString& path" -Detail "$dialogCppPath implements loadGridFile"
+Add-ContainsCheck -Rows $rows -Group "real-view" -Name "render-load-polygons" -Requirement "RenderViewWidget reads actual polygon CSV export." -Text $dialogCpp -Needle "loadPolygonCsv(const QString& path" -Detail "$dialogCppPath implements loadPolygonCsv"
+Add-ContainsCheck -Rows $rows -Group "real-view" -Name "runner-view-grid-arg" -Requirement "Launcher asks runner to export an actual grid view file." -Text $dialogCpp -Needle '"--view-grid-output"' -Detail "$dialogCppPath passes --view-grid-output"
+Add-ContainsCheck -Rows $rows -Group "real-view" -Name "runner-view-polygon-arg" -Requirement "Launcher asks runner to export an actual polygon view file." -Text $dialogCpp -Needle '"--view-polygons-output"' -Detail "$dialogCppPath passes --view-polygons-output"
+Add-ContainsCheck -Rows $rows -Group "real-view" -Name "runner-supports-view-grid" -Requirement "Runner supports actual grid view export." -Text $runnerMain -Needle 'arg == "--preview-grid-output" || arg == "--view-grid-output"' -Detail "$runnerMainPath parses --view-grid-output"
+Add-ContainsCheck -Rows $rows -Group "real-view" -Name "runner-supports-view-polygons" -Requirement "Runner supports actual polygon view export." -Text $runnerMain -Needle 'arg == "--preview-polygons-output" || arg == "--view-polygons-output"' -Detail "$runnerMainPath parses --view-polygons-output"
+Add-ContainsCheck -Rows $rows -Group "official-view" -Name "open-basemap-slot" -Requirement "Launcher can open GeoEast GeoBasemap for official layer-tree viewing." -Text $dialogHeader -Needle "void openGeoEastBasemap()" -Detail "$dialogHeaderPath declares openGeoEastBasemap"
+Add-ContainsCheck -Rows $rows -Group "official-view" -Name "open-mapping-slot" -Requirement "Launcher can open GeoEast GeoMapping for official layer-tree viewing." -Text $dialogHeader -Needle "void openGeoEastMapping()" -Detail "$dialogHeaderPath declares openGeoEastMapping"
+Add-ContainsCheck -Rows $rows -Group "official-view" -Name "launch-geoeast-app" -Requirement "Launcher starts official GeoEast applications with configured environment." -Text $dialogCpp -Needle "launchGeoEastApp" -Detail "$dialogCppPath implements launchGeoEastApp"
+Add-NotContainsCheck -Rows $rows -Group "anti-fake-preview" -Name "no-old-fake-belt-gradient" -Requirement "Old fake colored belt drawing must not remain in launcher UI." -Text $dialogCpp -Needle "beltGradient" -Detail "$dialogCppPath should not contain old fake belt gradient"
+Add-NotContainsCheck -Rows $rows -Group "anti-fake-preview" -Name "no-old-fake-style-preview" -Requirement "Old fixed style preview drawing must not remain in launcher UI." -Text $dialogCpp -Needle "style preview" -Detail "$dialogCppPath should not contain old fixed style preview"
 
 Add-ContainsCheck -Rows $rows -Group "settings" -Name "save-input-layer" -Requirement "Input preview choice is persisted." -Text $dialogCpp -Needle 'settings.setValue("showInputLayer"' -Detail "$dialogCppPath saves showInputLayer"
 Add-ContainsCheck -Rows $rows -Group "settings" -Name "save-result-layer" -Requirement "Result preview choice is persisted." -Text $dialogCpp -Needle 'settings.setValue("showResultLayer"' -Detail "$dialogCppPath saves showResultLayer"
@@ -96,31 +123,34 @@ Add-ContainsCheck -Rows $rows -Group "settings" -Name "load-result-layer" -Requi
 
 $failed = @($rows | Where-Object { $_.Status -eq "FAIL" })
 New-Item -ItemType Directory -Force -Path $reportDir | Out-Null
-$lines = [System.Collections.Generic.List[string]]::new()
-$lines.Add("# GeoEast Plugin UI Function Check Report") | Out-Null
-$lines.Add("") | Out-Null
-$lines.Add("Time: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')") | Out-Null
-$lines.Add("Repo: $repoRoot") | Out-Null
-$lines.Add("") | Out-Null
-$lines.Add("## Summary") | Out-Null
-$lines.Add("") | Out-Null
-$lines.Add("| Item | Count |") | Out-Null
-$lines.Add("|---|---:|") | Out-Null
-$lines.Add("| PASS | $($rows.Count - $failed.Count) |") | Out-Null
-$lines.Add("| FAIL | $($failed.Count) |") | Out-Null
-$lines.Add("") | Out-Null
-$lines.Add("## Details") | Out-Null
-$lines.Add("") | Out-Null
-$lines.Add("| Group | Item | Status | Requirement | Evidence |") | Out-Null
-$lines.Add("|---|---|---|---|---|") | Out-Null
+$passCount = $rows.Count - $failed.Count
+$failCount = $failed.Count
+$lines = @(
+    '# GeoEast Plugin UI Function Check Report'
+    ''
+    ('Time: {0}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))
+    ('Repo: {0}' -f $repoRoot)
+    ''
+    '## Summary'
+    ''
+    '| Item | Count |'
+    '|---|---:|'
+    ('| PASS | {0} |' -f $passCount)
+    ('| FAIL | {0} |' -f $failCount)
+    ''
+    '## Details'
+    ''
+    '| Group | Item | Status | Requirement | Evidence |'
+    '|---|---|---|---|---|'
+)
 foreach ($row in $rows) {
-    $lines.Add("| $(Escape-Md $row.Group) | $(Escape-Md $row.Name) | $($row.Status) | $(Escape-Md $row.Requirement) | $(Escape-Md $row.Detail) |") | Out-Null
+    $lines += ('| {0} | {1} | {2} | {3} | {4} |' -f (Escape-Md $row.Group), (Escape-Md $row.Name), $row.Status, (Escape-Md $row.Requirement), (Escape-Md $row.Detail))
 }
 $lines | Set-Content -LiteralPath $reportPath -Encoding UTF8
 
-Write-Host "GeoEast plugin UI function report: $reportPath"
-Write-Host "PASS: $($rows.Count - $failed.Count)  FAIL: $($failed.Count)"
+Write-Host ('GeoEast plugin UI function report: {0}' -f $reportPath)
+Write-Host ('PASS: {0}  FAIL: {1}' -f $passCount, $failCount)
 
 if ($failed.Count -gt 0) {
-    throw "GeoEast plugin UI function check failed."
+    throw 'GeoEast plugin UI function check failed.'
 }
