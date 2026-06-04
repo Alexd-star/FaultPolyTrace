@@ -197,6 +197,13 @@ foreach ($function in $supportFunctions) {
     Add-ContainsCheck -Rows $rows -Group "功能实现" -Name $function.Name -Requirement "槽函数实现存在" -Text $cpp -Needle $function.Needle -Detail "$cppPath 包含 $($function.Needle)"
 }
 
+Add-ContainsCheck -Rows $rows -Group "GeoEast数据库操作" -Name "配置自检声明" -Requirement "独立软件在读写 GeoEast 数据库前必须先校验配置完整性" -Text $header -Needle "bool ensureGeoEastConfigReady" -Detail "$headerPath 声明 ensureGeoEastConfigReady"
+Add-ContainsCheck -Rows $rows -Group "GeoEast数据库操作" -Name "缺失字段清单声明" -Requirement "配置不完整时必须明确列出缺失字段" -Text $header -Needle "QStringList missingGeoEastConfig" -Detail "$headerPath 声明 missingGeoEastConfig"
+Add-ContainsCheck -Rows $rows -Group "GeoEast数据库操作" -Name "刷新前自检" -Requirement "刷新 BOMapGrid 前不能直接调用 runner，必须先做配置自检" -Text $cpp -Needle 'ensureGeoEastConfigReady(QString::fromUtf8("刷新网格列表")' -Detail "$cppPath refreshGeoEastGrids 调用配置自检"
+Add-ContainsCheck -Rows $rows -Group "GeoEast数据库操作" -Name "追踪前自检" -Requirement "GeoEast 数据库追踪前必须校验输入网格和输出名称" -Text $cpp -Needle 'ensureGeoEastConfigReady(QString::fromUtf8("开始追踪")' -Detail "$cppPath runTrace 调用配置自检"
+Add-ContainsCheck -Rows $rows -Group "GeoEast数据库操作" -Name "删除前自检" -Requirement "删除 GeoEast 结果前必须校验数据库配置和输出对象名" -Text $cpp -Needle 'ensureGeoEastConfigReady(QString::fromUtf8("删除当前结果")' -Detail "$cppPath deleteGeoEastResult 调用配置自检"
+Add-ContainsCheck -Rows $rows -Group "GeoEast数据库操作" -Name "配置对话入口" -Requirement "配置不完整时应能直接打开 GeoEast 配置对话框" -Text $cpp -Needle "打开数据库配置" -Detail "$cppPath 提供打开数据库配置按钮"
+
 Add-ContainsCheck -Rows $rows -Group "发布链路" -Name "界面检查脚本" -Requirement "发布包携带本检查脚本" -Text $packageScript -Needle "检查独立软件界面功能.ps1" -Detail "$packageScriptPath 脚本清单包含 检查独立软件界面功能.ps1"
 
 $failed = @($rows | Where-Object { $_.Status -eq "失败" })

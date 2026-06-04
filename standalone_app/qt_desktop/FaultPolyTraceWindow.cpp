@@ -1125,9 +1125,12 @@ void FaultPolyTraceWindow::buildUi() {
     QHBoxLayout* geoEastActionLayout = new QHBoxLayout(geoEastActionRow);
     geoEastActionLayout->setContentsMargins(0, 0, 0, 0);
     geoEastActionLayout->setSpacing(6);
-    geoEastRefreshButton_ = new QPushButton(QString::fromUtf8("刷新网格"), geoEastActionRow);
+    geoEastRefreshButton_ = new QPushButton(QString::fromUtf8("刷新 BOMapGrid"), geoEastActionRow);
     geoEastConfigButton_ = new QPushButton(QString::fromUtf8("数据库配置"), geoEastActionRow);
     geoEastDeleteButton_ = new QPushButton(QString::fromUtf8("删除结果"), geoEastActionRow);
+    geoEastRefreshButton_->setToolTip(QString::fromUtf8("从配置的 GeoEast 数据库刷新当前项目下的 BOMapGrid 输入网格列表"));
+    geoEastConfigButton_->setToolTip(QString::fromUtf8("配置 GeoEast 根目录、数据根目录、数据库、项目和用户信息"));
+    geoEastDeleteButton_->setToolTip(QString::fromUtf8("删除当前输出名对应的 GeoEast BOFaultPolygon 结果对象"));
     geoEastActionLayout->addWidget(geoEastRefreshButton_, 1);
     geoEastActionLayout->addWidget(geoEastConfigButton_, 1);
     geoEastActionLayout->addWidget(geoEastDeleteButton_, 1);
@@ -2243,16 +2246,84 @@ void FaultPolyTraceWindow::showGeoEastConfigDialog() {
     dialog.exec();
 }
 
+QStringList FaultPolyTraceWindow::missingGeoEastConfig(bool requireGrid, bool requireOutput) const {
+    QStringList missing;
+    const QString runner = geoEastRunnerEdit_ ? geoEastRunnerEdit_->text().trimmed() : QString();
+    const QString geoEastRoot = geoEastRootEdit_ ? geoEastRootEdit_->text().trimmed() : QString();
+    const QString dataRoot = geoEastDataRootEdit_ ? geoEastDataRootEdit_->text().trimmed() : QString();
+    const QString database = databaseEdit_ ? databaseEdit_->text().trimmed() : QString();
+    const QString project = projectEdit_ ? projectEdit_->text().trimmed() : QString();
+    const QString user = userEdit_ ? userEdit_->text().trimmed() : QString();
+    const QString grid = geoEastGridCombo_ ? geoEastGridCombo_->currentText().trimmed() : QString();
+    const QString output = geoEastOutputName().trimmed();
+
+    if (runner.isEmpty()) {
+        missing << QString::fromUtf8("GeoEast Runner 可执行文件");
+    } else if (!QFileInfo::exists(runner)) {
+        missing << QString::fromUtf8("GeoEast Runner 文件不存在：%1").arg(QDir::toNativeSeparators(runner));
+    }
+    if (geoEastRoot.isEmpty()) {
+        missing << QString::fromUtf8("GeoEast 根目录");
+    } else if (!QDir(geoEastRoot).exists()) {
+        missing << QString::fromUtf8("GeoEast 根目录不存在：%1").arg(QDir::toNativeSeparators(geoEastRoot));
+    }
+    if (dataRoot.isEmpty()) {
+        missing << QString::fromUtf8("GeoEast 数据根目录");
+    } else if (!QDir(dataRoot).exists()) {
+        missing << QString::fromUtf8("GeoEast 数据根目录不存在：%1").arg(QDir::toNativeSeparators(dataRoot));
+    }
+    if (database.isEmpty()) {
+        missing << QString::fromUtf8("数据库名");
+    }
+    if (project.isEmpty()) {
+        missing << QString::fromUtf8("项目名");
+    }
+    if (user.isEmpty()) {
+        missing << QString::fromUtf8("用户名");
+    }
+    if (requireGrid && grid.isEmpty()) {
+        missing << QString::fromUtf8("输入 BOMapGrid");
+    }
+    if (requireOutput && output.isEmpty()) {
+        missing << QString::fromUtf8("输出 BOFaultPolygon 名称");
+    }
+    return missing;
+}
+
+bool FaultPolyTraceWindow::ensureGeoEastConfigReady(const QString& operation, bool requireGrid, bool requireOutput) {
+    const QStringList missing = missingGeoEastConfig(requireGrid, requireOutput);
+    if (missing.isEmpty()) {
+        return true;
+    }
+
+    appendLog(QString::fromUtf8("无法执行【%1】：GeoEast 配置不完整。缺失或无效项：%2")
+                  .arg(operation, missing.join(QString::fromUtf8("；"))));
+
+    QMessageBox message(this);
+    message.setIcon(QMessageBox::Warning);
+    message.setWindowTitle(QString::fromUtf8("GeoEast 配置不完整"));
+    message.setText(QString::fromUtf8("执行【%1】前需要先补齐 GeoEast 配置。").arg(operation));
+    message.setInformativeText(QString::fromUtf8("缺失或无效项：\n\n- %1\n\n请点击【打开数据库配置】补齐后再执行。保存一次后，下次打开会自动记住。")
+                                   .arg(missing.join(QString::fromUtf8("\n- "))));
+    QPushButton* configButton = message.addButton(QString::fromUtf8("打开数据库配置"), QMessageBox::AcceptRole);
+    message.addButton(QString::fromUtf8("稍后处理"), QMessageBox::RejectRole);
+    message.exec();
+    if (message.clickedButton() == configButton) {
+        showGeoEastConfigDialog();
+    }
+    updateStatus(QString::fromUtf8("GeoEast 配置不完整，已停止操作"));
+    return false;
+}
+
 void FaultPolyTraceWindow::refreshGeoEastGrids() {
     if (process_->state() != QProcess::NotRunning) {
         return;
     }
-    const QString runner = geoEastRunnerEdit_->text().trimmed();
-    if (!QFileInfo::exists(runner)) {
-        QMessageBox::warning(this, QString::fromUtf8("GeoEast Runner 不存在"), runner);
+    saveSettings();
+    if (!ensureGeoEastConfigReady(QString::fromUtf8("刷新网格列表"), false, false)) {
         return;
     }
-    saveSettings();
+    const QString runner = geoEastRunnerEdit_->text().trimmed();
     QStringList args = geoEastConnectionArgs();
     args << "--list-grids";
     startProcess(ProcessTask::RefreshGeoEastGrids, runner, args, QString::fromUtf8("正在刷新 GeoEast 网格对象..."));
@@ -2260,6 +2331,10 @@ void FaultPolyTraceWindow::refreshGeoEastGrids() {
 
 void FaultPolyTraceWindow::deleteGeoEastResult() {
     if (process_->state() != QProcess::NotRunning) {
+        return;
+    }
+    saveSettings();
+    if (!ensureGeoEastConfigReady(QString::fromUtf8("删除当前结果"), false, true)) {
         return;
     }
     const QString outputName = geoEastOutputName();
@@ -2273,11 +2348,6 @@ void FaultPolyTraceWindow::deleteGeoEastResult() {
         return;
     }
     const QString runner = geoEastRunnerEdit_->text().trimmed();
-    if (!QFileInfo::exists(runner)) {
-        QMessageBox::warning(this, QString::fromUtf8("GeoEast Runner 不存在"), runner);
-        return;
-    }
-    saveSettings();
     QStringList args = geoEastConnectionArgs();
     args << "--output" << outputName << "--delete-output";
     startProcess(ProcessTask::DeleteGeoEastResult, runner, args, QString::fromUtf8("正在删除 GeoEast 结果对象..."));
@@ -2320,18 +2390,13 @@ void FaultPolyTraceWindow::runTrace() {
         return;
     }
     if (isGeoEastMode()) {
+        saveSettings();
+        if (!ensureGeoEastConfigReady(QString::fromUtf8("开始追踪"), true, true)) {
+            return;
+        }
         const QString runner = geoEastRunnerEdit_->text().trimmed();
-        if (!QFileInfo::exists(runner)) {
-            QMessageBox::warning(this, QString::fromUtf8("GeoEast Runner 不存在"), runner);
-            return;
-        }
-        if (geoEastGridCombo_->currentText().trimmed().isEmpty() || geoEastOutputName().trimmed().isEmpty()) {
-            QMessageBox::warning(this, QString::fromUtf8("参数不完整"), QString::fromUtf8("GeoEast 输入网格和输出多边形名称不能为空。"));
-            return;
-        }
         lastOutputCsv_.clear();
         updateResultPanel();
-        saveSettings();
         startProcess(ProcessTask::GeoEastTrace, runner, geoEastTraceArgs(), QString::fromUtf8("正在连接 GeoEast 并追踪断层多边形..."));
         return;
     }

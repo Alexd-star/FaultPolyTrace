@@ -3,6 +3,7 @@
 #include <QDialog>
 #include <QProcess>
 #include <QString>
+#include <QStringList>
 
 class QCheckBox;
 class QColor;
@@ -31,6 +32,7 @@ private slots:
     void choosePolygonColor();
     void showDatabaseConfigDialog();
     void saveCurrentPreset();
+    void restoreDefaults();
     void showHelpHint();
     void refreshGrids();
     void deleteOutput();
@@ -65,6 +67,8 @@ private:
     void updateOptionControls();
     QString defaultRunnerPath() const;
     QString defaultOfficialDatPath() const;
+    QStringList missingGeoEastConfig(bool requireGrid, bool requireOutput) const;
+    bool ensureGeoEastConfigReady(const QString& operation, bool requireGrid, bool requireOutput);
 
     QLineEdit* runnerEdit_ = nullptr;
     QLineEdit* geoEastRootEdit_ = nullptr;
@@ -138,6 +142,7 @@ private:
     QAction* showResultLayerAction_ = nullptr;
     QAction* refreshGridAction_ = nullptr;
     QAction* deleteOutputAction_ = nullptr;
+    QAction* restoreDefaultsAction_ = nullptr;
     QAction* runTraceAction_ = nullptr;
     QAction* stopTraceAction_ = nullptr;
     QTextEdit* logEdit_ = nullptr;

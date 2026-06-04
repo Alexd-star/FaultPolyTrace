@@ -1011,10 +1011,10 @@ void FaultTraceDialog::buildUi() {
     polygonLineWidthSpin_->setValue(0.025);
     connect(polygonColorButton_, &QPushButton::clicked, this, &FaultTraceDialog::choosePolygonColor);
     setPolygonColor(QColor(polygonColorEdit_->text()));
-    refreshButton_ = new QPushButton(QString::fromUtf8("刷新网格"), this);
+    refreshButton_ = new QPushButton(QString::fromUtf8("刷新 BOMapGrid 列表"), this);
     connect(refreshButton_, &QPushButton::clicked, this, &FaultTraceDialog::refreshGrids);
 
-    importDatCheck_ = new QCheckBox(QString::fromUtf8("从官方 DAT 导入/覆盖输入网格"), this);
+    importDatCheck_ = new QCheckBox(QString::fromUtf8("从 DAT 导入/覆盖输入网格"), this);
     importDatCheck_->setChecked(false);
     datFileEdit_ = new QLineEdit(defaultOfficialDatPath(), this);
     datFileEdit_->setPlaceholderText(QString::fromUtf8("可选：选择需要导入或覆盖到 GeoEast 的 DAT 文件"));
@@ -1207,7 +1207,7 @@ void FaultTraceDialog::buildUi() {
         polygonLineWidthSpin_->setFixedWidth(64);
         browseDatButton->setText(QString::fromUtf8("浏览"));
         browseDatButton->setFixedWidth(52);
-        refreshButton_->setText(QString::fromUtf8("刷新网格"));
+        refreshButton_->setText(QString::fromUtf8("刷新 BOMapGrid 列表"));
         refreshButton_->setToolTip(QString::fromUtf8("从 GeoEast 数据库刷新 BOMapGrid 列表"));
         refreshButton_->setIcon(makeToolIcon(ToolIconKind::Reset));
         refreshButton_->setIconSize(QSize(18, 18));
@@ -1408,9 +1408,10 @@ void FaultTraceDialog::buildUi() {
         QMenuBar* menuBar = new QMenuBar(this);
         menuBar->setNativeMenuBar(false);
         QMenu* geoEastMenu = menuBar->addMenu(QString::fromUtf8("GeoEast(G)"));
-        QAction* configAction = geoEastMenu->addAction(makeToolIcon(ToolIconKind::Database), QString::fromUtf8("数据库与环境底层配置..."));
+        QAction* configAction = geoEastMenu->addAction(makeToolIcon(ToolIconKind::Database), QString::fromUtf8("数据库配置..."));
         connect(configAction, &QAction::triggered, this, &FaultTraceDialog::showDatabaseConfigDialog);
-        refreshGridAction_ = geoEastMenu->addAction(makeToolIcon(ToolIconKind::Database), QString::fromUtf8("刷新网格列表"));
+        refreshGridAction_ = geoEastMenu->addAction(makeToolIcon(ToolIconKind::Database), QString::fromUtf8("刷新 BOMapGrid 列表"));
+        refreshGridAction_->setToolTip(QString::fromUtf8("刷新 GeoEast 当前项目下的 BOMapGrid 对象列表"));
         connect(refreshGridAction_, &QAction::triggered, this, &FaultTraceDialog::refreshGrids);
         deleteOutputAction_ = geoEastMenu->addAction(QString::fromUtf8("删除当前结果"));
         connect(deleteOutputAction_, &QAction::triggered, this, &FaultTraceDialog::deleteOutput);
@@ -1525,6 +1526,9 @@ void FaultTraceDialog::buildUi() {
         QMenu* toolMenu = menuBar->addMenu(QString::fromUtf8("工具(T)"));
         QAction* savePresetAction = toolMenu->addAction(makeToolIcon(ToolIconKind::Preset), QString::fromUtf8("保存当前参数"));
         connect(savePresetAction, &QAction::triggered, this, &FaultTraceDialog::saveCurrentPreset);
+        restoreDefaultsAction_ = toolMenu->addAction(makeToolIcon(ToolIconKind::Reset), QString::fromUtf8("恢复默认配置"));
+        restoreDefaultsAction_->setToolTip(QString::fromUtf8("恢复推荐算法参数、显示样式和默认输出名，不清空数据库连接信息"));
+        connect(restoreDefaultsAction_, &QAction::triggered, this, &FaultTraceDialog::restoreDefaults);
         QAction* userManualToolAction = toolMenu->addAction(QString::fromUtf8("打开用户操作手册"));
         connect(userManualToolAction, &QAction::triggered, this, [openLocalFile]() { openLocalFile("docs/用户操作手册.md"); });
         QAction* packageGuideAction = toolMenu->addAction(QString::fromUtf8("打开异机运行说明"));
@@ -1555,7 +1559,9 @@ void FaultTraceDialog::buildUi() {
         toolbar->addAction(resetViewAction);
         toolbar->addSeparator();
         toolbar->addAction(configAction);
-        toolbar->addWidget(refreshButton_);
+        toolbar->addAction(refreshGridAction_);
+        toolbar->addAction(restoreDefaultsAction_);
+        toolbar->addSeparator();
         toolbar->addAction(loadResultViewAction_);
         toolbar->addAction(savePresetAction);
         QWidget* toolbarSpacer = new QWidget(this);
@@ -2075,13 +2081,39 @@ void FaultTraceDialog::saveCurrentPreset() {
     appendLog(QString::fromUtf8("当前参数和界面配置已保存。"));
 }
 
+void FaultTraceDialog::restoreDefaults() {
+    outputEdit_->setText("FaultPolyTrace_Result");
+    presetCombo_->setCurrentText(QString::fromUtf8("防黏连增强"));
+    applyParameterPreset(presetCombo_->currentText());
+    traceModeCombo_->setCurrentText("ridge-belt");
+    thresholdModeCombo_->setCurrentText("percentile");
+    thresholdSpin_->setValue(0.95);
+    percentileSpin_->setValue(0.98);
+    minAreaSpin_->setValue(120.0);
+    setPolygonColor(QColor("#00FFFF"));
+    polygonLineWidthSpin_->setValue(0.03);
+    importDatCheck_->setChecked(false);
+    overwriteGridCheck_->setChecked(true);
+    if (showInputLayerCheck_) {
+        showInputLayerCheck_->setChecked(true);
+    }
+    if (showResultLayerCheck_) {
+        showResultLayerCheck_->setChecked(true);
+    }
+    updateOptionControls();
+    updateLayerVisibility();
+    saveSettings();
+    appendLog(QString::fromUtf8("已恢复推荐默认配置：防黏连增强、青色结果线、默认输出名。数据库连接信息已保留。"));
+    appendStatus(QString::fromUtf8("已恢复默认配置"));
+}
+
 void FaultTraceDialog::showHelpHint() {
     appendLog(QString::fromUtf8("帮助文档：docs/用户操作手册.md；异机交付说明：docs/评审交付与异机运行说明.md。"));
     QMessageBox::information(this,
                              QString::fromUtf8("FaultPolyTrace 帮助提示"),
                              QString::fromUtf8("常用流程：\n"
-                                               "1. 在【数据库与环境底层配置】中确认 GeoEast 根目录、项目、用户和 Runner。\n"
-                                                "2. 点击【刷新网格】读取 GeoEast 中的 BOMapGrid 对象。\n"
+                                               "1. 在【数据库配置】中确认 GeoEast 根目录、数据根目录、项目、用户和 Runner。\n"
+                                                "2. 点击【刷新 BOMapGrid 列表】读取 GeoEast 中的输入网格对象。\n"
                                                 "3. 设置输入网格、输出多边形、结果颜色和必要参数。\n"
                                                 "4. 点击【开始追踪】，完成后本窗口会载入真实原始网格和结果多边形。\n"
                                                 "5. 如需用 GeoEast 官方窗口查看，点击【打开工区底图】或【打开平面成图】，再在图层树中勾选 Grids 和 Fault Polygons。\n"
@@ -2217,6 +2249,75 @@ void FaultTraceDialog::saveSettings() const {
     if (showResultLayerCheck_) {
         settings.setValue("showResultLayer", showResultLayerCheck_->isChecked());
     }
+}
+
+QStringList FaultTraceDialog::missingGeoEastConfig(bool requireGrid, bool requireOutput) const {
+    QStringList missing;
+    const QString runner = runnerEdit_ ? runnerEdit_->text().trimmed() : QString();
+    const QString geoEastRoot = geoEastRootEdit_ ? geoEastRootEdit_->text().trimmed() : QString();
+    const QString dataRoot = geoEastDataRootEdit_ ? geoEastDataRootEdit_->text().trimmed() : QString();
+    const QString database = databaseEdit_ ? databaseEdit_->text().trimmed() : QString();
+    const QString project = projectEdit_ ? projectEdit_->text().trimmed() : QString();
+    const QString user = userEdit_ ? userEdit_->text().trimmed() : QString();
+    const QString grid = gridCombo_ ? gridCombo_->currentText().trimmed() : QString();
+    const QString output = outputEdit_ ? outputEdit_->text().trimmed() : QString();
+
+    if (runner.isEmpty()) {
+        missing << QString::fromUtf8("Runner 可执行文件");
+    } else if (!QFileInfo::exists(runner)) {
+        missing << QString::fromUtf8("Runner 文件不存在：%1").arg(QDir::toNativeSeparators(runner));
+    }
+    if (geoEastRoot.isEmpty()) {
+        missing << QString::fromUtf8("GeoEast 根目录");
+    } else if (!QDir(geoEastRoot).exists()) {
+        missing << QString::fromUtf8("GeoEast 根目录不存在：%1").arg(QDir::toNativeSeparators(geoEastRoot));
+    }
+    if (dataRoot.isEmpty()) {
+        missing << QString::fromUtf8("GeoEast 数据根目录");
+    } else if (!QDir(dataRoot).exists()) {
+        missing << QString::fromUtf8("GeoEast 数据根目录不存在：%1").arg(QDir::toNativeSeparators(dataRoot));
+    }
+    if (database.isEmpty()) {
+        missing << QString::fromUtf8("数据库名");
+    }
+    if (project.isEmpty()) {
+        missing << QString::fromUtf8("项目名");
+    }
+    if (user.isEmpty()) {
+        missing << QString::fromUtf8("用户名");
+    }
+    if (requireGrid && grid.isEmpty()) {
+        missing << QString::fromUtf8("输入 BOMapGrid");
+    }
+    if (requireOutput && output.isEmpty()) {
+        missing << QString::fromUtf8("输出 BOFaultPolygon 名称");
+    }
+    return missing;
+}
+
+bool FaultTraceDialog::ensureGeoEastConfigReady(const QString& operation, bool requireGrid, bool requireOutput) {
+    const QStringList missing = missingGeoEastConfig(requireGrid, requireOutput);
+    if (missing.isEmpty()) {
+        return true;
+    }
+
+    appendLog(QString::fromUtf8("无法执行【%1】：GeoEast 配置不完整。缺失或无效项：%2")
+                  .arg(operation, missing.join(QString::fromUtf8("；"))));
+
+    QMessageBox message(this);
+    message.setIcon(QMessageBox::Warning);
+    message.setWindowTitle(QString::fromUtf8("GeoEast 配置不完整"));
+    message.setText(QString::fromUtf8("执行【%1】前需要先补齐 GeoEast 配置。").arg(operation));
+    message.setInformativeText(QString::fromUtf8("缺失或无效项：\n\n- %1\n\n请点击【打开数据库配置】补齐后再执行。保存一次后，下次打开会自动记住。")
+                                   .arg(missing.join(QString::fromUtf8("\n- "))));
+    QPushButton* configButton = message.addButton(QString::fromUtf8("打开数据库配置"), QMessageBox::AcceptRole);
+    message.addButton(QString::fromUtf8("稍后处理"), QMessageBox::RejectRole);
+    message.exec();
+    if (message.clickedButton() == configButton) {
+        showDatabaseConfigDialog();
+    }
+    appendStatus(QString::fromUtf8("GeoEast 配置不完整，已停止操作"));
+    return false;
 }
 
 void FaultTraceDialog::choosePolygonColor() {
@@ -2685,11 +2786,10 @@ void FaultTraceDialog::refreshGrids() {
         return;
     }
     saveSettings();
-    const QString runner = runnerEdit_->text().trimmed();
-    if (!QFileInfo::exists(runner)) {
-        QMessageBox::warning(this, QString::fromUtf8("Runner 不存在"), runner);
+    if (!ensureGeoEastConfigReady(QString::fromUtf8("刷新网格列表"), false, false)) {
         return;
     }
+    const QString runner = runnerEdit_->text().trimmed();
 
     refreshingGrids_ = true;
     deletingOutput_ = false;
@@ -2714,15 +2814,10 @@ void FaultTraceDialog::runTrace() {
         return;
     }
     saveSettings();
+    if (!ensureGeoEastConfigReady(QString::fromUtf8("开始追踪"), true, true)) {
+        return;
+    }
     const QString runner = runnerEdit_->text().trimmed();
-    if (!QFileInfo::exists(runner)) {
-        QMessageBox::warning(this, QString::fromUtf8("Runner 不存在"), runner);
-        return;
-    }
-    if (gridCombo_->currentText().trimmed().isEmpty() || outputEdit_->text().trimmed().isEmpty()) {
-        QMessageBox::warning(this, QString::fromUtf8("参数不完整"), QString::fromUtf8("输入网格和输出多边形名称不能为空。"));
-        return;
-    }
 
     refreshingGrids_ = false;
     deletingOutput_ = false;
@@ -2746,8 +2841,8 @@ void FaultTraceDialog::deleteOutput() {
         return;
     }
     const QString outputName = outputEdit_->text().trimmed();
-    if (outputName.isEmpty()) {
-        QMessageBox::warning(this, QString::fromUtf8("输出名称为空"), QString::fromUtf8("请先填写要删除的输出多边形名称。"));
+    saveSettings();
+    if (!ensureGeoEastConfigReady(QString::fromUtf8("删除当前结果"), false, true)) {
         return;
     }
     const int choice = QMessageBox::warning(
@@ -2759,12 +2854,7 @@ void FaultTraceDialog::deleteOutput() {
     if (choice != QMessageBox::Yes) {
         return;
     }
-    saveSettings();
     const QString runner = runnerEdit_->text().trimmed();
-    if (!QFileInfo::exists(runner)) {
-        QMessageBox::warning(this, QString::fromUtf8("Runner 不存在"), runner);
-        return;
-    }
 
     refreshingGrids_ = false;
     deletingOutput_ = true;
@@ -2961,6 +3051,9 @@ void FaultTraceDialog::setRunning(bool running) {
     }
     if (deleteOutputAction_) {
         deleteOutputAction_->setEnabled(!running);
+    }
+    if (restoreDefaultsAction_) {
+        restoreDefaultsAction_->setEnabled(!running);
     }
     if (loadResultViewAction_) {
         loadResultViewAction_->setEnabled(!running);

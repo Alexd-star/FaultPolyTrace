@@ -3,6 +3,7 @@
 #include <QMainWindow>
 #include <QProcess>
 #include <QString>
+#include <QStringList>
 
 class AttributeView;
 class QAction;
@@ -94,6 +95,8 @@ private:
     void configureGeoEastEnvironment(QProcessEnvironment& environment) const;
     void startProcess(ProcessTask task, const QString& runner, const QStringList& args, const QString& statusText);
     QString geoEastOutputName() const;
+    QStringList missingGeoEastConfig(bool requireGrid, bool requireOutput) const;
+    bool ensureGeoEastConfigReady(const QString& operation, bool requireGrid, bool requireOutput);
 
     QProcess* process_ = nullptr;
     qint64 processStartMs_ = 0;
