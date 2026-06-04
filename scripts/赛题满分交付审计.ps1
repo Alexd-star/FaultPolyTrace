@@ -120,6 +120,104 @@ function Get-FirstCsvRow {
     return $rows | Select-Object -First 1
 }
 
+function Find-FileByStem {
+    param([string]$Dir, [string]$Stem, [string[]]$Extensions, [int64]$MinBytes = 1)
+    foreach ($ext in $Extensions) {
+        $candidate = Join-Path $Dir ($Stem + $ext)
+        if ((Test-Path -LiteralPath $candidate) -and ((Get-Item -LiteralPath $candidate).Length -ge $MinBytes)) {
+            return (Get-Item -LiteralPath $candidate).FullName
+        }
+    }
+    return ""
+}
+
+function Get-GeoEastEvidence {
+    $figureRoots = @(
+        (Join-Path $root "release\figure"),
+        (Join-Path $root "figure")
+    )
+    $figureRoot = $figureRoots | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+    if ([string]::IsNullOrWhiteSpace($figureRoot)) {
+        return [pscustomobject]@{
+            dir = ""
+            screenshotsReady = $false
+            videoReady = $false
+            missing = @("未找到 release\figure 或 figure 目录")
+            menu = ""
+            launcher = ""
+            grid = ""
+            original = ""
+            result = ""
+            overlay = ""
+            database = ""
+            log = ""
+            video = ""
+        }
+    }
+
+    $evidenceDir = Get-ChildItem -LiteralPath $figureRoot -Directory |
+        Where-Object { $_.Name -like "geoeast_acceptance_*" } |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1
+    if (!$evidenceDir) {
+        return [pscustomobject]@{
+            dir = ""
+            screenshotsReady = $false
+            videoReady = $false
+            missing = @("未找到 geoeast_acceptance_* 现场证据目录")
+            menu = ""
+            launcher = ""
+            grid = ""
+            original = ""
+            result = ""
+            overlay = ""
+            database = ""
+            log = ""
+            video = ""
+        }
+    }
+
+    $imageExts = @(".png", ".jpg", ".jpeg", ".bmp")
+    $videoExts = @(".mp4", ".mkv", ".avi", ".mov", ".wmv")
+    $items = @(
+        @{ Key = "menu"; Stem = "01_GeoEast菜单入口"; Name = "GeoEast 菜单入口截图" },
+        @{ Key = "launcher"; Stem = "02_启动器自动配置"; Name = "启动器自动配置截图" },
+        @{ Key = "grid"; Stem = "03_输入网格列表"; Name = "输入网格列表截图" },
+        @{ Key = "original"; Stem = "04_原始网格显示"; Name = "原始网格显示截图" },
+        @{ Key = "result"; Stem = "05_结果多边形图层"; Name = "结果多边形图层截图" },
+        @{ Key = "overlay"; Stem = "06_原始与结果叠加"; Name = "原始与结果叠加截图" },
+        @{ Key = "database"; Stem = "07_数据库对象管理"; Name = "数据库对象管理截图" },
+        @{ Key = "log"; Stem = "08_运行日志与耗时"; Name = "运行日志与耗时截图" }
+    )
+
+    $files = @{}
+    $missing = @()
+    foreach ($item in $items) {
+        $file = Find-FileByStem -Dir $evidenceDir.FullName -Stem $item.Stem -Extensions $imageExts -MinBytes 10000
+        $files[$item.Key] = $file
+        if ([string]::IsNullOrWhiteSpace($file)) {
+            $missing += $item.Name
+        }
+    }
+    $videoFile = Find-FileByStem -Dir $evidenceDir.FullName -Stem "09_演示视频" -Extensions $videoExts -MinBytes 100000
+
+    return [pscustomobject]@{
+        dir = $evidenceDir.FullName
+        screenshotsReady = ($missing.Count -eq 0)
+        videoReady = ![string]::IsNullOrWhiteSpace($videoFile)
+        missing = $missing
+        menu = $files["menu"]
+        launcher = $files["launcher"]
+        grid = $files["grid"]
+        original = $files["original"]
+        result = $files["result"]
+        overlay = $files["overlay"]
+        database = $files["database"]
+        log = $files["log"]
+        video = $videoFile
+    }
+}
+
 if ([string]::IsNullOrWhiteSpace($AcceptanceDir)) {
     $latestAcceptance = Find-LatestDirectory -BaseDir $outputsRoot -Pattern "acceptance_*_official_root_antimerge"
     if ($latestAcceptance) {
@@ -354,10 +452,31 @@ foreach ($file in $repoGeoEastFiles) {
     Test-RequiredAnyFile "GeoEast 集成" $file.Name $candidatePaths 1 | Out-Null
 }
 
-Add-Manual "GeoEast 集成" "GeoEast 菜单/按钮现场可见" "需在有效 license 和目标工区中确认菜单入口可见" "脚本不能替代人工打开 GeoEast 现场确认；需保留截图或演示视频。"
-Add-Manual "GeoEast 集成" "GeoEast 原始数据与结果叠加显示" "需在 GeoMapping/GeoBasemap 中叠加原始网格和输出多边形确认" "需人工确认颜色、线宽、范围和图层选择。"
-Add-Manual "GeoEast 集成" "GeoEast 数据库写入当前工区" "需在目标工区确认 BOFaultPolygon 输出对象可见且可刷新" "依赖有效 GeoEast license、PG/BO 数据库、当前项目和用户权限。"
-Add-Manual "评审交付" "演示视频或答辩截图" "建议准备双击独立软件、GeoEast 按钮、官方数据运行、结果叠加四类证据" "自动脚本只生成报告，不能代替视频录制。"
+$geoEastEvidence = Get-GeoEastEvidence
+if ($geoEastEvidence.screenshotsReady) {
+    Add-Pass "GeoEast 集成" "GeoEast 菜单/按钮现场可见" "需在有效 license 和目标工区中确认菜单入口可见" $geoEastEvidence.menu $geoEastEvidence.dir
+    Add-Pass "GeoEast 集成" "GeoEast 启动器自动配置与输入网格" "需证明从 GeoEast 入口打开后能自动配置并刷新 BOMapGrid" ("{0}；{1}" -f $geoEastEvidence.launcher, $geoEastEvidence.grid) $geoEastEvidence.dir
+    Add-Pass "GeoEast 集成" "GeoEast 原始数据与结果叠加显示" "需在 GeoMapping/GeoBasemap 中叠加原始网格和输出多边形确认" ("{0}；{1}；{2}" -f $geoEastEvidence.original, $geoEastEvidence.result, $geoEastEvidence.overlay) $geoEastEvidence.dir
+    Add-Pass "GeoEast 集成" "GeoEast 数据库写入当前工区" "需在目标工区确认 BOFaultPolygon 输出对象可见且可刷新" ("{0}；{1}" -f $geoEastEvidence.database, $geoEastEvidence.log) $geoEastEvidence.dir
+} else {
+    $missingEvidence = ($geoEastEvidence.missing -join "；")
+    if ([string]::IsNullOrWhiteSpace($geoEastEvidence.dir)) {
+        $missingEvidence = "未找到现场证据目录。可运行 scripts/检查GeoEast现场证据.ps1 -Initialize 生成模板。"
+    } else {
+        $missingEvidence = "现场证据目录：$($geoEastEvidence.dir)；缺少：$missingEvidence"
+    }
+    Add-Manual "GeoEast 集成" "GeoEast 菜单/按钮现场可见" "需在有效 license 和目标工区中确认菜单入口可见" $missingEvidence $geoEastEvidence.dir
+    Add-Manual "GeoEast 集成" "GeoEast 原始数据与结果叠加显示" "需在 GeoMapping/GeoBasemap 中叠加原始网格和输出多边形确认" $missingEvidence $geoEastEvidence.dir
+    Add-Manual "GeoEast 集成" "GeoEast 数据库写入当前工区" "需在目标工区确认 BOFaultPolygon 输出对象可见且可刷新" $missingEvidence $geoEastEvidence.dir
+}
+
+if ($geoEastEvidence.videoReady) {
+    Add-Pass "评审交付" "演示视频或答辩截图" "建议准备双击独立软件、GeoEast 按钮、官方数据运行、结果叠加四类证据" $geoEastEvidence.video $geoEastEvidence.dir
+} elseif ($geoEastEvidence.screenshotsReady) {
+    Add-Pass "评审交付" "演示视频或答辩截图" "演示视频或答辩截图至少满足其一" ("现场答辩截图齐全：$($geoEastEvidence.dir)") $geoEastEvidence.dir
+} else {
+    Add-Manual "评审交付" "演示视频或答辩截图" "建议准备双击独立软件、GeoEast 按钮、官方数据运行、结果叠加四类证据" "未找到完整截图或 09_演示视频。可按 GeoEast 现场证据包模板补齐。" $geoEastEvidence.dir
+}
 
 $passCount = ($script:auditResults | Where-Object { $_.status -eq "通过" }).Count
 $failCount = ($script:auditResults | Where-Object { $_.status -eq "失败" }).Count

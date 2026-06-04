@@ -213,6 +213,7 @@ foreach ($script in @(
     "验收独立软件发布包.ps1",
     "检查参数一致性.ps1",
     "检查独立软件界面功能.ps1",
+    "检查GeoEast现场证据.ps1",
     "赛题满分交付审计.ps1",
     "性能回归检查.ps1",
     "visualize_official_result.py",
@@ -285,7 +286,8 @@ $manifest += '6. 修改界面参数、模板参数、CLI 参数或 Runner 参数
 $manifest += '7. 修改独立软件菜单、工具栏、视图切换或主操作按钮后运行 `scripts/检查独立软件界面功能.ps1`，确认没有空控件和漏联动。'
 $manifest += '8. 修改独立软件或发布包后运行 `scripts/验收独立软件发布包.ps1 -PackageDir <发布包目录>`，确认 GUI、CLI、根目录转发和输出文件完整。'
 $manifest += '9. 修改算法后运行 `scripts/一键总验收.ps1 -SkipGeoEastBuild -SkipPackage`，确认官方数据仍满足覆盖、防黏连、拓扑和性能门禁。'
-$manifest += '10. 提交或打包前运行 `scripts/赛题满分交付审计.ps1`，汇总官方 DAT、独立软件、GeoEast 集成、文档和发布包证据。'
+$manifest += '10. 在 GeoEast 现场截图前运行 `scripts/检查GeoEast现场证据.ps1 -Initialize`，按模板补齐截图和录屏后再运行该脚本校验。'
+$manifest += '11. 提交或打包前运行 `scripts/赛题满分交付审计.ps1`，汇总官方 DAT、独立软件、GeoEast 集成、文档和发布包证据。'
 
 Set-Content -LiteralPath (Join-Path $packageDir "发布包清单.md") -Value ($manifest -join "`n") -Encoding UTF8
 

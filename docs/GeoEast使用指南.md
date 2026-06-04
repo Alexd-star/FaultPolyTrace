@@ -184,11 +184,37 @@ C:\Users\26312\Documents\BGPCup\FaultPolyTrace\geoeast_plugin\qt_launcher\faultp
 
 ## 9. 最终证据清单
 
-比赛材料建议准备以下截图和日志：
+比赛材料建议准备以下截图、日志和录屏。为避免截图命名混乱，建议先生成现场证据包：
 
-- Basemap 中 `test7_fault_attribute_bo` 的原始属性图。
-- Basemap 中 `FaultPolyTrace_Result` 或用户命名结果叠加在属性图上的结果图。
-- `GeoFaultPolygonBrowser` 中显示结果对象的截图。
-- Qt 启动器运行日志截图。
-- 命令行或 JSON 诊断结果：多边形数量、开放环数量、自相交数量、多边形相交数量、耗时。
-- 说明官方 DAT 已转换为正确 `BOMapGrid`，避免 GeoEast ASCII 格式定义歧义。
+```powershell
+.\scripts\检查GeoEast现场证据.ps1 -Initialize
+```
+
+脚本会在 `release\figure\geoeast_acceptance_<时间戳>` 下生成说明文件和占位清单。完成 GeoEast 现场操作后，将截图按固定文件名放入该目录，再运行：
+
+```powershell
+.\scripts\检查GeoEast现场证据.ps1 -EvidenceDir .\release\figure\geoeast_acceptance_<时间戳>
+```
+
+满分交付审计脚本会自动读取最新 `geoeast_acceptance_*` 目录。若以下截图齐全，GeoEast 现场项会从“待人工确认”转为“通过”。
+
+必需截图：
+
+| 文件名 | 内容 |
+|---|---|
+| `01_GeoEast菜单入口.png` | GeoEast 主界面中的“断层多边形追踪”菜单、按钮或 Ribbon 入口 |
+| `02_启动器自动配置.png` | 从 GeoEast 入口打开后的启动器，数据库、项目、用户和 Runner 自动识别 |
+| `03_输入网格列表.png` | 点击【刷新网格】后可选择 `test7_fault_attribute_bo` |
+| `04_原始网格显示.png` | Basemap 或 GeoMapping 中的原始断层属性图 |
+| `05_结果多边形图层.png` | `FaultPolyTrace_Result` 或用户命名结果图层单独显示 |
+| `06_原始与结果叠加.png` | 原始网格与断层多边形叠加显示，颜色和线宽清晰 |
+| `07_数据库对象管理.png` | `GeoFaultPolygonBrowser` 或对象管理器中可见结果对象 |
+| `08_运行日志与耗时.png` | 启动器日志中可见多边形数量、拓扑诊断、耗时和写库结果 |
+
+建议录屏：
+
+| 文件名 | 内容 |
+|---|---|
+| `09_演示视频.mp4` | 1 到 2 分钟，覆盖 GeoEast 入口、选择网格、运行追踪、写库和叠加查看 |
+
+截图和录屏的目的不是重复算法验收，而是证明“集成到 GeoEast 系统”的现场可用性。算法质量仍以官方 `test.dat` 一键验收、质量评估图、漏检质控和残余复核层为准。
