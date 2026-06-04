@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$GeoEastRoot = $(if ($env:FPT_GEOEAST_ROOT) { $env:FPT_GEOEAST_ROOT } else { "C:\Users\26312\GeoEast" }),
     [switch]$SkipBuild
 )

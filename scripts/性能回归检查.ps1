@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$OfficialDat = "",
     [int]$MaxElapsedMs = 5000,
     [int]$ExpectedPolygons = 232,

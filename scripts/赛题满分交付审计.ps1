@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$AcceptanceDir = "",
     [string]$ReleasePackageDir = "",
     [string]$StandaloneAcceptanceDir = "",
@@ -409,11 +409,24 @@ if ([string]::IsNullOrWhiteSpace($ReleasePackageDir) -or !(Test-Path -LiteralPat
         "检查参数一致性.ps1",
         "检查独立软件界面功能.ps1",
         "赛题满分交付审计.ps1",
+        "生成答辩评审材料包.ps1",
         "生成残余复核层.py",
         "生成质量评估图.py",
         "顶尖质量诊断.py"
     )) {
         Test-RequiredFile "发布包脚本" $script (Join-Path $ReleasePackageDir "scripts\$script") 1 | Out-Null
+    }
+
+    $reviewPackDir = Join-Path $ReleasePackageDir "答辩评审材料包"
+    if (Test-RequiredDir "评审交付" "答辩评审材料包" $reviewPackDir) {
+        foreach ($item in @(
+            @{Name="评分项证据索引"; Path="评分项证据索引.md"; Min=500},
+            @{Name="答辩演示脚本"; Path="答辩演示脚本.md"; Min=500},
+            @{Name="交付材料检查清单"; Path="交付材料检查清单.md"; Min=500},
+            @{Name="材料包清单"; Path="材料包清单.csv"; Min=100}
+        )) {
+            Test-RequiredFile "评审交付" $item.Name (Join-Path $reviewPackDir $item.Path) $item.Min | Out-Null
+        }
     }
 }
 

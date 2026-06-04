@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$GeoEastRoot = $(if ($env:FPT_GEOEAST_ROOT) { $env:FPT_GEOEAST_ROOT } else { "C:\Users\26312\GeoEast" }),
     [string]$OfficialDat = "",
     [string]$PackageVersion = "v0.9.5",

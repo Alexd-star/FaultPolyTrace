@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 
 $projectPath = Join-Path $PSScriptRoot "..\geoeast_plugin\bo_runner\FaultPolyTraceGeoEast.vcxproj"
 $projectPath = (Resolve-Path -LiteralPath $projectPath).Path

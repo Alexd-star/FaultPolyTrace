@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$Version = "v0.9.0",
     [string]$GeoEastRoot = $(if ($env:FPT_GEOEAST_ROOT) { $env:FPT_GEOEAST_ROOT } elseif ($env:USERPROFILE) { Join-Path $env:USERPROFILE "GeoEast" } else { "C:\GeoEast" }),
     [switch]$SkipBuild
@@ -31,18 +31,26 @@ function Copy-FileOptional {
 
 function Sanitize-PackageTextFiles {
     param([string]$Root)
-    Get-ChildItem -LiteralPath $Root -Recurse -File -Include *.md,*.txt,*.ini,*.ps1,*.cmd,*.py | ForEach-Object {
-        $text = Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8
-        $text = $text -replace 'C:\\Users\\[^\\]+\\Documents\\BGPCup\\FaultPolyTrace', "<安装目录>\FaultPolyTrace"
-        $text = $text -replace 'C:/Users/[^/]+/Documents/BGPCup/FaultPolyTrace', "<安装目录>/FaultPolyTrace"
-        $text = $text -replace 'C:\\Users\\[^\\]+\\GeoEast', "<GeoEast安装根目录>"
-        $text = $text -replace 'C:/Users/[^/]+/GeoEast', "<GeoEast安装根目录>"
-        $text = $text -replace '[A-Za-z]:[\\/]+BaiduNetdiskDownload', "<数据目录>"
-        if ($env:USERNAME) {
-            $escapedUser = [regex]::Escape($env:USERNAME)
-            $text = $text -replace "(?<!\d)$escapedUser(?!\d)", '<GeoEast用户名>'
-        }
-        Set-Content -LiteralPath $_.FullName -Value $text -Encoding UTF8
+    $textExtensions = @(".md", ".txt", ".ini", ".ps1", ".cmd", ".py", ".csv", ".json")
+    $utf8Bom = New-Object System.Text.UTF8Encoding($true)
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    Get-ChildItem -LiteralPath $Root -Recurse -File |
+        Where-Object { $textExtensions -contains $_.Extension.ToLowerInvariant() } |
+        ForEach-Object {
+            $original = [System.IO.File]::ReadAllText($_.FullName, [System.Text.Encoding]::UTF8)
+            $text = $original -replace 'C:\\Users\\[^\\]+\\Documents\\BGPCup\\FaultPolyTrace', "<安装目录>\FaultPolyTrace"
+            $text = $text -replace 'C:/Users/[^/]+/Documents/BGPCup/FaultPolyTrace', "<安装目录>/FaultPolyTrace"
+            $text = $text -replace 'C:\\Users\\[^\\]+\\GeoEast', "<GeoEast安装根目录>"
+            $text = $text -replace 'C:/Users/[^/]+/GeoEast', "<GeoEast安装根目录>"
+            $text = $text -replace '[A-Za-z]:[\\/]+BaiduNetdiskDownload', "<数据目录>"
+            if ($env:USERNAME) {
+                $escapedUser = [regex]::Escape($env:USERNAME)
+                $text = $text -replace "(?<!\d)$escapedUser(?!\d)", '<GeoEast用户名>'
+            }
+            if ($text -ne $original) {
+                $encoding = $(if ($_.Extension.ToLowerInvariant() -eq ".ps1") { $utf8Bom } else { $utf8NoBom })
+                [System.IO.File]::WriteAllText($_.FullName, $text, $encoding)
+            }
     }
 }
 
@@ -215,6 +223,7 @@ foreach ($script in @(
     "检查独立软件界面功能.ps1",
     "检查GeoEast现场证据.ps1",
     "赛题满分交付审计.ps1",
+    "生成答辩评审材料包.ps1",
     "性能回归检查.ps1",
     "visualize_official_result.py",
     "generate_official_quality_report.py",
@@ -255,6 +264,7 @@ $manifest += '- `figure/`：界面样式截图和 GeoEast 参考截图'
 $manifest += '- `examples/outputs/official/`：官方数据结果、图件、报告依据'
 $manifest += '- `examples/outputs/acceptance_*_official_root_antimerge/`：最新官方 DAT 一键验收证据链'
 $manifest += '- `examples/outputs/standalone_acceptance_*/`：最新独立软件发布包验收证据链'
+$manifest += '- `答辩评审材料包/`：评分项证据索引、答辩演示脚本和交付检查清单'
 $manifest += '- `scripts/`：运行、可视化、报告脚本'
 $manifest += '- `src/`：核心源码'
 $manifest += '- `standalone_app/`：独立桌面软件 Qt 工程源码'
@@ -288,8 +298,14 @@ $manifest += '8. 修改独立软件或发布包后运行 `scripts/验收独立�
 $manifest += '9. 修改算法后运行 `scripts/一键总验收.ps1 -SkipGeoEastBuild -SkipPackage`，确认官方数据仍满足覆盖、防黏连、拓扑和性能门禁。'
 $manifest += '10. 在 GeoEast 现场截图前运行 `scripts/检查GeoEast现场证据.ps1 -Initialize`，按模板补齐截图和录屏后再运行该脚本校验。'
 $manifest += '11. 提交或打包前运行 `scripts/赛题满分交付审计.ps1`，汇总官方 DAT、独立软件、GeoEast 集成、文档和发布包证据。'
+$manifest += '12. 答辩或提交前查看 `答辩评审材料包/评分项证据索引.md`，也可运行 `scripts/生成答辩评审材料包.ps1` 重新生成材料包。'
 
 Set-Content -LiteralPath (Join-Path $packageDir "发布包清单.md") -Value ($manifest -join "`n") -Encoding UTF8
+
+$reviewPackScript = Join-Path $repoRoot "scripts\生成答辩评审材料包.ps1"
+if (Test-Path -LiteralPath $reviewPackScript) {
+    & $reviewPackScript -OutputDir (Join-Path $packageDir "答辩评审材料包") -PackageDir $packageDir
+}
 
 Sanitize-PackageTextFiles $packageDir
 

@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$EvidenceDir = "",
     [switch]$Initialize,
     [switch]$Strict

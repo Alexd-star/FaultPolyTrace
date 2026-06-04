@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $officialDat = "D:\BaiduNetdiskDownload\BGPCup2025\赛题7-基于平面断层属性的断层多边形自动追踪\test.dat"

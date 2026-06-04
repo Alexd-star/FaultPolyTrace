@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$GeoEastRoot = $env:FPT_GEOEAST_ROOT,
     [string]$QMake = $env:FPT_GEOEAST_QMAKE,
     [string]$VcVars = "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars64.bat"

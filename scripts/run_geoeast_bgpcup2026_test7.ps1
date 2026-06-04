@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$GeoEastRoot = $env:FPT_GEOEAST_ROOT,
     [string]$GeoEastDataRoot = $env:FPT_GEOEAST_DATA_ROOT,
     [string]$Database = $(if ($env:FPT_GEOEAST_DB) { $env:FPT_GEOEAST_DB } else { "ndp" }),

@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$OutputDir = $(Join-Path (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")) "assets\icons")
 )
 

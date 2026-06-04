@@ -1,4 +1,4 @@
-[CmdletBinding(SupportsShouldProcess = $true)]
+﻿[CmdletBinding(SupportsShouldProcess = $true)]
 param(
     [string]$PackageDir,
     [string]$Version,
@@ -363,7 +363,9 @@ function Test-PersonalPathLeak {
     )
     $matches = @()
     $rootPrefix = (Resolve-Path -LiteralPath $Root).Path.TrimEnd('\')
-    Get-ChildItem -LiteralPath $Root -Recurse -File -Include *.md,*.txt,*.ini,*.ps1,*.cmd,*.py |
+    $textExtensions = @(".md", ".txt", ".ini", ".ps1", ".cmd", ".py", ".csv", ".json")
+    Get-ChildItem -LiteralPath $Root -Recurse -File |
+        Where-Object { $textExtensions -contains $_.Extension.ToLowerInvariant() } |
         ForEach-Object {
             $relative = $_.FullName.Substring($rootPrefix.Length).TrimStart('\')
             if ($relative -like "examples\outputs\full_score_audit_*") {

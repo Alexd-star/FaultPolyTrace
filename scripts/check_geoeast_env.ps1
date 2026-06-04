@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 
 $required = @("IECO", "NGP", "NDPDIR", "NGPDIR", "PG_HOME", "GEOEAST")
 $optional = @("GEOEAST", "GGI_MAKE_PATH", "BASE_MAKE_PATH")
