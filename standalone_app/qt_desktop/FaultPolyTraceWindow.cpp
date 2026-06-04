@@ -1,6 +1,8 @@
 #include "FaultPolyTraceWindow.h"
+#include "UiLocalization.h"
 
 #include <QAction>
+#include <QActionGroup>
 #include <QApplication>
 #include <QCheckBox>
 #include <QCloseEvent>
@@ -393,6 +395,11 @@ public:
         update();
     }
 
+    void setLanguage(UiLanguage language) {
+        languageCode_ = language == UiLanguage::English ? "en" : "zh-CN";
+        update();
+    }
+
     void setTaskSummary(const QStringList& lines) {
         taskLines_ = lines;
         update();
@@ -680,17 +687,17 @@ protected:
         title.setBold(true);
         painter.setFont(title);
         painter.setPen(QColor("#666666"));
-        const QString modeText = showGridLayer_ && showPolygonLayer_ ? QString::fromUtf8("叠加结果") :
-            (showGridLayer_ ? QString::fromUtf8("原始网格") :
-            (showPolygonLayer_ ? QString::fromUtf8("结果多边形") : QString::fromUtf8("图层已关闭")));
-        painter.drawText(QPoint(24, 34), QString::fromUtf8("[视图区] %1").arg(modeText));
+        const QString modeText = showGridLayer_ && showPolygonLayer_ ? uiText(QString::fromUtf8("叠加结果")) :
+            (showGridLayer_ ? uiText(QString::fromUtf8("原始网格")) :
+            (showPolygonLayer_ ? uiText(QString::fromUtf8("结果多边形")) : uiText(QString::fromUtf8("图层已关闭"))));
+        painter.drawText(QPoint(24, 34), uiText(QString::fromUtf8("[视图区] %1")).arg(modeText));
         painter.setFont(QFont(painter.font().family(), 9));
         painter.setPen(QColor("#777777"));
         painter.drawText(QRect(width() - 280, 18, 250, 20), Qt::AlignRight, status_);
         painter.drawText(QRect(width() - 280, 38, 250, 20), Qt::AlignRight,
-                         QString::fromUtf8("缩放 %1%").arg(qRound(zoom_ * 100)));
+                         uiText(QString::fromUtf8("缩放 %1%")).arg(qRound(zoom_ * 100)));
         if (grid_.isEmpty() && polygons_.isEmpty()) {
-            painter.drawText(canvas, Qt::AlignCenter, QString::fromUtf8("请选择输入网格，或载入历史结果。"));
+            painter.drawText(canvas, Qt::AlignCenter, uiText(QString::fromUtf8("请选择输入网格，或载入历史结果。")));
         }
     }
 
@@ -809,7 +816,7 @@ private:
         titleFont.setBold(true);
         painter.setFont(titleFont);
         painter.setPen(QColor("#7A7A7A"));
-        painter.drawText(QPoint(26, 38), QString::fromUtf8("[任务视图区] 结果查看"));
+        painter.drawText(QPoint(26, 38), uiText(QString::fromUtf8("[任务视图区] 结果查看")));
 
         QFont hintFont = painter.font();
         hintFont.setPointSize(10);
@@ -825,16 +832,20 @@ private:
             painter.drawRect(guideRect);
             painter.setPen(QColor("#666666"));
             painter.drawText(guideRect.adjusted(12, 12, -12, -12), Qt::AlignLeft | Qt::AlignTop,
-                             QString::fromUtf8("查看逻辑：\n"
-                                               "1. 原始网格显示输入属性色图。\n"
-                                               "2. 结果多边形显示 CSV/WKT 结果文件。\n"
-                                               "3. 叠加结果用于核对断层响应贴合度。\n"
-                                               "4. 左侧复选框可独立开关图层。"));
+                             uiText(QString::fromUtf8("查看逻辑：\n"
+                                                       "1. 原始网格显示输入属性色图。\n"
+                                                       "2. 结果多边形显示 CSV/WKT 结果文件。\n"
+                                                       "3. 叠加结果用于核对断层响应贴合度。\n"
+                                                       "4. 左侧复选框可独立开关图层。")));
         }
 
         painter.setPen(QColor("#8A8A8A"));
         painter.drawText(QRect(width() - 210, 18, 180, 20), Qt::AlignRight,
-                         QString::fromUtf8("查看模式  缩放 %1%").arg(qRound(zoom_ * 100)));
+                         uiText(QString::fromUtf8("查看模式  缩放 %1%")).arg(qRound(zoom_ * 100)));
+    }
+
+    QString uiText(const QString& zh) const {
+        return fpt_ui::translate(zh, languageCode_);
     }
 
     Mode mode_ = Mode::Task;
@@ -862,6 +873,7 @@ private:
     bool showPolygonLayer_ = true;
     QString status_ = QString::fromUtf8("等待数据");
     QStringList taskLines_;
+    QString languageCode_ = "zh-CN";
 };
 
 class ColorBarWidget : public QWidget {
@@ -982,13 +994,13 @@ void FaultPolyTraceWindow::buildUi() {
 
     QMenu* viewMenu = menuBar()->addMenu(QString::fromUtf8("视图(&V)"));
     QAction* taskViewAction = viewMenu->addAction(QString::fromUtf8("任务预览"));
-    connect(taskViewAction, &QAction::triggered, this, [this]() { viewModeCombo_->setCurrentText(QString::fromUtf8("任务预览")); });
+    connect(taskViewAction, &QAction::triggered, this, [this]() { setComboByKey(viewModeCombo_, QString::fromUtf8("任务预览")); });
     QAction* rawViewAction = viewMenu->addAction(QString::fromUtf8("原始网格"));
-    connect(rawViewAction, &QAction::triggered, this, [this]() { viewModeCombo_->setCurrentText(QString::fromUtf8("原始网格")); });
+    connect(rawViewAction, &QAction::triggered, this, [this]() { setComboByKey(viewModeCombo_, QString::fromUtf8("原始网格")); });
     QAction* resultViewAction = viewMenu->addAction(QString::fromUtf8("结果多边形"));
-    connect(resultViewAction, &QAction::triggered, this, [this]() { viewModeCombo_->setCurrentText(QString::fromUtf8("结果多边形")); });
+    connect(resultViewAction, &QAction::triggered, this, [this]() { setComboByKey(viewModeCombo_, QString::fromUtf8("结果多边形")); });
     QAction* overlayViewAction = viewMenu->addAction(QString::fromUtf8("叠加结果"));
-    connect(overlayViewAction, &QAction::triggered, this, [this]() { viewModeCombo_->setCurrentText(QString::fromUtf8("叠加结果")); });
+    connect(overlayViewAction, &QAction::triggered, this, [this]() { setComboByKey(viewModeCombo_, QString::fromUtf8("叠加结果")); });
     viewMenu->addSeparator();
     QAction* panAction = viewMenu->addAction(makeToolIcon(ToolIconKind::Pan), QString::fromUtf8("平移模式"));
     panAction->setCheckable(true);
@@ -1031,6 +1043,18 @@ void FaultPolyTraceWindow::buildUi() {
     QMenu* toolsMenu = menuBar()->addMenu(QString::fromUtf8("工具(&T)"));
     toolsMenu->addAction(outputDirAction);
     toolsMenu->addAction(resetAction);
+
+    QMenu* languageMenu = menuBar()->addMenu(uiText("语言(&I)"));
+    QActionGroup* languageGroup = new QActionGroup(this);
+    languageGroup->setExclusive(true);
+    languageChineseAction_ = languageMenu->addAction(uiText("简体中文"));
+    languageChineseAction_->setCheckable(true);
+    languageChineseAction_->setActionGroup(languageGroup);
+    languageEnglishAction_ = languageMenu->addAction(uiText("English"));
+    languageEnglishAction_->setCheckable(true);
+    languageEnglishAction_->setActionGroup(languageGroup);
+    connect(languageChineseAction_, &QAction::triggered, this, [this]() { setLanguage(UiLanguage::SimplifiedChinese); });
+    connect(languageEnglishAction_, &QAction::triggered, this, [this]() { setLanguage(UiLanguage::English); });
 
     QMenu* helpMenu = menuBar()->addMenu(QString::fromUtf8("帮助(&H)"));
     helpMenu->addAction(helpAction);
@@ -1502,9 +1526,10 @@ void FaultPolyTraceWindow::buildUi() {
     connect(inputFormatCombo_, &QComboBox::currentTextChanged, this, &FaultPolyTraceWindow::refreshInputPreview);
     connect(sourceModeCombo_, &QComboBox::currentTextChanged, this, &FaultPolyTraceWindow::updateDataSourceMode);
     connect(viewModeCombo_, &QComboBox::currentTextChanged, this, [this]() {
-        if (viewModeCombo_->currentText() == QString::fromUtf8("任务预览")) {
+        const QString viewKey = comboKey(viewModeCombo_);
+        if (viewKey == QString::fromUtf8("任务预览")) {
             view_->setMode(AttributeView::Mode::Task);
-        } else if (viewModeCombo_->currentText() == QString::fromUtf8("原始网格")) {
+        } else if (viewKey == QString::fromUtf8("原始网格")) {
             view_->setMode(AttributeView::Mode::Raw);
             showGridLayerCheck_->blockSignals(true);
             showPolygonLayerCheck_->blockSignals(true);
@@ -1512,7 +1537,7 @@ void FaultPolyTraceWindow::buildUi() {
             showPolygonLayerCheck_->setChecked(false);
             showGridLayerCheck_->blockSignals(false);
             showPolygonLayerCheck_->blockSignals(false);
-        } else if (viewModeCombo_->currentText() == QString::fromUtf8("结果多边形")) {
+        } else if (viewKey == QString::fromUtf8("结果多边形")) {
             view_->setMode(AttributeView::Mode::Result);
             showGridLayerCheck_->blockSignals(true);
             showPolygonLayerCheck_->blockSignals(true);
@@ -1586,6 +1611,8 @@ void FaultPolyTraceWindow::buildUi() {
     connect(rootAntiMergeCheck_, &QCheckBox::toggled, this, &FaultPolyTraceWindow::updateTaskPreview);
     connect(localAntiMergeCheck_, &QCheckBox::toggled, this, &FaultPolyTraceWindow::updateTaskPreview);
     connect(residualTraceCheck_, &QCheckBox::toggled, this, &FaultPolyTraceWindow::updateTaskPreview);
+    prepareLanguageMetadata();
+    retranslateUi();
     updateOptionControls();
 }
 
@@ -1724,7 +1751,7 @@ QString FaultPolyTraceWindow::defaultGeoEastDataRoot() const {
 }
 
 bool FaultPolyTraceWindow::isGeoEastMode() const {
-    return sourceModeCombo_ && sourceModeCombo_->currentText() == QString::fromUtf8("GeoEast数据库");
+    return sourceModeCombo_ && comboKey(sourceModeCombo_) == QString::fromUtf8("GeoEast数据库");
 }
 
 QString FaultPolyTraceWindow::geoEastOutputName() const {
@@ -1859,7 +1886,7 @@ void FaultPolyTraceWindow::startProcess(ProcessTask task, const QString& runner,
     currentTask_ = task;
     appendLog("> " + runner + " " + quoteForLog(args));
     updateStatus(statusText);
-    elapsedLabel_->setText(QString::fromUtf8("耗时: 计算中"));
+    elapsedLabel_->setText(uiText(QString::fromUtf8("耗时: 计算中")));
     QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
     if (task == ProcessTask::GeoEastTrace || task == ProcessTask::RefreshGeoEastGrids || task == ProcessTask::DeleteGeoEastResult) {
         configureGeoEastEnvironment(environment);
@@ -1870,17 +1897,99 @@ void FaultPolyTraceWindow::startProcess(ProcessTask task, const QString& runner,
     process_->start(runner, args);
 }
 
+QString FaultPolyTraceWindow::languageCode() const {
+    return currentLanguage_ == UiLanguage::English ? "en" : "zh-CN";
+}
+
+QString FaultPolyTraceWindow::uiText(const char* zh) const {
+    return uiText(QString::fromUtf8(zh));
+}
+
+QString FaultPolyTraceWindow::uiText(const QString& zh) const {
+    return fpt_ui::translate(zh, languageCode());
+}
+
+void FaultPolyTraceWindow::setComboByKey(QComboBox* combo, const QString& key) {
+    fpt_ui::setComboByKey(combo, key);
+}
+
+QString FaultPolyTraceWindow::comboKey(const QComboBox* combo) const {
+    return fpt_ui::comboCurrentKey(combo);
+}
+
+void FaultPolyTraceWindow::prepareLanguageMetadata() {
+    fpt_ui::captureTranslatableText(this);
+    fpt_ui::setComboItems(sourceModeCombo_, {
+        QString::fromUtf8("外部文件"),
+        QString::fromUtf8("GeoEast数据库")
+    }, languageCode());
+    fpt_ui::setComboItems(viewModeCombo_, {
+        QString::fromUtf8("任务预览"),
+        QString::fromUtf8("叠加结果"),
+        QString::fromUtf8("原始网格"),
+        QString::fromUtf8("结果多边形")
+    }, languageCode());
+    fpt_ui::setComboItems(presetCombo_, {
+        QString::fromUtf8("全覆盖优先"),
+        QString::fromUtf8("贴合融合推荐"),
+        QString::fromUtf8("防黏连增强"),
+        QString::fromUtf8("均衡推荐"),
+        QString::fromUtf8("保守高精度"),
+        QString::fromUtf8("弱响应高召回"),
+        QString::fromUtf8("宽断层带"),
+        QString::fromUtf8("细碎断裂")
+    }, languageCode());
+}
+
+void FaultPolyTraceWindow::setLanguage(UiLanguage language) {
+    if (currentLanguage_ == language) {
+        retranslateUi();
+        return;
+    }
+    currentLanguage_ = language;
+    retranslateUi();
+    saveSettings();
+    updateStatus(uiText(QString::fromUtf8("界面语言已切换")));
+}
+
+void FaultPolyTraceWindow::retranslateUi() {
+    setWindowTitle(uiText("FaultPolyTrace 断层多边形自动追踪"));
+    fpt_ui::applyTranslatableText(this, languageCode());
+    fpt_ui::refreshComboItems(sourceModeCombo_, languageCode());
+    fpt_ui::refreshComboItems(viewModeCombo_, languageCode());
+    fpt_ui::refreshComboItems(presetCombo_, languageCode());
+    if (languageChineseAction_) {
+        languageChineseAction_->setText(uiText("简体中文"));
+        languageChineseAction_->setChecked(currentLanguage_ == UiLanguage::SimplifiedChinese);
+    }
+    if (languageEnglishAction_) {
+        languageEnglishAction_->setText(uiText("English"));
+        languageEnglishAction_->setChecked(currentLanguage_ == UiLanguage::English);
+    }
+    if (rootAntiMergeMinPartCellsSpin_) {
+        rootAntiMergeMinPartCellsSpin_->setSpecialValueText(uiText("自动"));
+    }
+    if (view_) {
+        view_->setLanguage(currentLanguage_);
+    }
+    updateTaskPreview();
+    updateResultPanel();
+}
+
 void FaultPolyTraceWindow::loadSettings() {
     QSettings settings(settingsPath(), QSettings::IniFormat);
     const int schemaVersion = settings.value("configSchemaVersion", 0).toInt();
-    sourceModeCombo_->setCurrentText(settings.value("sourceMode", sourceModeCombo_->currentText()).toString());
+    currentLanguage_ = fpt_ui::normalizeLanguageCode(settings.value("language", "zh-CN").toString()) == "en"
+        ? UiLanguage::English
+        : UiLanguage::SimplifiedChinese;
+    setComboByKey(sourceModeCombo_, settings.value("sourceMode", comboKey(sourceModeCombo_)).toString());
     const QString savedInput = settingOrCurrent(settings, "input", defaultInputPath(), schemaVersion);
     inputEdit_->setText(QFileInfo::exists(savedInput) ? savedInput : defaultInputPath());
     outputDirEdit_->setText(settings.value("outputDir", defaultOutputDir()).toString());
     outputNameEdit_->setText(settings.value("outputName", outputNameEdit_->text()).toString());
     inputFormatCombo_->setCurrentText(settings.value("inputFormat", "auto").toString());
-    viewModeCombo_->setCurrentText(settings.value("viewMode", QString::fromUtf8("任务预览")).toString());
-    presetCombo_->setCurrentText(settings.value("preset", presetCombo_->currentText()).toString());
+    setComboByKey(viewModeCombo_, settings.value("viewMode", QString::fromUtf8("任务预览")).toString());
+    setComboByKey(presetCombo_, settings.value("preset", comboKey(presetCombo_)).toString());
     traceModeCombo_->setCurrentText(settings.value("traceMode", traceModeCombo_->currentText()).toString());
     thresholdModeCombo_->setCurrentText(settings.value("thresholdMode", thresholdModeCombo_->currentText()).toString());
     percentileSpin_->setValue(settings.value("percentile", percentileSpin_->value()).toDouble());
@@ -1937,18 +2046,20 @@ void FaultPolyTraceWindow::loadSettings() {
     outputDirEdit_->setToolTip(outputDirEdit_->text());
     updateOptionControls();
     updateDataSourceMode();
+    retranslateUi();
 }
 
 void FaultPolyTraceWindow::saveSettings() const {
     QSettings settings(settingsPath(), QSettings::IniFormat);
     settings.setValue("configSchemaVersion", 2);
-    settings.setValue("sourceMode", sourceModeCombo_->currentText());
+    settings.setValue("language", languageCode());
+    settings.setValue("sourceMode", comboKey(sourceModeCombo_));
     settings.setValue("input", inputEdit_->text());
     settings.setValue("outputDir", outputDirEdit_->text());
     settings.setValue("outputName", outputNameEdit_->text());
     settings.setValue("inputFormat", inputFormatCombo_->currentText());
-    settings.setValue("viewMode", viewModeCombo_->currentText());
-    settings.setValue("preset", presetCombo_->currentText());
+    settings.setValue("viewMode", comboKey(viewModeCombo_));
+    settings.setValue("preset", comboKey(presetCombo_));
     settings.setValue("traceMode", traceModeCombo_->currentText());
     settings.setValue("thresholdMode", thresholdModeCombo_->currentText());
     settings.setValue("percentile", percentileSpin_->value());
@@ -2006,40 +2117,47 @@ void FaultPolyTraceWindow::updateTaskPreview() {
         return;
     }
     const QString thresholdText = thresholdModeCombo_->currentText() == "fixed"
-        ? QString::fromUtf8("固定阈值 %1").arg(thresholdSpin_->value(), 0, 'f', 4)
-        : QString::fromUtf8("分位数 %1").arg(percentileSpin_->value(), 0, 'f', 4);
+        ? uiText(QString::fromUtf8("固定阈值 %1")).arg(thresholdSpin_->value(), 0, 'f', 4)
+        : uiText(QString::fromUtf8("分位数 %1")).arg(percentileSpin_->value(), 0, 'f', 4);
     const QString inputText = isGeoEastMode()
         ? geoEastGridCombo_->currentText().trimmed()
         : (inputEdit_->text().trimmed().isEmpty()
-        ? QString::fromUtf8("未选择")
+        ? uiText(QString::fromUtf8("未选择"))
         : QFileInfo(inputEdit_->text().trimmed()).fileName());
     const QString outputText = outputNameEdit_->text().trimmed().isEmpty()
-        ? QString::fromUtf8("未命名")
+        ? uiText(QString::fromUtf8("未命名"))
         : outputNameEdit_->text().trimmed();
     const QString outputDirText = outputDirEdit_->text().trimmed().isEmpty()
-        ? QString::fromUtf8("默认输出目录")
+        ? uiText(QString::fromUtf8("默认输出目录"))
         : QDir::toNativeSeparators(outputDirEdit_->text().trimmed());
+    const QString presetText = uiText(comboKey(presetCombo_));
+    const QString rootAntiMergeText = rootAntiMergeCheck_->isChecked()
+        ? uiText(QString::fromUtf8("启用"))
+        : uiText(QString::fromUtf8("关闭"));
+    const QString residualTraceText = residualTraceCheck_->isChecked()
+        ? uiText(QString::fromUtf8("启用"))
+        : uiText(QString::fromUtf8("关闭"));
 
     view_->setTaskSummary({
         isGeoEastMode()
-            ? QString::fromUtf8("运行方式：GeoEast 数据库模式    数据库：%1    项目：%2").arg(databaseEdit_->text(), projectEdit_->text())
-            : QString::fromUtf8("运行方式：独立文件模式    输入格式：%1").arg(inputFormatCombo_->currentText()),
+            ? uiText(QString::fromUtf8("运行方式：GeoEast 数据库模式    数据库：%1    项目：%2")).arg(databaseEdit_->text(), projectEdit_->text())
+            : uiText(QString::fromUtf8("运行方式：独立文件模式    输入格式：%1")).arg(inputFormatCombo_->currentText()),
         isGeoEastMode()
-            ? QString::fromUtf8("输入网格：%1").arg(inputText)
-            : QString::fromUtf8("输入文件：%1").arg(inputText),
-        QString::fromUtf8("输出名称：%1").arg(outputText),
-        QString::fromUtf8("输出目录：%1").arg(outputDirText),
-        QString::fromUtf8("方案：%1    模式：%2    阈值：%3")
-            .arg(presetCombo_->currentText(), traceModeCombo_->currentText(), thresholdText),
-        QString::fromUtf8("面积过滤：小于 %1 的多边形不输出    结果线宽：%2")
+            ? uiText(QString::fromUtf8("输入网格：%1")).arg(inputText)
+            : uiText(QString::fromUtf8("输入文件：%1")).arg(inputText),
+        uiText(QString::fromUtf8("输出名称：%1")).arg(outputText),
+        uiText(QString::fromUtf8("输出目录：%1")).arg(outputDirText),
+        uiText(QString::fromUtf8("方案：%1    模式：%2    阈值：%3"))
+            .arg(presetText, traceModeCombo_->currentText(), thresholdText),
+        uiText(QString::fromUtf8("面积过滤：小于 %1 的多边形不输出    结果线宽：%2"))
             .arg(minAreaSpin_->value(), 0, 'f', 2)
             .arg(lineWidthSpin_->value(), 0, 'f', 3),
-        QString::fromUtf8("弱响应：分位 %1 / 半径 %2    根系防黏连：%3    残余补追：%4")
+        uiText(QString::fromUtf8("弱响应：分位 %1 / 半径 %2    根系防黏连：%3    残余补追：%4"))
             .arg(weakPercentileSpin_->value(), 0, 'f', 4)
             .arg(weakConnectRadiusSpin_->value())
-            .arg(rootAntiMergeCheck_->isChecked() ? QString::fromUtf8("启用") : QString::fromUtf8("关闭"))
-            .arg(residualTraceCheck_->isChecked() ? QString::fromUtf8("启用") : QString::fromUtf8("关闭")),
-        QString::fromUtf8("当前状态：等待参数输入及任务执行")
+            .arg(rootAntiMergeText)
+            .arg(residualTraceText),
+        uiText(QString::fromUtf8("当前状态：等待参数输入及任务执行"))
     });
 }
 
@@ -2104,7 +2222,7 @@ QStringList FaultPolyTraceWindow::traceArgs() const {
 }
 
 void FaultPolyTraceWindow::browseInput() {
-    const QString path = QFileDialog::getOpenFileName(this, QString::fromUtf8("选择平面断层属性网格"), QFileInfo(inputEdit_->text()).absolutePath(), QString::fromUtf8("网格文件 (*.txt *.dat *.csv);;所有文件 (*.*)"));
+    const QString path = QFileDialog::getOpenFileName(this, uiText(QString::fromUtf8("选择平面断层属性网格")), QFileInfo(inputEdit_->text()).absolutePath(), uiText(QString::fromUtf8("网格文件 (*.txt *.dat *.csv);;所有文件 (*.*)")));
     if (!path.isEmpty()) {
         inputEdit_->setText(QDir::toNativeSeparators(path));
         refreshInputPreview();
@@ -2112,7 +2230,7 @@ void FaultPolyTraceWindow::browseInput() {
 }
 
 void FaultPolyTraceWindow::browseOutputDir() {
-    const QString path = QFileDialog::getExistingDirectory(this, QString::fromUtf8("选择输出目录"), outputDirEdit_->text());
+    const QString path = QFileDialog::getExistingDirectory(this, uiText(QString::fromUtf8("选择输出目录")), outputDirEdit_->text());
     if (!path.isEmpty()) {
         outputDirEdit_->setText(QDir::toNativeSeparators(path));
     }
@@ -2174,9 +2292,9 @@ void FaultPolyTraceWindow::showGeoEastConfigDialog() {
         connect(browse, &QPushButton::clicked, &dialog, [this, edit, directory]() {
             QString path;
             if (directory) {
-                path = QFileDialog::getExistingDirectory(this, QString::fromUtf8("选择目录"), edit->text());
+                path = QFileDialog::getExistingDirectory(this, uiText(QString::fromUtf8("选择目录")), edit->text());
             } else {
-                path = QFileDialog::getOpenFileName(this, QString::fromUtf8("选择可执行文件"), QFileInfo(edit->text()).absolutePath(), QString::fromUtf8("程序 (*.exe);;所有文件 (*.*)"));
+                path = QFileDialog::getOpenFileName(this, uiText(QString::fromUtf8("选择可执行文件")), QFileInfo(edit->text()).absolutePath(), uiText(QString::fromUtf8("程序 (*.exe);;所有文件 (*.*)")));
             }
             if (!path.isEmpty()) {
                 edit->setText(QDir::toNativeSeparators(path));
@@ -2448,7 +2566,7 @@ void FaultPolyTraceWindow::onFinished(int exitCode, QProcess::ExitStatus status)
     onReadyRead();
     setRunning(false);
     const qint64 elapsedMs = QDateTime::currentMSecsSinceEpoch() - processStartMs_;
-    elapsedLabel_->setText(QString::fromUtf8("耗时: %1").arg(elapsedText(elapsedMs)));
+    elapsedLabel_->setText(uiText(QString::fromUtf8("耗时: %1")).arg(elapsedText(elapsedMs)));
     const ProcessTask finishedTask = currentTask_;
     currentTask_ = ProcessTask::None;
 
@@ -2521,7 +2639,7 @@ void FaultPolyTraceWindow::onFinished(int exitCode, QProcess::ExitStatus status)
         appendLog(QString::fromUtf8("拓扑 CSV：%1").arg(QDir::toNativeSeparators(outputBasePath() + ".topology.csv")));
         appendLog(QString::fromUtf8("枝干 CSV：%1").arg(QDir::toNativeSeparators(outputBasePath() + ".branches.csv")));
         refreshResultPreview();
-        viewModeCombo_->setCurrentText(QString::fromUtf8("叠加结果"));
+        setComboByKey(viewModeCombo_, QString::fromUtf8("叠加结果"));
         appendHistory(elapsedMs);
         saveSettings();
         updateResultPanel();
@@ -2568,7 +2686,7 @@ void FaultPolyTraceWindow::appendLog(const QString& text) {
 }
 
 void FaultPolyTraceWindow::updateStatus(const QString& text) {
-    statusLabel_->setText(QDateTime::currentDateTime().toString("HH:mm:ss  ") + text);
+    statusLabel_->setText(QDateTime::currentDateTime().toString("HH:mm:ss  ") + uiText(text));
 }
 
 void FaultPolyTraceWindow::updateOptionControls() {
@@ -2630,6 +2748,7 @@ void FaultPolyTraceWindow::updateLayerVisibility() {
 }
 
 void FaultPolyTraceWindow::applyPreset(const QString& preset) {
+    const QString presetKey = fpt_ui::canonical(preset);
     traceModeCombo_->setCurrentText("ridge-belt");
     thresholdModeCombo_->setCurrentText("percentile");
     thresholdSpin_->setValue(0.95);
@@ -2657,7 +2776,7 @@ void FaultPolyTraceWindow::applyPreset(const QString& preset) {
     setLocalAntiMergePreset(false);
     setRootAntiMergePreset(false);
 
-    if (preset == QString::fromUtf8("全覆盖优先")) {
+    if (presetKey == QString::fromUtf8("全覆盖优先")) {
         percentileSpin_->setValue(0.975);
         minAreaSpin_->setValue(120);
         closeRadiusSpin_->setValue(1);
@@ -2677,7 +2796,7 @@ void FaultPolyTraceWindow::applyPreset(const QString& preset) {
         residualTraceMaxCellsSpin_->setValue(120);
         simplifyToleranceSpin_->setValue(1.5);
         smoothIterationsSpin_->setValue(0);
-    } else if (preset == QString::fromUtf8("弱响应高召回") || preset == QString::fromUtf8("高召回")) {
+    } else if (presetKey == QString::fromUtf8("弱响应高召回") || presetKey == QString::fromUtf8("高召回")) {
         percentileSpin_->setValue(0.975);
         minAreaSpin_->setValue(80);
         closeRadiusSpin_->setValue(1);
@@ -2697,7 +2816,7 @@ void FaultPolyTraceWindow::applyPreset(const QString& preset) {
         residualTraceMaxCellsSpin_->setValue(120);
         simplifyToleranceSpin_->setValue(1.5);
         smoothIterationsSpin_->setValue(0);
-    } else if (preset == QString::fromUtf8("保守高精度")) {
+    } else if (presetKey == QString::fromUtf8("保守高精度")) {
         percentileSpin_->setValue(0.985);
         minAreaSpin_->setValue(250);
         closeRadiusSpin_->setValue(1);
@@ -2717,7 +2836,7 @@ void FaultPolyTraceWindow::applyPreset(const QString& preset) {
         residualTraceMaxCellsSpin_->setValue(40);
         simplifyToleranceSpin_->setValue(3.0);
         smoothIterationsSpin_->setValue(1);
-    } else if (preset == QString::fromUtf8("宽断层带")) {
+    } else if (presetKey == QString::fromUtf8("宽断层带")) {
         percentileSpin_->setValue(0.97);
         minAreaSpin_->setValue(300);
         closeRadiusSpin_->setValue(2);
@@ -2737,7 +2856,7 @@ void FaultPolyTraceWindow::applyPreset(const QString& preset) {
         residualTraceMaxCellsSpin_->setValue(60);
         simplifyToleranceSpin_->setValue(6.0);
         smoothIterationsSpin_->setValue(1);
-    } else if (preset == QString::fromUtf8("细碎断裂")) {
+    } else if (presetKey == QString::fromUtf8("细碎断裂")) {
         percentileSpin_->setValue(0.98);
         minAreaSpin_->setValue(120);
         closeRadiusSpin_->setValue(1);
@@ -2757,7 +2876,7 @@ void FaultPolyTraceWindow::applyPreset(const QString& preset) {
         residualTraceMaxCellsSpin_->setValue(80);
         simplifyToleranceSpin_->setValue(3.0);
         smoothIterationsSpin_->setValue(1);
-    } else if (preset == QString::fromUtf8("防黏连增强")) {
+    } else if (presetKey == QString::fromUtf8("防黏连增强")) {
         percentileSpin_->setValue(0.98);
         minAreaSpin_->setValue(120);
         closeRadiusSpin_->setValue(1);
@@ -2805,7 +2924,7 @@ void FaultPolyTraceWindow::applyPreset(const QString& preset) {
 
 void FaultPolyTraceWindow::showOverlayResult() {
     refreshResultPreview();
-    viewModeCombo_->setCurrentText(QString::fromUtf8("叠加结果"));
+    setComboByKey(viewModeCombo_, QString::fromUtf8("叠加结果"));
     updateStatus(QString::fromUtf8("正在查看叠加结果"));
 }
 
@@ -2856,7 +2975,7 @@ void FaultPolyTraceWindow::saveTemplate() {
         return;
     }
     QJsonObject obj;
-    obj["preset"] = presetCombo_->currentText();
+    obj["preset"] = comboKey(presetCombo_);
     obj["traceMode"] = traceModeCombo_->currentText();
     obj["thresholdMode"] = thresholdModeCombo_->currentText();
     obj["percentile"] = percentileSpin_->value();
@@ -2909,7 +3028,7 @@ void FaultPolyTraceWindow::loadTemplate() {
         return;
     }
     const QJsonObject obj = QJsonDocument::fromJson(file.readAll()).object();
-    presetCombo_->setCurrentText(obj.value("preset").toString(presetCombo_->currentText()));
+    setComboByKey(presetCombo_, obj.value("preset").toString(comboKey(presetCombo_)));
     traceModeCombo_->setCurrentText(obj.value("traceMode").toString(traceModeCombo_->currentText()));
     thresholdModeCombo_->setCurrentText(obj.value("thresholdMode").toString(thresholdModeCombo_->currentText()));
     percentileSpin_->setValue(obj.value("percentile").toDouble(percentileSpin_->value()));
@@ -2954,8 +3073,8 @@ void FaultPolyTraceWindow::restoreDefaults() {
     inputEdit_->setText(defaultInputPath());
     outputDirEdit_->setText(defaultOutputDir());
     outputNameEdit_->setText("FaultPolyTrace_Result");
-    presetCombo_->setCurrentText(QString::fromUtf8("防黏连增强"));
-    applyPreset(presetCombo_->currentText());
+    setComboByKey(presetCombo_, QString::fromUtf8("防黏连增强"));
+    applyPreset(comboKey(presetCombo_));
     thresholdModeCombo_->setCurrentText("percentile");
     colorEdit_->setText("#00FFFF");
     lineWidthSpin_->setValue(0.03);
@@ -2978,7 +3097,7 @@ void FaultPolyTraceWindow::appendHistory(qint64 elapsedMs) {
         inputEdit_->text().trimmed(),
         lastOutputCsv_,
         QString::number(elapsedMs),
-        presetCombo_->currentText()
+        comboKey(presetCombo_)
     };
     for (QString& field : fields) {
         field.replace('\t', ' ');
@@ -3018,11 +3137,11 @@ void FaultPolyTraceWindow::loadHistory() {
     QFileInfo out(parts[2]);
     outputDirEdit_->setText(out.absolutePath());
     outputNameEdit_->setText(out.completeBaseName());
-    presetCombo_->setCurrentText(parts[4]);
+    setComboByKey(presetCombo_, parts[4]);
     lastOutputCsv_ = parts[2];
     refreshInputPreview();
     refreshResultPreview();
-    viewModeCombo_->setCurrentText(QString::fromUtf8("叠加结果"));
+    setComboByKey(viewModeCombo_, QString::fromUtf8("叠加结果"));
     updateResultPanel();
 }
 
@@ -3048,18 +3167,18 @@ void FaultPolyTraceWindow::updateResultPanel() {
     const bool running = process_ && process_->state() != QProcess::NotRunning;
 
     if (running) {
-        resultSummaryLabel_->setText(QString::fromUtf8("正在计算，结果文件生成后会自动显示。"));
+        resultSummaryLabel_->setText(uiText(QString::fromUtf8("正在计算，结果文件生成后会自动显示。")));
     } else if (hasCsv) {
-        resultSummaryLabel_->setText(QString::fromUtf8("最近结果已生成，可在中间视图区查看或打开结果文件。"));
+        resultSummaryLabel_->setText(uiText(QString::fromUtf8("最近结果已生成，可在中间视图区查看或打开结果文件。")));
     } else if (!lastOutputCsv_.isEmpty()) {
-        resultSummaryLabel_->setText(QString::fromUtf8("运行结束，但未找到结果 CSV。请检查日志和输出目录。"));
+        resultSummaryLabel_->setText(uiText(QString::fromUtf8("运行结束，但未找到结果 CSV。请检查日志和输出目录。")));
     } else {
-        resultSummaryLabel_->setText(QString::fromUtf8("尚未生成结果。运行完成后将自动切换到叠加结果。"));
+        resultSummaryLabel_->setText(uiText(QString::fromUtf8("尚未生成结果。运行完成后将自动切换到叠加结果。")));
     }
 
     resultPathLabel_->setText(hasCsv
-        ? QString::fromUtf8("CSV：%1").arg(QDir::toNativeSeparators(csvPath))
-        : QString::fromUtf8("预计输出：%1").arg(QDir::toNativeSeparators(csvPath)));
+        ? uiText(QString::fromUtf8("CSV：%1")).arg(QDir::toNativeSeparators(csvPath))
+        : uiText(QString::fromUtf8("预计输出：%1")).arg(QDir::toNativeSeparators(csvPath)));
     resultPathLabel_->setToolTip(QDir::toNativeSeparators(csvPath));
 
     if (showOverlayButton_) {
@@ -3083,20 +3202,20 @@ void FaultPolyTraceWindow::updateResultPanel() {
 }
 
 void FaultPolyTraceWindow::openHelp() {
-    QMessageBox::information(this, QString::fromUtf8("FaultPolyTrace 帮助"),
-                             QString::fromUtf8("FaultPolyTrace 独立软件支持两种数据源。\n\n"
-                                               "外部文件流程：\n"
-                                               "1. 数据源选择【外部文件】。\n"
-                                               "2. 选择 DAT、矩阵文本或 GeoEast DAT 文件。\n"
-                                               "3. 设置输出目录、输出名称和追踪参数。\n"
-                                               "4. 点击【开始追踪】，完成后自动切换到【叠加结果】。\n\n"
-                                               "GeoEast 数据库流程：\n"
-                                               "1. 数据源选择【GeoEast数据库】。\n"
-                                               "2. 点击【数据库配置】确认 GeoEast 根目录、数据根目录、数据库、项目和用户。\n"
-                                               "3. 点击【刷新网格】读取 GeoEast 输入网格列表。\n"
-                                               "4. 设置输出多边形名称后点击【开始追踪】。\n"
-                                               "5. 结果写入 GeoEast 数据库，同时在本软件生成结果视图文件用于查看。\n\n"
-                                               "在左侧【结果查看】中打开 CSV、GeoJSON、诊断 JSON 或输出目录，也可导出当前 PNG。"));
+    QMessageBox::information(this, uiText(QString::fromUtf8("FaultPolyTrace 帮助")),
+                             uiText(QString::fromUtf8("FaultPolyTrace 独立软件支持两种数据源。\n\n"
+                                                       "外部文件流程：\n"
+                                                       "1. 数据源选择【外部文件】。\n"
+                                                       "2. 选择 DAT、矩阵文本或 GeoEast DAT 文件。\n"
+                                                       "3. 设置输出目录、输出名称和追踪参数。\n"
+                                                       "4. 点击【开始追踪】，完成后自动切换到【叠加结果】。\n\n"
+                                                       "GeoEast 数据库流程：\n"
+                                                       "1. 数据源选择【GeoEast数据库】。\n"
+                                                       "2. 点击【数据库配置】确认 GeoEast 根目录、数据根目录、数据库、项目和用户。\n"
+                                                       "3. 点击【刷新网格】读取 GeoEast 输入网格列表。\n"
+                                                       "4. 设置输出多边形名称后点击【开始追踪】。\n"
+                                                       "5. 结果写入 GeoEast 数据库，同时在本软件生成结果视图文件用于查看。\n\n"
+                                                       "在左侧【结果查看】中打开 CSV、GeoJSON、诊断 JSON 或输出目录，也可导出当前 PNG。")));
 }
 
 void FaultPolyTraceWindow::closeEvent(QCloseEvent* event) {

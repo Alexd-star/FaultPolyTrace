@@ -1,6 +1,8 @@
 #include "FaultTraceDialog.h"
+#include "UiLocalization.h"
 
 #include <QAction>
+#include <QActionGroup>
 #include <QApplication>
 #include <QCheckBox>
 #include <QClipboard>
@@ -416,6 +418,11 @@ public:
         update();
     }
 
+    void setLanguage(UiLanguage language) {
+        languageCode_ = language == UiLanguage::English ? "en" : "zh-CN";
+        update();
+    }
+
     void setActivity(const QString& activity) {
         activity_ = activity;
         update();
@@ -646,10 +653,10 @@ protected:
         painter.setFont(titleFont);
         painter.setPen(QColor("#7A7A7A"));
         const QString viewTitle = showInputLayer_ && showResultLayer_
-            ? QString::fromUtf8("[结果视图区] 原始网格 + 结果多边形")
-            : (showInputLayer_ ? QString::fromUtf8("[结果视图区] 原始网格")
-            : (showResultLayer_ ? QString::fromUtf8("[结果视图区] 结果多边形")
-            : QString::fromUtf8("[结果视图区] 图层显示已关闭")));
+            ? uiText(QString::fromUtf8("[结果视图区] 原始网格 + 结果多边形"))
+            : (showInputLayer_ ? uiText(QString::fromUtf8("[结果视图区] 原始网格"))
+            : (showResultLayer_ ? uiText(QString::fromUtf8("[结果视图区] 结果多边形"))
+            : uiText(QString::fromUtf8("[结果视图区] 图层显示已关闭"))));
         painter.drawText(QPoint(26, 38), viewTitle);
 
         QFont hintFont = painter.font();
@@ -659,26 +666,26 @@ protected:
             painter.setFont(hintFont);
             painter.setPen(QColor("#666666"));
             const QString thresholdText = thresholdMode_ == "fixed"
-                ? QString::fromUtf8("固定阈值 %1").arg(threshold_, 0, 'f', 4)
-                : QString::fromUtf8("分位数 %1").arg(percentile_, 0, 'f', 4);
+                ? uiText(QString::fromUtf8("固定阈值 %1")).arg(threshold_, 0, 'f', 4)
+                : uiText(QString::fromUtf8("分位数 %1")).arg(percentile_, 0, 'f', 4);
             const QStringList lines = {
-                QString::fromUtf8("数据库：%1    项目：%2").arg(database_.isEmpty() ? QString::fromUtf8("未配置") : database_,
-                                                            project_.isEmpty() ? QString::fromUtf8("未配置") : project_),
-                QString::fromUtf8("输入网格：%1").arg(gridName_.isEmpty() ? QString::fromUtf8("未选择") : gridName_),
-                QString::fromUtf8("输出多边形：%1").arg(output_.isEmpty() ? QString::fromUtf8("未命名") : output_),
-                QString::fromUtf8("方案：%1    模式：%2    阈值：%3").arg(preset_, traceMode_, thresholdText),
-                QString::fromUtf8("面积过滤：小于 %1 的多边形不输出    结果线宽：%2").arg(minArea_, 0, 'f', 2).arg(polygonLineWidth_, 0, 'f', 3),
-                QString::fromUtf8("结果查看：追踪完成后自动显示原始网格和结果多边形；如需复查，可在左侧重新载入结果视图。"),
-                QString::fromUtf8("官方查看：点击【打开工区底图】或【打开平面成图】，在 GeoEast 图层树中加载 Grids 和 Fault Polygons。"),
-                QString::fromUtf8("当前状态：%1").arg(activity_.isEmpty() ? QString::fromUtf8("等待运行") : activity_)
+                uiText(QString::fromUtf8("数据库：%1    项目：%2")).arg(database_.isEmpty() ? uiText(QString::fromUtf8("未配置")) : database_,
+                                                            project_.isEmpty() ? uiText(QString::fromUtf8("未配置")) : project_),
+                uiText(QString::fromUtf8("输入网格：%1")).arg(gridName_.isEmpty() ? uiText(QString::fromUtf8("未选择")) : gridName_),
+                uiText(QString::fromUtf8("输出多边形：%1")).arg(output_.isEmpty() ? uiText(QString::fromUtf8("未命名")) : output_),
+                uiText(QString::fromUtf8("方案：%1    模式：%2    阈值：%3")).arg(uiText(preset_), traceMode_, thresholdText),
+                uiText(QString::fromUtf8("面积过滤：小于 %1 的多边形不输出    结果线宽：%2")).arg(minArea_, 0, 'f', 2).arg(polygonLineWidth_, 0, 'f', 3),
+                uiText(QString::fromUtf8("结果查看：追踪完成后自动显示原始网格和结果多边形；如需复查，可在左侧重新载入结果视图。")),
+                uiText(QString::fromUtf8("官方查看：点击【打开工区底图】或【打开平面成图】，在 GeoEast 图层树中加载 Grids 和 Fault Polygons。")),
+                uiText(QString::fromUtf8("当前状态：%1")).arg(activity_.isEmpty() ? uiText(QString::fromUtf8("等待运行")) : uiText(activity_))
             };
             painter.drawText(rect().adjusted(26, 62, -26, -26), Qt::AlignLeft | Qt::AlignTop, lines.join('\n'));
         }
 
         painter.setPen(QColor("#8A8A8A"));
         painter.drawText(QRect(width() - 210, 18, 180, 20), Qt::AlignRight,
-                         QString::fromUtf8("%1  缩放 %2%")
-                             .arg(panMode_ ? QString::fromUtf8("平移模式") : QString::fromUtf8("查看模式"))
+                         uiText(QString::fromUtf8("%1  缩放 %2%"))
+                             .arg(panMode_ ? uiText(QString::fromUtf8("平移模式")) : uiText(QString::fromUtf8("查看模式")))
                              .arg(qRound(zoom_ * 100)));
         painter.setFont(hintFont);
         painter.setPen(QColor("#666666"));
@@ -821,6 +828,10 @@ private:
         }
     }
 
+    QString uiText(const QString& zh) const {
+        return fpt_ui::translate(zh, languageCode_);
+    }
+
     double zoom_ = 1.0;
     bool panMode_ = false;
     bool dragging_ = false;
@@ -847,6 +858,7 @@ private:
     QString thresholdMode_ = "percentile";
     QString activity_ = QString::fromUtf8("等待运行");
     QString dataStatus_;
+    QString languageCode_ = "zh-CN";
     double percentile_ = 0.98;
     double threshold_ = 0.95;
     double minArea_ = 120.0;
@@ -1543,6 +1555,18 @@ void FaultTraceDialog::buildUi() {
         QAction* packageGuideAction = toolMenu->addAction(QString::fromUtf8("打开异机运行说明"));
         connect(packageGuideAction, &QAction::triggered, this, [openLocalFile]() { openLocalFile("docs/评审交付与异机运行说明.md"); });
 
+        QMenu* languageMenu = menuBar->addMenu(uiText("语言(L)"));
+        QActionGroup* languageGroup = new QActionGroup(this);
+        languageGroup->setExclusive(true);
+        languageChineseAction_ = languageMenu->addAction(uiText("简体中文"));
+        languageChineseAction_->setCheckable(true);
+        languageChineseAction_->setActionGroup(languageGroup);
+        languageEnglishAction_ = languageMenu->addAction(uiText("English"));
+        languageEnglishAction_->setCheckable(true);
+        languageEnglishAction_->setActionGroup(languageGroup);
+        connect(languageChineseAction_, &QAction::triggered, this, [this]() { setLanguage(UiLanguage::SimplifiedChinese); });
+        connect(languageEnglishAction_, &QAction::triggered, this, [this]() { setLanguage(UiLanguage::English); });
+
         QMenu* helpMenu = menuBar->addMenu(QString::fromUtf8("帮助(H)"));
         QAction* helpAction = helpMenu->addAction(makeToolIcon(ToolIconKind::Help), QString::fromUtf8("帮助提示"));
         connect(helpAction, &QAction::triggered, this, &FaultTraceDialog::showHelpHint);
@@ -1859,6 +1883,8 @@ void FaultTraceDialog::buildUi() {
         } else {
             appendLog(QString::fromUtf8("未检测到当前项目名，请先在【数据库配置】中填写项目，再刷新网格列表。"));
         }
+        prepareLanguageMetadata();
+        retranslateUi();
     }
 }
 
@@ -2090,8 +2116,8 @@ void FaultTraceDialog::saveCurrentPreset() {
 
 void FaultTraceDialog::restoreDefaults() {
     outputEdit_->setText("FaultPolyTrace_Result");
-    presetCombo_->setCurrentText(QString::fromUtf8("防黏连增强"));
-    applyParameterPreset(presetCombo_->currentText());
+    setComboByKey(presetCombo_, QString::fromUtf8("防黏连增强"));
+    applyParameterPreset(comboKey(presetCombo_));
     traceModeCombo_->setCurrentText("ridge-belt");
     thresholdModeCombo_->setCurrentText("percentile");
     thresholdSpin_->setValue(0.95);
@@ -2128,9 +2154,79 @@ void FaultTraceDialog::showHelpHint() {
                                                 "详细说明见 docs/用户操作手册.md 和 docs/评审交付与异机运行说明.md。"));
 }
 
+QString FaultTraceDialog::languageCode() const {
+    return currentLanguage_ == UiLanguage::English ? "en" : "zh-CN";
+}
+
+QString FaultTraceDialog::uiText(const char* zh) const {
+    return uiText(QString::fromUtf8(zh));
+}
+
+QString FaultTraceDialog::uiText(const QString& zh) const {
+    return fpt_ui::translate(zh, languageCode());
+}
+
+void FaultTraceDialog::setComboByKey(QComboBox* combo, const QString& key) {
+    fpt_ui::setComboByKey(combo, key);
+}
+
+QString FaultTraceDialog::comboKey(const QComboBox* combo) const {
+    return fpt_ui::comboCurrentKey(combo);
+}
+
+void FaultTraceDialog::prepareLanguageMetadata() {
+    fpt_ui::captureTranslatableText(this);
+    const QStringList presetKeys = {
+        QString::fromUtf8("全覆盖优先"),
+        QString::fromUtf8("贴合融合推荐"),
+        QString::fromUtf8("防黏连增强"),
+        QString::fromUtf8("均衡推荐"),
+        QString::fromUtf8("保守高精度"),
+        QString::fromUtf8("弱响应高召回"),
+        QString::fromUtf8("宽断层带"),
+        QString::fromUtf8("细碎断裂")
+    };
+    fpt_ui::setComboItems(presetCombo_, presetKeys, languageCode());
+}
+
+void FaultTraceDialog::setLanguage(UiLanguage language) {
+    if (currentLanguage_ == language) {
+        retranslateUi();
+        return;
+    }
+    currentLanguage_ = language;
+    retranslateUi();
+    saveSettings();
+    appendStatus(uiText(QString::fromUtf8("界面语言已切换")));
+}
+
+void FaultTraceDialog::retranslateUi() {
+    setWindowTitle(uiText("FaultPolyTrace 断层多边形自动追踪"));
+    fpt_ui::applyTranslatableText(this, languageCode());
+    fpt_ui::refreshComboItems(presetCombo_, languageCode());
+    if (languageChineseAction_) {
+        languageChineseAction_->setText(uiText("简体中文"));
+        languageChineseAction_->setChecked(currentLanguage_ == UiLanguage::SimplifiedChinese);
+    }
+    if (languageEnglishAction_) {
+        languageEnglishAction_->setText(uiText("English"));
+        languageEnglishAction_->setChecked(currentLanguage_ == UiLanguage::English);
+    }
+    if (rootAntiMergeMinPartCellsSpin_) {
+        rootAntiMergeMinPartCellsSpin_->setSpecialValueText(uiText("自动"));
+    }
+    if (renderViewWidget_) {
+        static_cast<RenderViewWidget*>(renderViewWidget_)->setLanguage(currentLanguage_);
+    }
+    updateStatusContext();
+}
+
 void FaultTraceDialog::loadSettings() {
     QSettings settings(QCoreApplication::applicationDirPath() + "/faultpolytrace_launcher.ini", QSettings::IniFormat);
     const int schemaVersion = settings.value("configSchemaVersion", 0).toInt();
+    currentLanguage_ = fpt_ui::normalizeLanguageCode(settings.value("language", "zh-CN").toString()) == "en"
+        ? UiLanguage::English
+        : UiLanguage::SimplifiedChinese;
     runnerEdit_->setText(settingOrCurrent(settings, "runner", runnerEdit_->text(), schemaVersion));
     geoEastRootEdit_->setText(settingOrCurrent(settings, "geoEastRoot", geoEastRootEdit_->text(), schemaVersion));
     geoEastDataRootEdit_->setText(settingOrCurrent(settings, "geoEastDataRoot", geoEastDataRootEdit_->text(), schemaVersion));
@@ -2139,7 +2235,7 @@ void FaultTraceDialog::loadSettings() {
     databaseEdit_->setText(settings.value("database", databaseEdit_->text()).toString());
     projectEdit_->setText(settingOrCurrent(settings, "project", projectEdit_->text(), schemaVersion));
     userEdit_->setText(settingOrCurrent(settings, "user", userEdit_->text(), schemaVersion));
-    presetCombo_->setCurrentText(settings.value("preset", presetCombo_->currentText()).toString());
+    setComboByKey(presetCombo_, settings.value("preset", comboKey(presetCombo_)).toString());
     gridCombo_->setCurrentText(settingOrCurrent(settings, "grid", gridCombo_->currentText(), schemaVersion));
     outputEdit_->setText(settings.value("output", outputEdit_->text()).toString());
     datFileEdit_->setText(settingOrCurrent(settings, "datFile", datFileEdit_->text(), schemaVersion));
@@ -2193,11 +2289,13 @@ void FaultTraceDialog::loadSettings() {
     updateOptionControls();
     updateLayerVisibility();
     updateStatusContext();
+    retranslateUi();
 }
 
 void FaultTraceDialog::saveSettings() const {
     QSettings settings(QCoreApplication::applicationDirPath() + "/faultpolytrace_launcher.ini", QSettings::IniFormat);
     settings.setValue("configSchemaVersion", 2);
+    settings.setValue("language", languageCode());
     settings.setValue("runner", runnerEdit_->text());
     settings.setValue("geoEastRoot", geoEastRootEdit_->text());
     settings.setValue("geoEastDataRoot", geoEastDataRootEdit_->text());
@@ -2206,7 +2304,7 @@ void FaultTraceDialog::saveSettings() const {
     settings.setValue("database", databaseEdit_->text());
     settings.setValue("project", projectEdit_->text());
     settings.setValue("user", userEdit_->text());
-    settings.setValue("preset", presetCombo_->currentText());
+    settings.setValue("preset", comboKey(presetCombo_));
     settings.setValue("grid", gridCombo_->currentText());
     settings.setValue("output", outputEdit_->text());
     settings.setValue("datFile", datFileEdit_->text());
@@ -2589,6 +2687,7 @@ QStringList FaultTraceDialog::traceArgs() const {
 }
 
 void FaultTraceDialog::applyParameterPreset(const QString& presetName) {
+    const QString presetKey = fpt_ui::canonical(presetName);
     traceModeCombo_->setCurrentText("ridge-belt");
     thresholdModeCombo_->setCurrentText("percentile");
     thresholdSpin_->setValue(0.95);
@@ -2613,7 +2712,7 @@ void FaultTraceDialog::applyParameterPreset(const QString& presetName) {
     setLocalAntiMergePreset(false);
     setRootAntiMergePreset(false);
 
-    if (presetName == QString::fromUtf8("全覆盖优先")) {
+    if (presetKey == QString::fromUtf8("全覆盖优先")) {
         traceModeCombo_->setCurrentText("ridge-belt");
         thresholdModeCombo_->setCurrentText("percentile");
         percentileSpin_->setValue(0.975);
@@ -2636,7 +2735,7 @@ void FaultTraceDialog::applyParameterPreset(const QString& presetName) {
         smoothIterationsSpin_->setValue(0);
         residualTraceMinLengthSpin_->setValue(5);
         residualTraceMaxCellsSpin_->setValue(120);
-    } else if (presetName == QString::fromUtf8("防黏连增强")) {
+    } else if (presetKey == QString::fromUtf8("防黏连增强")) {
         percentileSpin_->setValue(0.98);
         minAreaSpin_->setValue(120.0);
         closeRadiusSpin_->setValue(1);
@@ -2657,7 +2756,7 @@ void FaultTraceDialog::applyParameterPreset(const QString& presetName) {
         smoothIterationsSpin_->setValue(1);
         residualTraceMinLengthSpin_->setValue(6);
         residualTraceMaxCellsSpin_->setValue(80);
-    } else if (presetName == QString::fromUtf8("保守高精度")) {
+    } else if (presetKey == QString::fromUtf8("保守高精度")) {
         percentileSpin_->setValue(0.985);
         minAreaSpin_->setValue(250.0);
         closeRadiusSpin_->setValue(1);
@@ -2678,7 +2777,7 @@ void FaultTraceDialog::applyParameterPreset(const QString& presetName) {
         smoothIterationsSpin_->setValue(1);
         residualTraceMinLengthSpin_->setValue(8);
         residualTraceMaxCellsSpin_->setValue(40);
-    } else if (presetName == QString::fromUtf8("弱响应高召回")) {
+    } else if (presetKey == QString::fromUtf8("弱响应高召回")) {
         percentileSpin_->setValue(0.98);
         minAreaSpin_->setValue(120.0);
         closeRadiusSpin_->setValue(1);
@@ -2699,7 +2798,7 @@ void FaultTraceDialog::applyParameterPreset(const QString& presetName) {
         smoothIterationsSpin_->setValue(1);
         residualTraceMinLengthSpin_->setValue(5);
         residualTraceMaxCellsSpin_->setValue(120);
-    } else if (presetName == QString::fromUtf8("宽断层带")) {
+    } else if (presetKey == QString::fromUtf8("宽断层带")) {
         percentileSpin_->setValue(0.97);
         minAreaSpin_->setValue(300.0);
         closeRadiusSpin_->setValue(2);
@@ -2720,7 +2819,7 @@ void FaultTraceDialog::applyParameterPreset(const QString& presetName) {
         smoothIterationsSpin_->setValue(1);
         residualTraceMinLengthSpin_->setValue(8);
         residualTraceMaxCellsSpin_->setValue(60);
-    } else if (presetName == QString::fromUtf8("细碎断裂")) {
+    } else if (presetKey == QString::fromUtf8("细碎断裂")) {
         percentileSpin_->setValue(0.98);
         minAreaSpin_->setValue(120.0);
         closeRadiusSpin_->setValue(1);
@@ -2741,7 +2840,7 @@ void FaultTraceDialog::applyParameterPreset(const QString& presetName) {
         smoothIterationsSpin_->setValue(1);
         residualTraceMinLengthSpin_->setValue(4);
         residualTraceMaxCellsSpin_->setValue(80);
-    } else if (presetName == QString::fromUtf8("贴合融合推荐")) {
+    } else if (presetKey == QString::fromUtf8("贴合融合推荐")) {
         percentileSpin_->setValue(0.98);
         minAreaSpin_->setValue(120.0);
         closeRadiusSpin_->setValue(1);
@@ -3081,7 +3180,7 @@ void FaultTraceDialog::setRunning(bool running) {
         stopTraceAction_->setEnabled(running);
     }
     if (connectionLabel_) {
-        connectionLabel_->setText(running ? QString::fromUtf8("任务运行中") : QString::fromUtf8("数据库连接待验证"));
+        connectionLabel_->setText(running ? uiText(QString::fromUtf8("任务运行中")) : uiText(QString::fromUtf8("数据库连接待验证")));
     }
     updateStatusContext();
 }
@@ -3119,14 +3218,14 @@ void FaultTraceDialog::updateLayerVisibility() {
 
 void FaultTraceDialog::updateStatusContext() {
     if (projectStatusLabel_) {
-        projectStatusLabel_->setText(QString::fromUtf8("正在操作项目: %1").arg(projectEdit_ ? projectEdit_->text().trimmed() : QString()));
+        projectStatusLabel_->setText(uiText(QString::fromUtf8("正在操作项目: %1")).arg(projectEdit_ ? projectEdit_->text().trimmed() : QString()));
     }
     if (gridStatusLabel_) {
-        gridStatusLabel_->setText(QString::fromUtf8("当前网格: %1").arg(gridCombo_ ? gridCombo_->currentText().trimmed() : QString()));
+        gridStatusLabel_->setText(uiText(QString::fromUtf8("当前网格: %1")).arg(gridCombo_ ? gridCombo_->currentText().trimmed() : QString()));
     }
     if (connectionLabel_ && process_ && process_->state() == QProcess::NotRunning) {
         const QString db = databaseEdit_ ? databaseEdit_->text().trimmed() : QString();
-        connectionLabel_->setText(db.isEmpty() ? QString::fromUtf8("数据库未配置") : QString::fromUtf8("数据库连接待验证: %1").arg(db));
+        connectionLabel_->setText(db.isEmpty() ? uiText(QString::fromUtf8("数据库未配置")) : uiText(QString::fromUtf8("数据库连接待验证: %1")).arg(db));
     }
     if (renderViewWidget_) {
         static_cast<RenderViewWidget*>(renderViewWidget_)->setContext(
@@ -3134,7 +3233,7 @@ void FaultTraceDialog::updateStatusContext() {
             projectEdit_ ? projectEdit_->text().trimmed() : QString(),
             gridCombo_ ? gridCombo_->currentText().trimmed() : QString(),
             outputEdit_ ? outputEdit_->text().trimmed() : QString(),
-            presetCombo_ ? presetCombo_->currentText() : QString(),
+            presetCombo_ ? comboKey(presetCombo_) : QString(),
             traceModeCombo_ ? traceModeCombo_->currentText() : QString(),
             thresholdModeCombo_ ? thresholdModeCombo_->currentText() : QString(),
             percentileSpin_ ? percentileSpin_->value() : 0.0,

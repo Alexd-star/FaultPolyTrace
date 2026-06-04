@@ -151,6 +151,19 @@ Add-ContainsCheck -Rows $rows -Group "settings" -Name "save-result-layer" -Requi
 Add-ContainsCheck -Rows $rows -Group "settings" -Name "load-input-layer" -Requirement "Input preview choice is restored." -Text $dialogCpp -Needle 'settings.value("showInputLayer"' -Detail "$dialogCppPath loads showInputLayer"
 Add-ContainsCheck -Rows $rows -Group "settings" -Name "load-result-layer" -Requirement "Result preview choice is restored." -Text $dialogCpp -Needle 'settings.value("showResultLayer"' -Detail "$dialogCppPath loads showResultLayer"
 
+Add-ContainsCheck -Rows $rows -Group "language" -Name "language-enum" -Requirement "Launcher exposes a product language state." -Text $dialogHeader -Needle "enum class UiLanguage" -Detail "$dialogHeaderPath declares UiLanguage"
+Add-ContainsCheck -Rows $rows -Group "language" -Name "language-slot" -Requirement "Launcher can switch language at runtime." -Text $dialogHeader -Needle "void setLanguage" -Detail "$dialogHeaderPath declares setLanguage"
+Add-ContainsCheck -Rows $rows -Group "language" -Name "language-retranslate" -Requirement "Launcher refreshes all visible UI text after language changes." -Text $dialogHeader -Needle "void retranslateUi()" -Detail "$dialogHeaderPath declares retranslateUi"
+Add-ContainsCheck -Rows $rows -Group "language" -Name "language-menu" -Requirement "Menu bar contains a language menu." -Text $dialogCpp -Needle 'menuBar->addMenu(uiText("语言(L)"))' -Detail "$dialogCppPath adds language menu"
+Add-ContainsCheck -Rows $rows -Group "language" -Name "language-english-action" -Requirement "Language menu provides English." -Text $dialogCpp -Needle 'languageEnglishAction_' -Detail "$dialogCppPath wires English action"
+Add-ContainsCheck -Rows $rows -Group "language" -Name "language-chinese-action" -Requirement "Language menu provides Simplified Chinese." -Text $dialogCpp -Needle 'languageChineseAction_' -Detail "$dialogCppPath wires Chinese action"
+Add-ContainsCheck -Rows $rows -Group "language" -Name "save-language" -Requirement "Selected language is persisted." -Text $dialogCpp -Needle 'settings.setValue("language"' -Detail "$dialogCppPath saves language"
+Add-ContainsCheck -Rows $rows -Group "language" -Name "load-language" -Requirement "Selected language is restored." -Text $dialogCpp -Needle 'settings.value("language"' -Detail "$dialogCppPath loads language"
+Add-ContainsCheck -Rows $rows -Group "language" -Name "language-render-view" -Requirement "Result view canvas uses the selected language." -Text $dialogCpp -Needle "setLanguage(currentLanguage_)" -Detail "$dialogCppPath passes language to render view"
+Add-ContainsCheck -Rows $rows -Group "language" -Name "shared-localization" -Requirement "Launcher reuses the shared localization module instead of scattered translations." -Text $dialogCpp -Needle '#include "UiLocalization.h"' -Detail "$dialogCppPath includes UiLocalization"
+Add-ContainsCheck -Rows $rows -Group "language" -Name "compile-localization-source" -Requirement "Launcher build includes the shared localization implementation." -Text $launcherPro -Needle "../../src/ui/UiLocalization.cpp" -Detail "$launcherProPath compiles UiLocalization.cpp"
+Add-ContainsCheck -Rows $rows -Group "language" -Name "include-localization-header" -Requirement "Launcher project includes the shared localization header." -Text $launcherPro -Needle "../../src/ui/UiLocalization.h" -Detail "$launcherProPath includes UiLocalization.h"
+
 $failed = @($rows | Where-Object { $_.Status -eq "FAIL" })
 New-Item -ItemType Directory -Force -Path $reportDir | Out-Null
 $passCount = $rows.Count - $failed.Count

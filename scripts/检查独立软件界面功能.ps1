@@ -136,7 +136,7 @@ $viewActions = @(
 )
 foreach ($viewAction in $viewActions) {
     Add-ContainsCheck -Rows $rows -Group "视图切换" -Name $viewAction.Name -Requirement "视图菜单项存在" -Text $cpp -Needle "$($viewAction.Var) = viewMenu->addAction" -Detail "$cppPath 创建 $($viewAction.Var)"
-    Add-ContainsCheck -Rows $rows -Group "视图切换" -Name $viewAction.Name -Requirement "菜单切换到对应视图" -Text $cpp -Needle "viewModeCombo_->setCurrentText(QString::fromUtf8(`"$($viewAction.Value)`"))" -Detail "$cppPath 切换到 $($viewAction.Value)"
+    Add-ContainsCheck -Rows $rows -Group "视图切换" -Name $viewAction.Name -Requirement "菜单切换到对应视图" -Text $cpp -Needle "setComboByKey(viewModeCombo_, QString::fromUtf8(`"$($viewAction.Value)`"))" -Detail "$cppPath 使用稳定键切换到 $($viewAction.Value)"
 }
 
 $toolActions = @(
@@ -165,7 +165,7 @@ $resultChecks = @(
     @{ Name="打开 GeoJSON 按钮"; Needle="openGeoJsonButton_ = new QPushButton(QString::fromUtf8(`"GeoJSON`")"; Requirement="可直接打开 GeoJSON" },
     @{ Name="打开诊断按钮"; Needle="openDiagnosticsButton_ = new QPushButton(QString::fromUtf8(`"诊断JSON`")"; Requirement="可直接打开诊断 JSON" },
     @{ Name="结果区刷新"; Needle="void FaultPolyTraceWindow::updateResultPanel()"; Requirement="结果文件状态有统一刷新函数" },
-    @{ Name="完成后自动叠加"; Needle="viewModeCombo_->setCurrentText(QString::fromUtf8(`"叠加结果`"))"; Requirement="运行完成或历史载入后自动显示叠加结果" },
+    @{ Name="完成后自动叠加"; Needle="setComboByKey(viewModeCombo_, QString::fromUtf8(`"叠加结果`"))"; Requirement="运行完成或历史载入后自动显示叠加结果" },
     @{ Name="帮助说明结果入口"; Needle="在左侧【结果查看】中打开 CSV、GeoJSON、诊断 JSON 或输出目录"; Requirement="帮助提示说明结果查看方式" }
 )
 foreach ($check in $resultChecks) {
@@ -209,6 +209,19 @@ Add-ContainsCheck -Rows $rows -Group "GeoEast数据库操作" -Name "GeoEast网�
 Add-Check -Rows $rows -Group "GeoEast数据库操作" -Name "不用计算引擎" -Requirement "用户界面不使用计算引擎这一术语" -Passed (-not $cpp.Contains("计算引擎")) -Detail "$cppPath 不应包含 计算引擎"
 Add-Check -Rows $rows -Group "GeoEast数据库操作" -Name "不用真实视图" -Requirement "用户界面不使用真实视图这一实现术语" -Passed (-not $cpp.Contains("真实视图")) -Detail "$cppPath 不应包含 真实视图"
 Add-Check -Rows $rows -Group "GeoEast数据库操作" -Name "不用载入真实" -Requirement "用户界面不使用载入真实这一实现术语" -Passed (-not $cpp.Contains("载入真实")) -Detail "$cppPath 不应包含 载入真实"
+
+Add-ContainsCheck -Rows $rows -Group "语言切换" -Name "语言枚举" -Requirement "独立软件维护当前界面语言状态" -Text $header -Needle "enum class UiLanguage" -Detail "$headerPath 声明 UiLanguage"
+Add-ContainsCheck -Rows $rows -Group "语言切换" -Name "切换槽函数" -Requirement "独立软件支持运行时切换语言" -Text $header -Needle "void setLanguage" -Detail "$headerPath 声明 setLanguage"
+Add-ContainsCheck -Rows $rows -Group "语言切换" -Name "重绘界面文字" -Requirement "语言变化后刷新菜单、工具栏、侧栏和状态文字" -Text $header -Needle "void retranslateUi()" -Detail "$headerPath 声明 retranslateUi"
+Add-ContainsCheck -Rows $rows -Group "语言切换" -Name "语言菜单" -Requirement "菜单栏提供语言切换入口" -Text $cpp -Needle 'menuBar()->addMenu(uiText("语言(&I)"))' -Detail "$cppPath 添加语言菜单"
+Add-ContainsCheck -Rows $rows -Group "语言切换" -Name "中文动作" -Requirement "语言菜单包含简体中文" -Text $cpp -Needle "languageChineseAction_" -Detail "$cppPath 创建中文语言动作"
+Add-ContainsCheck -Rows $rows -Group "语言切换" -Name "英文动作" -Requirement "语言菜单包含 English" -Text $cpp -Needle "languageEnglishAction_" -Detail "$cppPath 创建英文语言动作"
+Add-ContainsCheck -Rows $rows -Group "语言切换" -Name "保存语言" -Requirement "关闭后记住上次语言" -Text $cpp -Needle 'settings.setValue("language"' -Detail "$cppPath 保存 language"
+Add-ContainsCheck -Rows $rows -Group "语言切换" -Name "加载语言" -Requirement "启动时恢复上次语言" -Text $cpp -Needle 'settings.value("language"' -Detail "$cppPath 加载 language"
+Add-ContainsCheck -Rows $rows -Group "语言切换" -Name "视图区语言" -Requirement "中间结果视图区随语言切换" -Text $cpp -Needle "view_->setLanguage(currentLanguage_)" -Detail "$cppPath 设置视图区语言"
+Add-ContainsCheck -Rows $rows -Group "语言切换" -Name "共享本地化模块" -Requirement "独立软件必须复用统一本地化模块，避免散落翻译" -Text $cpp -Needle '#include "UiLocalization.h"' -Detail "$cppPath 引用 UiLocalization"
+Add-ContainsCheck -Rows $rows -Group "语言切换" -Name "本地化源码编译" -Requirement "构建脚本必须编译共享本地化实现" -Text $pro -Needle "../../src/ui/UiLocalization.cpp" -Detail "$proPath 编译 UiLocalization.cpp"
+Add-ContainsCheck -Rows $rows -Group "语言切换" -Name "本地化头文件纳入工程" -Requirement "构建脚本必须纳入共享本地化头文件" -Text $pro -Needle "../../src/ui/UiLocalization.h" -Detail "$proPath 纳入 UiLocalization.h"
 
 Add-ContainsCheck -Rows $rows -Group "发布链路" -Name "界面检查脚本" -Requirement "发布包携带本检查脚本" -Text $packageScript -Needle "检查独立软件界面功能.ps1" -Detail "$packageScriptPath 脚本清单包含 检查独立软件界面功能.ps1"
 

@@ -18,6 +18,11 @@ class QTextEdit;
 class QWidget;
 class QAction;
 
+enum class UiLanguage {
+    SimplifiedChinese,
+    English
+};
+
 class FaultTraceDialog : public QDialog {
     Q_OBJECT
 
@@ -46,9 +51,17 @@ private slots:
     void onProcessFinished(int exitCode, QProcess::ExitStatus status);
     void onProcessError(QProcess::ProcessError error);
     void updateLayerVisibility();
+    void setLanguage(UiLanguage language);
 
 private:
     void buildUi();
+    void retranslateUi();
+    QString uiText(const char* zh) const;
+    QString uiText(const QString& zh) const;
+    QString languageCode() const;
+    void setComboByKey(QComboBox* combo, const QString& key);
+    QString comboKey(const QComboBox* combo) const;
+    void prepareLanguageMetadata();
     void setRunning(bool running);
     void appendLog(const QString& text);
     void appendStatus(const QString& text);
@@ -145,6 +158,8 @@ private:
     QAction* restoreDefaultsAction_ = nullptr;
     QAction* runTraceAction_ = nullptr;
     QAction* stopTraceAction_ = nullptr;
+    QAction* languageChineseAction_ = nullptr;
+    QAction* languageEnglishAction_ = nullptr;
     QTextEdit* logEdit_ = nullptr;
     QLabel* statusLabel_ = nullptr;
     QLabel* coordinateLabel_ = nullptr;
@@ -156,4 +171,5 @@ private:
     QProcess* process_ = nullptr;
     bool refreshingGrids_ = false;
     bool deletingOutput_ = false;
+    UiLanguage currentLanguage_ = UiLanguage::SimplifiedChinese;
 };

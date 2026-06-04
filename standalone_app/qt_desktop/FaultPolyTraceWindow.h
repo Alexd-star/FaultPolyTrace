@@ -18,6 +18,11 @@ class QSpinBox;
 class QStackedWidget;
 class QTextEdit;
 
+enum class UiLanguage {
+    SimplifiedChinese,
+    English
+};
+
 class FaultPolyTraceWindow : public QMainWindow {
     Q_OBJECT
 
@@ -52,6 +57,7 @@ private slots:
     void updateOptionControls();
     void updateDataSourceMode();
     void updateLayerVisibility();
+    void setLanguage(UiLanguage language);
 
 protected:
     void closeEvent(QCloseEvent* event) override;
@@ -66,6 +72,13 @@ private:
     };
 
     void buildUi();
+    void retranslateUi();
+    QString uiText(const char* zh) const;
+    QString uiText(const QString& zh) const;
+    QString languageCode() const;
+    void setComboByKey(QComboBox* combo, const QString& key);
+    QString comboKey(const QComboBox* combo) const;
+    void prepareLanguageMetadata();
     void loadSettings();
     void saveSettings() const;
     void setRunning(bool running);
@@ -178,10 +191,13 @@ private:
     QPushButton* exportPngButton_ = nullptr;
     QAction* runAction_ = nullptr;
     QAction* stopAction_ = nullptr;
+    QAction* languageChineseAction_ = nullptr;
+    QAction* languageEnglishAction_ = nullptr;
     QTextEdit* logEdit_ = nullptr;
     QLabel* statusLabel_ = nullptr;
     QLabel* elapsedLabel_ = nullptr;
     QLabel* resultSummaryLabel_ = nullptr;
     QLabel* resultPathLabel_ = nullptr;
     AttributeView* view_ = nullptr;
+    UiLanguage currentLanguage_ = UiLanguage::SimplifiedChinese;
 };
