@@ -33,11 +33,13 @@ private slots:
     void saveCurrentPreset();
     void showHelpHint();
     void refreshGrids();
+    void deleteOutput();
     void runTrace();
     void stopProcess();
     void onReadyRead();
     void onProcessFinished(int exitCode, QProcess::ExitStatus status);
     void onProcessError(QProcess::ProcessError error);
+    void updateLayerVisibility();
 
 private:
     void buildUi();
@@ -110,10 +112,16 @@ private:
     QCheckBox* residualTraceCheck_ = nullptr;
     QSpinBox* residualTraceMinLengthSpin_ = nullptr;
     QSpinBox* residualTraceMaxCellsSpin_ = nullptr;
+    QCheckBox* showInputLayerCheck_ = nullptr;
+    QCheckBox* showResultLayerCheck_ = nullptr;
     QPushButton* refreshButton_ = nullptr;
+    QPushButton* deleteOutputButton_ = nullptr;
     QPushButton* runButton_ = nullptr;
     QPushButton* stopButton_ = nullptr;
+    QAction* showInputLayerAction_ = nullptr;
+    QAction* showResultLayerAction_ = nullptr;
     QAction* refreshGridAction_ = nullptr;
+    QAction* deleteOutputAction_ = nullptr;
     QAction* runTraceAction_ = nullptr;
     QAction* stopTraceAction_ = nullptr;
     QTextEdit* logEdit_ = nullptr;
@@ -126,4 +134,5 @@ private:
 
     QProcess* process_ = nullptr;
     bool refreshingGrids_ = false;
+    bool deletingOutput_ = false;
 };

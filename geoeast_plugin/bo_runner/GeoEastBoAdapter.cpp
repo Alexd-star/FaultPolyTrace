@@ -291,4 +291,18 @@ void writeFaultPolygons(
     }
 }
 
+void deleteFaultPolygons(
+    const GeoEastProjectPtr& project,
+    const std::string& outputName) {
+    if (!project) {
+        throw std::runtime_error("GeoEast project is null.");
+    }
+    if (outputName.empty()) {
+        throw std::runtime_error("GeoEast BOFaultPolygon output name is empty.");
+    }
+
+    project->eraseChild<geobo::BOFaultPolygon>(outputName);
+    std::cout << "BOFaultPolygon deleted if it existed: " << outputName << "\n";
+}
+
 } // namespace fpt_geoeast

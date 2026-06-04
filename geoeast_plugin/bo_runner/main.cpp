@@ -41,6 +41,7 @@ struct Options {
     bool listGrids = false;
     bool validateGridOnly = false;
     bool overwriteGrid = false;
+    bool deleteOutput = false;
     fpt_geoeast::FaultPolygonStyle polygonStyle;
     fpt::TraceOptions trace;
 };
@@ -54,6 +55,7 @@ void printUsage() {
         << "  --trace-mode region|ridge-belt\n"
         << "  --list-grids\n"
         << "  --validate-grid\n"
+        << "  --delete-output\n"
         << "  --import-geoeast-dat <test.dat>\n"
         << "  --overwrite-grid\n"
         << "  --threshold-mode fixed|percentile|positive-percentile\n"
@@ -269,6 +271,8 @@ Options parseArgs(int argc, char** argv) {
             options.listGrids = true;
         } else if (arg == "--validate-grid") {
             options.validateGridOnly = true;
+        } else if (arg == "--delete-output") {
+            options.deleteOutput = true;
         } else if (arg == "--overwrite-grid") {
             options.overwriteGrid = true;
         } else if (arg == "--trace-mode") {
@@ -436,11 +440,17 @@ Options parseArgs(int argc, char** argv) {
     if (options.databaseName.empty() || options.projectName.empty() || options.userName.empty()) {
         throw std::runtime_error("Missing required GeoEast connection or data arguments.");
     }
-    if (!options.listGrids && options.gridName.empty()) {
+    if (!options.listGrids && !options.deleteOutput && options.gridName.empty()) {
         throw std::runtime_error("Missing --grid. Use --list-grids to inspect available BOMapGrid objects.");
     }
-    if (!options.listGrids && options.importGeoEastDatPath.empty() && !options.validateGridOnly && options.outputName.empty()) {
+    if (!options.listGrids && !options.importGeoEastDatPath.empty() && options.outputName.empty()) {
+        throw std::runtime_error("Missing --output for imported GeoEast DAT.");
+    }
+    if (!options.listGrids && !options.deleteOutput && options.importGeoEastDatPath.empty() && !options.validateGridOnly && options.outputName.empty()) {
         throw std::runtime_error("Missing --output. Use --list-grids to inspect available BOMapGrid objects.");
+    }
+    if (options.deleteOutput && options.outputName.empty()) {
+        throw std::runtime_error("Missing --output for --delete-output.");
     }
     return options;
 }
@@ -512,6 +522,14 @@ int main(int argc, char** argv) {
                 std::cout << "  " << gridName << "\n";
             }
             std::cout << "Total: " << gridNames.size() << "\n";
+            return 0;
+        }
+
+        if (options.deleteOutput) {
+            debugLog("Deleting BOFaultPolygon: " + options.outputName);
+            fpt_geoeast::deleteFaultPolygons(project, options.outputName);
+            debugLog("BOFaultPolygon delete completed.");
+            std::cout << "Deleted BOFaultPolygon: " << options.outputName << "\n";
             return 0;
         }
 

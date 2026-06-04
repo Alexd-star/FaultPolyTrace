@@ -40,4 +40,8 @@ void writeFaultPolygons(
     bool keptOnly,
     const FaultPolygonStyle& style = FaultPolygonStyle{});
 
+void deleteFaultPolygons(
+    const GeoEastProjectPtr& project,
+    const std::string& outputName);
+
 } // namespace fpt_geoeast

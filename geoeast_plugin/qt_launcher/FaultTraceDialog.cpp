@@ -245,6 +245,12 @@ public:
         update();
     }
 
+    void setLayerVisibility(bool showInputLayer, bool showResultLayer) {
+        showInputLayer_ = showInputLayer;
+        showResultLayer_ = showResultLayer;
+        update();
+    }
+
     void setActivity(const QString& activity) {
         activity_ = activity;
         update();
@@ -276,7 +282,12 @@ protected:
         titleFont.setBold(true);
         painter.setFont(titleFont);
         painter.setPen(QColor("#7A7A7A"));
-        painter.drawText(QPoint(26, 38), QString::fromUtf8("[任务视图区] GeoEast Basemap 参数预览"));
+        const QString viewTitle = showInputLayer_ && showResultLayer_
+            ? QString::fromUtf8("[任务视图区] GeoEast Basemap 叠加预览")
+            : (showInputLayer_ ? QString::fromUtf8("[任务视图区] 原始网格预览")
+            : (showResultLayer_ ? QString::fromUtf8("[任务视图区] 结果多边形预览")
+            : QString::fromUtf8("[任务视图区] 图层预览已关闭")));
+        painter.drawText(QPoint(26, 38), viewTitle);
 
         QFont hintFont = painter.font();
         hintFont.setPointSize(10);
@@ -293,6 +304,9 @@ protected:
             QString::fromUtf8("输出多边形：%1").arg(output_.isEmpty() ? QString::fromUtf8("未命名") : output_),
             QString::fromUtf8("方案：%1    模式：%2    阈值：%3").arg(preset_, traceMode_, thresholdText),
             QString::fromUtf8("面积过滤：小于 %1 的多边形不输出    结果线宽：%2").arg(minArea_, 0, 'f', 2).arg(polygonLineWidth_, 0, 'f', 3),
+            QString::fromUtf8("显示选择：原始网格 %1    结果多边形 %2")
+                .arg(showInputLayer_ ? QString::fromUtf8("开启") : QString::fromUtf8("关闭"),
+                     showResultLayer_ ? QString::fromUtf8("开启") : QString::fromUtf8("关闭")),
             QString::fromUtf8("当前状态：%1").arg(activity_.isEmpty() ? QString::fromUtf8("等待运行") : activity_)
         };
         painter.drawText(rect().adjusted(26, 60, -26, -26), Qt::AlignLeft | Qt::AlignTop, lines.join('\n'));
@@ -300,7 +314,7 @@ protected:
         const QRectF previewRect(width() - 300, height() - 190, 250, 130);
         if (previewRect.left() > 360 && previewRect.top() > 170) {
             painter.setPen(QPen(QColor("#C8C8C8"), 1));
-            painter.setBrush(QColor("#FBFBFB"));
+            painter.setBrush(showInputLayer_ ? QColor("#FFF8F4") : QColor("#FBFBFB"));
             painter.drawRect(previewRect);
             painter.setPen(QPen(QColor("#E6E6E6"), 1));
             for (int i = 1; i < 5; ++i) {
@@ -311,17 +325,41 @@ protected:
                 const qreal y = previewRect.top() + previewRect.height() * i / 4.0;
                 painter.drawLine(QPointF(previewRect.left(), y), QPointF(previewRect.right(), y));
             }
-            painter.setPen(QPen(polygonColor_, qMax(1.5, polygonLineWidth_ * 40.0), Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+
+            if (showInputLayer_) {
+                const QRectF belt(previewRect.left() + 28, previewRect.top() + 56, previewRect.width() - 56, 30);
+                QLinearGradient gradient(belt.left(), belt.center().y(), belt.right(), belt.center().y());
+                gradient.setColorAt(0.00, QColor("#F44336"));
+                gradient.setColorAt(0.20, QColor("#FFD21F"));
+                gradient.setColorAt(0.42, QColor("#1FEF77"));
+                gradient.setColorAt(0.52, QColor("#0A57E8"));
+                gradient.setColorAt(0.62, QColor("#1FEF77"));
+                gradient.setColorAt(0.80, QColor("#FFD21F"));
+                gradient.setColorAt(1.00, QColor("#F44336"));
+                painter.setPen(Qt::NoPen);
+                painter.setBrush(gradient);
+                painter.drawRoundedRect(belt, 8, 8);
+            }
+
             QPainterPath path;
             path.moveTo(previewRect.left() + 24, previewRect.bottom() - 28);
             path.cubicTo(previewRect.left() + 80, previewRect.top() + 88,
                          previewRect.left() + 142, previewRect.top() + 36,
                          previewRect.right() - 28, previewRect.top() + 24);
-            painter.drawPath(path);
+            if (showResultLayer_) {
+                painter.setPen(QPen(polygonColor_, qMax(1.5, polygonLineWidth_ * 40.0), Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+                painter.setBrush(Qt::NoBrush);
+                painter.drawPath(path);
+            }
             painter.setFont(hintFont);
             painter.setPen(QColor("#666666"));
+            const QString previewText = showInputLayer_ && showResultLayer_
+                ? QString::fromUtf8("叠加预览")
+                : (showInputLayer_ ? QString::fromUtf8("原始网格")
+                : (showResultLayer_ ? QString::fromUtf8("结果边界")
+                : QString::fromUtf8("预览关闭")));
             painter.drawText(previewRect.adjusted(8, 8, -8, -8), Qt::AlignLeft | Qt::AlignTop,
-                             QString::fromUtf8("样式预览"));
+                             previewText);
         }
 
         painter.setPen(QColor("#8A8A8A"));
@@ -348,6 +386,8 @@ protected:
 private:
     double zoom_ = 1.0;
     bool panMode_ = false;
+    bool showInputLayer_ = true;
+    bool showResultLayer_ = true;
     QString database_;
     QString project_;
     QString grid_;
@@ -789,6 +829,14 @@ void FaultTraceDialog::buildUi() {
             QLabel#formLabel {
                 color: #222222;
             }
+            QLabel#displayHint {
+                color: #555555;
+                background: #F7F7F7;
+                border: 1px solid #D0D0D0;
+                border-radius: 2px;
+                padding: 5px 6px;
+                line-height: 140%;
+            }
             QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox {
                 background: #FFFFFF;
                 border: 1px solid #A0A0A0;
@@ -811,6 +859,13 @@ void FaultTraceDialog::buildUi() {
             QPushButton:hover {
                 background: #E5F1FB;
                 border-color: #0078D7;
+            }
+            QPushButton#dangerButton {
+                color: #7A1F1F;
+            }
+            QPushButton#dangerButton:hover {
+                background: #FDECEC;
+                border-color: #C94040;
             }
             QPushButton#runButton {
                 background: #0078D7;
@@ -898,6 +953,8 @@ void FaultTraceDialog::buildUi() {
         connect(configAction, &QAction::triggered, this, &FaultTraceDialog::showDatabaseConfigDialog);
         refreshGridAction_ = geoEastMenu->addAction(makeToolIcon(ToolIconKind::Database), QString::fromUtf8("刷新网格列表"));
         connect(refreshGridAction_, &QAction::triggered, this, &FaultTraceDialog::refreshGrids);
+        deleteOutputAction_ = geoEastMenu->addAction(QString::fromUtf8("删除当前结果"));
+        connect(deleteOutputAction_, &QAction::triggered, this, &FaultTraceDialog::deleteOutput);
         geoEastMenu->addSeparator();
         QAction* exitAction = geoEastMenu->addAction(QString::fromUtf8("关闭启动器"));
         connect(exitAction, &QAction::triggered, this, &FaultTraceDialog::close);
@@ -956,6 +1013,27 @@ void FaultTraceDialog::buildUi() {
             }
             panAction->setChecked(false);
             appendStatus(QString::fromUtf8("视图区已重置"));
+        });
+        viewMenu->addSeparator();
+        showInputLayerAction_ = viewMenu->addAction(QString::fromUtf8("显示原始网格预览"));
+        showInputLayerAction_->setCheckable(true);
+        showInputLayerAction_->setChecked(true);
+        connect(showInputLayerAction_, &QAction::toggled, this, [this](bool checked) {
+            if (showInputLayerCheck_ && showInputLayerCheck_->isChecked() != checked) {
+                showInputLayerCheck_->setChecked(checked);
+                return;
+            }
+            updateLayerVisibility();
+        });
+        showResultLayerAction_ = viewMenu->addAction(QString::fromUtf8("显示结果多边形预览"));
+        showResultLayerAction_->setCheckable(true);
+        showResultLayerAction_->setChecked(true);
+        connect(showResultLayerAction_, &QAction::toggled, this, [this](bool checked) {
+            if (showResultLayerCheck_ && showResultLayerCheck_->isChecked() != checked) {
+                showResultLayerCheck_->setChecked(checked);
+                return;
+            }
+            updateLayerVisibility();
         });
 
         QMenu* faultMenu = menuBar->addMenu(QString::fromUtf8("断层(L)"));
@@ -1063,7 +1141,50 @@ void FaultTraceDialog::buildUi() {
         addFormRow(dataLayoutNew, 3, QString::fromUtf8("DAT 文件"), datLineWidget, dataGroup);
         dataLayoutNew->addWidget(overwriteGridCheck_, 4, 0, 1, 2);
         dataLayoutNew->addWidget(importDatCheck_, 5, 0, 1, 2);
+        dataLayoutNew->addWidget(refreshButton_, 6, 0, 1, 2);
         sidebarContentLayout->addWidget(dataGroup);
+
+        QGroupBox* resultGroup = new QGroupBox(QString::fromUtf8("结果与显示"), sidebarContent);
+        QGridLayout* resultLayout = makeGroupLayout(resultGroup);
+        showInputLayerCheck_ = new QCheckBox(QString::fromUtf8("预览原始网格"), resultGroup);
+        showInputLayerCheck_->setToolTip(QString::fromUtf8("控制启动器中间视图区是否显示原始网格预览。GeoEast 实际图层请在平面成图图层树中勾选。"));
+        showInputLayerCheck_->setChecked(true);
+        showResultLayerCheck_ = new QCheckBox(QString::fromUtf8("预览结果多边形"), resultGroup);
+        showResultLayerCheck_->setToolTip(QString::fromUtf8("控制启动器中间视图区是否显示结果多边形预览。GeoEast 实际图层请在平面成图图层树中勾选。"));
+        showResultLayerCheck_->setChecked(true);
+        resultLayout->addWidget(showInputLayerCheck_, 0, 0);
+        resultLayout->addWidget(showResultLayerCheck_, 0, 1);
+        QPushButton* mappingGuideButton = new QPushButton(QString::fromUtf8("叠加查看步骤"), resultGroup);
+        mappingGuideButton->setToolTip(QString::fromUtf8("打开 GeoEast 平面成图叠加查看操作指南"));
+        deleteOutputButton_ = new QPushButton(QString::fromUtf8("删除当前结果"), resultGroup);
+        deleteOutputButton_->setObjectName("dangerButton");
+        deleteOutputButton_->setToolTip(QString::fromUtf8("删除当前输出名称对应的 BOFaultPolygon 结果对象"));
+        resultLayout->addWidget(mappingGuideButton, 1, 0);
+        resultLayout->addWidget(deleteOutputButton_, 1, 1);
+        QLabel* displayHint = new QLabel(QString::fromUtf8("提示：启动器内开关用于预览和操作提示；GeoEast 中实际显示/关闭图层，请在 GeoBasemap 或 GeoMapping 的图层树中勾选原始网格和结果多边形。"), resultGroup);
+        displayHint->setWordWrap(true);
+        displayHint->setObjectName("displayHint");
+        resultLayout->addWidget(displayHint, 2, 0, 1, 2);
+        connect(showInputLayerCheck_, &QCheckBox::toggled, this, [this](bool checked) {
+            if (showInputLayerAction_ && showInputLayerAction_->isChecked() != checked) {
+                showInputLayerAction_->setChecked(checked);
+                return;
+            }
+            updateLayerVisibility();
+        });
+        connect(showResultLayerCheck_, &QCheckBox::toggled, this, [this](bool checked) {
+            if (showResultLayerAction_ && showResultLayerAction_->isChecked() != checked) {
+                showResultLayerAction_->setChecked(checked);
+                return;
+            }
+            updateLayerVisibility();
+        });
+        connect(mappingGuideButton, &QPushButton::clicked, this, [this, openLocalFile]() {
+            appendLog(QString::fromUtf8("正在打开 GeoEast 叠加查看步骤。实际显示/关闭图层请在 GeoEast 图层树中操作。"));
+            openLocalFile("docs/GeoEast使用指南.md");
+        });
+        connect(deleteOutputButton_, &QPushButton::clicked, this, &FaultTraceDialog::deleteOutput);
+        sidebarContentLayout->addWidget(resultGroup);
 
         QGroupBox* traceGroup = new QGroupBox(QString::fromUtf8("追踪参数"), sidebarContent);
         QGridLayout* traceLayoutNew = makeGroupLayout(traceGroup);
@@ -1473,7 +1594,9 @@ void FaultTraceDialog::showHelpHint() {
                                                "1. 在【数据库与环境底层配置】中确认 GeoEast 根目录、项目、用户和 Runner。\n"
                                                "2. 点击【刷新网格】读取 GeoEast 中的 BOMapGrid 对象。\n"
                                                "3. 设置输入网格、输出多边形、结果颜色和必要参数。\n"
-                                               "4. 点击【开始追踪】，完成后到 GeoEast 底图叠加查看结果。\n\n"
+                                               "4. 点击【开始追踪】，完成后到 GeoEast 底图叠加查看结果。\n"
+                                               "5. 如需移除旧结果，在【结果与显示】中点击【删除当前结果】。\n"
+                                               "6. 如需显示或关闭原始网格、结果多边形，请在 GeoBasemap/GeoMapping 图层树中勾选对应图层；启动器内开关用于预览和操作提示。\n\n"
                                                "详细说明见 docs/用户操作手册.md 和 docs/评审交付与异机运行说明.md。"));
 }
 
@@ -1532,7 +1655,14 @@ void FaultTraceDialog::loadSettings() {
     residualTraceCheck_->setChecked(settings.value("residualTrace", residualTraceCheck_->isChecked()).toBool());
     residualTraceMinLengthSpin_->setValue(settings.value("residualTraceMinLength", residualTraceMinLengthSpin_->value()).toInt());
     residualTraceMaxCellsSpin_->setValue(settings.value("residualTraceMaxCells", residualTraceMaxCellsSpin_->value()).toInt());
+    if (showInputLayerCheck_) {
+        showInputLayerCheck_->setChecked(settings.value("showInputLayer", showInputLayerCheck_->isChecked()).toBool());
+    }
+    if (showResultLayerCheck_) {
+        showResultLayerCheck_->setChecked(settings.value("showResultLayer", showResultLayerCheck_->isChecked()).toBool());
+    }
     updateOptionControls();
+    updateLayerVisibility();
     updateStatusContext();
 }
 
@@ -1590,6 +1720,12 @@ void FaultTraceDialog::saveSettings() const {
     settings.setValue("residualTrace", residualTraceCheck_->isChecked());
     settings.setValue("residualTraceMinLength", residualTraceMinLengthSpin_->value());
     settings.setValue("residualTraceMaxCells", residualTraceMaxCellsSpin_->value());
+    if (showInputLayerCheck_) {
+        settings.setValue("showInputLayer", showInputLayerCheck_->isChecked());
+    }
+    if (showResultLayerCheck_) {
+        settings.setValue("showResultLayer", showResultLayerCheck_->isChecked());
+    }
 }
 
 void FaultTraceDialog::choosePolygonColor() {
@@ -2011,6 +2147,7 @@ void FaultTraceDialog::refreshGrids() {
     }
 
     refreshingGrids_ = true;
+    deletingOutput_ = false;
     logEdit_->clear();
     QStringList args = commonConnectionArgs();
     args << "--list-grids";
@@ -2043,11 +2180,55 @@ void FaultTraceDialog::runTrace() {
     }
 
     refreshingGrids_ = false;
+    deletingOutput_ = false;
     logEdit_->clear();
     QStringList args = traceArgs();
     appendStatus(QString::fromUtf8("正在追踪断层多边形..."));
     if (renderViewWidget_) {
         static_cast<RenderViewWidget*>(renderViewWidget_)->setActivity(QString::fromUtf8("正在追踪断层多边形"));
+    }
+    appendLog("> " + runner + " " + quoteForLog(args));
+
+    QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
+    configureGeoEastEnvironment(environment);
+    process_->setProcessEnvironment(environment);
+    setRunning(true);
+    process_->start(runner, args);
+}
+
+void FaultTraceDialog::deleteOutput() {
+    if (process_->state() != QProcess::NotRunning) {
+        return;
+    }
+    const QString outputName = outputEdit_->text().trimmed();
+    if (outputName.isEmpty()) {
+        QMessageBox::warning(this, QString::fromUtf8("输出名称为空"), QString::fromUtf8("请先填写要删除的输出多边形名称。"));
+        return;
+    }
+    const int choice = QMessageBox::warning(
+        this,
+        QString::fromUtf8("确认删除 GeoEast 结果"),
+        QString::fromUtf8("将删除当前项目中的 BOFaultPolygon 结果对象：\n\n%1\n\n该操作不会删除输入网格，也不会删除其它解释对象。是否继续？").arg(outputName),
+        QMessageBox::Yes | QMessageBox::No,
+        QMessageBox::No);
+    if (choice != QMessageBox::Yes) {
+        return;
+    }
+    saveSettings();
+    const QString runner = runnerEdit_->text().trimmed();
+    if (!QFileInfo::exists(runner)) {
+        QMessageBox::warning(this, QString::fromUtf8("Runner 不存在"), runner);
+        return;
+    }
+
+    refreshingGrids_ = false;
+    deletingOutput_ = true;
+    logEdit_->clear();
+    QStringList args = commonConnectionArgs();
+    args << "--output" << outputName << "--delete-output";
+    appendStatus(QString::fromUtf8("正在删除 GeoEast 结果对象..."));
+    if (renderViewWidget_) {
+        static_cast<RenderViewWidget*>(renderViewWidget_)->setActivity(QString::fromUtf8("正在删除 GeoEast 结果对象"));
     }
     appendLog("> " + runner + " " + quoteForLog(args));
 
@@ -2110,6 +2291,22 @@ void FaultTraceDialog::onProcessFinished(int exitCode, QProcess::ExitStatus stat
         return;
     }
 
+    if (deletingOutput_) {
+        if (exitCode == 0 && status == QProcess::NormalExit) {
+            appendStatus(QString::fromUtf8("结果对象已删除或原本不存在"));
+            if (renderViewWidget_) {
+                static_cast<RenderViewWidget*>(renderViewWidget_)->setActivity(QString::fromUtf8("结果对象已删除或原本不存在"));
+            }
+        } else {
+            appendStatus(QString::fromUtf8("删除失败，请查看日志"));
+            if (renderViewWidget_) {
+                static_cast<RenderViewWidget*>(renderViewWidget_)->setActivity(QString::fromUtf8("删除失败，请查看日志"));
+            }
+        }
+        deletingOutput_ = false;
+        return;
+    }
+
     if (exitCode == 0 && status == QProcess::NormalExit) {
         appendStatus(QString::fromUtf8("追踪完成，结果已写入 GeoEast 数据库"));
         if (renderViewWidget_) {
@@ -2122,6 +2319,7 @@ void FaultTraceDialog::onProcessFinished(int exitCode, QProcess::ExitStatus stat
         }
     }
     refreshingGrids_ = false;
+    deletingOutput_ = false;
 }
 
 void FaultTraceDialog::onProcessError(QProcess::ProcessError error) {
@@ -2135,10 +2333,16 @@ void FaultTraceDialog::onProcessError(QProcess::ProcessError error) {
 
 void FaultTraceDialog::setRunning(bool running) {
     refreshButton_->setEnabled(!running);
+    if (deleteOutputButton_) {
+        deleteOutputButton_->setEnabled(!running);
+    }
     runButton_->setEnabled(!running);
     stopButton_->setEnabled(running);
     if (refreshGridAction_) {
         refreshGridAction_->setEnabled(!running);
+    }
+    if (deleteOutputAction_) {
+        deleteOutputAction_->setEnabled(!running);
     }
     if (runTraceAction_) {
         runTraceAction_->setEnabled(!running);
@@ -2163,6 +2367,23 @@ void FaultTraceDialog::appendLog(const QString& text) {
 
 void FaultTraceDialog::appendStatus(const QString& text) {
     statusLabel_->setText(QDateTime::currentDateTime().toString("HH:mm:ss") + "  " + text);
+    updateStatusContext();
+}
+
+void FaultTraceDialog::updateLayerVisibility() {
+    const bool showInput = !showInputLayerCheck_ || showInputLayerCheck_->isChecked();
+    const bool showResult = !showResultLayerCheck_ || showResultLayerCheck_->isChecked();
+
+    if (showInputLayerAction_ && showInputLayerAction_->isChecked() != showInput) {
+        showInputLayerAction_->setChecked(showInput);
+    }
+    if (showResultLayerAction_ && showResultLayerAction_->isChecked() != showResult) {
+        showResultLayerAction_->setChecked(showResult);
+    }
+    if (renderViewWidget_) {
+        static_cast<RenderViewWidget*>(renderViewWidget_)->setLayerVisibility(showInput, showResult);
+    }
+
     updateStatusContext();
 }
 
@@ -2191,5 +2412,8 @@ void FaultTraceDialog::updateStatusContext() {
             minAreaSpin_ ? minAreaSpin_->value() : 0.0,
             polygonColorEdit_ ? QColor(polygonColorEdit_->text()) : QColor("#00FFFF"),
             polygonLineWidthSpin_ ? polygonLineWidthSpin_->value() : 0.03);
+        static_cast<RenderViewWidget*>(renderViewWidget_)->setLayerVisibility(
+            !showInputLayerCheck_ || showInputLayerCheck_->isChecked(),
+            !showResultLayerCheck_ || showResultLayerCheck_->isChecked());
     }
 }
