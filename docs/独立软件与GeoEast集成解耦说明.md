@@ -4,7 +4,7 @@
 
 FaultPolyTrace 同时面对两个不同使用场景。第一个场景是独立桌面软件：评审、演示人员或普通用户在没有 GeoEast 的电脑上打开程序，选择外部网格文件，运行断层多边形追踪，并查看原始网格、结果多边形和叠加结果。第二个场景是 GeoEast 集成控件：解释人员已经在 GeoEast 工区中工作，需要读取 BOMapGrid，写回 BOFaultPolygon，并在 GeoEast 底图或平面成图中查看结果。
 
-这两个场景共用同一套算法核心，但不应该共用同一个界面外壳。若把“独立文件处理”和“GeoEast 数据库读写”强行放进一个窗口，用户会同时看到数据库、Runner、外部文件、历史记录、预览图、项目配置等大量控件，界面会变得拥挤，也容易误用。更严重的是，发布包根目录的普通用户入口会依赖 GeoEast 风格配置，GeoEast 菜单入口又会被独立文件功能干扰，后续维护时很容易修一个场景却影响另一个场景。
+这两个场景共用同一套算法核心，但不应该共用同一个界面外壳。若把“独立文件处理”和“GeoEast 数据库读写”强行平铺在一个窗口，用户会同时看到数据库、Runner、外部文件、历史记录、预览图、项目配置等大量控件，界面会变得拥挤，也容易误用。当前独立软件采用“数据源切换”的方式处理该矛盾：默认显示外部文件流程，只有用户主动选择【GeoEast数据库】时才显示数据库配置；GeoEast 菜单入口仍使用专门的集成控件。
 
 因此当前版本采用“一个算法核心，两套清晰外壳”的架构。
 
@@ -12,14 +12,14 @@ FaultPolyTrace 同时面对两个不同使用场景。第一个场景是独立�
 
 | 程序 | 源码目录 | 发布包位置 | 面向用户 | 职责 |
 |---|---|---|---|---|
-| 独立桌面软件 `FaultPolyTrace.exe` | `standalone_app/qt_desktop` | 发布包根目录 | 没有 GeoEast 的评审、普通用户、演示人员 | 打开外部网格文件、运行算法、预览原始图/结果图/叠加图、导出 CSV/GeoJSON/PNG/诊断文件、保存历史和参数模板 |
+| 独立桌面软件 `FaultPolyTrace.exe` | `standalone_app/qt_desktop` | 发布包根目录 | 评审、普通用户、演示人员；可选支持有 GeoEast 环境的用户 | 打开外部网格文件、运行算法、预览原始图/结果图/叠加图、导出 CSV/GeoJSON/PNG/诊断文件、保存历史和参数模板；可选连接 GeoEast 数据库读写 BOMapGrid/BOFaultPolygon |
 | GeoEast 集成控件 `faultpolytrace_launcher.exe` | `geoeast_plugin/qt_launcher` | `qt_launcher/`，部署后也可位于 `GeoEast-RC/bin/FaultPolyTraceLauncher/` | GeoEast 平台用户 | 自动配置 GeoEast 环境、选择 BOMapGrid、设置输出 BOFaultPolygon、调用 runner 写回数据库 |
 | 命令行算法核心 `faultpolytrace.exe` | `src/` | `bin/` | 自动化验收、脚本批处理、两套 GUI 外壳 | 读取外部网格，执行断层多边形追踪，输出 CSV、诊断、拓扑和分支文件 |
 | GeoEast Runner `faultpolytrace_geoeast_runner.exe` | `geoeast_plugin/bo_runner` | `geoeast_plugin/bo_runner/` | GeoEast 集成控件 | 连接 GeoEast 数据库，读取 BOMapGrid，调用算法并写回 BOFaultPolygon |
 
 ## 3. 独立软件应保留的内容
 
-独立软件只保留外部文件全流程所需功能：
+独立软件默认保留外部文件全流程所需功能：
 
 1. 选择输入文件，支持矩阵文本、GeoEast DAT 五列采样数据和自动识别。
 2. 选择输出目录和输出名称。
@@ -32,7 +32,7 @@ FaultPolyTrace 同时面对两个不同使用场景。第一个场景是独立�
 9. 保存历史记录并允许回看历史任务。
 10. 关闭后记住上次配置。
 
-独立软件不显示 GeoEast 根目录、数据库、项目、用户、密码、BOMapGrid 列表、Runner 路径等字段。这些字段对没有 GeoEast 的用户没有意义，保留只会增加理解成本。
+独立软件在默认外部文件流程中不显示 GeoEast 根目录、数据库、项目、用户、密码、BOMapGrid 列表、Runner 路径等字段。这些字段对没有 GeoEast 的用户没有意义，平铺显示只会增加理解成本。当用户选择【GeoEast数据库】数据源时，软件会显示这些配置项，并通过 GeoEast Runner 完成读库、写库和删除结果对象。
 
 ## 4. GeoEast 集成控件应保留的内容
 

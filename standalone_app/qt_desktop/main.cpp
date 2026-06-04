@@ -18,9 +18,30 @@ namespace {
 QString locateCoreRunner() {
     QDir app(QCoreApplication::applicationDirPath());
     const QString self = QFileInfo(QCoreApplication::applicationFilePath()).absoluteFilePath();
+    QDir parent(app);
+    QString parentBin;
+    if (parent.cdUp()) {
+        parentBin = parent.absoluteFilePath("bin/faultpolytrace.exe");
+    }
+    QDir repo(app);
+    QString repoBuild;
+    QString repoBin;
+    for (int i = 0; i < 6; ++i) {
+        if (repo.exists("src") && repo.exists("examples")) {
+            repoBuild = repo.absoluteFilePath("build/faultpolytrace.exe");
+            repoBin = repo.absoluteFilePath("bin/faultpolytrace.exe");
+            break;
+        }
+        if (!repo.cdUp()) {
+            break;
+        }
+    }
     const QStringList candidates = {
         app.absoluteFilePath("bin/faultpolytrace.exe"),
-        app.absoluteFilePath("faultpolytrace.exe")
+        app.absoluteFilePath("faultpolytrace.exe"),
+        parentBin,
+        repoBuild,
+        repoBin
     };
     for (const QString& path : candidates) {
         const QFileInfo info(path);

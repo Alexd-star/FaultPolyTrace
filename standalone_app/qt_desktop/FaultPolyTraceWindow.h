@@ -11,8 +11,10 @@ class QComboBox;
 class QDoubleSpinBox;
 class QLabel;
 class QLineEdit;
+class QProcessEnvironment;
 class QPushButton;
 class QSpinBox;
+class QStackedWidget;
 class QTextEdit;
 
 class FaultPolyTraceWindow : public QMainWindow {
@@ -37,6 +39,9 @@ private slots:
     void openResultCsv();
     void openResultGeoJson();
     void openDiagnosticsJson();
+    void showGeoEastConfigDialog();
+    void refreshGeoEastGrids();
+    void deleteGeoEastResult();
     void saveTemplate();
     void loadTemplate();
     void restoreDefaults();
@@ -44,11 +49,21 @@ private slots:
     void openOutputDir();
     void openHelp();
     void updateOptionControls();
+    void updateDataSourceMode();
+    void updateLayerVisibility();
 
 protected:
     void closeEvent(QCloseEvent* event) override;
 
 private:
+    enum class ProcessTask {
+        None,
+        ExternalTrace,
+        GeoEastTrace,
+        RefreshGeoEastGrids,
+        DeleteGeoEastResult
+    };
+
     void buildUi();
     void loadSettings();
     void saveSettings() const;
@@ -61,23 +76,51 @@ private:
     void updateResultPanel();
     void updateTaskPreview();
     QStringList traceArgs() const;
+    QStringList geoEastConnectionArgs() const;
+    QStringList geoEastTraceArgs() const;
     QString outputCsvPath() const;
     QString outputBasePath() const;
     QString defaultInputPath() const;
+    QString defaultOfficialDatPath() const;
     QString defaultOutputDir() const;
     QString coreRunnerPath() const;
+    QString geoEastRunnerPath() const;
+    QString defaultGeoEastRoot() const;
+    QString defaultGeoEastDataRoot() const;
     QString settingsPath() const;
     QString historyPath() const;
     bool writeGeoJson(const QString& csvPath, QString* geoJsonPath, QString* errorMessage) const;
+    bool isGeoEastMode() const;
+    void configureGeoEastEnvironment(QProcessEnvironment& environment) const;
+    void startProcess(ProcessTask task, const QString& runner, const QStringList& args, const QString& statusText);
+    QString geoEastOutputName() const;
 
     QProcess* process_ = nullptr;
     qint64 processStartMs_ = 0;
+    ProcessTask currentTask_ = ProcessTask::None;
+    QString processOutput_;
     QString lastOutputCsv_;
+    QString lastGeoEastOutput_;
 
+    QComboBox* sourceModeCombo_ = nullptr;
+    QStackedWidget* sourceStack_ = nullptr;
     QLineEdit* inputEdit_ = nullptr;
     QLineEdit* outputDirEdit_ = nullptr;
     QLineEdit* outputNameEdit_ = nullptr;
     QComboBox* inputFormatCombo_ = nullptr;
+    QComboBox* geoEastGridCombo_ = nullptr;
+    QLineEdit* geoEastRunnerEdit_ = nullptr;
+    QLineEdit* geoEastRootEdit_ = nullptr;
+    QLineEdit* geoEastDataRootEdit_ = nullptr;
+    QLineEdit* pgHostEdit_ = nullptr;
+    QLineEdit* pgPortEdit_ = nullptr;
+    QLineEdit* databaseEdit_ = nullptr;
+    QLineEdit* projectEdit_ = nullptr;
+    QLineEdit* userEdit_ = nullptr;
+    QLineEdit* passwordEdit_ = nullptr;
+    QPushButton* geoEastRefreshButton_ = nullptr;
+    QPushButton* geoEastConfigButton_ = nullptr;
+    QPushButton* geoEastDeleteButton_ = nullptr;
     QComboBox* viewModeCombo_ = nullptr;
     QComboBox* historyCombo_ = nullptr;
     QComboBox* presetCombo_ = nullptr;
@@ -120,6 +163,8 @@ private:
     QLineEdit* colorEdit_ = nullptr;
     QDoubleSpinBox* lineWidthSpin_ = nullptr;
     QDoubleSpinBox* alphaSpin_ = nullptr;
+    QCheckBox* showGridLayerCheck_ = nullptr;
+    QCheckBox* showPolygonLayerCheck_ = nullptr;
     QPushButton* runButton_ = nullptr;
     QPushButton* stopButton_ = nullptr;
     QPushButton* showOverlayButton_ = nullptr;
