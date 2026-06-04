@@ -148,7 +148,7 @@ $toolActions = @(
 foreach ($tool in $toolActions) {
     Add-ContainsCheck -Rows $rows -Group "视图工具" -Name $tool.Name -Requirement "工具动作进入视图菜单" -Text $cpp -Needle "$($tool.Var) = viewMenu->addAction" -Detail "$cppPath 创建 $($tool.Var)"
     Add-ContainsCheck -Rows $rows -Group "视图工具" -Name $tool.Name -Requirement "工具动作进入工具栏" -Text $cpp -Needle "toolbar->addAction($($tool.Var))" -Detail "$cppPath 工具栏添加 $($tool.Var)"
-    Add-ContainsCheck -Rows $rows -Group "视图工具" -Name $tool.Name -Requirement "真实调用视图方法" -Text $cpp -Needle "view_->$($tool.Method)" -Detail "$cppPath 调用 $($tool.Method)"
+    Add-ContainsCheck -Rows $rows -Group "视图工具" -Name $tool.Name -Requirement "实际调用视图方法" -Text $cpp -Needle "view_->$($tool.Method)" -Detail "$cppPath 调用 $($tool.Method)"
 }
 
 Add-ContainsCheck -Rows $rows -Group "左侧主操作" -Name "开始追踪按钮" -Requirement "按钮连接运行槽" -Text $cpp -Needle "connect(runButton_, &QPushButton::clicked, this, &FaultPolyTraceWindow::runTrace)" -Detail "$cppPath 左侧按钮连接 runTrace"
@@ -179,7 +179,7 @@ $resultSlots = @(
     @{ Name="打开诊断 JSON"; Slot="openDiagnosticsJson" }
 )
 foreach ($slot in $resultSlots) {
-    Add-ContainsCheck -Rows $rows -Group "结果查看" -Name $slot.Name -Requirement "结果按钮连接真实槽函数" -Text $cpp -Needle "FaultPolyTraceWindow::$($slot.Slot)" -Detail "$cppPath 连接 $($slot.Slot)"
+    Add-ContainsCheck -Rows $rows -Group "结果查看" -Name $slot.Name -Requirement "结果按钮连接实际槽函数" -Text $cpp -Needle "FaultPolyTraceWindow::$($slot.Slot)" -Detail "$cppPath 连接 $($slot.Slot)"
     Add-ContainsCheck -Rows $rows -Group "结果查看" -Name $slot.Name -Requirement "槽函数声明存在" -Text $header -Needle "void $($slot.Slot)()" -Detail "$headerPath 声明 $($slot.Slot)"
 }
 
@@ -199,10 +199,16 @@ foreach ($function in $supportFunctions) {
 
 Add-ContainsCheck -Rows $rows -Group "GeoEast数据库操作" -Name "配置自检声明" -Requirement "独立软件在读写 GeoEast 数据库前必须先校验配置完整性" -Text $header -Needle "bool ensureGeoEastConfigReady" -Detail "$headerPath 声明 ensureGeoEastConfigReady"
 Add-ContainsCheck -Rows $rows -Group "GeoEast数据库操作" -Name "缺失字段清单声明" -Requirement "配置不完整时必须明确列出缺失字段" -Text $header -Needle "QStringList missingGeoEastConfig" -Detail "$headerPath 声明 missingGeoEastConfig"
-Add-ContainsCheck -Rows $rows -Group "GeoEast数据库操作" -Name "刷新前自检" -Requirement "刷新 BOMapGrid 前不能直接调用 runner，必须先做配置自检" -Text $cpp -Needle 'ensureGeoEastConfigReady(QString::fromUtf8("刷新网格列表")' -Detail "$cppPath refreshGeoEastGrids 调用配置自检"
+Add-ContainsCheck -Rows $rows -Group "GeoEast数据库操作" -Name "刷新前自检" -Requirement "刷新 GeoEast 网格前不能直接调用执行程序，必须先做配置自检" -Text $cpp -Needle 'ensureGeoEastConfigReady(QString::fromUtf8("刷新网格列表")' -Detail "$cppPath refreshGeoEastGrids 调用配置自检"
 Add-ContainsCheck -Rows $rows -Group "GeoEast数据库操作" -Name "追踪前自检" -Requirement "GeoEast 数据库追踪前必须校验输入网格和输出名称" -Text $cpp -Needle 'ensureGeoEastConfigReady(QString::fromUtf8("开始追踪")' -Detail "$cppPath runTrace 调用配置自检"
 Add-ContainsCheck -Rows $rows -Group "GeoEast数据库操作" -Name "删除前自检" -Requirement "删除 GeoEast 结果前必须校验数据库配置和输出对象名" -Text $cpp -Needle 'ensureGeoEastConfigReady(QString::fromUtf8("删除当前结果")' -Detail "$cppPath deleteGeoEastResult 调用配置自检"
 Add-ContainsCheck -Rows $rows -Group "GeoEast数据库操作" -Name "配置对话入口" -Requirement "配置不完整时应能直接打开 GeoEast 配置对话框" -Text $cpp -Needle "打开数据库配置" -Detail "$cppPath 提供打开数据库配置按钮"
+Add-ContainsCheck -Rows $rows -Group "GeoEast数据库操作" -Name "执行程序术语" -Requirement "GeoEast 配置使用执行程序这一用户术语" -Text $cpp -Needle "执行程序" -Detail "$cppPath 使用 执行程序"
+Add-ContainsCheck -Rows $rows -Group "GeoEast数据库操作" -Name "结果视图术语" -Requirement "运行完成提示使用结果视图文件这一用户术语" -Text $cpp -Needle "结果视图文件" -Detail "$cppPath 使用 结果视图文件"
+Add-ContainsCheck -Rows $rows -Group "GeoEast数据库操作" -Name "GeoEast网格术语" -Requirement "GeoEast 输入对象在界面上表述为 GeoEast 网格" -Text $cpp -Needle "GeoEast 网格" -Detail "$cppPath 使用 GeoEast 网格"
+Add-Check -Rows $rows -Group "GeoEast数据库操作" -Name "不用计算引擎" -Requirement "用户界面不使用计算引擎这一术语" -Passed (-not $cpp.Contains("计算引擎")) -Detail "$cppPath 不应包含 计算引擎"
+Add-Check -Rows $rows -Group "GeoEast数据库操作" -Name "不用真实视图" -Requirement "用户界面不使用真实视图这一实现术语" -Passed (-not $cpp.Contains("真实视图")) -Detail "$cppPath 不应包含 真实视图"
+Add-Check -Rows $rows -Group "GeoEast数据库操作" -Name "不用载入真实" -Requirement "用户界面不使用载入真实这一实现术语" -Passed (-not $cpp.Contains("载入真实")) -Detail "$cppPath 不应包含 载入真实"
 
 Add-ContainsCheck -Rows $rows -Group "发布链路" -Name "界面检查脚本" -Requirement "发布包携带本检查脚本" -Text $packageScript -Needle "检查独立软件界面功能.ps1" -Detail "$packageScriptPath 脚本清单包含 检查独立软件界面功能.ps1"
 

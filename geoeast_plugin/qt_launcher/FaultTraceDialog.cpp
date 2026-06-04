@@ -668,7 +668,7 @@ protected:
                 QString::fromUtf8("输出多边形：%1").arg(output_.isEmpty() ? QString::fromUtf8("未命名") : output_),
                 QString::fromUtf8("方案：%1    模式：%2    阈值：%3").arg(preset_, traceMode_, thresholdText),
                 QString::fromUtf8("面积过滤：小于 %1 的多边形不输出    结果线宽：%2").arg(minArea_, 0, 'f', 2).arg(polygonLineWidth_, 0, 'f', 3),
-                QString::fromUtf8("真实查看：运行追踪后自动载入原始网格和结果多边形；也可点击【载入真实视图】读取缓存文件。"),
+                QString::fromUtf8("结果查看：追踪完成后自动显示原始网格和结果多边形；如需复查，可在左侧重新载入结果视图。"),
                 QString::fromUtf8("官方查看：点击【打开工区底图】或【打开平面成图】，在 GeoEast 图层树中加载 Grids 和 Fault Polygons。"),
                 QString::fromUtf8("当前状态：%1").arg(activity_.isEmpty() ? QString::fromUtf8("等待运行") : activity_)
             };
@@ -936,6 +936,7 @@ FaultTraceDialog::FaultTraceDialog(QWidget* parent) : QDialog(parent), process_(
 
 void FaultTraceDialog::buildUi() {
     setWindowTitle(QString::fromUtf8("FaultPolyTrace 断层多边形自动追踪"));
+    setWindowFlags((windowFlags() | Qt::WindowMinimizeButtonHint | Qt::WindowMaximizeButtonHint | Qt::WindowCloseButtonHint) & ~Qt::WindowContextHelpButtonHint);
     resize(980, 720);
 
     runnerEdit_ = new QLineEdit(defaultRunnerPath(), this);
@@ -980,7 +981,7 @@ void FaultTraceDialog::buildUi() {
     passwordEdit_->setEchoMode(QLineEdit::Password);
 
     QFormLayout* connectionLayout = new QFormLayout(connectionBox);
-    connectionLayout->addRow(QString::fromUtf8("Runner"), runnerLayout);
+    connectionLayout->addRow(QString::fromUtf8("执行程序"), runnerLayout);
     connectionLayout->addRow(QString::fromUtf8("GeoEast 根目录"), geoEastRootLayout);
     connectionLayout->addRow(QString::fromUtf8("GeoEast 数据根目录"), geoEastDataRootLayout);
     connectionLayout->addRow(QString::fromUtf8("PG 主机/端口"), pgLayout);
@@ -998,7 +999,7 @@ void FaultTraceDialog::buildUi() {
         gridCombo_->setCurrentText(defaultGrid);
     }
     if (gridCombo_->lineEdit()) {
-        gridCombo_->lineEdit()->setPlaceholderText(QString::fromUtf8("点击刷新网格或手动输入 BOMapGrid 名称"));
+        gridCombo_->lineEdit()->setPlaceholderText(QString::fromUtf8("点击刷新网格或输入 GeoEast 网格名"));
     }
     outputEdit_ = new QLineEdit(envOrDefault("FPT_GEOEAST_OUTPUT", "FaultPolyTrace_Result"), this);
     polygonColorEdit_ = new QLineEdit(envOrDefault("FPT_POLYGON_COLOR", "#00FFFF"), this);
@@ -1011,7 +1012,7 @@ void FaultTraceDialog::buildUi() {
     polygonLineWidthSpin_->setValue(0.025);
     connect(polygonColorButton_, &QPushButton::clicked, this, &FaultTraceDialog::choosePolygonColor);
     setPolygonColor(QColor(polygonColorEdit_->text()));
-    refreshButton_ = new QPushButton(QString::fromUtf8("刷新 BOMapGrid 列表"), this);
+    refreshButton_ = new QPushButton(QString::fromUtf8("刷新网格列表"), this);
     connect(refreshButton_, &QPushButton::clicked, this, &FaultTraceDialog::refreshGrids);
 
     importDatCheck_ = new QCheckBox(QString::fromUtf8("从 DAT 导入/覆盖输入网格"), this);
@@ -1019,7 +1020,7 @@ void FaultTraceDialog::buildUi() {
     datFileEdit_ = new QLineEdit(defaultOfficialDatPath(), this);
     datFileEdit_->setPlaceholderText(QString::fromUtf8("可选：选择需要导入或覆盖到 GeoEast 的 DAT 文件"));
     QPushButton* browseDatButton = new QPushButton(QString::fromUtf8("浏览"), this);
-    overwriteGridCheck_ = new QCheckBox(QString::fromUtf8("覆盖同名 BOMapGrid"), this);
+    overwriteGridCheck_ = new QCheckBox(QString::fromUtf8("覆盖同名 GeoEast 网格"), this);
     overwriteGridCheck_->setChecked(true);
     connect(browseDatButton, &QPushButton::clicked, this, &FaultTraceDialog::browseDatFile);
 
@@ -1194,8 +1195,8 @@ void FaultTraceDialog::buildUi() {
 
     {
         setWindowTitle(QString::fromUtf8("FaultPolyTrace 断层多边形自动追踪"));
-        setMinimumSize(1024, 680);
-        resize(1280, 760);
+        setMinimumSize(1120, 700);
+        resize(1320, 780);
 
         connectionBox->hide();
         dataBox->hide();
@@ -1207,8 +1208,8 @@ void FaultTraceDialog::buildUi() {
         polygonLineWidthSpin_->setFixedWidth(64);
         browseDatButton->setText(QString::fromUtf8("浏览"));
         browseDatButton->setFixedWidth(52);
-        refreshButton_->setText(QString::fromUtf8("刷新 BOMapGrid 列表"));
-        refreshButton_->setToolTip(QString::fromUtf8("从 GeoEast 数据库刷新 BOMapGrid 列表"));
+        refreshButton_->setText(QString::fromUtf8("刷新网格列表"));
+        refreshButton_->setToolTip(QString::fromUtf8("从 GeoEast 数据库读取可用输入网格列表"));
         refreshButton_->setIcon(makeToolIcon(ToolIconKind::Reset));
         refreshButton_->setIconSize(QSize(18, 18));
 
@@ -1408,10 +1409,11 @@ void FaultTraceDialog::buildUi() {
         QMenuBar* menuBar = new QMenuBar(this);
         menuBar->setNativeMenuBar(false);
         QMenu* geoEastMenu = menuBar->addMenu(QString::fromUtf8("GeoEast(G)"));
-        QAction* configAction = geoEastMenu->addAction(makeToolIcon(ToolIconKind::Database), QString::fromUtf8("数据库配置..."));
+        QAction* configAction = geoEastMenu->addAction(makeToolIcon(ToolIconKind::Database), QString::fromUtf8("数据库配置"));
+        configAction->setToolTip(QString::fromUtf8("配置 GeoEast 根目录、数据根目录、数据库、项目、用户和执行程序"));
         connect(configAction, &QAction::triggered, this, &FaultTraceDialog::showDatabaseConfigDialog);
-        refreshGridAction_ = geoEastMenu->addAction(makeToolIcon(ToolIconKind::Database), QString::fromUtf8("刷新 BOMapGrid 列表"));
-        refreshGridAction_->setToolTip(QString::fromUtf8("刷新 GeoEast 当前项目下的 BOMapGrid 对象列表"));
+        refreshGridAction_ = geoEastMenu->addAction(makeToolIcon(ToolIconKind::Database), QString::fromUtf8("刷新网格"));
+        refreshGridAction_->setToolTip(QString::fromUtf8("刷新 GeoEast 当前项目下的输入网格列表"));
         connect(refreshGridAction_, &QAction::triggered, this, &FaultTraceDialog::refreshGrids);
         deleteOutputAction_ = geoEastMenu->addAction(QString::fromUtf8("删除当前结果"));
         connect(deleteOutputAction_, &QAction::triggered, this, &FaultTraceDialog::deleteOutput);
@@ -1426,8 +1428,12 @@ void FaultTraceDialog::buildUi() {
 
         QMenu* fileMenu = menuBar->addMenu(QString::fromUtf8("文件(F)"));
         QAction* openAction = fileMenu->addAction(makeToolIcon(ToolIconKind::Open), QString::fromUtf8("打开 DAT 文件..."));
+        openAction->setText(QString::fromUtf8("打开DAT"));
+        openAction->setToolTip(QString::fromUtf8("打开或选择 DAT 文件"));
         connect(openAction, &QAction::triggered, this, &FaultTraceDialog::browseDatFile);
         QAction* saveAction = fileMenu->addAction(makeToolIcon(ToolIconKind::Save), QString::fromUtf8("保存当前配置"));
+        saveAction->setText(QString::fromUtf8("保存配置"));
+        saveAction->setToolTip(QString::fromUtf8("保存当前界面配置和参数"));
         connect(saveAction, &QAction::triggered, this, &FaultTraceDialog::saveCurrentPreset);
         QAction* outputDirAction = fileMenu->addAction(QString::fromUtf8("打开输出目录"));
         connect(outputDirAction, &QAction::triggered, this, [openLocalDir]() { openLocalDir("examples/outputs"); });
@@ -1450,6 +1456,7 @@ void FaultTraceDialog::buildUi() {
 
         QMenu* viewMenu = menuBar->addMenu(QString::fromUtf8("视图(V)"));
         QAction* panAction = viewMenu->addAction(makeToolIcon(ToolIconKind::Pan), QString::fromUtf8("平移模式"));
+        panAction->setText(QString::fromUtf8("平移"));
         panAction->setCheckable(true);
         connect(panAction, &QAction::toggled, this, [this, renderView](bool checked) {
             if (renderView()) {
@@ -1472,6 +1479,7 @@ void FaultTraceDialog::buildUi() {
             appendStatus(QString::fromUtf8("视图区已缩小"));
         });
         QAction* resetViewAction = viewMenu->addAction(makeToolIcon(ToolIconKind::Reset), QString::fromUtf8("重置视图"));
+        resetViewAction->setText(QString::fromUtf8("重置"));
         connect(resetViewAction, &QAction::triggered, this, [this, renderView, panAction]() {
             if (renderView()) {
                 renderView()->resetView();
@@ -1501,7 +1509,7 @@ void FaultTraceDialog::buildUi() {
             updateLayerVisibility();
         });
         viewMenu->addSeparator();
-        loadResultViewAction_ = viewMenu->addAction(QString::fromUtf8("载入真实图层视图"));
+        loadResultViewAction_ = viewMenu->addAction(QString::fromUtf8("重新载入结果视图"));
         connect(loadResultViewAction_, &QAction::triggered, this, &FaultTraceDialog::loadResultView);
         exportViewAction_ = viewMenu->addAction(QString::fromUtf8("导出当前视图 PNG"));
         connect(exportViewAction_, &QAction::triggered, this, &FaultTraceDialog::exportResultViewPng);
@@ -1527,6 +1535,7 @@ void FaultTraceDialog::buildUi() {
         QAction* savePresetAction = toolMenu->addAction(makeToolIcon(ToolIconKind::Preset), QString::fromUtf8("保存当前参数"));
         connect(savePresetAction, &QAction::triggered, this, &FaultTraceDialog::saveCurrentPreset);
         restoreDefaultsAction_ = toolMenu->addAction(makeToolIcon(ToolIconKind::Reset), QString::fromUtf8("恢复默认配置"));
+        restoreDefaultsAction_->setText(QString::fromUtf8("恢复默认"));
         restoreDefaultsAction_->setToolTip(QString::fromUtf8("恢复推荐算法参数、显示样式和默认输出名，不清空数据库连接信息"));
         connect(restoreDefaultsAction_, &QAction::triggered, this, &FaultTraceDialog::restoreDefaults);
         QAction* userManualToolAction = toolMenu->addAction(QString::fromUtf8("打开用户操作手册"));
@@ -1544,7 +1553,7 @@ void FaultTraceDialog::buildUi() {
             QMessageBox::information(this, QString::fromUtf8("关于 FaultPolyTrace"),
                                      QString::fromUtf8("FaultPolyTrace 断层多边形自动追踪\n\n"
                                                        "定位：平面断层属性到闭合断层多边形的自动追踪工具。\n"
-                                                       "入口：可独立运行，也可通过 GeoEast 菜单或 Qt 启动器调用 GeoEast runner。"));
+                                                       "入口：可独立运行，也可通过 GeoEast 菜单调用执行程序。"));
         });
 
         QToolBar* toolbar = new QToolBar(this);
@@ -1562,16 +1571,13 @@ void FaultTraceDialog::buildUi() {
         toolbar->addAction(refreshGridAction_);
         toolbar->addAction(restoreDefaultsAction_);
         toolbar->addSeparator();
-        toolbar->addAction(loadResultViewAction_);
-        toolbar->addAction(savePresetAction);
         QWidget* toolbarSpacer = new QWidget(this);
         toolbarSpacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
         toolbar->addWidget(toolbarSpacer);
-        toolbar->addAction(helpAction);
 
         QFrame* sidebar = new QFrame(this);
         sidebar->setObjectName("sidebar");
-        sidebar->setFixedWidth(345);
+        sidebar->setFixedWidth(360);
         QVBoxLayout* sidebarRoot = new QVBoxLayout(sidebar);
         sidebarRoot->setContentsMargins(0, 0, 0, 0);
         sidebarRoot->setSpacing(0);
@@ -1623,17 +1629,17 @@ void FaultTraceDialog::buildUi() {
         QGroupBox* resultGroup = new QGroupBox(QString::fromUtf8("结果查看"), sidebarContent);
         QGridLayout* resultLayout = makeGroupLayout(resultGroup);
         showInputLayerCheck_ = new QCheckBox(QString::fromUtf8("显示原始网格层"), resultGroup);
-        showInputLayerCheck_->setToolTip(QString::fromUtf8("控制本窗口真实图层视图区是否显示 runner 导出的原始网格。"));
+        showInputLayerCheck_->setToolTip(QString::fromUtf8("控制结果视图区是否显示本次追踪生成的原始网格图层。"));
         showInputLayerCheck_->setChecked(true);
         showResultLayerCheck_ = new QCheckBox(QString::fromUtf8("显示结果多边形层"), resultGroup);
-        showResultLayerCheck_->setToolTip(QString::fromUtf8("控制本窗口真实图层视图区是否显示 runner 导出的保留多边形。"));
+        showResultLayerCheck_->setToolTip(QString::fromUtf8("控制结果视图区是否显示本次追踪生成的结果多边形图层。"));
         showResultLayerCheck_->setChecked(true);
         resultLayout->addWidget(showInputLayerCheck_, 0, 0);
         resultLayout->addWidget(showResultLayerCheck_, 0, 1);
-        loadResultViewButton_ = new QPushButton(QString::fromUtf8("载入真实视图"), resultGroup);
-        loadResultViewButton_->setToolTip(QString::fromUtf8("读取本次追踪导出的真实原始网格和结果多边形缓存。"));
+        loadResultViewButton_ = new QPushButton(QString::fromUtf8("重新载入"), resultGroup);
+        loadResultViewButton_->setToolTip(QString::fromUtf8("重新读取本次计算生成的原始网格和结果多边形文件。"));
         exportViewButton_ = new QPushButton(QString::fromUtf8("导出PNG"), resultGroup);
-        exportViewButton_->setToolTip(QString::fromUtf8("导出当前真实图层视图区 PNG 图片。"));
+        exportViewButton_->setToolTip(QString::fromUtf8("导出当前结果视图 PNG 图片。"));
         resultLayout->addWidget(loadResultViewButton_, 1, 0);
         resultLayout->addWidget(exportViewButton_, 1, 1);
         openBasemapButton_ = new QPushButton(QString::fromUtf8("打开工区底图"), resultGroup);
@@ -1646,10 +1652,10 @@ void FaultTraceDialog::buildUi() {
         mappingGuideButton->setToolTip(QString::fromUtf8("打开 GeoEast 平面成图叠加查看操作指南"));
         deleteOutputButton_ = new QPushButton(QString::fromUtf8("删除当前结果"), resultGroup);
         deleteOutputButton_->setObjectName("dangerButton");
-        deleteOutputButton_->setToolTip(QString::fromUtf8("删除当前输出名称对应的 BOFaultPolygon 结果对象"));
+        deleteOutputButton_->setToolTip(QString::fromUtf8("删除当前输出名称对应的结果多边形对象"));
         resultLayout->addWidget(mappingGuideButton, 3, 0);
         resultLayout->addWidget(deleteOutputButton_, 3, 1);
-        QLabel* displayHint = new QLabel(QString::fromUtf8("提示：本窗口读取 runner 导出的真实网格和多边形缓存；GeoEast 官方窗口仍需在图层树中勾选 Grids 与 Fault Polygons。"), resultGroup);
+        QLabel* displayHint = new QLabel(QString::fromUtf8("提示：本窗口显示本次计算结果；官方复核请在工区底图或平面成图中勾选网格和断层多边形图层。"), resultGroup);
         displayHint->setWordWrap(true);
         displayHint->setObjectName("displayHint");
         resultLayout->addWidget(displayHint, 4, 0, 1, 2);
@@ -1668,7 +1674,7 @@ void FaultTraceDialog::buildUi() {
             updateLayerVisibility();
         });
         connect(mappingGuideButton, &QPushButton::clicked, this, [this, openLocalFile]() {
-            appendLog(QString::fromUtf8("正在打开 GeoEast 叠加查看步骤。官方显示/关闭图层请在 GeoEast 图层树中操作。"));
+            appendLog(QString::fromUtf8("正在打开 GeoEast 叠加查看步骤。官方图层显示和关闭请在 GeoEast 图层树中操作。"));
             openLocalFile("docs/GeoEast使用指南.md");
         });
         connect(loadResultViewButton_, &QPushButton::clicked, this, &FaultTraceDialog::loadResultView);
@@ -1851,7 +1857,7 @@ void FaultTraceDialog::buildUi() {
         if (projectEdit_ && !projectEdit_->text().trimmed().isEmpty()) {
             appendLog(QString::fromUtf8("加载项目配置：%1 成功。").arg(projectEdit_->text().trimmed()));
         } else {
-            appendLog(QString::fromUtf8("未检测到当前项目名，请在【数据库与环境底层配置】中确认项目，或点击【刷新网格】读取 GeoEast 数据库对象。"));
+            appendLog(QString::fromUtf8("未检测到当前项目名，请先在【数据库配置】中填写项目，再刷新网格列表。"));
         }
     }
 }
@@ -1885,7 +1891,7 @@ QString FaultTraceDialog::defaultOfficialDatPath() const {
 
 void FaultTraceDialog::browseRunner() {
     const QString path = QFileDialog::getOpenFileName(
-        this, QString::fromUtf8("选择 GeoEast Runner"), QFileInfo(runnerEdit_->text()).absolutePath(),
+        this, QString::fromUtf8("选择 GeoEast 执行程序"), QFileInfo(runnerEdit_->text()).absolutePath(),
         QString::fromUtf8("可执行文件 (*.exe);;所有文件 (*.*)"));
     if (!path.isEmpty()) {
         runnerEdit_->setText(QDir::toNativeSeparators(path));
@@ -1919,7 +1925,8 @@ void FaultTraceDialog::browseGeoEastDataRoot() {
 
 void FaultTraceDialog::showDatabaseConfigDialog() {
     QDialog dialog(this);
-    dialog.setWindowTitle(QString::fromUtf8("GeoEast 环境与数据库底层配置"));
+    dialog.setWindowTitle(QString::fromUtf8("GeoEast 数据库配置"));
+    dialog.setWindowFlags((dialog.windowFlags() | Qt::WindowMinimizeButtonHint | Qt::WindowMaximizeButtonHint | Qt::WindowCloseButtonHint) & ~Qt::WindowContextHelpButtonHint);
     dialog.setModal(true);
     dialog.resize(600, 324);
     dialog.setStyleSheet(QString::fromUtf8(R"(
@@ -1975,7 +1982,7 @@ void FaultTraceDialog::showDatabaseConfigDialog() {
     QVBoxLayout* root = new QVBoxLayout(&dialog);
     root->setContentsMargins(0, 0, 0, 0);
     root->setSpacing(0);
-    QLabel* header = new QLabel(QString::fromUtf8("GeoEast 环境与数据库底层配置"), &dialog);
+    QLabel* header = new QLabel(QString::fromUtf8("GeoEast 连接配置"), &dialog);
     header->setObjectName("dialogHeader");
     header->setFixedHeight(34);
     root->addWidget(header);
@@ -2019,7 +2026,7 @@ void FaultTraceDialog::showDatabaseConfigDialog() {
         bodyLayout->addWidget(browse, row, 4);
     };
 
-    addPathRow(0, QString::fromUtf8("Runner 可执行文件:"), runnerCopy, QString::fromUtf8("选择 GeoEast Runner"), false);
+    addPathRow(0, QString::fromUtf8("执行程序文件:"), runnerCopy, QString::fromUtf8("选择 GeoEast 执行程序"), false);
     addPathRow(1, QString::fromUtf8("GeoEast 根目录:"), geoEastRootCopy, QString::fromUtf8("选择 GeoEast 安装根目录"), true);
     addPathRow(2, QString::fromUtf8("GeoEast 数据根目录:"), dataRootCopy, QString::fromUtf8("选择 GeoEastData 根目录"), true);
 
@@ -2068,7 +2075,7 @@ void FaultTraceDialog::showDatabaseConfigDialog() {
         passwordEdit_->setText(passwordCopy->text());
         saveSettings();
         updateStatusContext();
-        appendLog(QString::fromUtf8("底层配置已更新并保存。"));
+        appendLog(QString::fromUtf8("GeoEast 连接配置已保存。"));
         dialog.accept();
     });
 
@@ -2112,10 +2119,10 @@ void FaultTraceDialog::showHelpHint() {
     QMessageBox::information(this,
                              QString::fromUtf8("FaultPolyTrace 帮助提示"),
                              QString::fromUtf8("常用流程：\n"
-                                               "1. 在【数据库配置】中确认 GeoEast 根目录、数据根目录、项目、用户和 Runner。\n"
-                                                "2. 点击【刷新 BOMapGrid 列表】读取 GeoEast 中的输入网格对象。\n"
+                                               "1. 在【数据库配置】中确认 GeoEast 根目录、数据根目录、项目、用户和执行程序。\n"
+                                                "2. 点击【刷新网格列表】读取 GeoEast 中的输入网格。\n"
                                                 "3. 设置输入网格、输出多边形、结果颜色和必要参数。\n"
-                                                "4. 点击【开始追踪】，完成后本窗口会载入真实原始网格和结果多边形。\n"
+                                                "4. 点击【开始追踪】，完成后本窗口会显示原始网格和结果多边形。\n"
                                                 "5. 如需用 GeoEast 官方窗口查看，点击【打开工区底图】或【打开平面成图】，再在图层树中勾选 Grids 和 Fault Polygons。\n"
                                                 "6. 如需移除旧结果，在【结果查看】中点击【删除当前结果】。\n\n"
                                                 "详细说明见 docs/用户操作手册.md 和 docs/评审交付与异机运行说明.md。"));
@@ -2263,9 +2270,9 @@ QStringList FaultTraceDialog::missingGeoEastConfig(bool requireGrid, bool requir
     const QString output = outputEdit_ ? outputEdit_->text().trimmed() : QString();
 
     if (runner.isEmpty()) {
-        missing << QString::fromUtf8("Runner 可执行文件");
+        missing << QString::fromUtf8("执行程序文件");
     } else if (!QFileInfo::exists(runner)) {
-        missing << QString::fromUtf8("Runner 文件不存在：%1").arg(QDir::toNativeSeparators(runner));
+        missing << QString::fromUtf8("执行程序文件不存在：%1").arg(QDir::toNativeSeparators(runner));
     }
     if (geoEastRoot.isEmpty()) {
         missing << QString::fromUtf8("GeoEast 根目录");
@@ -2287,10 +2294,10 @@ QStringList FaultTraceDialog::missingGeoEastConfig(bool requireGrid, bool requir
         missing << QString::fromUtf8("用户名");
     }
     if (requireGrid && grid.isEmpty()) {
-        missing << QString::fromUtf8("输入 BOMapGrid");
+        missing << QString::fromUtf8("输入网格");
     }
     if (requireOutput && output.isEmpty()) {
-        missing << QString::fromUtf8("输出 BOFaultPolygon 名称");
+        missing << QString::fromUtf8("输出多边形名称");
     }
     return missing;
 }
@@ -2796,9 +2803,9 @@ void FaultTraceDialog::refreshGrids() {
     logEdit_->clear();
     QStringList args = commonConnectionArgs();
     args << "--list-grids";
-    appendStatus(QString::fromUtf8("正在刷新 GeoEast 网格对象..."));
+    appendStatus(QString::fromUtf8("正在刷新 GeoEast 网格列表..."));
     if (renderViewWidget_) {
-        static_cast<RenderViewWidget*>(renderViewWidget_)->setActivity(QString::fromUtf8("正在刷新 GeoEast 网格对象"));
+        static_cast<RenderViewWidget*>(renderViewWidget_)->setActivity(QString::fromUtf8("正在刷新 GeoEast 网格列表"));
     }
     appendLog("> " + runner + " " + quoteForLog(args));
 
@@ -2848,7 +2855,7 @@ void FaultTraceDialog::deleteOutput() {
     const int choice = QMessageBox::warning(
         this,
         QString::fromUtf8("确认删除 GeoEast 结果"),
-        QString::fromUtf8("将删除当前项目中的 BOFaultPolygon 结果对象：\n\n%1\n\n该操作不会删除输入网格，也不会删除其它解释对象。是否继续？").arg(outputName),
+        QString::fromUtf8("将删除当前项目中的结果多边形对象：\n\n%1\n\n该操作不会删除输入网格，也不会删除其它解释对象。是否继续？").arg(outputName),
         QMessageBox::Yes | QMessageBox::No,
         QMessageBox::No);
     if (choice != QMessageBox::Yes) {
@@ -2887,7 +2894,7 @@ void FaultTraceDialog::loadResultView() {
     if (!gridLoaded) {
         appendLog(error);
     } else {
-        appendLog(QString::fromUtf8("已载入真实原始网格视图：%1").arg(QDir::toNativeSeparators(gridPath)));
+        appendLog(QString::fromUtf8("已载入原始网格视图：%1").arg(QDir::toNativeSeparators(gridPath)));
     }
 
     error.clear();
@@ -2895,15 +2902,15 @@ void FaultTraceDialog::loadResultView() {
     if (!polygonsLoaded) {
         appendLog(error);
     } else {
-        appendLog(QString::fromUtf8("已载入真实结果多边形视图：%1").arg(QDir::toNativeSeparators(polygonPath)));
+        appendLog(QString::fromUtf8("已载入结果多边形视图：%1").arg(QDir::toNativeSeparators(polygonPath)));
     }
 
     if (gridLoaded || polygonsLoaded) {
-        view->setActivity(QString::fromUtf8("真实图层视图已载入"));
-        appendStatus(QString::fromUtf8("真实图层视图已载入"));
+        view->setActivity(QString::fromUtf8("结果视图已载入"));
+        appendStatus(QString::fromUtf8("结果视图已载入"));
     } else {
-        view->setActivity(QString::fromUtf8("未找到真实视图缓存，请先运行追踪"));
-        appendStatus(QString::fromUtf8("未找到真实视图缓存"));
+        view->setActivity(QString::fromUtf8("未找到结果视图文件，请先运行追踪"));
+        appendStatus(QString::fromUtf8("未找到结果视图文件"));
     }
 }
 
@@ -2918,11 +2925,11 @@ void FaultTraceDialog::exportResultViewPng() {
              QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss"));
     const QString path = QDir(previewOutputDir()).absoluteFilePath(fileName);
     if (static_cast<RenderViewWidget*>(renderViewWidget_)->savePng(path)) {
-        appendLog(QString::fromUtf8("真实视图 PNG 已导出：%1").arg(QDir::toNativeSeparators(path)));
-        appendStatus(QString::fromUtf8("真实视图 PNG 已导出"));
+        appendLog(QString::fromUtf8("结果视图 PNG 已导出：%1").arg(QDir::toNativeSeparators(path)));
+        appendStatus(QString::fromUtf8("结果视图 PNG 已导出"));
     } else {
-        appendLog(QString::fromUtf8("真实视图 PNG 导出失败：%1").arg(QDir::toNativeSeparators(path)));
-        appendStatus(QString::fromUtf8("真实视图 PNG 导出失败"));
+        appendLog(QString::fromUtf8("结果视图 PNG 导出失败：%1").arg(QDir::toNativeSeparators(path)));
+        appendStatus(QString::fromUtf8("结果视图 PNG 导出失败"));
     }
 }
 

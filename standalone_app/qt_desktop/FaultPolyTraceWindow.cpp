@@ -809,7 +809,7 @@ private:
         titleFont.setBold(true);
         painter.setFont(titleFont);
         painter.setPen(QColor("#7A7A7A"));
-        painter.drawText(QPoint(26, 38), QString::fromUtf8("[任务视图区] 真实图层查看"));
+        painter.drawText(QPoint(26, 38), QString::fromUtf8("[任务视图区] 结果查看"));
 
         QFont hintFont = painter.font();
         hintFont.setPointSize(10);
@@ -826,8 +826,8 @@ private:
             painter.setPen(QColor("#666666"));
             painter.drawText(guideRect.adjusted(12, 12, -12, -12), Qt::AlignLeft | Qt::AlignTop,
                              QString::fromUtf8("查看逻辑：\n"
-                                               "1. 原始网格显示真实输入属性色图。\n"
-                                               "2. 结果多边形显示真实 CSV/WKT 输出。\n"
+                                               "1. 原始网格显示输入属性色图。\n"
+                                               "2. 结果多边形显示 CSV/WKT 结果文件。\n"
                                                "3. 叠加结果用于核对断层响应贴合度。\n"
                                                "4. 左侧复选框可独立开关图层。"));
         }
@@ -1118,19 +1118,19 @@ void FaultPolyTraceWindow::buildUi() {
         geoEastGridCombo_->setCurrentText(envValue("FPT_GEOEAST_GRID"));
     }
     if (geoEastGridCombo_->lineEdit()) {
-        geoEastGridCombo_->lineEdit()->setPlaceholderText(QString::fromUtf8("点击刷新网格或手动输入 BOMapGrid 名称"));
+        geoEastGridCombo_->lineEdit()->setPlaceholderText(QString::fromUtf8("点击刷新网格或输入 GeoEast 网格名"));
     }
     addRow(geoEastLayout, 0, QString::fromUtf8("输入网格"), geoEastGridCombo_, geoEastPage);
     QWidget* geoEastActionRow = new QWidget(geoEastPage);
     QHBoxLayout* geoEastActionLayout = new QHBoxLayout(geoEastActionRow);
     geoEastActionLayout->setContentsMargins(0, 0, 0, 0);
     geoEastActionLayout->setSpacing(6);
-    geoEastRefreshButton_ = new QPushButton(QString::fromUtf8("刷新 BOMapGrid"), geoEastActionRow);
+    geoEastRefreshButton_ = new QPushButton(QString::fromUtf8("刷新网格"), geoEastActionRow);
     geoEastConfigButton_ = new QPushButton(QString::fromUtf8("数据库配置"), geoEastActionRow);
     geoEastDeleteButton_ = new QPushButton(QString::fromUtf8("删除结果"), geoEastActionRow);
-    geoEastRefreshButton_->setToolTip(QString::fromUtf8("从配置的 GeoEast 数据库刷新当前项目下的 BOMapGrid 输入网格列表"));
+    geoEastRefreshButton_->setToolTip(QString::fromUtf8("从配置的 GeoEast 数据库刷新当前项目下的输入网格列表"));
     geoEastConfigButton_->setToolTip(QString::fromUtf8("配置 GeoEast 根目录、数据根目录、数据库、项目和用户信息"));
-    geoEastDeleteButton_->setToolTip(QString::fromUtf8("删除当前输出名对应的 GeoEast BOFaultPolygon 结果对象"));
+    geoEastDeleteButton_->setToolTip(QString::fromUtf8("删除当前输出名对应的 GeoEast 结果多边形对象"));
     geoEastActionLayout->addWidget(geoEastRefreshButton_, 1);
     geoEastActionLayout->addWidget(geoEastConfigButton_, 1);
     geoEastActionLayout->addWidget(geoEastDeleteButton_, 1);
@@ -2185,7 +2185,7 @@ void FaultPolyTraceWindow::showGeoEastConfigDialog() {
         return edit;
     };
 
-    QLineEdit* runnerCopy = addPathRow(0, QString::fromUtf8("Runner"), geoEastRunnerEdit_, false);
+    QLineEdit* runnerCopy = addPathRow(0, QString::fromUtf8("执行程序"), geoEastRunnerEdit_, false);
     QLineEdit* rootCopy = addPathRow(1, QString::fromUtf8("GeoEast根目录"), geoEastRootEdit_, true);
     QLineEdit* dataRootCopy = addPathRow(2, QString::fromUtf8("数据根目录"), geoEastDataRootEdit_, true);
 
@@ -2258,9 +2258,9 @@ QStringList FaultPolyTraceWindow::missingGeoEastConfig(bool requireGrid, bool re
     const QString output = geoEastOutputName().trimmed();
 
     if (runner.isEmpty()) {
-        missing << QString::fromUtf8("GeoEast Runner 可执行文件");
+        missing << QString::fromUtf8("GeoEast 执行程序文件");
     } else if (!QFileInfo::exists(runner)) {
-        missing << QString::fromUtf8("GeoEast Runner 文件不存在：%1").arg(QDir::toNativeSeparators(runner));
+        missing << QString::fromUtf8("GeoEast 执行程序文件不存在：%1").arg(QDir::toNativeSeparators(runner));
     }
     if (geoEastRoot.isEmpty()) {
         missing << QString::fromUtf8("GeoEast 根目录");
@@ -2282,10 +2282,10 @@ QStringList FaultPolyTraceWindow::missingGeoEastConfig(bool requireGrid, bool re
         missing << QString::fromUtf8("用户名");
     }
     if (requireGrid && grid.isEmpty()) {
-        missing << QString::fromUtf8("输入 BOMapGrid");
+        missing << QString::fromUtf8("输入网格");
     }
     if (requireOutput && output.isEmpty()) {
-        missing << QString::fromUtf8("输出 BOFaultPolygon 名称");
+        missing << QString::fromUtf8("输出多边形名称");
     }
     return missing;
 }
@@ -2326,7 +2326,7 @@ void FaultPolyTraceWindow::refreshGeoEastGrids() {
     const QString runner = geoEastRunnerEdit_->text().trimmed();
     QStringList args = geoEastConnectionArgs();
     args << "--list-grids";
-    startProcess(ProcessTask::RefreshGeoEastGrids, runner, args, QString::fromUtf8("正在刷新 GeoEast 网格对象..."));
+    startProcess(ProcessTask::RefreshGeoEastGrids, runner, args, QString::fromUtf8("正在刷新 GeoEast 网格列表..."));
 }
 
 void FaultPolyTraceWindow::deleteGeoEastResult() {
@@ -2341,7 +2341,7 @@ void FaultPolyTraceWindow::deleteGeoEastResult() {
     const int choice = QMessageBox::warning(
         this,
         QString::fromUtf8("确认删除 GeoEast 结果"),
-        QString::fromUtf8("将删除当前项目中的 BOFaultPolygon 结果对象：\n\n%1\n\n该操作不会删除输入网格，也不会删除本地输出文件。是否继续？").arg(outputName),
+        QString::fromUtf8("将删除当前项目中的结果多边形对象：\n\n%1\n\n该操作不会删除输入网格，也不会删除本地输出文件。是否继续？").arg(outputName),
         QMessageBox::Yes | QMessageBox::No,
         QMessageBox::No);
     if (choice != QMessageBox::Yes) {
@@ -2355,7 +2355,7 @@ void FaultPolyTraceWindow::deleteGeoEastResult() {
 
 void FaultPolyTraceWindow::refreshInputPreview() {
     if (isGeoEastMode()) {
-        updateStatus(QString::fromUtf8("GeoEast 模式下请先运行追踪或刷新网格；运行完成后载入真实图层缓存"));
+        updateStatus(QString::fromUtf8("GeoEast 模式下请先运行追踪或刷新网格；运行完成后会生成结果视图文件"));
         return;
     }
     if (inputEdit_->text().trimmed().isEmpty() || !QFileInfo::exists(inputEdit_->text().trimmed())) {
@@ -2504,7 +2504,7 @@ void FaultPolyTraceWindow::onFinished(int exitCode, QProcess::ExitStatus status)
         if (finishedTask == ProcessTask::GeoEastTrace) {
             QString gridError;
             if (view_->loadGrid(outputBasePath() + ".grid.txt", "matrix", &gridError)) {
-                appendLog(QString::fromUtf8("真实原始网格缓存：%1").arg(QDir::toNativeSeparators(outputBasePath() + ".grid.txt")));
+                appendLog(QString::fromUtf8("原始网格视图文件：%1").arg(QDir::toNativeSeparators(outputBasePath() + ".grid.txt")));
             } else if (!gridError.isEmpty()) {
                 appendLog(gridError);
             }
@@ -2526,7 +2526,7 @@ void FaultPolyTraceWindow::onFinished(int exitCode, QProcess::ExitStatus status)
         saveSettings();
         updateResultPanel();
         updateStatus(finishedTask == ProcessTask::GeoEastTrace
-            ? QString::fromUtf8("GeoEast 追踪完成，结果已写入数据库并载入真实视图")
+            ? QString::fromUtf8("GeoEast 追踪完成，结果已写入数据库并显示结果视图")
             : QString::fromUtf8("追踪完成，已切换到叠加结果"));
     } else {
         updateResultPanel();
@@ -3093,9 +3093,9 @@ void FaultPolyTraceWindow::openHelp() {
                                                "GeoEast 数据库流程：\n"
                                                "1. 数据源选择【GeoEast数据库】。\n"
                                                "2. 点击【数据库配置】确认 GeoEast 根目录、数据根目录、数据库、项目和用户。\n"
-                                               "3. 点击【刷新网格】读取 BOMapGrid 列表。\n"
+                                               "3. 点击【刷新网格】读取 GeoEast 输入网格列表。\n"
                                                "4. 设置输出多边形名称后点击【开始追踪】。\n"
-                                               "5. 结果写入 GeoEast 数据库，同时在本软件生成真实图层缓存用于查看。\n\n"
+                                               "5. 结果写入 GeoEast 数据库，同时在本软件生成结果视图文件用于查看。\n\n"
                                                "在左侧【结果查看】中打开 CSV、GeoJSON、诊断 JSON 或输出目录，也可导出当前 PNG。"));
 }
 
