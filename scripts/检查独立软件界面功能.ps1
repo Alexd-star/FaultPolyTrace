@@ -151,6 +151,31 @@ Add-ContainsCheck -Rows $rows -Group "运行状态联动" -Name "停止按钮" -
 Add-ContainsCheck -Rows $rows -Group "运行状态联动" -Name "动作成员" -Requirement "运行 QAction 成员声明" -Text $header -Needle "QAction* runAction_" -Detail "$headerPath 声明 runAction_"
 Add-ContainsCheck -Rows $rows -Group "运行状态联动" -Name "动作成员" -Requirement "停止 QAction 成员声明" -Text $header -Needle "QAction* stopAction_" -Detail "$headerPath 声明 stopAction_"
 
+$resultChecks = @(
+    @{ Name="结果查看分组"; Needle="QGroupBox* resultBox = new QGroupBox(QString::fromUtf8(`"结果查看`")"; Requirement="左侧结果查看入口存在" },
+    @{ Name="查看叠加按钮"; Needle="showOverlayButton_ = new QPushButton(QString::fromUtf8(`"查看叠加`")"; Requirement="可直接切换到叠加结果" },
+    @{ Name="打开 CSV 按钮"; Needle="openCsvButton_ = new QPushButton(QString::fromUtf8(`"打开CSV`")"; Requirement="可直接打开结果 CSV" },
+    @{ Name="打开 GeoJSON 按钮"; Needle="openGeoJsonButton_ = new QPushButton(QString::fromUtf8(`"GeoJSON`")"; Requirement="可直接打开 GeoJSON" },
+    @{ Name="打开诊断按钮"; Needle="openDiagnosticsButton_ = new QPushButton(QString::fromUtf8(`"诊断JSON`")"; Requirement="可直接打开诊断 JSON" },
+    @{ Name="结果区刷新"; Needle="void FaultPolyTraceWindow::updateResultPanel()"; Requirement="结果文件状态有统一刷新函数" },
+    @{ Name="完成后自动叠加"; Needle="viewModeCombo_->setCurrentText(QString::fromUtf8(`"叠加结果`"))"; Requirement="运行完成或历史载入后自动显示叠加结果" },
+    @{ Name="帮助说明结果入口"; Needle="在左侧【结果查看】中打开 CSV、GeoJSON、诊断 JSON 或输出目录"; Requirement="帮助提示说明结果查看方式" }
+)
+foreach ($check in $resultChecks) {
+    Add-ContainsCheck -Rows $rows -Group "结果查看" -Name $check.Name -Requirement $check.Requirement -Text $cpp -Needle $check.Needle -Detail "$cppPath 包含 $($check.Name)"
+}
+
+$resultSlots = @(
+    @{ Name="查看叠加"; Slot="showOverlayResult" },
+    @{ Name="打开 CSV"; Slot="openResultCsv" },
+    @{ Name="打开 GeoJSON"; Slot="openResultGeoJson" },
+    @{ Name="打开诊断 JSON"; Slot="openDiagnosticsJson" }
+)
+foreach ($slot in $resultSlots) {
+    Add-ContainsCheck -Rows $rows -Group "结果查看" -Name $slot.Name -Requirement "结果按钮连接真实槽函数" -Text $cpp -Needle "FaultPolyTraceWindow::$($slot.Slot)" -Detail "$cppPath 连接 $($slot.Slot)"
+    Add-ContainsCheck -Rows $rows -Group "结果查看" -Name $slot.Name -Requirement "槽函数声明存在" -Text $header -Needle "void $($slot.Slot)()" -Detail "$headerPath 声明 $($slot.Slot)"
+}
+
 $supportFunctions = @(
     @{ Name="导出 PNG"; Needle="void FaultPolyTraceWindow::exportPng()" },
     @{ Name="保存模板"; Needle="void FaultPolyTraceWindow::saveTemplate()" },

@@ -33,6 +33,10 @@ private slots:
     void refreshInputPreview();
     void refreshResultPreview();
     void exportPng();
+    void showOverlayResult();
+    void openResultCsv();
+    void openResultGeoJson();
+    void openDiagnosticsJson();
     void saveTemplate();
     void loadTemplate();
     void restoreDefaults();
@@ -54,6 +58,7 @@ private:
     void applyPreset(const QString& preset);
     void refreshHistory();
     void appendHistory(qint64 elapsedMs);
+    void updateResultPanel();
     void updateTaskPreview();
     QStringList traceArgs() const;
     QString outputCsvPath() const;
@@ -117,10 +122,18 @@ private:
     QDoubleSpinBox* alphaSpin_ = nullptr;
     QPushButton* runButton_ = nullptr;
     QPushButton* stopButton_ = nullptr;
+    QPushButton* showOverlayButton_ = nullptr;
+    QPushButton* openCsvButton_ = nullptr;
+    QPushButton* openGeoJsonButton_ = nullptr;
+    QPushButton* openDiagnosticsButton_ = nullptr;
+    QPushButton* openOutputDirButton_ = nullptr;
+    QPushButton* exportPngButton_ = nullptr;
     QAction* runAction_ = nullptr;
     QAction* stopAction_ = nullptr;
     QTextEdit* logEdit_ = nullptr;
     QLabel* statusLabel_ = nullptr;
     QLabel* elapsedLabel_ = nullptr;
+    QLabel* resultSummaryLabel_ = nullptr;
+    QLabel* resultPathLabel_ = nullptr;
     AttributeView* view_ = nullptr;
 };

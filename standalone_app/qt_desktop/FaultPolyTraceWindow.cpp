@@ -690,6 +690,7 @@ FaultPolyTraceWindow::FaultPolyTraceWindow(QWidget* parent)
     refreshHistory();
     refreshInputPreview();
     updateTaskPreview();
+    updateResultPanel();
     appendLog(QString::fromUtf8("[系统就绪] 等待参数输入及任务执行。"));
     connect(process_, &QProcess::readyReadStandardOutput, this, &FaultPolyTraceWindow::onReadyRead);
     connect(process_, &QProcess::readyReadStandardError, this, &FaultPolyTraceWindow::onReadyRead);
@@ -721,6 +722,8 @@ void FaultPolyTraceWindow::buildUi() {
         QPushButton#runButton { background: #0078D7; color: white; border-color: #005A9E; font-weight: bold; min-height: 30px; }
         QLabel#logHeader { background: #E6E6E6; border-top: 1px solid #A8A8A8; border-bottom: 1px solid #C8C8C8; padding-left: 10px; font-weight: bold; }
         QTextEdit { background: #F8F9FA; border-top: 1px solid #B8B8B8; font-family: Consolas, "Courier New"; }
+        QLabel#resultSummary { color: #333333; font-weight: bold; }
+        QLabel#resultPath { color: #555555; background: #F7F7F7; border: 1px solid #CCCCCC; padding: 4px; }
     )"));
 
     QAction* openAction = new QAction(style()->standardIcon(QStyle::SP_DirOpenIcon), QString::fromUtf8("打开 DAT 文件"), this);
@@ -923,6 +926,40 @@ void FaultPolyTraceWindow::buildUi() {
     alphaSpin_->setValue(1.0);
     addRow(styleLayout, 2, QString::fromUtf8("透明度"), alphaSpin_, styleBox);
     sidebarLayout->addWidget(styleBox);
+
+    QGroupBox* resultBox = new QGroupBox(QString::fromUtf8("结果查看"), sidebarContent);
+    QGridLayout* resultLayout = new QGridLayout(resultBox);
+    resultLayout->setContentsMargins(10, 14, 10, 10);
+    resultLayout->setHorizontalSpacing(6);
+    resultLayout->setVerticalSpacing(6);
+    resultSummaryLabel_ = new QLabel(QString::fromUtf8("尚未运行追踪任务"), resultBox);
+    resultSummaryLabel_->setObjectName("resultSummary");
+    resultSummaryLabel_->setWordWrap(true);
+    resultPathLabel_ = new QLabel(QString::fromUtf8("结果文件将在运行完成后显示在这里。"), resultBox);
+    resultPathLabel_->setObjectName("resultPath");
+    resultPathLabel_->setWordWrap(true);
+    resultPathLabel_->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    resultLayout->addWidget(resultSummaryLabel_, 0, 0, 1, 3);
+    resultLayout->addWidget(resultPathLabel_, 1, 0, 1, 3);
+    showOverlayButton_ = new QPushButton(QString::fromUtf8("查看叠加"), resultBox);
+    openCsvButton_ = new QPushButton(QString::fromUtf8("打开CSV"), resultBox);
+    openGeoJsonButton_ = new QPushButton(QString::fromUtf8("GeoJSON"), resultBox);
+    openDiagnosticsButton_ = new QPushButton(QString::fromUtf8("诊断JSON"), resultBox);
+    openOutputDirButton_ = new QPushButton(QString::fromUtf8("输出目录"), resultBox);
+    exportPngButton_ = new QPushButton(QString::fromUtf8("导出PNG"), resultBox);
+    resultLayout->addWidget(showOverlayButton_, 2, 0);
+    resultLayout->addWidget(openCsvButton_, 2, 1);
+    resultLayout->addWidget(openGeoJsonButton_, 2, 2);
+    resultLayout->addWidget(openDiagnosticsButton_, 3, 0);
+    resultLayout->addWidget(openOutputDirButton_, 3, 1);
+    resultLayout->addWidget(exportPngButton_, 3, 2);
+    connect(showOverlayButton_, &QPushButton::clicked, this, &FaultPolyTraceWindow::showOverlayResult);
+    connect(openCsvButton_, &QPushButton::clicked, this, &FaultPolyTraceWindow::openResultCsv);
+    connect(openGeoJsonButton_, &QPushButton::clicked, this, &FaultPolyTraceWindow::openResultGeoJson);
+    connect(openDiagnosticsButton_, &QPushButton::clicked, this, &FaultPolyTraceWindow::openDiagnosticsJson);
+    connect(openOutputDirButton_, &QPushButton::clicked, this, &FaultPolyTraceWindow::openOutputDir);
+    connect(exportPngButton_, &QPushButton::clicked, this, &FaultPolyTraceWindow::exportPng);
+    sidebarLayout->addWidget(resultBox);
 
     QGroupBox* basicBox = new QGroupBox(QString::fromUtf8("追踪参数"), sidebarContent);
     QGridLayout* basicLayout = new QGridLayout(basicBox);
@@ -1206,6 +1243,8 @@ void FaultPolyTraceWindow::buildUi() {
     connect(inputEdit_, &QLineEdit::textChanged, this, &FaultPolyTraceWindow::updateTaskPreview);
     connect(outputDirEdit_, &QLineEdit::textChanged, this, &FaultPolyTraceWindow::updateTaskPreview);
     connect(outputNameEdit_, &QLineEdit::textChanged, this, &FaultPolyTraceWindow::updateTaskPreview);
+    connect(outputDirEdit_, &QLineEdit::textChanged, this, &FaultPolyTraceWindow::updateResultPanel);
+    connect(outputNameEdit_, &QLineEdit::textChanged, this, &FaultPolyTraceWindow::updateResultPanel);
     connect(inputFormatCombo_, &QComboBox::currentTextChanged, this, &FaultPolyTraceWindow::updateTaskPreview);
     connect(presetCombo_, &QComboBox::currentTextChanged, this, &FaultPolyTraceWindow::updateTaskPreview);
     connect(traceModeCombo_, &QComboBox::currentTextChanged, this, &FaultPolyTraceWindow::updateTaskPreview);
@@ -1585,12 +1624,14 @@ void FaultPolyTraceWindow::refreshInputPreview() {
 void FaultPolyTraceWindow::refreshResultPreview() {
     const QString path = !lastOutputCsv_.isEmpty() && QFileInfo::exists(lastOutputCsv_) ? lastOutputCsv_ : outputCsvPath();
     if (!QFileInfo::exists(path)) {
+        updateResultPanel();
         return;
     }
     QString error;
     if (!view_->loadPolygons(path, &error) && !error.isEmpty()) {
         appendLog(error);
     }
+    updateResultPanel();
 }
 
 void FaultPolyTraceWindow::runTrace() {
@@ -1615,6 +1656,8 @@ void FaultPolyTraceWindow::runTrace() {
         return;
     }
     logEdit_->clear();
+    lastOutputCsv_.clear();
+    updateResultPanel();
     saveSettings();
     const QStringList args = traceArgs();
     appendLog("> " + runner + " " + quoteForLog(args));
@@ -1649,6 +1692,14 @@ void FaultPolyTraceWindow::onFinished(int exitCode, QProcess::ExitStatus status)
     elapsedLabel_->setText(QString::fromUtf8("耗时: %1").arg(elapsedText(elapsedMs)));
     if (exitCode == 0 && status == QProcess::NormalExit) {
         lastOutputCsv_ = outputCsvPath();
+        if (!QFileInfo::exists(lastOutputCsv_) || QFileInfo(lastOutputCsv_).size() <= 0) {
+            appendLog(QString::fromUtf8("运行结束，但未生成结果 CSV：%1").arg(QDir::toNativeSeparators(lastOutputCsv_)));
+            appendLog(QString::fromUtf8("请检查输入格式、输出目录写入权限和上方算法日志。"));
+            updateResultPanel();
+            updateStatus(QString::fromUtf8("运行结束但未找到结果 CSV"));
+            return;
+        }
+        appendLog(QString::fromUtf8("结果 CSV：%1").arg(QDir::toNativeSeparators(lastOutputCsv_)));
         QString geoJsonPath;
         QString geoJsonError;
         if (writeGeoJson(lastOutputCsv_, &geoJsonPath, &geoJsonError)) {
@@ -1656,11 +1707,17 @@ void FaultPolyTraceWindow::onFinished(int exitCode, QProcess::ExitStatus status)
         } else if (!geoJsonError.isEmpty()) {
             appendLog(geoJsonError);
         }
+        appendLog(QString::fromUtf8("诊断 JSON：%1").arg(QDir::toNativeSeparators(outputBasePath() + ".diagnostics.json")));
+        appendLog(QString::fromUtf8("拓扑 CSV：%1").arg(QDir::toNativeSeparators(outputBasePath() + ".topology.csv")));
+        appendLog(QString::fromUtf8("枝干 CSV：%1").arg(QDir::toNativeSeparators(outputBasePath() + ".branches.csv")));
         refreshResultPreview();
+        viewModeCombo_->setCurrentText(QString::fromUtf8("叠加结果"));
         appendHistory(elapsedMs);
         saveSettings();
-        updateStatus(QString::fromUtf8("追踪完成"));
+        updateResultPanel();
+        updateStatus(QString::fromUtf8("追踪完成，已切换到叠加结果"));
     } else {
+        updateResultPanel();
         updateStatus(QString::fromUtf8("运行失败，请查看日志"));
     }
 }
@@ -1680,6 +1737,7 @@ void FaultPolyTraceWindow::setRunning(bool running) {
     if (stopAction_) {
         stopAction_->setEnabled(running);
     }
+    updateResultPanel();
 }
 
 void FaultPolyTraceWindow::appendLog(const QString& text) {
@@ -1916,6 +1974,43 @@ void FaultPolyTraceWindow::applyPreset(const QString& preset) {
     updateTaskPreview();
 }
 
+void FaultPolyTraceWindow::showOverlayResult() {
+    refreshResultPreview();
+    viewModeCombo_->setCurrentText(QString::fromUtf8("叠加结果"));
+    updateStatus(QString::fromUtf8("正在查看叠加结果"));
+}
+
+void FaultPolyTraceWindow::openResultCsv() {
+    const QString path = !lastOutputCsv_.isEmpty() ? lastOutputCsv_ : outputCsvPath();
+    if (!QFileInfo::exists(path)) {
+        QMessageBox::warning(this, QString::fromUtf8("结果文件不存在"), path);
+        return;
+    }
+    QDesktopServices::openUrl(QUrl::fromLocalFile(path));
+}
+
+void FaultPolyTraceWindow::openResultGeoJson() {
+    const QString csvPath = !lastOutputCsv_.isEmpty() ? lastOutputCsv_ : outputCsvPath();
+    const QFileInfo csvInfo(csvPath);
+    const QString path = csvInfo.absolutePath() + "/" + csvInfo.completeBaseName() + ".geojson";
+    if (!QFileInfo::exists(path)) {
+        QMessageBox::warning(this, QString::fromUtf8("GeoJSON 不存在"), path);
+        return;
+    }
+    QDesktopServices::openUrl(QUrl::fromLocalFile(path));
+}
+
+void FaultPolyTraceWindow::openDiagnosticsJson() {
+    const QString csvPath = !lastOutputCsv_.isEmpty() ? lastOutputCsv_ : outputCsvPath();
+    const QFileInfo csvInfo(csvPath);
+    const QString path = csvInfo.absolutePath() + "/" + csvInfo.completeBaseName() + ".diagnostics.json";
+    if (!QFileInfo::exists(path)) {
+        QMessageBox::warning(this, QString::fromUtf8("诊断 JSON 不存在"), path);
+        return;
+    }
+    QDesktopServices::openUrl(QUrl::fromLocalFile(path));
+}
+
 void FaultPolyTraceWindow::exportPng() {
     const QString path = QFileDialog::getSaveFileName(this, QString::fromUtf8("导出当前视图 PNG"), QDir(outputDirEdit_->text()).absoluteFilePath("FaultPolyTrace_View.png"), QString::fromUtf8("PNG 图像 (*.png);;所有文件 (*.*)"));
     if (path.isEmpty()) {
@@ -2098,10 +2193,64 @@ void FaultPolyTraceWindow::loadHistory() {
     lastOutputCsv_ = parts[2];
     refreshInputPreview();
     refreshResultPreview();
+    viewModeCombo_->setCurrentText(QString::fromUtf8("叠加结果"));
+    updateResultPanel();
 }
 
 void FaultPolyTraceWindow::openOutputDir() {
-    QDesktopServices::openUrl(QUrl::fromLocalFile(outputDirEdit_->text()));
+    const QString dir = outputDirEdit_->text().trimmed().isEmpty() ? defaultOutputDir() : outputDirEdit_->text().trimmed();
+    QDir().mkpath(dir);
+    QDesktopServices::openUrl(QUrl::fromLocalFile(dir));
+}
+
+void FaultPolyTraceWindow::updateResultPanel() {
+    if (!resultSummaryLabel_ || !resultPathLabel_) {
+        return;
+    }
+
+    const QString csvPath = !lastOutputCsv_.isEmpty() ? lastOutputCsv_ : outputCsvPath();
+    const QFileInfo csvInfo(csvPath);
+    const QString base = csvInfo.absolutePath() + "/" + csvInfo.completeBaseName();
+    const QString geoJsonPath = base + ".geojson";
+    const QString diagnosticsPath = base + ".diagnostics.json";
+    const bool hasCsv = csvInfo.exists() && csvInfo.size() > 0;
+    const bool hasGeoJson = QFileInfo::exists(geoJsonPath);
+    const bool hasDiagnostics = QFileInfo::exists(diagnosticsPath);
+    const bool running = process_ && process_->state() != QProcess::NotRunning;
+
+    if (running) {
+        resultSummaryLabel_->setText(QString::fromUtf8("正在计算，结果文件生成后会自动显示。"));
+    } else if (hasCsv) {
+        resultSummaryLabel_->setText(QString::fromUtf8("最近结果已生成，可在中间视图区查看或打开结果文件。"));
+    } else if (!lastOutputCsv_.isEmpty()) {
+        resultSummaryLabel_->setText(QString::fromUtf8("运行结束，但未找到结果 CSV。请检查日志和输出目录。"));
+    } else {
+        resultSummaryLabel_->setText(QString::fromUtf8("尚未生成结果。运行完成后将自动切换到叠加结果。"));
+    }
+
+    resultPathLabel_->setText(hasCsv
+        ? QString::fromUtf8("CSV：%1").arg(QDir::toNativeSeparators(csvPath))
+        : QString::fromUtf8("预计输出：%1").arg(QDir::toNativeSeparators(csvPath)));
+    resultPathLabel_->setToolTip(QDir::toNativeSeparators(csvPath));
+
+    if (showOverlayButton_) {
+        showOverlayButton_->setEnabled(hasCsv);
+    }
+    if (openCsvButton_) {
+        openCsvButton_->setEnabled(hasCsv);
+    }
+    if (openGeoJsonButton_) {
+        openGeoJsonButton_->setEnabled(hasGeoJson);
+    }
+    if (openDiagnosticsButton_) {
+        openDiagnosticsButton_->setEnabled(hasDiagnostics);
+    }
+    if (openOutputDirButton_) {
+        openOutputDirButton_->setEnabled(true);
+    }
+    if (exportPngButton_) {
+        exportPngButton_->setEnabled(true);
+    }
 }
 
 void FaultPolyTraceWindow::openHelp() {
@@ -2111,8 +2260,9 @@ void FaultPolyTraceWindow::openHelp() {
                                                "1. 选择 DAT、矩阵文本或 GeoEast DAT 文件。\n"
                                                "2. 设置输出目录、输出名称和追踪参数。\n"
                                                "3. 点击【开始追踪】。\n"
-                                               "4. 在视图区切换原始网格、结果多边形和叠加结果。\n"
-                                               "5. 结果会保存为 CSV、GeoJSON、诊断 JSON、拓扑 CSV 和枝干 CSV。"));
+                                               "4. 运行完成后软件会自动切换到【叠加结果】。\n"
+                                               "5. 在左侧【结果查看】中打开 CSV、GeoJSON、诊断 JSON 或输出目录。\n"
+                                               "6. 结果会保存为 CSV、GeoJSON、诊断 JSON、拓扑 CSV 和枝干 CSV。"));
 }
 
 void FaultPolyTraceWindow::closeEvent(QCloseEvent* event) {
