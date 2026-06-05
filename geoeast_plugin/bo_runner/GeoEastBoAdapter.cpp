@@ -47,6 +47,73 @@ std::vector<std::string> listMapGrids(const GeoEastProjectPtr& project) {
     return names;
 }
 
+std::vector<std::string> listFaultPolygons(const GeoEastProjectPtr& project) {
+    if (!project) {
+        throw std::runtime_error("GeoEast project is null.");
+    }
+
+    geobo::BANameIDs nameIds;
+    project->listNameIDsOfChildren<geobo::BOFaultPolygon>(nameIds);
+
+    std::vector<std::string> names;
+    names.reserve(nameIds.size());
+    for (int i = 0; i < static_cast<int>(nameIds.size()); ++i) {
+        names.push_back(nameIds[i]->getName());
+    }
+    return names;
+}
+
+std::vector<fpt::Polygon> readFaultPolygons(const GeoEastProjectPtr& project, const std::string& outputName) {
+    if (!project) {
+        throw std::runtime_error("GeoEast project is null.");
+    }
+    if (outputName.empty()) {
+        throw std::runtime_error("GeoEast BOFaultPolygon output name is empty.");
+    }
+
+    std::shared_ptr<geobo::BOFaultPolygon> boPolygon = project->getChild<geobo::BOFaultPolygon>(outputName);
+    if (!boPolygon) {
+        throw std::runtime_error("Failed to get BOFaultPolygon: " + outputName);
+    }
+
+    BAFaultPolygonHead head;
+    BAFaultPolygonData data;
+    if (!boPolygon->readData(head, data)) {
+        throw std::runtime_error("Failed to read BOFaultPolygon data: " + outputName);
+    }
+
+    std::vector<fpt::Polygon> polygons;
+    polygons.reserve(data.faultPolygonList.size());
+    int id = 1;
+    for (const BAFaultPolygonSegment& segment : data.faultPolygonList) {
+        if (segment.faultPolygonData.size() < 3) {
+            continue;
+        }
+        fpt::Polygon polygon;
+        polygon.id = id++;
+        polygon.kept = true;
+        polygon.points.reserve(segment.faultPolygonData.size());
+        for (const BAFaultPolygonPoint& sourcePoint : segment.faultPolygonData) {
+            polygon.points.push_back({sourcePoint.x, sourcePoint.y});
+        }
+        if (polygon.points.size() >= 2) {
+            const fpt::Point& first = polygon.points.front();
+            const fpt::Point& last = polygon.points.back();
+            if (std::abs(first.x - last.x) <= 1e-9 && std::abs(first.y - last.y) <= 1e-9) {
+                polygon.points.pop_back();
+            }
+        }
+        if (polygon.points.size() < 3) {
+            continue;
+        }
+        polygon.area = fpt::polygonArea(polygon.points);
+        polygon.perimeter = fpt::polygonPerimeter(polygon.points);
+        polygon.cellCount = static_cast<int>(polygon.points.size());
+        polygons.push_back(std::move(polygon));
+    }
+    return polygons;
+}
+
 fpt::Grid2D readMapGrid(const GeoEastProjectPtr& project, const std::string& gridName) {
     if (!project) {
         throw std::runtime_error("GeoEast project is null.");

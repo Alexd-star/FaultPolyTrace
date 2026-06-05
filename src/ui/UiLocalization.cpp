@@ -106,6 +106,7 @@ QMap<QString, QString> buildEnglishTextMap() {
     add("[视图区] %1", "[View] %1");
     add("缩放 %1%", "Zoom %1%");
     add("请选择输入网格，或载入历史结果。", "Select an input grid or load a historical result.");
+    add("已载入原始网格，尚未运行追踪；当前不是处理后的叠加结果。", "The input grid is loaded, but tracing has not run yet. This is not a processed overlay result.");
     add("[任务视图区] 结果查看", "[Task View] Result Review");
     add("查看逻辑：\n"
         "1. 原始网格显示输入属性色图。\n"
@@ -128,6 +129,9 @@ QMap<QString, QString> buildEnglishTextMap() {
     add("从 DAT 导入/覆盖输入网格", "Import / Overwrite Input Grid from DAT");
     add("结果查看", "Result View");
     add("重新载入", "Reload");
+    add("刷新结果", "Refresh Results");
+    add("选为当前", "Set as Current");
+    add("浏览", "Browse");
     add("查看叠加", "View Overlay");
     add("打开CSV", "Open CSV");
     add("GeoJSON", "GeoJSON");
@@ -209,11 +213,13 @@ QMap<QString, QString> buildEnglishTextMap() {
     add("最近结果已生成，可在中间视图区查看或打开结果文件。", "The latest result is ready. Review it in the center view or open the result files.");
     add("运行结束，但未找到结果 CSV。请检查日志和输出目录。", "The run finished, but no result CSV was found. Check the log and output folder.");
     add("尚未生成结果。运行完成后将自动切换到叠加结果。", "No result yet. The view will switch to overlay after the run completes.");
+    add("请选择输入文件或 GeoEast 网格，然后点击【开始追踪】。", "Select an input file or GeoEast grid, then click [Start Trace].");
     add("CSV：%1", "CSV: %1");
     add("预计输出：%1", "Expected Output: %1");
 
     add("未配置", "Not Configured");
     add("未选择", "Not Selected");
+    add("请选择平面断层属性文件", "Select a planar fault attribute file");
     add("未命名", "Unnamed");
     add("默认输出目录", "Default Output Folder");
     add("等待运行", "Waiting");
@@ -238,6 +244,31 @@ QMap<QString, QString> buildEnglishTextMap() {
     add("面积过滤：小于 %1 的多边形不输出    结果线宽：%2", "Area Filter: polygons below %1 are excluded    Line Width: %2");
     add("弱响应：分位 %1 / 半径 %2    根系防黏连：%3    残余补追：%4", "Weak Response: percentile %1 / radius %2    Root Anti-merge: %3    Residual Trace: %4");
     add("当前状态：%1", "Status: %1");
+    add("结果查看：追踪完成后自动显示原始网格和结果多边形；如需复查，可在左侧重新载入结果视图。",
+        "Result Review: the input grid and result polygons are shown automatically after tracing. Use Reload in the sidebar to review them again.");
+    add("官方查看：点击【打开工区底图】或【打开平面成图】，在 GeoEast 图层树中加载 Grids 和 Fault Polygons。",
+        "Official Review: open Basemap or GeoMapping, then load Grids and Fault Polygons in the GeoEast layer tree.");
+    add("属性", "Attribute");
+    add("视图 X: --   |   Y: --", "View X: --   |   Y: --");
+    add("视图 X: %1   |   Y: %2", "View X: %1   |   Y: %2");
+    add("[系统就绪] 等待参数输入及任务执行...", "[System Ready] Waiting for parameters and task execution...");
+    add("[系统就绪] 等待参数输入及任务执行。", "[System Ready] Waiting for parameters and task execution.");
+    add("未检测到当前项目名，请先在【数据库配置】中填写项目，再刷新网格列表。",
+        "No current project was detected. Enter the project in [Database Configuration], then refresh the grid list.");
+    add("已选择输入文件，尚未运行追踪", "Input file selected. Tracing has not run yet.");
+    add("已载入原始网格，尚未运行追踪", "Input grid loaded. Tracing has not run yet.");
+    add("原始网格已载入，尚未运行追踪", "Input grid loaded. Tracing has not run yet.");
+    add("正在计算，等待结果生成", "Running. Waiting for results.");
+    add("已恢复推荐算法与显示参数，输入文件和输出位置保持不变", "Recommended algorithm and display parameters restored. Input file and output location were kept unchanged.");
+    add("已恢复推荐算法与显示参数", "Recommended algorithm and display parameters restored.");
+    add("尚未生成结果", "No Result Yet");
+    add("请先选择输入文件并点击【开始追踪】。运行完成后才能查看处理后的叠加结果。", "Select an input file and click [Start Trace] first. The processed overlay can be viewed after the run completes.");
+    add("结果文件不存在", "Result File Not Found");
+    add("请先完成一次追踪，或从历史记录载入已有结果。", "Run tracing once or load an existing result from history first.");
+    add("GeoJSON 不存在", "GeoJSON Not Found");
+    add("请先完成一次追踪。GeoJSON 会在结果 CSV 生成后自动写出。", "Run tracing first. GeoJSON is written automatically after the result CSV is generated.");
+    add("诊断 JSON 不存在", "Diagnostics JSON Not Found");
+    add("请先完成一次追踪。诊断 JSON 会随结果文件一起生成。", "Run tracing first. Diagnostics JSON is generated with the result files.");
     add("当前状态：等待参数输入及任务执行", "Status: waiting for parameters and task execution");
     add("运行方式：GeoEast 数据库模式    数据库：%1    项目：%2", "Mode: GeoEast Database    Database: %1    Project: %2");
     add("运行方式：独立文件模式    输入格式：%1", "Mode: External File    Input Format: %1");
@@ -275,6 +306,25 @@ QMap<QString, QString> buildEnglishTextMap() {
     add("宽断层带", "Wide Fault Belt");
     add("细碎断裂", "Fragmented Faults");
     add("点击刷新网格或输入 GeoEast 网格名", "Click refresh or enter a GeoEast grid name");
+    add("请先配置项目并刷新网格", "Configure the project and refresh grids first");
+    add("请先配置项目并刷新结果", "Configure the project and refresh results first");
+    add("请先运行追踪或刷新已有结果", "Run tracing or refresh existing results first");
+    add("当前项目暂无结果；点击此处重新刷新", "No result in the current project; click to refresh");
+    add("输出目录暂无结果；点击此处查看引导", "No result in the output folder; click for guidance");
+    add("选择输入网格", "Select Input Grid");
+    add("选择已有结果", "Select Existing Result");
+    add("正在读取数据库，请稍候", "Reading the database. Please wait.");
+    add("任务运行中，请稍候", "A task is running. Please wait.");
+    add("输入网格列表为空，正在自动刷新...", "The input grid list is empty. Refreshing automatically...");
+    add("已有结果列表为空，正在自动刷新...", "The result list is empty. Refreshing automatically...");
+    add("暂无可查看结果", "No Result Available");
+    add("当前输出目录中没有可查看的结果 CSV。\n\n"
+        "请先选择输入数据并完成一次追踪，或检查“输出目录”后点击【刷新结果】。",
+        "There is no result CSV in the current output folder.\n\n"
+        "Select input data and complete a trace, or check the Output Folder and click [Refresh Results].");
+    add("当前输出目录暂无结果，请先运行追踪或检查输出目录", "No result in the current output folder. Run tracing or check the output folder.");
+    add("刷新当前项目中的 BOFaultPolygon 结果列表。", "Refresh BOFaultPolygon results in the current project.");
+    add("把选中的已有结果多边形对象设为当前输出名称。", "Use the selected result polygon object as the current output name.");
     add("可选：选择需要导入或覆盖到 GeoEast 的 DAT 文件", "Optional: choose a DAT file to import or overwrite in GeoEast");
     add("外部断层属性网格文件路径", "External fault attribute grid file path");
     add("结果文件输出目录", "Result file output folder");

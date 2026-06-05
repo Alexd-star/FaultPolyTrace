@@ -270,6 +270,7 @@ function Invoke-GuiClickAcceptance {
 
     Set-Content -LiteralPath $config -Encoding UTF8 -Value @(
         "[General]",
+        "configSchemaVersion=3",
         "input=$inputIni",
         "outputDir=$outIni",
         "outputName=$outputName",

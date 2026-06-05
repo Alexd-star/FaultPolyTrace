@@ -15,6 +15,7 @@ class QLineEdit;
 class QProcessEnvironment;
 class QPushButton;
 class QSpinBox;
+class QSplitter;
 class QStackedWidget;
 class QTextEdit;
 
@@ -40,6 +41,7 @@ private slots:
     void onProcessError(QProcess::ProcessError error);
     void refreshInputPreview();
     void refreshResultPreview();
+    void clearResultStateForNewInput();
     void exportPng();
     void showOverlayResult();
     void openResultCsv();
@@ -47,6 +49,8 @@ private slots:
     void openDiagnosticsJson();
     void showGeoEastConfigDialog();
     void refreshGeoEastGrids();
+    void refreshAvailableResults();
+    void loadSelectedResult();
     void deleteGeoEastResult();
     void saveTemplate();
     void loadTemplate();
@@ -71,6 +75,8 @@ private:
         ExternalTrace,
         GeoEastTrace,
         RefreshGeoEastGrids,
+        RefreshGeoEastResults,
+        ExportGeoEastResult,
         DeleteGeoEastResult
     };
 
@@ -115,6 +121,7 @@ private:
     QString geoEastOutputName() const;
     QStringList missingGeoEastConfig(bool requireGrid, bool requireOutput) const;
     bool ensureGeoEastConfigReady(const QString& operation, bool requireGrid, bool requireOutput);
+    QStringList localResultCandidates() const;
 
     QProcess* process_ = nullptr;
     qint64 processStartMs_ = 0;
@@ -122,6 +129,7 @@ private:
     QString processOutput_;
     QString lastOutputCsv_;
     QString lastGeoEastOutput_;
+    bool refreshResultsAfterGrids_ = false;
 
     QComboBox* sourceModeCombo_ = nullptr;
     QStackedWidget* sourceStack_ = nullptr;
@@ -130,6 +138,7 @@ private:
     QLineEdit* outputNameEdit_ = nullptr;
     QComboBox* inputFormatCombo_ = nullptr;
     QComboBox* geoEastGridCombo_ = nullptr;
+    QComboBox* resultCatalogCombo_ = nullptr;
     QLineEdit* geoEastRunnerEdit_ = nullptr;
     QLineEdit* geoEastRootEdit_ = nullptr;
     QLineEdit* geoEastDataRootEdit_ = nullptr;
@@ -142,6 +151,8 @@ private:
     QPushButton* geoEastRefreshButton_ = nullptr;
     QPushButton* geoEastConfigButton_ = nullptr;
     QPushButton* geoEastDeleteButton_ = nullptr;
+    QPushButton* refreshResultsButton_ = nullptr;
+    QPushButton* loadSelectedResultButton_ = nullptr;
     QComboBox* viewModeCombo_ = nullptr;
     QComboBox* historyCombo_ = nullptr;
     QComboBox* presetCombo_ = nullptr;
@@ -204,5 +215,7 @@ private:
     QLabel* resultSummaryLabel_ = nullptr;
     QLabel* resultPathLabel_ = nullptr;
     AttributeView* view_ = nullptr;
+    QWidget* colorBarWidget_ = nullptr;
+    QSplitter* mainSplitter_ = nullptr;
     UiLanguage currentLanguage_ = UiLanguage::SimplifiedChinese;
 };

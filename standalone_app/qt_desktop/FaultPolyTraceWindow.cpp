@@ -41,6 +41,7 @@
 #include <QRegularExpression>
 #include <QScrollArea>
 #include <QSettings>
+#include <QSizePolicy>
 #include <QSpinBox>
 #include <QSplitter>
 #include <QStackedWidget>
@@ -51,6 +52,7 @@
 #include <QTextCursor>
 #include <QTextStream>
 #include <QToolBar>
+#include <QTimer>
 #include <QUrl>
 #include <QVBoxLayout>
 #include <QWheelEvent>
@@ -58,9 +60,34 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <functional>
 #include <limits>
 
 namespace {
+
+class GuidedCatalogComboBox : public QComboBox {
+public:
+    using BeforePopupHandler = std::function<bool()>;
+
+    explicit GuidedCatalogComboBox(QWidget* parent = nullptr)
+        : QComboBox(parent) {
+    }
+
+    void setBeforePopupHandler(BeforePopupHandler handler) {
+        beforePopupHandler_ = std::move(handler);
+    }
+
+protected:
+    void showPopup() override {
+        if (beforePopupHandler_ && beforePopupHandler_()) {
+            return;
+        }
+        QComboBox::showPopup();
+    }
+
+private:
+    BeforePopupHandler beforePopupHandler_;
+};
 
 QString repoRootFromAppDir() {
     QDir dir(QCoreApplication::applicationDirPath());
@@ -195,6 +222,98 @@ QString detectGeoEastDataRoot(const QString& geoEastRoot) {
     return QString();
 }
 
+QString detectGeoEastDatabaseName(const QString& dataRoot) {
+    const QString fromEnv = envValue("FPT_GEOEAST_DB");
+    if (!fromEnv.isEmpty()) {
+        return fromEnv;
+    }
+
+    const QString dbData = envValue("NGP_DBDATA_PATH");
+    if (!dbData.isEmpty()) {
+        const QString name = QFileInfo(QDir::fromNativeSeparators(dbData)).fileName();
+        if (!name.isEmpty()) {
+            return name;
+        }
+    }
+
+    QDir pgData(QDir(QDir::fromNativeSeparators(dataRoot)).absoluteFilePath("pgdata"));
+    if (pgData.exists()) {
+        const QFileInfoList databases = pgData.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
+        for (const QFileInfo& info : databases) {
+            if (info.fileName().compare("ndp", Qt::CaseInsensitive) == 0) {
+                return info.fileName();
+            }
+        }
+        if (!databases.isEmpty()) {
+            return databases.first().fileName();
+        }
+    }
+    return "ndp";
+}
+
+QString geoEastConfigHelpText() {
+    return QString::fromUtf8(
+        "GeoEast 数据库配置用于让 FaultPolyTrace 读取 BOMapGrid，并把追踪结果写入 BOFaultPolygon。\n\n"
+        "字段来源：\n"
+        "1. 执行程序文件：通常位于 GeoEast-RC\\bin\\faultpolytrace_geoeast_runner.exe，发布包或 GeoEast 插件部署后会自动检测。\n"
+        "2. GeoEast 根目录：包含 NGP 和 GeoEast-RC 两个子目录的安装根目录。\n"
+        "3. GeoEast 数据根目录：GeoEastData 根目录，通常包含 pgdata 和 DATA 等数据目录。\n"
+        "4. PG 主机和端口：本机 GeoEast 通常为 127.0.0.1 和 5433；如果连接远端数据库，请填写管理员提供的地址。\n"
+        "5. 数据库：通常为 ndp，也可从 GeoEast 项目管理或数据源配置中确认。\n"
+        "6. 项目：GeoEast 当前打开或需要处理的项目名，可在 GeoEast 主控标题、打开项目窗口或项目管理工具中查看。\n"
+        "7. 用户：GeoEast 登录用户，通常与 Windows 用户名一致。\n\n"
+        "建议流程：先点击【自动检测】，再点击【检查配置】。检查通过后点击【应用并保存配置】，然后返回主界面点击【刷新网格列表】。");
+}
+
+QStringList validateGeoEastConfigValues(const QString& runner,
+                                        const QString& geoEastRoot,
+                                        const QString& dataRoot,
+                                        const QString& host,
+                                        const QString& port,
+                                        const QString& database,
+                                        const QString& project,
+                                        const QString& user) {
+    QStringList issues;
+    const QString runnerPath = runner.trimmed();
+    const QString rootPath = QDir::fromNativeSeparators(geoEastRoot.trimmed());
+    const QString dataRootPath = QDir::fromNativeSeparators(dataRoot.trimmed());
+    if (runnerPath.isEmpty()) {
+        issues << QString::fromUtf8("执行程序文件未填写");
+    } else if (!QFileInfo::exists(runnerPath)) {
+        issues << QString::fromUtf8("执行程序文件不存在：%1").arg(QDir::toNativeSeparators(runnerPath));
+    }
+    if (rootPath.isEmpty()) {
+        issues << QString::fromUtf8("GeoEast 根目录未填写");
+    } else if (!QDir(rootPath).exists()) {
+        issues << QString::fromUtf8("GeoEast 根目录不存在：%1").arg(QDir::toNativeSeparators(rootPath));
+    } else if (!QDir(rootPath).exists("NGP") || !QDir(rootPath).exists("GeoEast-RC")) {
+        issues << QString::fromUtf8("GeoEast 根目录应包含 NGP 和 GeoEast-RC 子目录");
+    }
+    if (dataRootPath.isEmpty()) {
+        issues << QString::fromUtf8("GeoEast 数据根目录未填写");
+    } else if (!QDir(dataRootPath).exists()) {
+        issues << QString::fromUtf8("GeoEast 数据根目录不存在：%1").arg(QDir::toNativeSeparators(dataRootPath));
+    }
+    if (host.trimmed().isEmpty()) {
+        issues << QString::fromUtf8("PG 主机未填写");
+    }
+    bool portOk = false;
+    const int portValue = port.trimmed().toInt(&portOk);
+    if (!portOk || portValue <= 0 || portValue > 65535) {
+        issues << QString::fromUtf8("PG 端口应为 1 到 65535 之间的数字");
+    }
+    if (database.trimmed().isEmpty()) {
+        issues << QString::fromUtf8("数据库名未填写");
+    }
+    if (project.trimmed().isEmpty()) {
+        issues << QString::fromUtf8("项目名未填写。请在 GeoEast 主控标题、打开项目窗口或项目管理工具中确认");
+    }
+    if (user.trimmed().isEmpty()) {
+        issues << QString::fromUtf8("用户名未填写");
+    }
+    return issues;
+}
+
 QString defaultUserName() {
     const QString fromEnv = envValue("FPT_GEOEAST_USER");
     if (!fromEnv.isEmpty()) {
@@ -291,7 +410,7 @@ QVector<QPolygonF> parsePolygonRings(const QString& wkt, double* pxMin, double* 
 
 QLabel* formLabel(const QString& text, QWidget* parent) {
     QLabel* label = new QLabel(text, parent);
-    label->setFixedWidth(92);
+    label->setFixedWidth(100);
     label->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     return label;
 }
@@ -306,7 +425,7 @@ void configureFormGrid(QGridLayout* layout) {
     layout->setContentsMargins(10, 14, 10, 10);
     layout->setHorizontalSpacing(8);
     layout->setVerticalSpacing(6);
-    layout->setColumnMinimumWidth(0, 92);
+    layout->setColumnMinimumWidth(0, 100);
     layout->setColumnStretch(1, 1);
 }
 
@@ -645,6 +764,35 @@ public:
         return !polygons_.isEmpty();
     }
 
+    void clearPolygons(const QString& status = QString()) {
+        polygons_.clear();
+        if (!status.isEmpty()) {
+            status_ = status;
+        } else if (!grid_.isEmpty()) {
+            status_ = QString::fromUtf8("原始网格：%1 x %2").arg(nx_).arg(ny_);
+        } else {
+            status_ = QString();
+        }
+        update();
+    }
+
+    void clearData(const QString& status = QString()) {
+        grid_.clear();
+        polygons_.clear();
+        gridImage_ = QImage();
+        gridImageDirty_ = true;
+        nx_ = 0;
+        ny_ = 0;
+        xMin_ = 0.0;
+        yMin_ = 0.0;
+        xMax_ = 1.0;
+        yMax_ = 1.0;
+        min_ = 0.0;
+        max_ = 1.0;
+        status_ = status;
+        update();
+    }
+
     bool savePng(const QString& path) {
         QPixmap pixmap(size());
         render(&pixmap);
@@ -698,6 +846,14 @@ protected:
                          uiText(QString::fromUtf8("缩放 %1%")).arg(qRound(zoom_ * 100)));
         if (grid_.isEmpty() && polygons_.isEmpty()) {
             painter.drawText(canvas, Qt::AlignCenter, uiText(QString::fromUtf8("请选择输入网格，或载入历史结果。")));
+        } else if (!grid_.isEmpty() && polygons_.isEmpty() && showPolygonLayer_) {
+            const QRectF hintRect(canvas.left() + 18, canvas.top() + 18, qMin(460.0, canvas.width() - 36), 54);
+            painter.setPen(QPen(QColor("#C9A451"), 1));
+            painter.setBrush(QColor(255, 250, 230, 230));
+            painter.drawRoundedRect(hintRect, 3, 3);
+            painter.setPen(QColor("#6B5A20"));
+            painter.drawText(hintRect.adjusted(12, 8, -12, -8), Qt::AlignLeft | Qt::AlignVCenter | Qt::TextWordWrap,
+                             uiText(QString::fromUtf8("已载入原始网格，尚未运行追踪；当前不是处理后的叠加结果。")));
         }
     }
 
@@ -883,6 +1039,11 @@ public:
         setMinimumHeight(360);
     }
 
+    void setLanguage(UiLanguage language) {
+        languageCode_ = language == UiLanguage::English ? "en" : "zh-CN";
+        update();
+    }
+
 protected:
     void paintEvent(QPaintEvent*) override {
         QPainter painter(this);
@@ -902,12 +1063,18 @@ protected:
         painter.drawRect(bar.adjusted(0, 0, -1, -1));
 
         painter.setPen(QColor("#333333"));
-        painter.drawText(QRect(4, 8, width() - 8, 18), Qt::AlignCenter, QString::fromUtf8("属性"));
+        painter.drawText(
+            QRect(4, 8, width() - 8, 18),
+            Qt::AlignCenter,
+            fpt_ui::translate(QString::fromUtf8("属性"), languageCode_));
         painter.setPen(QColor("#004CFF"));
         painter.drawText(QRect(4, 32, width() - 8, 18), Qt::AlignCenter, QString::fromUtf8("1.0"));
         painter.setPen(QColor("#FF0000"));
         painter.drawText(QRect(4, bar.bottom() + 8, width() - 8, 18), Qt::AlignCenter, QString::fromUtf8("0.0"));
     }
+
+private:
+    QString languageCode_ = "zh-CN";
 };
 
 FaultPolyTraceWindow::FaultPolyTraceWindow(QWidget* parent)
@@ -916,6 +1083,9 @@ FaultPolyTraceWindow::FaultPolyTraceWindow(QWidget* parent)
     loadSettings();
     refreshHistory();
     refreshInputPreview();
+    if (!isGeoEastMode()) {
+        refreshAvailableResults();
+    }
     updateTaskPreview();
     updateResultPanel();
     appendLog(QString::fromUtf8("[系统就绪] 等待参数输入及任务执行。"));
@@ -941,14 +1111,18 @@ void FaultPolyTraceWindow::buildUi() {
         QToolButton { background: transparent; border: 1px solid transparent; border-radius: 2px; padding: 3px; }
         QToolButton:hover { background: #DDECF8; border-color: #8CBCE8; }
         QGroupBox { background: #F0F0F0; border: 1px solid #B5B5B5; border-radius: 3px; margin-top: 10px; padding-top: 8px; }
-        QGroupBox::title { subcontrol-origin: margin; left: 8px; padding: 0 5px; color: #005A9E; font-weight: bold; }
+        QGroupBox::title { subcontrol-origin: margin; left: 8px; padding: 0 5px; background: #F0F0F0; color: #005A9E; font-weight: bold; }
+        QFrame#sectionBox { background: #F0F0F0; border: 1px solid #B5B5B5; border-radius: 3px; }
         QLabel { background: transparent; }
+        QLabel#sectionTitle { color: #005A9E; font-weight: bold; padding: 0 0 4px 0; }
         QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox { background: white; border: 1px solid #A0A0A0; border-radius: 2px; min-height: 23px; padding: 1px 5px; }
         QPushButton { background: #E1E1E1; border: 1px solid #A0A0A0; border-radius: 2px; min-height: 24px; padding: 2px 10px; }
         QPushButton:hover { background: #E5F1FB; border-color: #0078D7; }
         QPushButton#runButton { background: #0078D7; color: white; border-color: #005A9E; font-weight: bold; min-height: 30px; }
         QLabel#logHeader { background: #E6E6E6; border-top: 1px solid #A8A8A8; border-bottom: 1px solid #C8C8C8; padding-left: 10px; font-weight: bold; }
         QTextEdit { background: #F8F9FA; border-top: 1px solid #B8B8B8; font-family: Consolas, "Courier New"; }
+        QSplitter::handle { background: #C6C6C6; width: 5px; }
+        QSplitter::handle:hover { background: #6AA9D8; }
         QLabel#resultSummary { color: #333333; font-weight: bold; }
         QLabel#resultPath { color: #555555; background: #F7F7F7; border: 1px solid #CCCCCC; padding: 4px; }
     )"));
@@ -1099,7 +1273,9 @@ void FaultPolyTraceWindow::buildUi() {
     rootLayout->setSpacing(0);
 
     QWidget* leftPane = new QWidget(root);
-    leftPane->setFixedWidth(392);
+    leftPane->setMinimumWidth(340);
+    leftPane->setMaximumWidth(650);
+    leftPane->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
     QVBoxLayout* leftLayout = new QVBoxLayout(leftPane);
     leftLayout->setContentsMargins(10, 10, 10, 8);
     leftLayout->setSpacing(8);
@@ -1109,17 +1285,21 @@ void FaultPolyTraceWindow::buildUi() {
     sidebarScroll->setFrameShape(QFrame::NoFrame);
     sidebarScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     QWidget* sidebarContent = new QWidget(sidebarScroll);
-    sidebarContent->setMinimumWidth(356);
+    sidebarContent->setMinimumWidth(384);
     QVBoxLayout* sidebarLayout = new QVBoxLayout(sidebarContent);
-    sidebarLayout->setContentsMargins(0, 0, 4, 0);
+    sidebarLayout->setContentsMargins(0, 8, 4, 0);
     sidebarLayout->setSpacing(8);
 
-    QGroupBox* dataBox = new QGroupBox(QString::fromUtf8("数据与输出"), sidebarContent);
+    QFrame* dataBox = new QFrame(sidebarContent);
+    dataBox->setObjectName("sectionBox");
     QGridLayout* dataLayout = new QGridLayout(dataBox);
     configureFormGrid(dataLayout);
+    QLabel* dataTitle = new QLabel(QString::fromUtf8("数据与输出"), dataBox);
+    dataTitle->setObjectName("sectionTitle");
+    dataLayout->addWidget(dataTitle, 0, 0, 1, 2);
     sourceModeCombo_ = new QComboBox(dataBox);
     sourceModeCombo_->addItems({QString::fromUtf8("外部文件"), QString::fromUtf8("GeoEast数据库")});
-    addRow(dataLayout, 0, QString::fromUtf8("数据源"), sourceModeCombo_, dataBox);
+    addRow(dataLayout, 1, QString::fromUtf8("数据源"), sourceModeCombo_, dataBox);
 
     sourceStack_ = new QStackedWidget(dataBox);
     QWidget* filePage = new QWidget(sourceStack_);
@@ -1128,6 +1308,7 @@ void FaultPolyTraceWindow::buildUi() {
     fileLayout->setContentsMargins(0, 0, 0, 0);
     inputEdit_ = new QLineEdit(filePage);
     inputEdit_->setToolTip(QString::fromUtf8("外部断层属性网格文件路径"));
+    inputEdit_->setPlaceholderText(QString::fromUtf8("请选择平面断层属性文件"));
     QPushButton* inputButton = new QPushButton(QString::fromUtf8("浏览"), filePage);
     configureSmallButton(inputButton);
     connect(inputButton, &QPushButton::clicked, this, &FaultPolyTraceWindow::browseInput);
@@ -1147,15 +1328,34 @@ void FaultPolyTraceWindow::buildUi() {
     QGridLayout* geoEastLayout = new QGridLayout(geoEastPage);
     configureFormGrid(geoEastLayout);
     geoEastLayout->setContentsMargins(0, 0, 0, 0);
-    geoEastGridCombo_ = new QComboBox(geoEastPage);
+    auto* guidedGeoEastGridCombo = new GuidedCatalogComboBox(geoEastPage);
+    geoEastGridCombo_ = guidedGeoEastGridCombo;
     geoEastGridCombo_->setEditable(true);
     if (!envValue("FPT_GEOEAST_GRID").isEmpty()) {
         geoEastGridCombo_->addItem(envValue("FPT_GEOEAST_GRID"));
         geoEastGridCombo_->setCurrentText(envValue("FPT_GEOEAST_GRID"));
     }
     if (geoEastGridCombo_->lineEdit()) {
-        geoEastGridCombo_->lineEdit()->setPlaceholderText(QString::fromUtf8("点击刷新网格或输入 GeoEast 网格名"));
+        geoEastGridCombo_->lineEdit()->setPlaceholderText(QString::fromUtf8("请先配置项目并刷新网格"));
     }
+    guidedGeoEastGridCombo->setBeforePopupHandler([this]() {
+        if ((geoEastGridCombo_ && geoEastGridCombo_->count() > 0) ||
+            (geoEastGridCombo_ && !geoEastGridCombo_->currentText().trimmed().isEmpty())) {
+            return false;
+        }
+        QTimer::singleShot(0, this, [this]() {
+            if (process_->state() != QProcess::NotRunning) {
+                updateStatus(uiText(QString::fromUtf8("正在读取数据库，请稍候")));
+                return;
+            }
+            if (!ensureGeoEastConfigReady(uiText(QString::fromUtf8("选择输入网格")), false, false)) {
+                return;
+            }
+            updateStatus(uiText(QString::fromUtf8("输入网格列表为空，正在自动刷新...")));
+            refreshGeoEastGrids();
+        });
+        return true;
+    });
     addRow(geoEastLayout, 0, QString::fromUtf8("输入网格"), geoEastGridCombo_, geoEastPage);
     QWidget* geoEastActionRow = new QWidget(geoEastPage);
     QHBoxLayout* geoEastActionLayout = new QHBoxLayout(geoEastActionRow);
@@ -1175,7 +1375,7 @@ void FaultPolyTraceWindow::buildUi() {
     connect(geoEastConfigButton_, &QPushButton::clicked, this, &FaultPolyTraceWindow::showGeoEastConfigDialog);
     connect(geoEastDeleteButton_, &QPushButton::clicked, this, &FaultPolyTraceWindow::deleteGeoEastResult);
     sourceStack_->addWidget(geoEastPage);
-    dataLayout->addWidget(sourceStack_, 1, 0, 1, 2);
+    dataLayout->addWidget(sourceStack_, 2, 0, 1, 2);
 
     geoEastRunnerEdit_ = new QLineEdit(geoEastRunnerPath(), dataBox);
     geoEastRootEdit_ = new QLineEdit(defaultGeoEastRoot(), dataBox);
@@ -1189,6 +1389,19 @@ void FaultPolyTraceWindow::buildUi() {
     userEdit_->setPlaceholderText(QString::fromUtf8("GeoEast 登录用户名"));
     passwordEdit_ = new QLineEdit(dataBox);
     passwordEdit_->setEchoMode(QLineEdit::Password);
+    for (QLineEdit* internalConfigEdit : {
+             geoEastRunnerEdit_,
+             geoEastRootEdit_,
+             geoEastDataRootEdit_,
+             pgHostEdit_,
+             pgPortEdit_,
+             databaseEdit_,
+             projectEdit_,
+             userEdit_,
+             passwordEdit_
+         }) {
+        internalConfigEdit->hide();
+    }
 
     outputDirEdit_ = new QLineEdit(dataBox);
     outputDirEdit_->setToolTip(QString::fromUtf8("结果文件输出目录"));
@@ -1201,12 +1414,12 @@ void FaultPolyTraceWindow::buildUi() {
     outputRowLayout->setSpacing(6);
     outputRowLayout->addWidget(outputDirEdit_, 1);
     outputRowLayout->addWidget(outputButton);
-    addRow(dataLayout, 2, QString::fromUtf8("输出目录"), outputRow, dataBox);
+    addRow(dataLayout, 3, QString::fromUtf8("输出目录"), outputRow, dataBox);
     outputNameEdit_ = new QLineEdit("FaultPolyTrace_Result", dataBox);
-    addRow(dataLayout, 3, QString::fromUtf8("输出名称"), outputNameEdit_, dataBox);
+    addRow(dataLayout, 4, QString::fromUtf8("输出名称"), outputNameEdit_, dataBox);
     viewModeCombo_ = new QComboBox(dataBox);
     viewModeCombo_->addItems({QString::fromUtf8("任务预览"), QString::fromUtf8("叠加结果"), QString::fromUtf8("原始网格"), QString::fromUtf8("结果多边形")});
-    addRow(dataLayout, 4, QString::fromUtf8("视图内容"), viewModeCombo_, dataBox);
+    addRow(dataLayout, 5, QString::fromUtf8("视图内容"), viewModeCombo_, dataBox);
     sidebarLayout->addWidget(dataBox);
 
     QGroupBox* styleBox = new QGroupBox(QString::fromUtf8("显示样式"), sidebarContent);
@@ -1256,18 +1469,71 @@ void FaultPolyTraceWindow::buildUi() {
     resultPathLabel_->setTextInteractionFlags(Qt::TextSelectableByMouse);
     resultLayout->addWidget(resultSummaryLabel_, 0, 0, 1, 3);
     resultLayout->addWidget(resultPathLabel_, 1, 0, 1, 3);
+    auto* guidedResultCombo = new GuidedCatalogComboBox(resultBox);
+    resultCatalogCombo_ = guidedResultCombo;
+    resultCatalogCombo_->setEditable(false);
+    resultCatalogCombo_->addItem(QString::fromUtf8("请先运行追踪或刷新已有结果"), QString());
+    resultCatalogCombo_->setToolTip(QString::fromUtf8("列出可用于查看或管理的已有结果。外部文件模式读取输出目录，GeoEast 模式读取当前项目中的结果多边形对象。"));
+    guidedResultCombo->setBeforePopupHandler([this]() {
+        bool hasAvailableResult = false;
+        if (resultCatalogCombo_) {
+            for (int i = 0; i < resultCatalogCombo_->count(); ++i) {
+                if (!resultCatalogCombo_->itemData(i).toString().trimmed().isEmpty()) {
+                    hasAvailableResult = true;
+                    break;
+                }
+            }
+        }
+        if (hasAvailableResult) {
+            return false;
+        }
+        QTimer::singleShot(0, this, [this]() {
+            if (process_->state() != QProcess::NotRunning) {
+                updateStatus(uiText(QString::fromUtf8("任务运行中，请稍候")));
+                return;
+            }
+            if (isGeoEastMode()) {
+                if (!ensureGeoEastConfigReady(uiText(QString::fromUtf8("选择已有结果")), false, false)) {
+                    return;
+                }
+                updateStatus(uiText(QString::fromUtf8("已有结果列表为空，正在自动刷新...")));
+                refreshAvailableResults();
+                return;
+            }
+
+            refreshAvailableResults();
+            if (!resultCatalogCombo_ || resultCatalogCombo_->currentData().toString().trimmed().isEmpty()) {
+                QMessageBox::information(
+                    this,
+                    uiText(QString::fromUtf8("暂无可查看结果")),
+                    uiText(QString::fromUtf8("当前输出目录中没有可查看的结果 CSV。\n\n"
+                                             "请先选择输入数据并完成一次追踪，或检查“输出目录”后点击【刷新结果】。")));
+                updateStatus(uiText(QString::fromUtf8("当前输出目录暂无结果，请先运行追踪或检查输出目录")));
+            }
+        });
+        return true;
+    });
+    refreshResultsButton_ = new QPushButton(QString::fromUtf8("刷新结果"), resultBox);
+    refreshResultsButton_->setToolTip(QString::fromUtf8("刷新已有结果列表"));
+    loadSelectedResultButton_ = new QPushButton(QString::fromUtf8("载入结果"), resultBox);
+    loadSelectedResultButton_->setToolTip(QString::fromUtf8("载入当前选择的已有结果；GeoEast 数据库对象会同步为当前输出名称"));
+    resultLayout->addWidget(resultCatalogCombo_, 2, 0);
+    resultLayout->addWidget(refreshResultsButton_, 2, 1);
+    resultLayout->addWidget(loadSelectedResultButton_, 2, 2);
     showOverlayButton_ = new QPushButton(QString::fromUtf8("查看叠加"), resultBox);
     openCsvButton_ = new QPushButton(QString::fromUtf8("打开CSV"), resultBox);
     openGeoJsonButton_ = new QPushButton(QString::fromUtf8("GeoJSON"), resultBox);
     openDiagnosticsButton_ = new QPushButton(QString::fromUtf8("诊断JSON"), resultBox);
     openOutputDirButton_ = new QPushButton(QString::fromUtf8("输出目录"), resultBox);
     exportPngButton_ = new QPushButton(QString::fromUtf8("导出PNG"), resultBox);
-    resultLayout->addWidget(showOverlayButton_, 2, 0);
-    resultLayout->addWidget(openCsvButton_, 2, 1);
-    resultLayout->addWidget(openGeoJsonButton_, 2, 2);
-    resultLayout->addWidget(openDiagnosticsButton_, 3, 0);
-    resultLayout->addWidget(openOutputDirButton_, 3, 1);
-    resultLayout->addWidget(exportPngButton_, 3, 2);
+    resultLayout->addWidget(showOverlayButton_, 3, 0);
+    resultLayout->addWidget(openCsvButton_, 3, 1);
+    resultLayout->addWidget(openGeoJsonButton_, 3, 2);
+    resultLayout->addWidget(openDiagnosticsButton_, 4, 0);
+    resultLayout->addWidget(openOutputDirButton_, 4, 1);
+    resultLayout->addWidget(exportPngButton_, 4, 2);
+    connect(refreshResultsButton_, &QPushButton::clicked, this, &FaultPolyTraceWindow::refreshAvailableResults);
+    connect(loadSelectedResultButton_, &QPushButton::clicked, this, &FaultPolyTraceWindow::loadSelectedResult);
     connect(showOverlayButton_, &QPushButton::clicked, this, &FaultPolyTraceWindow::showOverlayResult);
     connect(openCsvButton_, &QPushButton::clicked, this, &FaultPolyTraceWindow::openResultCsv);
     connect(openGeoJsonButton_, &QPushButton::clicked, this, &FaultPolyTraceWindow::openResultGeoJson);
@@ -1508,9 +1774,9 @@ void FaultPolyTraceWindow::buildUi() {
     viewStripLayout->setContentsMargins(0, 0, 0, 0);
     viewStripLayout->setSpacing(0);
     view_ = new AttributeView(right);
-    ColorBarWidget* colorBar = new ColorBarWidget(viewStrip);
+    colorBarWidget_ = new ColorBarWidget(viewStrip);
     viewStripLayout->addWidget(view_, 1);
-    viewStripLayout->addWidget(colorBar);
+    viewStripLayout->addWidget(colorBarWidget_);
     QWidget* logPanel = new QWidget(right);
     QVBoxLayout* logLayout = new QVBoxLayout(logPanel);
     logLayout->setContentsMargins(0, 0, 0, 0);
@@ -1525,8 +1791,17 @@ void FaultPolyTraceWindow::buildUi() {
     logLayout->addWidget(logEdit_);
     rightLayout->addWidget(viewStrip, 1);
     rightLayout->addWidget(logPanel);
-    rootLayout->addWidget(leftPane);
-    rootLayout->addWidget(right, 1);
+    right->setMinimumWidth(540);
+    mainSplitter_ = new QSplitter(Qt::Horizontal, root);
+    mainSplitter_->setObjectName("mainSplitter");
+    mainSplitter_->setChildrenCollapsible(false);
+    mainSplitter_->setHandleWidth(5);
+    mainSplitter_->addWidget(leftPane);
+    mainSplitter_->addWidget(right);
+    mainSplitter_->setStretchFactor(0, 0);
+    mainSplitter_->setStretchFactor(1, 1);
+    mainSplitter_->setSizes({420, 860});
+    rootLayout->addWidget(mainSplitter_, 1);
     setCentralWidget(root);
 
     statusLabel_ = new QLabel(QString::fromUtf8("就绪"), this);
@@ -1579,11 +1854,14 @@ void FaultPolyTraceWindow::buildUi() {
     connect(showPolygonLayerCheck_, &QCheckBox::toggled, this, &FaultPolyTraceWindow::updateLayerVisibility);
     connect(presetCombo_, &QComboBox::currentTextChanged, this, &FaultPolyTraceWindow::applyPreset);
     connect(inputEdit_, &QLineEdit::textChanged, this, &FaultPolyTraceWindow::updateTaskPreview);
+    connect(inputEdit_, &QLineEdit::textChanged, this, &FaultPolyTraceWindow::clearResultStateForNewInput);
     connect(outputDirEdit_, &QLineEdit::textChanged, this, &FaultPolyTraceWindow::updateTaskPreview);
     connect(outputNameEdit_, &QLineEdit::textChanged, this, &FaultPolyTraceWindow::updateTaskPreview);
     connect(outputDirEdit_, &QLineEdit::textChanged, this, &FaultPolyTraceWindow::updateResultPanel);
     connect(outputNameEdit_, &QLineEdit::textChanged, this, &FaultPolyTraceWindow::updateResultPanel);
+    connect(outputDirEdit_, &QLineEdit::editingFinished, this, &FaultPolyTraceWindow::refreshAvailableResults);
     connect(inputFormatCombo_, &QComboBox::currentTextChanged, this, &FaultPolyTraceWindow::updateTaskPreview);
+    connect(inputFormatCombo_, &QComboBox::currentTextChanged, this, &FaultPolyTraceWindow::clearResultStateForNewInput);
     connect(presetCombo_, &QComboBox::currentTextChanged, this, &FaultPolyTraceWindow::updateTaskPreview);
     connect(traceModeCombo_, &QComboBox::currentTextChanged, this, &FaultPolyTraceWindow::updateTaskPreview);
     connect(thresholdModeCombo_, &QComboBox::currentTextChanged, this, &FaultPolyTraceWindow::updateTaskPreview);
@@ -1944,7 +2222,11 @@ void FaultPolyTraceWindow::startProcess(ProcessTask task, const QString& runner,
     updateStatus(statusText);
     elapsedLabel_->setText(uiText(QString::fromUtf8("耗时: 计算中")));
     QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
-    if (task == ProcessTask::GeoEastTrace || task == ProcessTask::RefreshGeoEastGrids || task == ProcessTask::DeleteGeoEastResult) {
+    if (task == ProcessTask::GeoEastTrace ||
+        task == ProcessTask::RefreshGeoEastGrids ||
+        task == ProcessTask::RefreshGeoEastResults ||
+        task == ProcessTask::ExportGeoEastResult ||
+        task == ProcessTask::DeleteGeoEastResult) {
         configureGeoEastEnvironment(environment);
     }
     process_->setProcessEnvironment(environment);
@@ -2014,6 +2296,7 @@ void FaultPolyTraceWindow::retranslateUi() {
     fpt_ui::refreshComboItems(sourceModeCombo_, languageCode());
     fpt_ui::refreshComboItems(viewModeCombo_, languageCode());
     fpt_ui::refreshComboItems(presetCombo_, languageCode());
+    fpt_ui::refreshComboItems(resultCatalogCombo_, languageCode());
     if (languageChineseAction_) {
         languageChineseAction_->setText(uiText("简体中文"));
         languageChineseAction_->setChecked(currentLanguage_ == UiLanguage::SimplifiedChinese);
@@ -2028,8 +2311,22 @@ void FaultPolyTraceWindow::retranslateUi() {
     if (view_) {
         view_->setLanguage(currentLanguage_);
     }
+    if (colorBarWidget_) {
+        static_cast<ColorBarWidget*>(colorBarWidget_)->setLanguage(currentLanguage_);
+    }
+    if (logEdit_ && !logEdit_->toPlainText().isEmpty()) {
+        QStringList translatedLines;
+        for (const QString& line : logEdit_->toPlainText().split('\n')) {
+            translatedLines << uiText(line);
+        }
+        logEdit_->setPlainText(translatedLines.join('\n'));
+        logEdit_->moveCursor(QTextCursor::End);
+    }
     updateTaskPreview();
     updateResultPanel();
+    if (!isGeoEastMode()) {
+        refreshAvailableResults();
+    }
 }
 
 void FaultPolyTraceWindow::loadSettings() {
@@ -2039,8 +2336,13 @@ void FaultPolyTraceWindow::loadSettings() {
         ? UiLanguage::English
         : UiLanguage::SimplifiedChinese;
     setComboByKey(sourceModeCombo_, settings.value("sourceMode", comboKey(sourceModeCombo_)).toString());
-    const QString savedInput = settingOrCurrent(settings, "input", defaultInputPath(), schemaVersion);
-    inputEdit_->setText(QFileInfo::exists(savedInput) ? savedInput : defaultInputPath());
+    const QString savedInput = settingOrCurrent(settings, "input", QString(), schemaVersion);
+    const QString bundledSampleInput = defaultInputPath();
+    const bool legacySampleInput = schemaVersion < 3 &&
+        !savedInput.isEmpty() &&
+        !bundledSampleInput.isEmpty() &&
+        QFileInfo(savedInput).absoluteFilePath().compare(QFileInfo(bundledSampleInput).absoluteFilePath(), Qt::CaseInsensitive) == 0;
+    inputEdit_->setText(!legacySampleInput && QFileInfo::exists(savedInput) ? savedInput : QString());
     outputDirEdit_->setText(settings.value("outputDir", defaultOutputDir()).toString());
     outputNameEdit_->setText(settings.value("outputName", outputNameEdit_->text()).toString());
     inputFormatCombo_->setCurrentText(settings.value("inputFormat", "auto").toString());
@@ -2096,10 +2398,28 @@ void FaultPolyTraceWindow::loadSettings() {
     passwordEdit_->setText(settings.value("password", QString()).toString());
     geoEastGridCombo_->setCurrentText(settingOrCurrent(settings, "geoEastGrid", geoEastGridCombo_->currentText(), schemaVersion));
     lastOutputCsv_ = settings.value("lastOutputCsv").toString();
+    lastGeoEastOutput_ = settings.value("lastGeoEastOutput").toString();
+    if (!isGeoEastMode() && (inputEdit_->text().trimmed().isEmpty() || !QFileInfo::exists(lastOutputCsv_))) {
+        lastOutputCsv_.clear();
+    }
+    if (lastOutputCsv_.isEmpty()) {
+        if (inputEdit_->text().trimmed().isEmpty()) {
+            setComboByKey(viewModeCombo_, QString::fromUtf8("任务预览"));
+        } else if (comboKey(viewModeCombo_) == QString::fromUtf8("叠加结果") ||
+                   comboKey(viewModeCombo_) == QString::fromUtf8("结果多边形")) {
+            setComboByKey(viewModeCombo_, QString::fromUtf8("原始网格"));
+        }
+    }
     inputEdit_->setCursorPosition(0);
     outputDirEdit_->setCursorPosition(0);
     inputEdit_->setToolTip(inputEdit_->text());
     outputDirEdit_->setToolTip(outputDirEdit_->text());
+    if (mainSplitter_) {
+        const QByteArray splitterState = settings.value("mainSplitterState").toByteArray();
+        if (!splitterState.isEmpty()) {
+            mainSplitter_->restoreState(splitterState);
+        }
+    }
     updateOptionControls();
     updateDataSourceMode();
     retranslateUi();
@@ -2107,7 +2427,7 @@ void FaultPolyTraceWindow::loadSettings() {
 
 void FaultPolyTraceWindow::saveSettings() const {
     QSettings settings(settingsPath(), QSettings::IniFormat);
-    settings.setValue("configSchemaVersion", 2);
+    settings.setValue("configSchemaVersion", 3);
     settings.setValue("language", languageCode());
     settings.setValue("sourceMode", comboKey(sourceModeCombo_));
     settings.setValue("input", inputEdit_->text());
@@ -2155,6 +2475,9 @@ void FaultPolyTraceWindow::saveSettings() const {
     settings.setValue("color", colorEdit_->text());
     settings.setValue("lineWidth", lineWidthSpin_->value());
     settings.setValue("alpha", alphaSpin_->value());
+    if (mainSplitter_) {
+        settings.setValue("mainSplitterState", mainSplitter_->saveState());
+    }
     settings.setValue("geoEastRunner", geoEastRunnerEdit_->text());
     settings.setValue("geoEastRoot", geoEastRootEdit_->text());
     settings.setValue("geoEastDataRoot", geoEastDataRootEdit_->text());
@@ -2166,6 +2489,7 @@ void FaultPolyTraceWindow::saveSettings() const {
     settings.setValue("password", passwordEdit_->text());
     settings.setValue("geoEastGrid", geoEastGridCombo_->currentText());
     settings.setValue("lastOutputCsv", lastOutputCsv_);
+    settings.setValue("lastGeoEastOutput", lastGeoEastOutput_);
 }
 
 void FaultPolyTraceWindow::updateTaskPreview() {
@@ -2282,6 +2606,7 @@ void FaultPolyTraceWindow::browseInput() {
     if (!path.isEmpty()) {
         inputEdit_->setText(QDir::toNativeSeparators(path));
         refreshInputPreview();
+        refreshAvailableResults();
     }
 }
 
@@ -2325,13 +2650,93 @@ void FaultPolyTraceWindow::updateDataSourceMode() {
 void FaultPolyTraceWindow::showGeoEastConfigDialog() {
     QDialog dialog(this);
     dialog.setWindowTitle(QString::fromUtf8("GeoEast 数据库与环境配置"));
-    dialog.resize(720, 330);
+    dialog.setWindowFlags((dialog.windowFlags() | Qt::WindowMinimizeButtonHint | Qt::WindowCloseButtonHint) &
+                          ~Qt::WindowMaximizeButtonHint &
+                          ~Qt::WindowContextHelpButtonHint);
+    dialog.resize(680, 350);
+    dialog.setMinimumSize(660, 340);
+    dialog.setStyleSheet(QString::fromUtf8(R"(
+        QDialog {
+            background: #F0F0F0;
+            color: #222222;
+            font-family: "Microsoft YaHei", "Segoe UI", Tahoma, sans-serif;
+            font-size: 12px;
+        }
+        QLabel#dialogHeader {
+            background: #005A9E;
+            color: white;
+            font-weight: bold;
+            padding-left: 16px;
+        }
+        QLabel#checkStatus {
+            color: #555555;
+            padding: 2px 0;
+        }
+        QLineEdit {
+            background: #FFFFFF;
+            border: 1px solid #A0A0A0;
+            border-radius: 2px;
+            min-height: 22px;
+            padding: 1px 5px;
+        }
+        QLineEdit:focus {
+            border-color: #0078D7;
+        }
+        QPushButton {
+            background: #E1E1E1;
+            border: 1px solid #A0A0A0;
+            border-radius: 2px;
+            min-height: 24px;
+            padding: 2px 12px;
+        }
+        QPushButton:hover {
+            background: #E5F1FB;
+            border-color: #0078D7;
+        }
+        QPushButton#primaryButton {
+            background: #0078D7;
+            border-color: #005A9E;
+            color: white;
+            font-weight: bold;
+        }
+        QPushButton#primaryButton:hover {
+            background: #106EBE;
+        }
+        QFrame#line {
+            background: #D0D0D0;
+            min-height: 1px;
+            max-height: 1px;
+        }
+    )"));
 
     QVBoxLayout* root = new QVBoxLayout(&dialog);
+    root->setContentsMargins(0, 0, 0, 0);
+    root->setSpacing(0);
+
+    QFrame* headerFrame = new QFrame(&dialog);
+    headerFrame->setObjectName("dialogHeader");
+    headerFrame->setStyleSheet("QFrame#dialogHeader { background: #005A9E; }");
+    QHBoxLayout* headerLayout = new QHBoxLayout(headerFrame);
+    headerLayout->setContentsMargins(0, 0, 10, 0);
+    QLabel* header = new QLabel(QString::fromUtf8("GeoEast 连接配置"), headerFrame);
+    header->setObjectName("dialogHeader");
+    header->setFixedHeight(36);
+    QPushButton* helpButton = new QPushButton(QString::fromUtf8("帮助"), headerFrame);
+    helpButton->setToolTip(QString::fromUtf8("查看每个配置项从哪里获取"));
+    helpButton->setFixedWidth(64);
+    headerLayout->addWidget(header, 1);
+    headerLayout->addWidget(helpButton);
+    root->addWidget(headerFrame);
+
+    QWidget* body = new QWidget(&dialog);
+    QVBoxLayout* bodyRoot = new QVBoxLayout(body);
+    bodyRoot->setContentsMargins(16, 14, 16, 12);
+    bodyRoot->setSpacing(10);
+
     QGridLayout* form = new QGridLayout();
     form->setHorizontalSpacing(8);
     form->setVerticalSpacing(8);
-    root->addLayout(form);
+    bodyRoot->addLayout(form);
 
     auto addPathRow = [&](int row, const QString& label, QLineEdit* source, bool directory) {
         QLineEdit* edit = new QLineEdit(source->text(), &dialog);
@@ -2364,13 +2769,13 @@ void FaultPolyTraceWindow::showGeoEastConfigDialog() {
     QLineEdit* dataRootCopy = addPathRow(2, QString::fromUtf8("数据根目录"), geoEastDataRootEdit_, true);
 
     QFrame* line = new QFrame(&dialog);
-    line->setFrameShape(QFrame::HLine);
-    root->addWidget(line);
+    line->setObjectName("line");
+    bodyRoot->addWidget(line);
 
     QGridLayout* db = new QGridLayout();
     db->setHorizontalSpacing(8);
     db->setVerticalSpacing(8);
-    root->addLayout(db);
+    bodyRoot->addLayout(db);
 
     QLineEdit* hostCopy = new QLineEdit(pgHostEdit_->text(), &dialog);
     QLineEdit* portCopy = new QLineEdit(pgPortEdit_->text(), &dialog);
@@ -2392,16 +2797,99 @@ void FaultPolyTraceWindow::showGeoEastConfigDialog() {
     db->addWidget(userCopy, 2, 1);
     db->addWidget(formLabel(QString::fromUtf8("密码"), &dialog), 2, 2);
     db->addWidget(passwordCopy, 2, 3);
+    db->setColumnStretch(1, 1);
+    db->setColumnStretch(3, 1);
 
-    QHBoxLayout* buttons = new QHBoxLayout();
-    root->addLayout(buttons);
+    QLabel* checkStatus = new QLabel(QString::fromUtf8("尚未检查配置。"), &dialog);
+    checkStatus->setObjectName("checkStatus");
+    bodyRoot->addWidget(checkStatus);
+    root->addWidget(body, 1);
+
+    QFrame* footer = new QFrame(&dialog);
+    footer->setStyleSheet("QFrame { background: #EAEAEA; border-top: 1px solid #C0C0C0; }");
+    QHBoxLayout* buttons = new QHBoxLayout(footer);
+    buttons->setContentsMargins(16, 10, 16, 10);
+    QPushButton* autoDetect = new QPushButton(QString::fromUtf8("自动检测"), footer);
+    QPushButton* check = new QPushButton(QString::fromUtf8("检查配置"), footer);
     buttons->addStretch(1);
-    QPushButton* cancel = new QPushButton(QString::fromUtf8("取消"), &dialog);
-    QPushButton* ok = new QPushButton(QString::fromUtf8("应用并保存配置"), &dialog);
+    QPushButton* cancel = new QPushButton(QString::fromUtf8("取消"), footer);
+    QPushButton* ok = new QPushButton(QString::fromUtf8("应用并保存配置"), footer);
+    ok->setObjectName("primaryButton");
+    buttons->insertWidget(0, autoDetect);
+    buttons->insertWidget(1, check);
     buttons->addWidget(cancel);
     buttons->addWidget(ok);
+    root->addWidget(footer);
+
+    auto applyAutoDetection = [&]() {
+        const QString rootPath = defaultGeoEastRoot();
+        const QString dataRootPath = detectGeoEastDataRoot(rootPath);
+        const QString runnerPath = geoEastRunnerPath();
+        if (!runnerPath.isEmpty()) {
+            runnerCopy->setText(runnerPath);
+        }
+        if (!rootPath.isEmpty()) {
+            rootCopy->setText(rootPath);
+        }
+        if (!dataRootPath.isEmpty()) {
+            dataRootCopy->setText(dataRootPath);
+        }
+        if (hostCopy->text().trimmed().isEmpty()) {
+            hostCopy->setText("127.0.0.1");
+        }
+        if (portCopy->text().trimmed().isEmpty()) {
+            portCopy->setText("5433");
+        }
+        if (databaseCopy->text().trimmed().isEmpty() || databaseCopy->text().trimmed() == "ndp") {
+            databaseCopy->setText(detectGeoEastDatabaseName(dataRootCopy->text()));
+        }
+        if (userCopy->text().trimmed().isEmpty()) {
+            userCopy->setText(defaultUserName());
+        }
+        checkStatus->setText(QString::fromUtf8("已执行自动检测。项目名无法安全推断，请按当前 GeoEast 项目填写后再检查配置。"));
+    };
+
+    auto currentIssues = [&]() {
+        return validateGeoEastConfigValues(runnerCopy->text(), rootCopy->text(), dataRootCopy->text(),
+                                           hostCopy->text(), portCopy->text(), databaseCopy->text(),
+                                           projectCopy->text(), userCopy->text());
+    };
+
+    auto showCheckResult = [&]() -> bool {
+        const QStringList issues = currentIssues();
+        if (issues.isEmpty()) {
+            checkStatus->setText(QString::fromUtf8("配置检查通过。可以刷新网格列表。"));
+            QMessageBox::information(&dialog, QString::fromUtf8("配置检查通过"),
+                                     QString::fromUtf8("GeoEast 数据库配置项完整。保存后可返回主界面刷新网格列表。"));
+            return true;
+        }
+        checkStatus->setText(QString::fromUtf8("配置仍有 %1 项需要处理。").arg(issues.size()));
+        QMessageBox::warning(&dialog, QString::fromUtf8("配置需要补充"),
+                             QString::fromUtf8("请处理以下项目：\n\n- %1").arg(issues.join(QString::fromUtf8("\n- "))));
+        return false;
+    };
+
+    connect(helpButton, &QPushButton::clicked, &dialog, [&]() {
+        QMessageBox::information(&dialog, QString::fromUtf8("GeoEast 配置帮助"), geoEastConfigHelpText());
+    });
+    connect(autoDetect, &QPushButton::clicked, &dialog, applyAutoDetection);
+    connect(check, &QPushButton::clicked, &dialog, showCheckResult);
     connect(cancel, &QPushButton::clicked, &dialog, &QDialog::reject);
     connect(ok, &QPushButton::clicked, &dialog, [&]() {
+        const QStringList issues = currentIssues();
+        if (!issues.isEmpty()) {
+            const int choice = QMessageBox::warning(
+                &dialog,
+                QString::fromUtf8("配置尚未完整"),
+                QString::fromUtf8("以下配置可能导致刷新网格或写库失败：\n\n- %1\n\n建议返回修改。是否仍然保存？")
+                    .arg(issues.join(QString::fromUtf8("\n- "))),
+                QMessageBox::Save | QMessageBox::Cancel,
+                QMessageBox::Cancel);
+            if (choice != QMessageBox::Save) {
+                checkStatus->setText(QString::fromUtf8("配置未保存，请补齐后再应用。"));
+                return;
+            }
+        }
         geoEastRunnerEdit_->setText(runnerCopy->text());
         geoEastRootEdit_->setText(rootCopy->text());
         geoEastDataRootEdit_->setText(dataRootCopy->text());
@@ -2415,6 +2903,10 @@ void FaultPolyTraceWindow::showGeoEastConfigDialog() {
         updateTaskPreview();
         updateStatus(QString::fromUtf8("GeoEast 数据库配置已保存"));
         dialog.accept();
+        if (isGeoEastMode() && process_->state() == QProcess::NotRunning) {
+            refreshResultsAfterGrids_ = true;
+            QTimer::singleShot(0, this, &FaultPolyTraceWindow::refreshGeoEastGrids);
+        }
     });
 
     dialog.exec();
@@ -2503,6 +2995,131 @@ void FaultPolyTraceWindow::refreshGeoEastGrids() {
     startProcess(ProcessTask::RefreshGeoEastGrids, runner, args, QString::fromUtf8("正在刷新 GeoEast 网格列表..."));
 }
 
+QStringList FaultPolyTraceWindow::localResultCandidates() const {
+    QString dir = outputDirEdit_ ? outputDirEdit_->text().trimmed() : QString();
+    if (dir.isEmpty()) {
+        dir = defaultOutputDir();
+    }
+
+    QStringList candidates;
+    const QString expected = outputCsvPath();
+    if (QFileInfo::exists(expected)) {
+        candidates << QFileInfo(expected).absoluteFilePath();
+    }
+
+    QDir outputDir(dir);
+    const QFileInfoList files = outputDir.entryInfoList(QStringList() << "*.csv", QDir::Files, QDir::Time);
+    for (const QFileInfo& file : files) {
+        const QString path = file.absoluteFilePath();
+        if (!candidates.contains(path, Qt::CaseInsensitive)) {
+            candidates << path;
+        }
+    }
+
+    return candidates;
+}
+
+void FaultPolyTraceWindow::refreshAvailableResults() {
+    if (!resultCatalogCombo_) {
+        return;
+    }
+    if (process_->state() != QProcess::NotRunning) {
+        updateStatus(QString::fromUtf8("任务运行中，暂不能刷新已有结果"));
+        return;
+    }
+
+    if (isGeoEastMode()) {
+        saveSettings();
+        if (!ensureGeoEastConfigReady(QString::fromUtf8("刷新已有结果"), false, false)) {
+            return;
+        }
+        const QString runner = geoEastRunnerEdit_->text().trimmed();
+        QStringList args = geoEastConnectionArgs();
+        args << "--list-fault-polygons";
+        startProcess(ProcessTask::RefreshGeoEastResults, runner, args, QString::fromUtf8("正在刷新 GeoEast 结果列表..."));
+        return;
+    }
+
+    const QString currentPath = resultCatalogCombo_->currentData().toString();
+    resultCatalogCombo_->clear();
+    const QStringList candidates = localResultCandidates();
+    for (const QString& path : candidates) {
+        resultCatalogCombo_->addItem(QFileInfo(path).fileName(), path);
+    }
+    if (resultCatalogCombo_->count() == 0) {
+        resultCatalogCombo_->addItem(QString::fromUtf8("输出目录暂无结果；点击此处查看引导"), QString());
+        resultCatalogCombo_->setEnabled(true);
+        if (loadSelectedResultButton_) {
+            loadSelectedResultButton_->setEnabled(false);
+        }
+    } else {
+        resultCatalogCombo_->setEnabled(true);
+        if (loadSelectedResultButton_) {
+            loadSelectedResultButton_->setEnabled(true);
+        }
+        const int index = resultCatalogCombo_->findData(currentPath);
+        if (index >= 0) {
+            resultCatalogCombo_->setCurrentIndex(index);
+        }
+    }
+    updateStatus(QString::fromUtf8("已刷新输出目录结果，共 %1 个").arg(candidates.size()));
+    updateResultPanel();
+}
+
+void FaultPolyTraceWindow::loadSelectedResult() {
+    if (!resultCatalogCombo_) {
+        return;
+    }
+    const QString selectedData = resultCatalogCombo_->currentData().toString();
+    const QString selectedText = resultCatalogCombo_->currentText().trimmed();
+    if (selectedText.isEmpty() || selectedData.isEmpty()) {
+        QMessageBox::information(this,
+                                 QString::fromUtf8("没有可载入的结果"),
+                                 QString::fromUtf8("请先运行追踪，或点击【刷新结果】读取输出目录/GeoEast 数据库中的已有结果。"));
+        return;
+    }
+
+    if (isGeoEastMode()) {
+        if (process_->state() != QProcess::NotRunning) {
+            updateStatus(QString::fromUtf8("任务运行中，暂不能载入 GeoEast 历史结果"));
+            return;
+        }
+        if (!ensureGeoEastConfigReady(QString::fromUtf8("载入已有结果"), false, false)) {
+            return;
+        }
+        outputNameEdit_->setText(selectedData);
+        lastGeoEastOutput_ = selectedData;
+        saveSettings();
+        const QString runner = geoEastRunnerEdit_->text().trimmed();
+        QStringList args = geoEastConnectionArgs();
+        args << "--output" << selectedData
+             << "--export-fault-polygons-output" << outputCsvPath();
+        startProcess(ProcessTask::ExportGeoEastResult, runner, args, QString::fromUtf8("正在导出 GeoEast 历史结果..."));
+        return;
+    }
+
+    if (!QFileInfo::exists(selectedData)) {
+        QMessageBox::warning(this, QString::fromUtf8("结果文件不存在"), QDir::toNativeSeparators(selectedData));
+        refreshAvailableResults();
+        return;
+    }
+    lastOutputCsv_ = selectedData;
+    const QFileInfo file(selectedData);
+    outputDirEdit_->setText(file.absolutePath());
+    outputNameEdit_->setText(file.completeBaseName());
+    if (inputEdit_->text().trimmed().isEmpty()) {
+        view_->clearData(QString::fromUtf8("已载入结果多边形；如需叠加，请再选择对应原始网格"));
+        refreshResultPreview();
+        setComboByKey(viewModeCombo_, QString::fromUtf8("结果多边形"));
+    } else {
+        refreshInputPreview();
+        refreshResultPreview();
+        setComboByKey(viewModeCombo_, QString::fromUtf8("叠加结果"));
+    }
+    updateStatus(QString::fromUtf8("已载入已有结果：%1").arg(file.fileName()));
+    updateResultPanel();
+}
+
 void FaultPolyTraceWindow::deleteGeoEastResult() {
     if (process_->state() != QProcess::NotRunning) {
         return;
@@ -2533,13 +3150,23 @@ void FaultPolyTraceWindow::refreshInputPreview() {
         return;
     }
     if (inputEdit_->text().trimmed().isEmpty() || !QFileInfo::exists(inputEdit_->text().trimmed())) {
+        view_->clearData(QString::fromUtf8("请选择输入文件"));
+        setComboByKey(viewModeCombo_, QString::fromUtf8("任务预览"));
         updateStatus(QString::fromUtf8("请选择输入文件"));
+        updateResultPanel();
         return;
     }
     QString error;
     if (view_->loadGrid(inputEdit_->text().trimmed(), inputFormatCombo_->currentText(), &error)) {
-        updateStatus(QString::fromUtf8("原始网格已载入"));
-        refreshResultPreview();
+        view_->clearPolygons(QString::fromUtf8("已载入原始网格，尚未运行追踪"));
+        if (lastOutputCsv_.isEmpty() &&
+            (comboKey(viewModeCombo_) == QString::fromUtf8("叠加结果") ||
+             comboKey(viewModeCombo_) == QString::fromUtf8("结果多边形") ||
+             comboKey(viewModeCombo_) == QString::fromUtf8("任务预览"))) {
+            setComboByKey(viewModeCombo_, QString::fromUtf8("原始网格"));
+        }
+        updateResultPanel();
+        updateStatus(QString::fromUtf8("原始网格已载入，尚未运行追踪"));
     } else if (!error.isEmpty()) {
         appendLog(error);
         updateStatus(QString::fromUtf8("原始网格载入失败"));
@@ -2547,14 +3174,34 @@ void FaultPolyTraceWindow::refreshInputPreview() {
 }
 
 void FaultPolyTraceWindow::refreshResultPreview() {
-    const QString path = !lastOutputCsv_.isEmpty() && QFileInfo::exists(lastOutputCsv_) ? lastOutputCsv_ : outputCsvPath();
-    if (!QFileInfo::exists(path)) {
+    if (lastOutputCsv_.isEmpty() || !QFileInfo::exists(lastOutputCsv_)) {
         updateResultPanel();
         return;
     }
     QString error;
-    if (!view_->loadPolygons(path, &error) && !error.isEmpty()) {
+    if (!view_->loadPolygons(lastOutputCsv_, &error) && !error.isEmpty()) {
         appendLog(error);
+    }
+    updateResultPanel();
+}
+
+void FaultPolyTraceWindow::clearResultStateForNewInput() {
+    if (process_ && process_->state() != QProcess::NotRunning) {
+        return;
+    }
+    if (!lastOutputCsv_.isEmpty()) {
+        lastOutputCsv_.clear();
+    }
+    if (view_) {
+        view_->clearPolygons(inputEdit_->text().trimmed().isEmpty()
+            ? QString::fromUtf8("请选择输入文件")
+            : QString::fromUtf8("已选择输入文件，尚未运行追踪"));
+    }
+    if (inputEdit_->text().trimmed().isEmpty()) {
+        setComboByKey(viewModeCombo_, QString::fromUtf8("任务预览"));
+    } else if (comboKey(viewModeCombo_) == QString::fromUtf8("叠加结果") ||
+               comboKey(viewModeCombo_) == QString::fromUtf8("结果多边形")) {
+        setComboByKey(viewModeCombo_, QString::fromUtf8("原始网格"));
     }
     updateResultPanel();
 }
@@ -2570,6 +3217,9 @@ void FaultPolyTraceWindow::runTrace() {
         }
         const QString runner = geoEastRunnerEdit_->text().trimmed();
         lastOutputCsv_.clear();
+        if (view_) {
+            view_->clearPolygons(QString::fromUtf8("正在计算，等待结果生成"));
+        }
         updateResultPanel();
         startProcess(ProcessTask::GeoEastTrace, runner, geoEastTraceArgs(), QString::fromUtf8("正在连接 GeoEast 并追踪断层多边形..."));
         return;
@@ -2594,6 +3244,9 @@ void FaultPolyTraceWindow::runTrace() {
     }
     logEdit_->clear();
     lastOutputCsv_.clear();
+    if (view_) {
+        view_->clearPolygons(QString::fromUtf8("正在计算，等待结果生成"));
+    }
     updateResultPanel();
     saveSettings();
     startProcess(ProcessTask::ExternalTrace, runner, traceArgs(), QString::fromUtf8("正在追踪断层多边形..."));
@@ -2651,8 +3304,59 @@ void FaultPolyTraceWindow::onFinished(int exitCode, QProcess::ExitStatus status)
             }
             updateStatus(QString::fromUtf8("GeoEast 网格刷新完成，共 %1 个").arg(names.size()));
             saveSettings();
+            if (refreshResultsAfterGrids_) {
+                refreshResultsAfterGrids_ = false;
+                QTimer::singleShot(0, this, &FaultPolyTraceWindow::refreshAvailableResults);
+            }
         } else {
+            refreshResultsAfterGrids_ = false;
             updateStatus(QString::fromUtf8("GeoEast 网格刷新失败，请查看日志"));
+        }
+        updateResultPanel();
+        return;
+    }
+
+    if (finishedTask == ProcessTask::RefreshGeoEastResults) {
+        if (exitCode == 0 && status == QProcess::NormalExit) {
+            QStringList names;
+            for (const QString& rawLine : processOutput_.split('\n')) {
+                const QString line = rawLine.trimmed();
+                if (line.isEmpty() || line.startsWith("BOFaultPolygon") || line.startsWith("Total:") ||
+                    line.startsWith("load ") || line.startsWith("Env ") || line.startsWith("GeoEast ") ||
+                    line.startsWith("Connecting ") || line.startsWith(">") || line.contains(':')) {
+                    continue;
+                }
+                if (!line.contains(' ')) {
+                    names << line;
+                }
+            }
+            const QString current = resultCatalogCombo_ ? resultCatalogCombo_->currentData().toString() : QString();
+            if (resultCatalogCombo_) {
+                resultCatalogCombo_->clear();
+                for (const QString& name : names) {
+                    resultCatalogCombo_->addItem(name, name);
+                }
+                if (names.isEmpty()) {
+                    resultCatalogCombo_->addItem(QString::fromUtf8("当前项目暂无结果；点击此处重新刷新"), QString());
+                    resultCatalogCombo_->setEnabled(true);
+                    if (loadSelectedResultButton_) {
+                        loadSelectedResultButton_->setEnabled(false);
+                    }
+                } else {
+                    resultCatalogCombo_->setEnabled(true);
+                    if (loadSelectedResultButton_) {
+                        loadSelectedResultButton_->setEnabled(true);
+                    }
+                    const int index = resultCatalogCombo_->findData(current.isEmpty() ? geoEastOutputName() : current);
+                    if (index >= 0) {
+                        resultCatalogCombo_->setCurrentIndex(index);
+                    }
+                }
+            }
+            updateStatus(QString::fromUtf8("GeoEast 结果刷新完成，共 %1 个").arg(names.size()));
+            saveSettings();
+        } else {
+            updateStatus(QString::fromUtf8("GeoEast 结果刷新失败，请查看日志"));
         }
         updateResultPanel();
         return;
@@ -2662,6 +3366,10 @@ void FaultPolyTraceWindow::onFinished(int exitCode, QProcess::ExitStatus status)
         updateStatus(exitCode == 0 && status == QProcess::NormalExit
             ? QString::fromUtf8("GeoEast 结果对象已删除或原本不存在")
             : QString::fromUtf8("GeoEast 结果删除失败，请查看日志"));
+        if (exitCode == 0 && status == QProcess::NormalExit) {
+            lastGeoEastOutput_.clear();
+            refreshAvailableResults();
+        }
         updateResultPanel();
         return;
     }
@@ -2676,12 +3384,17 @@ void FaultPolyTraceWindow::onFinished(int exitCode, QProcess::ExitStatus status)
             return;
         }
         if (finishedTask == ProcessTask::GeoEastTrace) {
+            lastGeoEastOutput_ = geoEastOutputName();
+            appendLog(QString::fromUtf8("GeoEast 数据库写入对象：BOFaultPolygon/%1").arg(lastGeoEastOutput_));
             QString gridError;
             if (view_->loadGrid(outputBasePath() + ".grid.txt", "matrix", &gridError)) {
                 appendLog(QString::fromUtf8("原始网格视图文件：%1").arg(QDir::toNativeSeparators(outputBasePath() + ".grid.txt")));
             } else if (!gridError.isEmpty()) {
                 appendLog(gridError);
             }
+        } else if (finishedTask == ProcessTask::ExportGeoEastResult) {
+            lastGeoEastOutput_ = geoEastOutputName();
+            appendLog(QString::fromUtf8("GeoEast 历史结果已导出：BOFaultPolygon/%1").arg(lastGeoEastOutput_));
         }
         appendLog(QString::fromUtf8("结果 CSV：%1").arg(QDir::toNativeSeparators(lastOutputCsv_)));
         QString geoJsonPath;
@@ -2695,13 +3408,20 @@ void FaultPolyTraceWindow::onFinished(int exitCode, QProcess::ExitStatus status)
         appendLog(QString::fromUtf8("拓扑 CSV：%1").arg(QDir::toNativeSeparators(outputBasePath() + ".topology.csv")));
         appendLog(QString::fromUtf8("枝干 CSV：%1").arg(QDir::toNativeSeparators(outputBasePath() + ".branches.csv")));
         refreshResultPreview();
-        setComboByKey(viewModeCombo_, QString::fromUtf8("叠加结果"));
+        if (finishedTask == ProcessTask::ExportGeoEastResult && inputEdit_->text().trimmed().isEmpty()) {
+            setComboByKey(viewModeCombo_, QString::fromUtf8("结果多边形"));
+        } else {
+            setComboByKey(viewModeCombo_, QString::fromUtf8("叠加结果"));
+        }
         appendHistory(elapsedMs);
         saveSettings();
         updateResultPanel();
         updateStatus(finishedTask == ProcessTask::GeoEastTrace
             ? QString::fromUtf8("GeoEast 追踪完成，结果已写入数据库并显示结果视图")
-            : QString::fromUtf8("追踪完成，已切换到叠加结果"));
+            : (finishedTask == ProcessTask::ExportGeoEastResult
+                ? QString::fromUtf8("GeoEast 历史结果已导出并载入")
+                : QString::fromUtf8("追踪完成，已切换到叠加结果")));
+        refreshAvailableResults();
     } else {
         updateResultPanel();
         updateStatus(QString::fromUtf8("运行失败，请查看日志"));
@@ -2725,6 +3445,12 @@ void FaultPolyTraceWindow::setRunning(bool running) {
     }
     if (geoEastDeleteButton_) {
         geoEastDeleteButton_->setEnabled(!running && isGeoEastMode());
+    }
+    if (refreshResultsButton_) {
+        refreshResultsButton_->setEnabled(!running);
+    }
+    if (loadSelectedResultButton_) {
+        loadSelectedResultButton_->setEnabled(!running && resultCatalogCombo_ && resultCatalogCombo_->currentData().toString().size() > 0);
     }
     if (runAction_) {
         runAction_->setEnabled(!running);
@@ -2979,37 +3705,49 @@ void FaultPolyTraceWindow::applyPreset(const QString& preset) {
 }
 
 void FaultPolyTraceWindow::showOverlayResult() {
+    if (lastOutputCsv_.isEmpty() || !QFileInfo::exists(lastOutputCsv_)) {
+        QMessageBox::information(this,
+                                 uiText(QString::fromUtf8("尚未生成结果")),
+                                 uiText(QString::fromUtf8("请先选择输入文件并点击【开始追踪】。运行完成后才能查看处理后的叠加结果。")));
+        return;
+    }
     refreshResultPreview();
     setComboByKey(viewModeCombo_, QString::fromUtf8("叠加结果"));
     updateStatus(QString::fromUtf8("正在查看叠加结果"));
 }
 
 void FaultPolyTraceWindow::openResultCsv() {
-    const QString path = !lastOutputCsv_.isEmpty() ? lastOutputCsv_ : outputCsvPath();
+    const QString path = lastOutputCsv_;
     if (!QFileInfo::exists(path)) {
-        QMessageBox::warning(this, QString::fromUtf8("结果文件不存在"), path);
+        QMessageBox::warning(this,
+                             uiText(QString::fromUtf8("结果文件不存在")),
+                             uiText(QString::fromUtf8("请先完成一次追踪，或从历史记录载入已有结果。")));
         return;
     }
     QDesktopServices::openUrl(QUrl::fromLocalFile(path));
 }
 
 void FaultPolyTraceWindow::openResultGeoJson() {
-    const QString csvPath = !lastOutputCsv_.isEmpty() ? lastOutputCsv_ : outputCsvPath();
+    const QString csvPath = lastOutputCsv_;
     const QFileInfo csvInfo(csvPath);
     const QString path = csvInfo.absolutePath() + "/" + csvInfo.completeBaseName() + ".geojson";
     if (!QFileInfo::exists(path)) {
-        QMessageBox::warning(this, QString::fromUtf8("GeoJSON 不存在"), path);
+        QMessageBox::warning(this,
+                             uiText(QString::fromUtf8("GeoJSON 不存在")),
+                             uiText(QString::fromUtf8("请先完成一次追踪。GeoJSON 会在结果 CSV 生成后自动写出。")));
         return;
     }
     QDesktopServices::openUrl(QUrl::fromLocalFile(path));
 }
 
 void FaultPolyTraceWindow::openDiagnosticsJson() {
-    const QString csvPath = !lastOutputCsv_.isEmpty() ? lastOutputCsv_ : outputCsvPath();
+    const QString csvPath = lastOutputCsv_;
     const QFileInfo csvInfo(csvPath);
     const QString path = csvInfo.absolutePath() + "/" + csvInfo.completeBaseName() + ".diagnostics.json";
     if (!QFileInfo::exists(path)) {
-        QMessageBox::warning(this, QString::fromUtf8("诊断 JSON 不存在"), path);
+        QMessageBox::warning(this,
+                             uiText(QString::fromUtf8("诊断 JSON 不存在")),
+                             uiText(QString::fromUtf8("请先完成一次追踪。诊断 JSON 会随结果文件一起生成。")));
         return;
     }
     QDesktopServices::openUrl(QUrl::fromLocalFile(path));
@@ -3126,9 +3864,6 @@ void FaultPolyTraceWindow::loadTemplate() {
 }
 
 void FaultPolyTraceWindow::restoreDefaults() {
-    inputEdit_->setText(defaultInputPath());
-    outputDirEdit_->setText(defaultOutputDir());
-    outputNameEdit_->setText("FaultPolyTrace_Result");
     setComboByKey(presetCombo_, QString::fromUtf8("防黏连增强"));
     applyPreset(comboKey(presetCombo_));
     thresholdModeCombo_->setCurrentText("percentile");
@@ -3138,7 +3873,8 @@ void FaultPolyTraceWindow::restoreDefaults() {
     traceModeCombo_->setCurrentText("ridge-belt");
     updateOptionControls();
     updateTaskPreview();
-    refreshInputPreview();
+    updateResultPanel();
+    updateStatus(QString::fromUtf8("已恢复推荐算法与显示参数，输入文件和输出位置保持不变"));
 }
 
 void FaultPolyTraceWindow::appendHistory(qint64 elapsedMs) {
@@ -3212,29 +3948,47 @@ void FaultPolyTraceWindow::updateResultPanel() {
         return;
     }
 
-    const QString csvPath = !lastOutputCsv_.isEmpty() ? lastOutputCsv_ : outputCsvPath();
+    const bool hasCurrentResult = !lastOutputCsv_.trimmed().isEmpty();
+    const QString csvPath = hasCurrentResult ? lastOutputCsv_ : outputCsvPath();
     const QFileInfo csvInfo(csvPath);
     const QString base = csvInfo.absolutePath() + "/" + csvInfo.completeBaseName();
     const QString geoJsonPath = base + ".geojson";
     const QString diagnosticsPath = base + ".diagnostics.json";
-    const bool hasCsv = csvInfo.exists() && csvInfo.size() > 0;
-    const bool hasGeoJson = QFileInfo::exists(geoJsonPath);
-    const bool hasDiagnostics = QFileInfo::exists(diagnosticsPath);
+    const bool hasCsv = hasCurrentResult && csvInfo.exists() && csvInfo.size() > 0;
+    const bool hasGeoJson = hasCurrentResult && QFileInfo::exists(geoJsonPath);
+    const bool hasDiagnostics = hasCurrentResult && QFileInfo::exists(diagnosticsPath);
     const bool running = process_ && process_->state() != QProcess::NotRunning;
+    const bool hasInput = isGeoEastMode()
+        ? !geoEastGridCombo_->currentText().trimmed().isEmpty()
+        : (!inputEdit_->text().trimmed().isEmpty() && QFileInfo::exists(inputEdit_->text().trimmed()));
 
     if (running) {
         resultSummaryLabel_->setText(uiText(QString::fromUtf8("正在计算，结果文件生成后会自动显示。")));
     } else if (hasCsv) {
-        resultSummaryLabel_->setText(uiText(QString::fromUtf8("最近结果已生成，可在中间视图区查看或打开结果文件。")));
+        resultSummaryLabel_->setText(isGeoEastMode() && !lastGeoEastOutput_.isEmpty()
+            ? uiText(QString::fromUtf8("结果已写入 GeoEast 数据库，并已生成本地视图文件。"))
+            : uiText(QString::fromUtf8("最近结果已生成，可在中间视图区查看或打开结果文件。")));
+    } else if (isGeoEastMode() && !lastGeoEastOutput_.isEmpty()) {
+        resultSummaryLabel_->setText(uiText(QString::fromUtf8("已选择 GeoEast 数据库结果；当前没有同名本地视图缓存。")));
     } else if (!lastOutputCsv_.isEmpty()) {
         resultSummaryLabel_->setText(uiText(QString::fromUtf8("运行结束，但未找到结果 CSV。请检查日志和输出目录。")));
+    } else if (hasInput) {
+        resultSummaryLabel_->setText(uiText(QString::fromUtf8("已载入原始网格，尚未运行追踪；当前不是处理后的叠加结果。")));
     } else {
-        resultSummaryLabel_->setText(uiText(QString::fromUtf8("尚未生成结果。运行完成后将自动切换到叠加结果。")));
+        resultSummaryLabel_->setText(uiText(QString::fromUtf8("请选择输入文件或 GeoEast 网格，然后点击【开始追踪】。")));
     }
 
-    resultPathLabel_->setText(hasCsv
-        ? uiText(QString::fromUtf8("CSV：%1")).arg(QDir::toNativeSeparators(csvPath))
-        : uiText(QString::fromUtf8("预计输出：%1")).arg(QDir::toNativeSeparators(csvPath)));
+    if (hasCsv && isGeoEastMode() && !lastGeoEastOutput_.isEmpty()) {
+        resultPathLabel_->setText(uiText(QString::fromUtf8("GeoEast对象：BOFaultPolygon/%1\n本地CSV：%2"))
+            .arg(lastGeoEastOutput_, QDir::toNativeSeparators(csvPath)));
+    } else if (isGeoEastMode() && !lastGeoEastOutput_.isEmpty()) {
+        resultPathLabel_->setText(uiText(QString::fromUtf8("GeoEast对象：BOFaultPolygon/%1\n本地缓存：%2"))
+            .arg(lastGeoEastOutput_, QDir::toNativeSeparators(csvPath)));
+    } else {
+        resultPathLabel_->setText(hasCsv
+            ? uiText(QString::fromUtf8("CSV：%1")).arg(QDir::toNativeSeparators(csvPath))
+            : uiText(QString::fromUtf8("预计输出：%1")).arg(QDir::toNativeSeparators(csvPath)));
+    }
     resultPathLabel_->setToolTip(QDir::toNativeSeparators(csvPath));
 
     if (showOverlayButton_) {
@@ -3254,6 +4008,9 @@ void FaultPolyTraceWindow::updateResultPanel() {
     }
     if (exportPngButton_) {
         exportPngButton_->setEnabled(true);
+    }
+    if (loadSelectedResultButton_) {
+        loadSelectedResultButton_->setEnabled(resultCatalogCombo_ && !resultCatalogCombo_->currentData().toString().isEmpty() && !running);
     }
 }
 

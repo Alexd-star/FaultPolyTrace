@@ -14,6 +14,7 @@ class QLabel;
 class QLineEdit;
 class QPushButton;
 class QSpinBox;
+class QSplitter;
 class QTextEdit;
 class QWidget;
 class QAction;
@@ -40,6 +41,8 @@ private slots:
     void restoreDefaults();
     void showHelpHint();
     void refreshGrids();
+    void refreshOutputs();
+    void loadSelectedOutput();
     void deleteOutput();
     void loadResultView();
     void exportResultViewPng();
@@ -93,6 +96,7 @@ private:
     QLineEdit* userEdit_ = nullptr;
     QLineEdit* passwordEdit_ = nullptr;
     QComboBox* gridCombo_ = nullptr;
+    QComboBox* outputCatalogCombo_ = nullptr;
     QLineEdit* outputEdit_ = nullptr;
     QPushButton* polygonColorButton_ = nullptr;
     QLineEdit* polygonColorEdit_ = nullptr;
@@ -144,6 +148,8 @@ private:
     QPushButton* openBasemapButton_ = nullptr;
     QPushButton* openMappingButton_ = nullptr;
     QPushButton* refreshButton_ = nullptr;
+    QPushButton* refreshOutputsButton_ = nullptr;
+    QPushButton* loadSelectedOutputButton_ = nullptr;
     QPushButton* deleteOutputButton_ = nullptr;
     QAction* loadResultViewAction_ = nullptr;
     QAction* exportViewAction_ = nullptr;
@@ -167,9 +173,14 @@ private:
     QLabel* projectStatusLabel_ = nullptr;
     QLabel* gridStatusLabel_ = nullptr;
     QWidget* renderViewWidget_ = nullptr;
+    QWidget* colorBarWidget_ = nullptr;
+    QSplitter* mainSplitter_ = nullptr;
 
     QProcess* process_ = nullptr;
     bool refreshingGrids_ = false;
+    bool refreshingOutputs_ = false;
+    bool refreshOutputsAfterGrids_ = false;
+    bool exportingOutputView_ = false;
     bool deletingOutput_ = false;
     UiLanguage currentLanguage_ = UiLanguage::SimplifiedChinese;
 };

@@ -40,8 +40,10 @@ struct Options {
     std::string topologyOutputPath;
     std::string previewGridOutputPath;
     std::string previewPolygonsOutputPath;
+    std::string exportFaultPolygonsOutputPath;
     std::string importGeoEastDatPath;
     bool listGrids = false;
+    bool listFaultPolygons = false;
     bool validateGridOnly = false;
     bool overwriteGrid = false;
     bool deleteOutput = false;
@@ -57,6 +59,7 @@ void printUsage() {
         << "Options:\n"
         << "  --trace-mode region|ridge-belt\n"
         << "  --list-grids\n"
+        << "  --list-fault-polygons\n"
         << "  --validate-grid\n"
         << "  --delete-output\n"
         << "  --import-geoeast-dat <test.dat>\n"
@@ -132,6 +135,7 @@ void printUsage() {
         << "  --topology-output <csv>\n"
         << "  --view-grid-output <txt>\n"
         << "  --view-polygons-output <csv>\n"
+        << "  --export-fault-polygons-output <csv>\n"
         << "  --preview-grid-output <txt> (compatibility alias)\n"
         << "  --preview-polygons-output <csv> (compatibility alias)\n";
 }
@@ -284,10 +288,14 @@ Options parseArgs(int argc, char** argv) {
             options.previewGridOutputPath = requireValue(arg);
         } else if (arg == "--preview-polygons-output" || arg == "--view-polygons-output") {
             options.previewPolygonsOutputPath = requireValue(arg);
+        } else if (arg == "--export-fault-polygons-output") {
+            options.exportFaultPolygonsOutputPath = requireValue(arg);
         } else if (arg == "--import-geoeast-dat") {
             options.importGeoEastDatPath = requireValue(arg);
         } else if (arg == "--list-grids") {
             options.listGrids = true;
+        } else if (arg == "--list-fault-polygons") {
+            options.listFaultPolygons = true;
         } else if (arg == "--validate-grid") {
             options.validateGridOnly = true;
         } else if (arg == "--delete-output") {
@@ -459,17 +467,20 @@ Options parseArgs(int argc, char** argv) {
     if (options.databaseName.empty() || options.projectName.empty() || options.userName.empty()) {
         throw std::runtime_error("Missing required GeoEast connection or data arguments.");
     }
-    if (!options.listGrids && !options.deleteOutput && options.gridName.empty()) {
+    if (!options.listGrids && !options.listFaultPolygons && options.exportFaultPolygonsOutputPath.empty() && !options.deleteOutput && options.gridName.empty()) {
         throw std::runtime_error("Missing --grid. Use --list-grids to inspect available BOMapGrid objects.");
     }
-    if (!options.listGrids && !options.importGeoEastDatPath.empty() && options.outputName.empty()) {
+    if (!options.listGrids && !options.listFaultPolygons && options.exportFaultPolygonsOutputPath.empty() && !options.importGeoEastDatPath.empty() && options.outputName.empty()) {
         throw std::runtime_error("Missing --output for imported GeoEast DAT.");
     }
-    if (!options.listGrids && !options.deleteOutput && options.importGeoEastDatPath.empty() && !options.validateGridOnly && options.outputName.empty()) {
+    if (!options.listGrids && !options.listFaultPolygons && options.exportFaultPolygonsOutputPath.empty() && !options.deleteOutput && options.importGeoEastDatPath.empty() && !options.validateGridOnly && options.outputName.empty()) {
         throw std::runtime_error("Missing --output. Use --list-grids to inspect available BOMapGrid objects.");
     }
     if (options.deleteOutput && options.outputName.empty()) {
         throw std::runtime_error("Missing --output for --delete-output.");
+    }
+    if (!options.exportFaultPolygonsOutputPath.empty() && options.outputName.empty()) {
+        throw std::runtime_error("Missing --output for --export-fault-polygons-output.");
     }
     return options;
 }
@@ -569,11 +580,34 @@ int main(int argc, char** argv) {
             return 0;
         }
 
+        if (options.listFaultPolygons) {
+            debugLog("Listing BOFaultPolygon objects...");
+            const std::vector<std::string> polygonNames = fpt_geoeast::listFaultPolygons(project);
+            debugLog("BOFaultPolygon list completed.");
+            std::cout << "BOFaultPolygon objects in project " << options.projectName << ":\n";
+            for (const std::string& polygonName : polygonNames) {
+                std::cout << "  " << polygonName << "\n";
+            }
+            std::cout << "Total: " << polygonNames.size() << "\n";
+            return 0;
+        }
+
         if (options.deleteOutput) {
             debugLog("Deleting BOFaultPolygon: " + options.outputName);
             fpt_geoeast::deleteFaultPolygons(project, options.outputName);
             debugLog("BOFaultPolygon delete completed.");
             std::cout << "Deleted BOFaultPolygon: " << options.outputName << "\n";
+            return 0;
+        }
+
+        if (!options.exportFaultPolygonsOutputPath.empty()) {
+            debugLog("Exporting BOFaultPolygon: " + options.outputName);
+            const std::vector<fpt::Polygon> polygons = fpt_geoeast::readFaultPolygons(project, options.outputName);
+            fpt::writePolygonCsv(options.exportFaultPolygonsOutputPath, polygons);
+            debugLog("BOFaultPolygon export completed.");
+            std::cout << "Exported BOFaultPolygon: " << options.outputName << "\n";
+            std::cout << "Output CSV: " << options.exportFaultPolygonsOutputPath << "\n";
+            std::cout << "Polygons: " << polygons.size() << "\n";
             return 0;
         }
 
