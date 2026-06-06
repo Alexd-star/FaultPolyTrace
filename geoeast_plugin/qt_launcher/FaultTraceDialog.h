@@ -42,6 +42,7 @@ private slots:
     void showHelpHint();
     void refreshGrids();
     void refreshOutputs();
+    void loadSelectedGridView();
     void loadSelectedOutput();
     void deleteOutput();
     void loadResultView();
@@ -181,6 +182,7 @@ private:
     bool refreshingOutputs_ = false;
     bool refreshOutputsAfterGrids_ = false;
     bool exportingOutputView_ = false;
+    bool exportingGridView_ = false;
     bool deletingOutput_ = false;
     UiLanguage currentLanguage_ = UiLanguage::SimplifiedChinese;
 };

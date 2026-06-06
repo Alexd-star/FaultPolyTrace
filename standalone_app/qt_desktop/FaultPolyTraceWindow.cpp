@@ -3,6 +3,7 @@
 
 #include <QAction>
 #include <QActionGroup>
+#include <QAbstractSpinBox>
 #include <QApplication>
 #include <QCheckBox>
 #include <QCloseEvent>
@@ -44,6 +45,7 @@
 #include <QSizePolicy>
 #include <QSpinBox>
 #include <QSplitter>
+#include <QSplashScreen>
 #include <QStackedWidget>
 #include <QStandardPaths>
 #include <QStatusBar>
@@ -87,6 +89,60 @@ protected:
 
 private:
     BeforePopupHandler beforePopupHandler_;
+};
+
+class NoWheelValueFilter : public QObject {
+public:
+    explicit NoWheelValueFilter(QObject* parent = nullptr) : QObject(parent) {}
+
+protected:
+    bool eventFilter(QObject* object, QEvent* event) override {
+        if (event->type() == QEvent::Wheel &&
+            (qobject_cast<QAbstractSpinBox*>(object) || qobject_cast<QComboBox*>(object))) {
+            event->ignore();
+            return true;
+        }
+        return QObject::eventFilter(object, event);
+    }
+};
+
+class GeoEastSplashScreen : public QSplashScreen {
+public:
+    GeoEastSplashScreen()
+        : QSplashScreen(makePixmap()) {
+        setWindowFlags(Qt::SplashScreen | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
+    }
+
+private:
+    static QPixmap makePixmap() {
+        QPixmap pixmap(450, 245);
+        pixmap.fill(QColor("#1F4D9B"));
+        QPainter painter(&pixmap);
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        QLinearGradient bg(0, 0, pixmap.width(), pixmap.height());
+        bg.setColorAt(0.0, QColor("#173880"));
+        bg.setColorAt(0.55, QColor("#4E7FC3"));
+        bg.setColorAt(1.0, QColor("#1E3F92"));
+        painter.fillRect(pixmap.rect(), bg);
+        painter.setBrush(QColor(255, 255, 255, 38));
+        painter.setPen(Qt::NoPen);
+        painter.drawEllipse(QRectF(225, 20, 180, 180));
+        painter.drawEllipse(QRectF(70, 65, 90, 90));
+        painter.setBrush(QColor(255, 255, 255, 26));
+        painter.drawPolygon(QPolygonF() << QPointF(150, -30) << QPointF(250, 25)
+                                      << QPointF(180, 115) << QPointF(260, 245)
+                                      << QPointF(125, 245) << QPointF(85, 105));
+        painter.setPen(QColor("#FFFFFF"));
+        QFont title("Times New Roman", 28, QFont::Bold);
+        title.setItalic(true);
+        painter.setFont(title);
+        painter.drawText(QPointF(34, 138), "GeoEast");
+        painter.fillRect(QRect(0, 182, pixmap.width(), 63), QColor(118, 143, 188, 170));
+        painter.setFont(QFont("Arial", 12));
+        painter.setPen(QColor("#FFFF00"));
+        painter.drawText(QPointF(6, 235), "Initializing ......");
+        return pixmap;
+    }
 };
 
 QString repoRootFromAppDir() {
@@ -1079,6 +1135,9 @@ private:
 
 FaultPolyTraceWindow::FaultPolyTraceWindow(QWidget* parent)
     : QMainWindow(parent), process_(new QProcess(this)) {
+    GeoEastSplashScreen splash;
+    splash.show();
+    QCoreApplication::processEvents();
     buildUi();
     loadSettings();
     refreshHistory();
@@ -1093,6 +1152,7 @@ FaultPolyTraceWindow::FaultPolyTraceWindow(QWidget* parent)
     connect(process_, &QProcess::readyReadStandardError, this, &FaultPolyTraceWindow::onReadyRead);
     connect(process_, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this, &FaultPolyTraceWindow::onFinished);
     connect(process_, &QProcess::errorOccurred, this, &FaultPolyTraceWindow::onProcessError);
+    splash.finish(this);
 }
 
 void FaultPolyTraceWindow::buildUi() {
@@ -1860,6 +1920,14 @@ void FaultPolyTraceWindow::buildUi() {
     connect(outputDirEdit_, &QLineEdit::textChanged, this, &FaultPolyTraceWindow::updateResultPanel);
     connect(outputNameEdit_, &QLineEdit::textChanged, this, &FaultPolyTraceWindow::updateResultPanel);
     connect(outputDirEdit_, &QLineEdit::editingFinished, this, &FaultPolyTraceWindow::refreshAvailableResults);
+    connect(resultCatalogCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this]() {
+        if (!resultCatalogCombo_ || resultCatalogCombo_->currentData().toString().trimmed().isEmpty()) {
+            return;
+        }
+        if (!showPolygonLayerCheck_ || showPolygonLayerCheck_->isChecked()) {
+            QTimer::singleShot(0, this, &FaultPolyTraceWindow::loadSelectedResult);
+        }
+    });
     connect(inputFormatCombo_, &QComboBox::currentTextChanged, this, &FaultPolyTraceWindow::updateTaskPreview);
     connect(inputFormatCombo_, &QComboBox::currentTextChanged, this, &FaultPolyTraceWindow::clearResultStateForNewInput);
     connect(presetCombo_, &QComboBox::currentTextChanged, this, &FaultPolyTraceWindow::updateTaskPreview);
@@ -1901,6 +1969,15 @@ void FaultPolyTraceWindow::buildUi() {
     connect(rootAntiMergeCheck_, &QCheckBox::toggled, this, &FaultPolyTraceWindow::updateTaskPreview);
     connect(localAntiMergeCheck_, &QCheckBox::toggled, this, &FaultPolyTraceWindow::updateTaskPreview);
     connect(residualTraceCheck_, &QCheckBox::toggled, this, &FaultPolyTraceWindow::updateTaskPreview);
+    auto* noWheelFilter = new NoWheelValueFilter(this);
+    for (QAbstractSpinBox* spin : findChildren<QAbstractSpinBox*>()) {
+        spin->installEventFilter(noWheelFilter);
+        spin->setFocusPolicy(Qt::StrongFocus);
+    }
+    for (QComboBox* combo : findChildren<QComboBox*>()) {
+        combo->installEventFilter(noWheelFilter);
+        combo->setFocusPolicy(Qt::StrongFocus);
+    }
     prepareLanguageMetadata();
     retranslateUi();
     updateOptionControls();
@@ -3041,6 +3118,7 @@ void FaultPolyTraceWindow::refreshAvailableResults() {
     }
 
     const QString currentPath = resultCatalogCombo_->currentData().toString();
+    resultCatalogCombo_->blockSignals(true);
     resultCatalogCombo_->clear();
     const QStringList candidates = localResultCandidates();
     for (const QString& path : candidates) {
@@ -3062,7 +3140,12 @@ void FaultPolyTraceWindow::refreshAvailableResults() {
             resultCatalogCombo_->setCurrentIndex(index);
         }
     }
+    resultCatalogCombo_->blockSignals(false);
     updateStatus(QString::fromUtf8("已刷新输出目录结果，共 %1 个").arg(candidates.size()));
+    if (resultCatalogCombo_->currentData().toString().size() > 0 &&
+        (!showPolygonLayerCheck_ || showPolygonLayerCheck_->isChecked())) {
+        QTimer::singleShot(0, this, &FaultPolyTraceWindow::loadSelectedResult);
+    }
     updateResultPanel();
 }
 
@@ -3092,7 +3175,10 @@ void FaultPolyTraceWindow::loadSelectedResult() {
         saveSettings();
         const QString runner = geoEastRunnerEdit_->text().trimmed();
         QStringList args = geoEastConnectionArgs();
-        args << "--output" << selectedData
+        args << "--grid" << geoEastGridCombo_->currentText().trimmed()
+             << "--output" << selectedData
+             << "--validate-grid"
+             << "--view-grid-output" << outputBasePath() + ".grid.txt"
              << "--export-fault-polygons-output" << outputCsvPath();
         startProcess(ProcessTask::ExportGeoEastResult, runner, args, QString::fromUtf8("正在导出 GeoEast 历史结果..."));
         return;
@@ -3332,6 +3418,7 @@ void FaultPolyTraceWindow::onFinished(int exitCode, QProcess::ExitStatus status)
             }
             const QString current = resultCatalogCombo_ ? resultCatalogCombo_->currentData().toString() : QString();
             if (resultCatalogCombo_) {
+                resultCatalogCombo_->blockSignals(true);
                 resultCatalogCombo_->clear();
                 for (const QString& name : names) {
                     resultCatalogCombo_->addItem(name, name);
@@ -3352,9 +3439,14 @@ void FaultPolyTraceWindow::onFinished(int exitCode, QProcess::ExitStatus status)
                         resultCatalogCombo_->setCurrentIndex(index);
                     }
                 }
+                resultCatalogCombo_->blockSignals(false);
             }
             updateStatus(QString::fromUtf8("GeoEast 结果刷新完成，共 %1 个").arg(names.size()));
             saveSettings();
+            if (!names.isEmpty() && resultCatalogCombo_ && !resultCatalogCombo_->currentData().toString().trimmed().isEmpty() &&
+                (!showPolygonLayerCheck_ || showPolygonLayerCheck_->isChecked())) {
+                QTimer::singleShot(0, this, &FaultPolyTraceWindow::loadSelectedResult);
+            }
         } else {
             updateStatus(QString::fromUtf8("GeoEast 结果刷新失败，请查看日志"));
         }
@@ -3395,6 +3487,12 @@ void FaultPolyTraceWindow::onFinished(int exitCode, QProcess::ExitStatus status)
         } else if (finishedTask == ProcessTask::ExportGeoEastResult) {
             lastGeoEastOutput_ = geoEastOutputName();
             appendLog(QString::fromUtf8("GeoEast 历史结果已导出：BOFaultPolygon/%1").arg(lastGeoEastOutput_));
+            QString gridError;
+            if (view_->loadGrid(outputBasePath() + ".grid.txt", "matrix", &gridError)) {
+                appendLog(QString::fromUtf8("原始网格视图文件：%1").arg(QDir::toNativeSeparators(outputBasePath() + ".grid.txt")));
+            } else if (!gridError.isEmpty()) {
+                appendLog(gridError);
+            }
         }
         appendLog(QString::fromUtf8("结果 CSV：%1").arg(QDir::toNativeSeparators(lastOutputCsv_)));
         QString geoJsonPath;

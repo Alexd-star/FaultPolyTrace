@@ -602,6 +602,13 @@ int main(int argc, char** argv) {
 
         if (!options.exportFaultPolygonsOutputPath.empty()) {
             debugLog("Exporting BOFaultPolygon: " + options.outputName);
+            if (!options.previewGridOutputPath.empty() && !options.gridName.empty()) {
+                debugLog("Exporting BOMapGrid view for result review: " + options.gridName);
+                const fpt::Grid2D grid = fpt_geoeast::readMapGrid(project, options.gridName);
+                writePreviewGrid(options.previewGridOutputPath, grid);
+                std::cout << "Exported BOMapGrid view: " << options.gridName << "\n";
+                std::cout << "View grid: " << options.previewGridOutputPath << "\n";
+            }
             const std::vector<fpt::Polygon> polygons = fpt_geoeast::readFaultPolygons(project, options.outputName);
             fpt::writePolygonCsv(options.exportFaultPolygonsOutputPath, polygons);
             debugLog("BOFaultPolygon export completed.");

@@ -3,6 +3,7 @@
 
 #include <QAction>
 #include <QActionGroup>
+#include <QAbstractSpinBox>
 #include <QApplication>
 #include <QCheckBox>
 #include <QClipboard>
@@ -41,6 +42,7 @@
 #include <QSizePolicy>
 #include <QSpinBox>
 #include <QSplitter>
+#include <QSplashScreen>
 #include <QStandardPaths>
 #include <QTextEdit>
 #include <QTextCursor>
@@ -78,6 +80,60 @@ protected:
 
 private:
     BeforePopupHandler beforePopupHandler_;
+};
+
+class NoWheelValueFilter : public QObject {
+public:
+    explicit NoWheelValueFilter(QObject* parent = nullptr) : QObject(parent) {}
+
+protected:
+    bool eventFilter(QObject* object, QEvent* event) override {
+        if (event->type() == QEvent::Wheel &&
+            (qobject_cast<QAbstractSpinBox*>(object) || qobject_cast<QComboBox*>(object))) {
+            event->ignore();
+            return true;
+        }
+        return QObject::eventFilter(object, event);
+    }
+};
+
+class GeoEastSplashScreen : public QSplashScreen {
+public:
+    GeoEastSplashScreen()
+        : QSplashScreen(makePixmap()) {
+        setWindowFlags(Qt::SplashScreen | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
+    }
+
+private:
+    static QPixmap makePixmap() {
+        QPixmap pixmap(450, 245);
+        pixmap.fill(QColor("#1F4D9B"));
+        QPainter painter(&pixmap);
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        QLinearGradient bg(0, 0, pixmap.width(), pixmap.height());
+        bg.setColorAt(0.0, QColor("#173880"));
+        bg.setColorAt(0.55, QColor("#4E7FC3"));
+        bg.setColorAt(1.0, QColor("#1E3F92"));
+        painter.fillRect(pixmap.rect(), bg);
+        painter.setBrush(QColor(255, 255, 255, 38));
+        painter.setPen(Qt::NoPen);
+        painter.drawEllipse(QRectF(225, 20, 180, 180));
+        painter.drawEllipse(QRectF(70, 65, 90, 90));
+        painter.setBrush(QColor(255, 255, 255, 26));
+        painter.drawPolygon(QPolygonF() << QPointF(150, -30) << QPointF(250, 25)
+                                      << QPointF(180, 115) << QPointF(260, 245)
+                                      << QPointF(125, 245) << QPointF(85, 105));
+        painter.setPen(QColor("#FFFFFF"));
+        QFont title("Times New Roman", 28, QFont::Bold);
+        title.setItalic(true);
+        painter.setFont(title);
+        painter.drawText(QPointF(34, 138), "GeoEast");
+        painter.fillRect(QRect(0, 182, pixmap.width(), 63), QColor(118, 143, 188, 170));
+        painter.setFont(QFont("Arial", 12));
+        painter.setPen(QColor("#FFFF00"));
+        painter.drawText(QPointF(6, 235), "Initializing ......");
+        return pixmap;
+    }
 };
 
 QString repoRootFromAppDir() {
@@ -1084,6 +1140,9 @@ void addFormRow(QGridLayout* layout, int row, const QString& label, QWidget* edi
 } // namespace
 
 FaultTraceDialog::FaultTraceDialog(QWidget* parent) : QDialog(parent), process_(new QProcess(this)) {
+    GeoEastSplashScreen splash;
+    splash.show();
+    QCoreApplication::processEvents();
     buildUi();
     loadSettings();
     updateStatusContext();
@@ -1093,6 +1152,7 @@ FaultTraceDialog::FaultTraceDialog(QWidget* parent) : QDialog(parent), process_(
     connect(process_, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &FaultTraceDialog::onProcessFinished);
     connect(process_, &QProcess::errorOccurred, this, &FaultTraceDialog::onProcessError);
+    splash.finish(this);
 }
 
 void FaultTraceDialog::buildUi() {
@@ -1869,10 +1929,10 @@ void FaultTraceDialog::buildUi() {
             });
             return true;
         });
-        refreshOutputsButton_ = new QPushButton(QString::fromUtf8("刷新结果"), resultGroup);
+        refreshOutputsButton_ = new QPushButton(QString::fromUtf8("刷新结果列表"), resultGroup);
         refreshOutputsButton_->setToolTip(QString::fromUtf8("刷新当前项目中的 BOFaultPolygon 结果列表。"));
-        loadSelectedOutputButton_ = new QPushButton(QString::fromUtf8("选为当前"), resultGroup);
-        loadSelectedOutputButton_->setToolTip(QString::fromUtf8("把选中的已有结果多边形对象设为当前输出名称。"));
+        loadSelectedOutputButton_ = new QPushButton(QString::fromUtf8("显示所选结果"), resultGroup);
+        loadSelectedOutputButton_->setToolTip(QString::fromUtf8("导出并显示当前选择的结果多边形，同时叠加当前输入网格。"));
         resultLayout->addWidget(outputCatalogCombo_, 1, 0, 1, 2);
         resultLayout->addWidget(refreshOutputsButton_, 2, 0);
         resultLayout->addWidget(loadSelectedOutputButton_, 2, 1);
@@ -1924,6 +1984,17 @@ void FaultTraceDialog::buildUi() {
         connect(openBasemapButton_, &QPushButton::clicked, this, &FaultTraceDialog::openGeoEastBasemap);
         connect(openMappingButton_, &QPushButton::clicked, this, &FaultTraceDialog::openGeoEastMapping);
         connect(deleteOutputButton_, &QPushButton::clicked, this, &FaultTraceDialog::deleteOutput);
+        connect(outputCatalogCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this]() {
+            if (!outputCatalogCombo_ || outputCatalogCombo_->currentData().toString().trimmed().isEmpty()) {
+                return;
+            }
+            if (!showResultLayerCheck_ || showResultLayerCheck_->isChecked()) {
+                QTimer::singleShot(0, this, &FaultTraceDialog::loadSelectedOutput);
+            } else {
+                outputEdit_->setText(outputCatalogCombo_->currentData().toString().trimmed());
+                updateStatusContext();
+            }
+        });
         sidebarContentLayout->addWidget(resultGroup);
 
         QGroupBox* traceGroup = new QGroupBox(QString::fromUtf8("追踪参数"), sidebarContent);
@@ -2091,6 +2162,20 @@ void FaultTraceDialog::buildUi() {
         connect(projectEdit_, &QLineEdit::textChanged, this, &FaultTraceDialog::updateStatusContext);
         connect(databaseEdit_, &QLineEdit::textChanged, this, &FaultTraceDialog::updateStatusContext);
         connect(gridCombo_, &QComboBox::currentTextChanged, this, &FaultTraceDialog::updateStatusContext);
+        connect(gridCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this]() {
+            if (gridCombo_ && !gridCombo_->currentText().trimmed().isEmpty() &&
+                (!showInputLayerCheck_ || showInputLayerCheck_->isChecked())) {
+                QTimer::singleShot(0, this, &FaultTraceDialog::loadSelectedGridView);
+            }
+        });
+        if (gridCombo_ && gridCombo_->lineEdit()) {
+            connect(gridCombo_->lineEdit(), &QLineEdit::editingFinished, this, [this]() {
+                if (gridCombo_ && !gridCombo_->currentText().trimmed().isEmpty() &&
+                    (!showInputLayerCheck_ || showInputLayerCheck_->isChecked())) {
+                    QTimer::singleShot(0, this, &FaultTraceDialog::loadSelectedGridView);
+                }
+            });
+        }
         connect(outputEdit_, &QLineEdit::textChanged, this, &FaultTraceDialog::updateStatusContext);
         connect(traceModeCombo_, &QComboBox::currentTextChanged, this, &FaultTraceDialog::updateStatusContext);
         connect(thresholdModeCombo_, &QComboBox::currentTextChanged, this, &FaultTraceDialog::updateOptionControls);
@@ -2107,6 +2192,15 @@ void FaultTraceDialog::buildUi() {
             appendLog(QString::fromUtf8("加载项目配置：%1 成功。").arg(projectEdit_->text().trimmed()));
         } else {
             appendLog(QString::fromUtf8("未检测到当前项目名，请先在【数据库配置】中填写项目，再刷新网格列表。"));
+        }
+        auto* noWheelFilter = new NoWheelValueFilter(this);
+        for (QAbstractSpinBox* spin : findChildren<QAbstractSpinBox*>()) {
+            spin->installEventFilter(noWheelFilter);
+            spin->setFocusPolicy(Qt::StrongFocus);
+        }
+        for (QComboBox* combo : findChildren<QComboBox*>()) {
+            combo->installEventFilter(noWheelFilter);
+            combo->setFocusPolicy(Qt::StrongFocus);
         }
         prepareLanguageMetadata();
         retranslateUi();
@@ -2537,10 +2631,10 @@ void FaultTraceDialog::retranslateUi() {
     fpt_ui::refreshComboItems(presetCombo_, languageCode());
     fpt_ui::refreshComboItems(outputCatalogCombo_, languageCode());
     if (refreshOutputsButton_) {
-        refreshOutputsButton_->setText(uiText(QString::fromUtf8("刷新结果")));
+        refreshOutputsButton_->setText(uiText(QString::fromUtf8("刷新结果列表")));
     }
     if (loadSelectedOutputButton_) {
-        loadSelectedOutputButton_->setText(uiText(QString::fromUtf8("选为当前")));
+        loadSelectedOutputButton_->setText(uiText(QString::fromUtf8("显示所选结果")));
     }
     if (languageChineseAction_) {
         languageChineseAction_->setText(uiText("简体中文"));
@@ -3258,6 +3352,7 @@ void FaultTraceDialog::refreshGrids() {
     refreshingGrids_ = true;
     refreshingOutputs_ = false;
     exportingOutputView_ = false;
+    exportingGridView_ = false;
     deletingOutput_ = false;
     logEdit_->clear();
     QStringList args = commonConnectionArgs();
@@ -3288,6 +3383,7 @@ void FaultTraceDialog::refreshOutputs() {
     refreshingGrids_ = false;
     refreshingOutputs_ = true;
     exportingOutputView_ = false;
+    exportingGridView_ = false;
     deletingOutput_ = false;
     logEdit_->clear();
     QStringList args = commonConnectionArgs();
@@ -3295,6 +3391,42 @@ void FaultTraceDialog::refreshOutputs() {
     appendStatus(QString::fromUtf8("正在刷新 GeoEast 结果列表..."));
     if (renderViewWidget_) {
         static_cast<RenderViewWidget*>(renderViewWidget_)->setActivity(QString::fromUtf8("正在刷新 GeoEast 结果列表"));
+    }
+    appendLog("> " + runner + " " + quoteForLog(args));
+
+    QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
+    configureGeoEastEnvironment(environment);
+    process_->setProcessEnvironment(environment);
+    setRunning(true);
+    process_->start(runner, args);
+}
+
+void FaultTraceDialog::loadSelectedGridView() {
+    if (!gridCombo_ || gridCombo_->currentText().trimmed().isEmpty()) {
+        return;
+    }
+    if (process_->state() != QProcess::NotRunning) {
+        appendStatus(QString::fromUtf8("任务运行中，暂不能载入输入网格"));
+        return;
+    }
+    saveSettings();
+    if (!ensureGeoEastConfigReady(QString::fromUtf8("显示输入网格"), true, false)) {
+        return;
+    }
+
+    const QString runner = runnerEdit_->text().trimmed();
+    refreshingGrids_ = false;
+    refreshingOutputs_ = false;
+    exportingOutputView_ = false;
+    exportingGridView_ = true;
+    deletingOutput_ = false;
+    QStringList args = commonConnectionArgs();
+    args << "--grid" << gridCombo_->currentText().trimmed()
+         << "--validate-grid"
+         << "--view-grid-output" << previewGridPath();
+    appendStatus(QString::fromUtf8("正在载入输入网格：%1").arg(gridCombo_->currentText().trimmed()));
+    if (renderViewWidget_) {
+        static_cast<RenderViewWidget*>(renderViewWidget_)->setActivity(QString::fromUtf8("正在载入输入网格"));
     }
     appendLog("> " + runner + " " + quoteForLog(args));
 
@@ -3329,10 +3461,13 @@ void FaultTraceDialog::loadSelectedOutput() {
     refreshingGrids_ = false;
     refreshingOutputs_ = false;
     exportingOutputView_ = true;
+    exportingGridView_ = false;
     deletingOutput_ = false;
-    logEdit_->clear();
     QStringList args = commonConnectionArgs();
-    args << "--output" << selected
+    args << "--grid" << gridCombo_->currentText().trimmed()
+         << "--output" << selected
+         << "--validate-grid"
+         << "--view-grid-output" << previewGridPath()
          << "--export-fault-polygons-output" << previewPolygonsPath();
     appendStatus(QString::fromUtf8("正在载入已有结果对象：%1").arg(selected));
     if (renderViewWidget_) {
@@ -3360,6 +3495,7 @@ void FaultTraceDialog::runTrace() {
     refreshingGrids_ = false;
     refreshingOutputs_ = false;
     exportingOutputView_ = false;
+    exportingGridView_ = false;
     deletingOutput_ = false;
     logEdit_->clear();
     QStringList args = traceArgs();
@@ -3399,6 +3535,7 @@ void FaultTraceDialog::deleteOutput() {
     refreshingGrids_ = false;
     refreshingOutputs_ = false;
     exportingOutputView_ = false;
+    exportingGridView_ = false;
     deletingOutput_ = true;
     logEdit_->clear();
     QStringList args = commonConnectionArgs();
@@ -3513,18 +3650,23 @@ void FaultTraceDialog::onProcessFinished(int exitCode, QProcess::ExitStatus stat
         }
         if (!names.isEmpty()) {
             const QString current = gridCombo_->currentText();
+            gridCombo_->blockSignals(true);
             gridCombo_->clear();
             gridCombo_->addItems(names);
             int index = gridCombo_->findText(current);
             if (index >= 0) {
                 gridCombo_->setCurrentIndex(index);
             }
+            gridCombo_->blockSignals(false);
         }
         appendStatus(QString::fromUtf8("网格对象刷新完成"));
         if (renderViewWidget_) {
             static_cast<RenderViewWidget*>(renderViewWidget_)->setActivity(QString::fromUtf8("网格对象刷新完成"));
         }
         refreshingGrids_ = false;
+        if (!names.isEmpty() && (!showInputLayerCheck_ || showInputLayerCheck_->isChecked())) {
+            QTimer::singleShot(0, this, &FaultTraceDialog::loadSelectedGridView);
+        }
         if (refreshOutputsAfterGrids_) {
             refreshOutputsAfterGrids_ = false;
             QTimer::singleShot(0, this, &FaultTraceDialog::refreshOutputs);
@@ -3550,6 +3692,7 @@ void FaultTraceDialog::onProcessFinished(int exitCode, QProcess::ExitStatus stat
             const QString current = outputCatalogCombo_->currentData().toString().isEmpty()
                 ? outputEdit_->text().trimmed()
                 : outputCatalogCombo_->currentData().toString();
+            outputCatalogCombo_->blockSignals(true);
             outputCatalogCombo_->clear();
             for (const QString& name : names) {
                 outputCatalogCombo_->addItem(name, name);
@@ -3570,18 +3713,44 @@ void FaultTraceDialog::onProcessFinished(int exitCode, QProcess::ExitStatus stat
                     outputCatalogCombo_->setCurrentIndex(index);
                 }
             }
+            outputCatalogCombo_->blockSignals(false);
         }
         appendStatus(QString::fromUtf8("结果对象刷新完成，共 %1 个").arg(names.size()));
         if (renderViewWidget_) {
             static_cast<RenderViewWidget*>(renderViewWidget_)->setActivity(QString::fromUtf8("结果对象刷新完成"));
         }
         refreshingOutputs_ = false;
+        if (!names.isEmpty() && outputCatalogCombo_ && !outputCatalogCombo_->currentData().toString().trimmed().isEmpty() &&
+            (!showResultLayerCheck_ || showResultLayerCheck_->isChecked())) {
+            QTimer::singleShot(0, this, &FaultTraceDialog::loadSelectedOutput);
+        }
         return;
     }
 
     if (refreshingOutputs_) {
         appendStatus(QString::fromUtf8("结果对象刷新失败，请查看日志"));
         refreshingOutputs_ = false;
+        return;
+    }
+
+    if (exportingGridView_) {
+        if (exitCode == 0 && status == QProcess::NormalExit) {
+            QString error;
+            RenderViewWidget* view = static_cast<RenderViewWidget*>(renderViewWidget_);
+            if (view && view->loadGridFile(previewGridPath(), &error)) {
+                appendLog(QString::fromUtf8("已载入原始网格视图：%1").arg(QDir::toNativeSeparators(previewGridPath())));
+                view->setActivity(QString::fromUtf8("原始网格已载入"));
+                appendStatus(QString::fromUtf8("原始网格已载入"));
+            } else {
+                if (!error.isEmpty()) {
+                    appendLog(error);
+                }
+                appendStatus(QString::fromUtf8("原始网格载入失败，请查看日志"));
+            }
+        } else {
+            appendStatus(QString::fromUtf8("原始网格导出失败，请查看日志"));
+        }
+        exportingGridView_ = false;
         return;
     }
 
@@ -3634,6 +3803,7 @@ void FaultTraceDialog::onProcessFinished(int exitCode, QProcess::ExitStatus stat
     refreshingGrids_ = false;
     refreshingOutputs_ = false;
     exportingOutputView_ = false;
+    exportingGridView_ = false;
     deletingOutput_ = false;
 }
 
@@ -3730,6 +3900,13 @@ void FaultTraceDialog::updateLayerVisibility() {
     }
     if (renderViewWidget_) {
         static_cast<RenderViewWidget*>(renderViewWidget_)->setLayerVisibility(showInput, showResult);
+    }
+    if (process_ && process_->state() == QProcess::NotRunning) {
+        if (showResult && outputCatalogCombo_ && !outputCatalogCombo_->currentData().toString().trimmed().isEmpty()) {
+            QTimer::singleShot(0, this, &FaultTraceDialog::loadSelectedOutput);
+        } else if (showInput && gridCombo_ && !gridCombo_->currentText().trimmed().isEmpty()) {
+            QTimer::singleShot(0, this, &FaultTraceDialog::loadSelectedGridView);
+        }
     }
 
     updateStatusContext();

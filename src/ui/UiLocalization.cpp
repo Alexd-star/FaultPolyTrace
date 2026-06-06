@@ -43,6 +43,8 @@ QMap<QString, QString> buildEnglishTextMap() {
     add("数据库配置", "Database Configuration");
     add("刷新网格", "Refresh Grids");
     add("刷新网格列表", "Refresh Grid List");
+    add("刷新结果列表", "Refresh Result List");
+    add("显示所选结果", "Display Selected Result");
     add("删除当前结果", "Delete Current Result");
     add("打开工区底图", "Open Basemap");
     add("打开平面成图", "Open GeoMapping");
