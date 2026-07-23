@@ -41,7 +41,10 @@ SOURCES += \
     main.cpp \
     GeoEastBoAdapter.cpp \
     ../../src/core/BinaryMask.cpp \
+    ../../src/core/BranchAttribution.cpp \
     ../../src/core/FaultTracer.cpp \
+    ../../src/core/LocalPolygonQuality.cpp \
+    ../../src/core/WeakPathSupport.cpp \
     ../../src/core/Grid2D.cpp \
     ../../src/io/AsciiGridIO.cpp \
     ../../src/io/DiagnosticsIO.cpp \
@@ -53,7 +56,10 @@ SOURCES += \
 HEADERS += \
     GeoEastBoAdapter.h \
     ../../src/core/BinaryMask.h \
+    ../../src/core/BranchAttribution.h \
     ../../src/core/FaultTracer.h \
+    ../../src/core/LocalPolygonQuality.h \
+    ../../src/core/WeakPathSupport.h \
     ../../src/core/Grid2D.h \
     ../../src/io/AsciiGridIO.h \
     ../../src/io/DiagnosticsIO.h \

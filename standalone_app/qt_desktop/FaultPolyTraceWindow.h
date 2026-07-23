@@ -5,8 +5,11 @@
 #include <QString>
 #include <QStringList>
 
+namespace fpt_ui { struct TraceParameters; }
+
 class AttributeView;
 class QAction;
+class QColor;
 class QCheckBox;
 class QComboBox;
 class QDoubleSpinBox;
@@ -18,6 +21,7 @@ class QSpinBox;
 class QSplitter;
 class QStackedWidget;
 class QTextEdit;
+class QToolButton;
 
 enum class UiLanguage {
     SimplifiedChinese,
@@ -93,12 +97,15 @@ private:
     void setRunning(bool running);
     void appendLog(const QString& text);
     void updateStatus(const QString& text);
+    void setPolygonColor(const QColor& color);
     void applyPreset(const QString& preset);
     void refreshHistory();
     void appendHistory(qint64 elapsedMs);
     void updateResultPanel();
     void updateTaskPreview();
+    void loadSelectedResultInternal(bool userInitiated);
     QStringList traceArgs() const;
+    fpt_ui::TraceParameters currentTraceParameters() const;
     QStringList geoEastConnectionArgs() const;
     QStringList geoEastTraceArgs() const;
     QString outputCsvPath() const;
@@ -156,6 +163,7 @@ private:
     QComboBox* viewModeCombo_ = nullptr;
     QComboBox* historyCombo_ = nullptr;
     QComboBox* presetCombo_ = nullptr;
+    QComboBox* qualityModeCombo_ = nullptr;
     QComboBox* traceModeCombo_ = nullptr;
     QComboBox* thresholdModeCombo_ = nullptr;
     QDoubleSpinBox* percentileSpin_ = nullptr;
@@ -197,6 +205,7 @@ private:
     QDoubleSpinBox* alphaSpin_ = nullptr;
     QCheckBox* showGridLayerCheck_ = nullptr;
     QCheckBox* showPolygonLayerCheck_ = nullptr;
+    QPushButton* showOverlayLayerButton_ = nullptr;
     QPushButton* runButton_ = nullptr;
     QPushButton* stopButton_ = nullptr;
     QPushButton* showOverlayButton_ = nullptr;
@@ -214,6 +223,8 @@ private:
     QLabel* elapsedLabel_ = nullptr;
     QLabel* resultSummaryLabel_ = nullptr;
     QLabel* resultPathLabel_ = nullptr;
+    QLabel* layerTitleLabel_ = nullptr;
+    QLabel* layerHintLabel_ = nullptr;
     AttributeView* view_ = nullptr;
     QWidget* colorBarWidget_ = nullptr;
     QSplitter* mainSplitter_ = nullptr;

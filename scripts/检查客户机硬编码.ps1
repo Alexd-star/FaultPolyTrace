@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param()
 
 $ErrorActionPreference = "Stop"
@@ -30,11 +30,11 @@ $files = @(
 )
 
 $patterns = @(
-    @{ Name = "开发机用户路径"; Regex = "C:[\\/]+Users[\\/]+26312" },
+    @{ Name = "开发机用户路径"; Regex = 'C:[\\/]+Users[\\/]+[A-Za-z0-9._-]+' },
     @{ Name = "开发机百度网盘路径"; Regex = "D:[\\/]+BaiduNetdiskDownload" },
     @{ Name = "固定赛题项目默认值"; Regex = '"BGPCup2026_Test7"' },
     @{ Name = "固定赛题输入网格默认值"; Regex = '"test7_fault_attribute(_bo)?"' },
-    @{ Name = "固定开发机用户名默认值"; Regex = '"26312"' }
+    @{ Name = "固定开发机用户名默认值"; Regex = 'user(Edit_)?->setText\("[^\"]+"\)' }
 )
 
 function Is-AllowedLegacyCleanupLine {

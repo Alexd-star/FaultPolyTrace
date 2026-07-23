@@ -46,6 +46,34 @@ $env:PATH = (@(
     (Join-Path $env:NGP "licmng\bin")
 ) -join ";") + ";" + $env:PATH
 
+function Invoke-VsBatchCommand {
+    param(
+        [string]$Name,
+        [string[]]$Commands
+    )
+
+    $tempBat = Join-Path $env:TEMP ("faultpolytrace_{0}_{1}.cmd" -f $Name.Replace(" ", "_"), ([guid]::NewGuid().ToString("N")))
+    $lines = [System.Collections.Generic.List[string]]::new()
+    $lines.Add("@echo off") | Out-Null
+    $lines.Add("call `"$vsDevCmd`" -arch=amd64 -host_arch=amd64") | Out-Null
+    $lines.Add("if errorlevel 1 exit /b %ERRORLEVEL%") | Out-Null
+    foreach ($commandLine in $Commands) {
+        $lines.Add($commandLine) | Out-Null
+        $lines.Add("if errorlevel 1 exit /b %ERRORLEVEL%") | Out-Null
+    }
+    $lines.Add("exit /b 0") | Out-Null
+    $lines | Set-Content -LiteralPath $tempBat -Encoding ASCII
+    try {
+        $process = Start-Process -FilePath "cmd.exe" -ArgumentList @("/d", "/c", "`"$tempBat`"") -Wait -PassThru -NoNewWindow
+        if ($process.ExitCode -ne 0) {
+            throw "$Name failed with exit code $($process.ExitCode)."
+        }
+    }
+    finally {
+        Remove-Item -LiteralPath $tempBat -Force -ErrorAction SilentlyContinue
+    }
+}
+
 $libpqPath = Join-Path $env:PG_HOME "lib\libpq.lib"
 if (!(Test-Path -LiteralPath $libpqPath)) {
     throw "libpq.lib was not found: $libpqPath"
@@ -62,11 +90,10 @@ try {
 
     if ($UseVisualStudioProject) {
         & (Join-Path $PSScriptRoot "fix_geoeast_vcxproj_libs.ps1")
-        $cmd = "`"$vsDevCmd`" -arch=amd64 -host_arch=amd64 && msbuild `"$vcxproj`" /m /p:Configuration=$Configuration /p:Platform=x64"
-        & cmd.exe /c $cmd
-        if ($LASTEXITCODE -ne 0) {
-            throw "GeoEast BO runner msbuild failed. Exit code: $LASTEXITCODE"
-        }
+        Invoke-VsBatchCommand -Name "GeoEast BO runner msbuild" -Commands @(
+            "cd /d `"$projectDir`"",
+            "msbuild `"$vcxproj`" /m /p:Configuration=$Configuration /p:Platform=x64"
+        )
     } else {
         $configAdd = $Configuration.ToLowerInvariant()
         $configRemove = if ($Configuration -ieq "Debug") { "release" } else { "debug" }
@@ -75,11 +102,10 @@ try {
             throw "qmake failed to generate Makefile. Exit code: $LASTEXITCODE"
         }
 
-        $cmd = "`"$vsDevCmd`" -arch=amd64 -host_arch=amd64 && nmake /NOLOGO"
-        & cmd.exe /c $cmd
-        if ($LASTEXITCODE -ne 0) {
-            throw "GeoEast BO runner nmake failed. Exit code: $LASTEXITCODE"
-        }
+        Invoke-VsBatchCommand -Name "GeoEast BO runner nmake" -Commands @(
+            "cd /d `"$projectDir`"",
+            "nmake /NOLOGO"
+        )
     }
 }
 finally {

@@ -5,6 +5,8 @@
 #include <QString>
 #include <QStringList>
 
+namespace fpt_ui { struct TraceParameters; }
+
 class QCheckBox;
 class QColor;
 class QComboBox;
@@ -17,7 +19,9 @@ class QSpinBox;
 class QSplitter;
 class QTextEdit;
 class QWidget;
+class QToolButton;
 class QAction;
+class QCloseEvent;
 
 enum class UiLanguage {
     SimplifiedChinese,
@@ -57,6 +61,9 @@ private slots:
     void updateLayerVisibility();
     void setLanguage(UiLanguage language);
 
+protected:
+    void closeEvent(QCloseEvent* event) override;
+
 private:
     void buildUi();
     void retranslateUi();
@@ -74,6 +81,7 @@ private:
     void configureGeoEastEnvironment(QProcessEnvironment& environment) const;
     QStringList commonConnectionArgs() const;
     QStringList traceArgs() const;
+    fpt_ui::TraceParameters currentTraceParameters() const;
     QString previewOutputDir() const;
     QString previewGridPath() const;
     QString previewPolygonsPath() const;
@@ -82,6 +90,7 @@ private:
     void setPolygonColor(const QColor& color);
     void updateStatusContext();
     void updateOptionControls();
+    void loadSelectedOutputInternal(bool userInitiated);
     QString defaultRunnerPath() const;
     QString defaultOfficialDatPath() const;
     QStringList missingGeoEastConfig(bool requireGrid, bool requireOutput) const;
@@ -106,6 +115,7 @@ private:
     QLineEdit* datFileEdit_ = nullptr;
     QCheckBox* overwriteGridCheck_ = nullptr;
     QComboBox* presetCombo_ = nullptr;
+    QComboBox* qualityModeCombo_ = nullptr;
     QComboBox* traceModeCombo_ = nullptr;
     QComboBox* thresholdModeCombo_ = nullptr;
     QDoubleSpinBox* thresholdSpin_ = nullptr;
@@ -144,6 +154,7 @@ private:
     QSpinBox* residualTraceMaxCellsSpin_ = nullptr;
     QCheckBox* showInputLayerCheck_ = nullptr;
     QCheckBox* showResultLayerCheck_ = nullptr;
+    QPushButton* showOverlayLayerButton_ = nullptr;
     QPushButton* loadResultViewButton_ = nullptr;
     QPushButton* exportViewButton_ = nullptr;
     QPushButton* openBasemapButton_ = nullptr;
@@ -173,6 +184,8 @@ private:
     QLabel* connectionLabel_ = nullptr;
     QLabel* projectStatusLabel_ = nullptr;
     QLabel* gridStatusLabel_ = nullptr;
+    QLabel* layerTitleLabel_ = nullptr;
+    QLabel* layerHintLabel_ = nullptr;
     QWidget* renderViewWidget_ = nullptr;
     QWidget* colorBarWidget_ = nullptr;
     QSplitter* mainSplitter_ = nullptr;

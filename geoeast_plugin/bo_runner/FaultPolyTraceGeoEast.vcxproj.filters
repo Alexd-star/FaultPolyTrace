@@ -30,7 +30,16 @@
     <ClCompile Include="..\..\src\core\BinaryMask.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\core\BranchAttribution.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\core\FaultTracer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\LocalPolygonQuality.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\WeakPathSupport.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="GeoEastBoAdapter.cpp">
@@ -65,7 +74,16 @@
     <ClInclude Include="..\..\src\core\BinaryMask.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\BranchAttribution.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\src\core\FaultTracer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\LocalPolygonQuality.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\WeakPathSupport.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="GeoEastBoAdapter.h">

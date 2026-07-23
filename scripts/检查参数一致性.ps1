@@ -71,15 +71,20 @@ $standalonePath = "standalone_app\qt_desktop\FaultPolyTraceWindow.cpp"
 $geoEastPath = "geoeast_plugin\qt_launcher\FaultTraceDialog.cpp"
 $coreCliPath = "src\app\main.cpp"
 $boRunnerPath = "geoeast_plugin\bo_runner\main.cpp"
+$sharedParameterPath = "src\ui\TraceParameterModel.cpp"
 $packageScriptPath = "scripts\打包发布包.ps1"
 
 $standalone = Read-TextFile $standalonePath
 $geoEast = Read-TextFile $geoEastPath
 $coreCli = Read-TextFile $coreCliPath
 $boRunner = Read-TextFile $boRunnerPath
+$sharedParameterModel = Read-TextFile $sharedParameterPath
 $packageScript = Read-TextFile $packageScriptPath
 
 $rows = [System.Collections.Generic.List[object]]::new()
+
+Add-ContainsCheck -Rows $rows -Group "共享参数架构" -Name "独立软件参数委托" -Requirement "独立软件必须调用共享序列化器" -Text $standalone -Needle "fpt_ui::traceArguments(currentTraceParameters())" -Detail "$standalonePath 委托 TraceParameterModel"
+Add-ContainsCheck -Rows $rows -Group "共享参数架构" -Name "GeoEast 控件参数委托" -Requirement "GeoEast 控件必须调用共享序列化器" -Text $geoEast -Needle "fpt_ui::traceArguments(currentTraceParameters())" -Detail "$geoEastPath 委托 TraceParameterModel"
 
 $algorithmParams = @(
     @{ Key="traceMode"; Label="追踪模式"; Cli="--trace-mode"; Control="traceModeCombo_"; Type="value" },
@@ -132,21 +137,15 @@ foreach ($paramSpec in $algorithmParams) {
     Add-ContainsCheck -Rows $rows -Group "独立软件参数" -Name $label -Requirement "配置保存" -Text $standalone -Needle "settings.setValue(`"$key`"" -Detail "$standalonePath 保存 $key"
     Add-ContainsCheck -Rows $rows -Group "独立软件参数" -Name $label -Requirement "模板保存" -Text $standalone -Needle "obj[`"$key`"]" -Detail "$standalonePath 模板写入 $key"
     Add-ContainsCheck -Rows $rows -Group "独立软件参数" -Name $label -Requirement "模板读取" -Text $standalone -Needle "obj.value(`"$key`")" -Detail "$standalonePath 模板读取 $key"
-    Add-ContainsCheck -Rows $rows -Group "独立软件传参" -Name $label -Requirement "传入核心 CLI" -Text $standalone -Needle $cli -Detail "$standalonePath traceArgs 包含 $cli"
+    Add-ContainsCheck -Rows $rows -Group "共享参数序列化" -Name $label -Requirement "共享模型传入核心 CLI" -Text $sharedParameterModel -Needle $cli -Detail "$sharedParameterPath traceArguments 包含 $cli"
 
     if (![string]::IsNullOrWhiteSpace($noCli)) {
-        Add-ContainsCheck -Rows $rows -Group "独立软件传参" -Name $label -Requirement "传入关闭开关" -Text $standalone -Needle $noCli -Detail "$standalonePath traceArgs 包含 $noCli"
+        Add-ContainsCheck -Rows $rows -Group "共享参数序列化" -Name $label -Requirement "共享模型传入关闭开关" -Text $sharedParameterModel -Needle $noCli -Detail "$sharedParameterPath traceArguments 包含 $noCli"
     }
 
     Add-ContainsCheck -Rows $rows -Group "GeoEast 控件参数" -Name $label -Requirement "界面控件存在" -Text $geoEast -Needle $control -Detail "$geoEastPath 包含 $control"
     Add-ContainsCheck -Rows $rows -Group "GeoEast 控件参数" -Name $label -Requirement "配置读取" -Text $geoEast -Needle "settings.value(`"$key`"" -Detail "$geoEastPath 读取 $key"
     Add-ContainsCheck -Rows $rows -Group "GeoEast 控件参数" -Name $label -Requirement "配置保存" -Text $geoEast -Needle "settings.setValue(`"$key`"" -Detail "$geoEastPath 保存 $key"
-    Add-ContainsCheck -Rows $rows -Group "GeoEast 控件传参" -Name $label -Requirement "传给 BO Runner" -Text $geoEast -Needle $cli -Detail "$geoEastPath traceArgs 包含 $cli"
-
-    if (![string]::IsNullOrWhiteSpace($noCli)) {
-        Add-ContainsCheck -Rows $rows -Group "GeoEast 控件传参" -Name $label -Requirement "传给 BO Runner 关闭开关" -Text $geoEast -Needle $noCli -Detail "$geoEastPath traceArgs 包含 $noCli"
-    }
-
     Add-ContainsCheck -Rows $rows -Group "核心 CLI 解析" -Name $label -Requirement "离线核心解析参数" -Text $coreCli -Needle "arg == `"$cli`"" -Detail "$coreCliPath 解析 $cli"
     Add-ContainsCheck -Rows $rows -Group "BO Runner 解析" -Name $label -Requirement "GeoEast Runner 解析参数" -Text $boRunner -Needle "arg == `"$cli`"" -Detail "$boRunnerPath 解析 $cli"
 
@@ -173,8 +172,7 @@ foreach ($fixed in $fixedParams) {
     $label = [string]$fixed.Label
     $cli = [string]$fixed.Cli
     $required = [bool]$StrictFixedParameters
-    Add-ContainsCheck -Rows $rows -Group "固定策略参数" -Name $label -Requirement "独立软件传参" -Text $standalone -Needle $cli -Detail "$standalonePath 固定传参 $cli" -Required $required
-    Add-ContainsCheck -Rows $rows -Group "固定策略参数" -Name $label -Requirement "GeoEast 控件传参" -Text $geoEast -Needle $cli -Detail "$geoEastPath 固定传参 $cli" -Required $required
+    Add-ContainsCheck -Rows $rows -Group "固定策略参数" -Name $label -Requirement "共享模型传参" -Text $sharedParameterModel -Needle $cli -Detail "$sharedParameterPath 固定传参 $cli" -Required $required
     Add-ContainsCheck -Rows $rows -Group "固定策略参数" -Name $label -Requirement "离线核心解析" -Text $coreCli -Needle "arg == `"$cli`"" -Detail "$coreCliPath 解析 $cli" -Required $required
     Add-ContainsCheck -Rows $rows -Group "固定策略参数" -Name $label -Requirement "BO Runner 解析" -Text $boRunner -Needle "arg == `"$cli`"" -Detail "$boRunnerPath 解析 $cli" -Required $required
 }

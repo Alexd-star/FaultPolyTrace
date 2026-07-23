@@ -62,6 +62,21 @@ function Write-QtConf {
     ) -Encoding ASCII
 }
 
+function Invoke-WinDeployQtWithVcEnv {
+    param(
+        [string]$DeployTool,
+        [string]$Executable
+    )
+
+    $deployCommand = @"
+call "$VcVars" >nul && set "PATH=$qtBin;!PATH!" && "$DeployTool" --force "$Executable"
+"@
+    cmd /v:on /c $deployCommand
+    if ($LASTEXITCODE -ne 0) {
+        throw "windeployqt failed with exit code $LASTEXITCODE."
+    }
+}
+
 $command = @"
 call "$VcVars" && set "PATH=$qtBin;!PATH!" && cd /d "$desktopDir" && "$QMake" FaultPolyTraceDesktop.pro -spec win32-msvc && nmake
 "@
@@ -73,10 +88,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 if (Test-Path -LiteralPath $windeployQt) {
-    & $windeployQt --force $desktopExe
-    if ($LASTEXITCODE -ne 0) {
-        throw "windeployqt failed with exit code $LASTEXITCODE."
-    }
+    Invoke-WinDeployQtWithVcEnv -DeployTool $windeployQt -Executable $desktopExe
     Copy-VcRuntimeIfAvailable $desktopDir
     Write-QtConf $desktopDir
 } else {

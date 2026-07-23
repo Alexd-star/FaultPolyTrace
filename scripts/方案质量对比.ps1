@@ -10,16 +10,18 @@ $repoRoot = Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")
 $exe = Join-Path $repoRoot "build\faultpolytrace.exe"
 
 if ([string]::IsNullOrWhiteSpace($OfficialDat)) {
-    $candidate = Get-ChildItem -LiteralPath "D:\BaiduNetdiskDownload\BGPCup2025" -Recurse -Filter "test.dat" -ErrorAction SilentlyContinue |
-        Where-Object { $_.FullName -like "*BGPCup2025*" } |
-        Select-Object -First 1
-    if ($candidate) {
-        $OfficialDat = $candidate.FullName
+    if ($env:FPT_OFFICIAL_DAT) {
+        $OfficialDat = $env:FPT_OFFICIAL_DAT
+    } elseif ($env:FPT_OFFICIAL_DATA_DIR -and (Test-Path -LiteralPath $env:FPT_OFFICIAL_DATA_DIR)) {
+        $candidate = Get-ChildItem -LiteralPath $env:FPT_OFFICIAL_DATA_DIR -Recurse -Filter "test.dat" -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($candidate) {
+            $OfficialDat = $candidate.FullName
+        }
     }
 }
 
 if (!(Test-Path -LiteralPath $OfficialDat)) {
-    throw "官方测试数据不存在：$OfficialDat"
+    throw "官方测试数据不存在：$OfficialDat。请通过 -OfficialDat <test.dat> 或环境变量 FPT_OFFICIAL_DAT 指定。"
 }
 
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {

@@ -15,16 +15,18 @@ $output = Join-Path $outputDir "official_root_antimerge.csv"
 $exe = Join-Path $repoRoot "build\faultpolytrace.exe"
 
 if ([string]::IsNullOrWhiteSpace($OfficialDat)) {
-    $candidate = Get-ChildItem -LiteralPath "D:\BaiduNetdiskDownload\BGPCup2025" -Recurse -Filter "test.dat" -ErrorAction SilentlyContinue |
-        Where-Object { $_.FullName -like "*BGPCup2025*" } |
-        Select-Object -First 1
-    if ($candidate) {
-        $OfficialDat = $candidate.FullName
+    if ($env:FPT_OFFICIAL_DAT) {
+        $OfficialDat = $env:FPT_OFFICIAL_DAT
+    } elseif ($env:FPT_OFFICIAL_DATA_DIR -and (Test-Path -LiteralPath $env:FPT_OFFICIAL_DATA_DIR)) {
+        $candidate = Get-ChildItem -LiteralPath $env:FPT_OFFICIAL_DATA_DIR -Recurse -Filter "test.dat" -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($candidate) {
+            $OfficialDat = $candidate.FullName
+        }
     }
 }
 
 if (!(Test-Path -LiteralPath $OfficialDat)) {
-    throw "Official test data not found: $OfficialDat"
+    throw "Official test data not found: $OfficialDat. Pass -OfficialDat <test.dat> or set FPT_OFFICIAL_DAT."
 }
 
 New-Item -ItemType Directory -Force -Path $outputDir | Out-Null

@@ -94,8 +94,34 @@ function Write-EvidenceReadme {
     $lines.Add("3. 点击【刷新网格】，选择官方输入网格并运行。") | Out-Null
     $lines.Add("4. 在 GeoMapping、GeoBasemap 或工区底图中分别截图原始网格、结果多边形和叠加图。") | Out-Null
     $lines.Add("5. 将截图按固定文件名放入本目录，再运行 `scripts/检查GeoEast现场证据.ps1 -EvidenceDir <本目录>`。") | Out-Null
+    $lines.Add("") | Out-Null
+    $lines.Add("## 合格截图要点") | Out-Null
+    $lines.Add("") | Out-Null
+    $lines.Add("- 截图中必须能看出 GeoEast 环境、输入网格名、输出结果名或运行日志，不能只截局部空白窗口。") | Out-Null
+    $lines.Add("- 结果多边形颜色应与原始属性背景明显区分，避免红色背景上继续使用红色结果线。") | Out-Null
+    $lines.Add("- 叠加图应显示原始断层属性和输出多边形在同一坐标范围内。") | Out-Null
+    $lines.Add("- 数据库对象管理截图应能证明输出对象已经写入 GeoEast，而不是只在本地生成 CSV。") | Out-Null
+    $lines.Add("") | Out-Null
+    $lines.Add("更多说明请查看项目文档：`docs/GeoEast现场截图与演示视频清单.md`。") | Out-Null
 
     Set-Content -LiteralPath (Join-Path $Dir "README_现场证据说明.md") -Value ($lines -join "`n") -Encoding UTF8
+
+    $checklist = New-Object System.Collections.Generic.List[object]
+    foreach ($item in $requiredImages) {
+        $checklist.Add([pscustomobject]@{
+            file = "$($item.Stem).png"
+            name = $item.Name
+            requirement = $item.Description
+            status = "待截图"
+        }) | Out-Null
+    }
+    $checklist.Add([pscustomobject]@{
+        file = "09_演示视频.mp4"
+        name = "演示视频"
+        requirement = "1 到 2 分钟，覆盖 GeoEast 入口、运行追踪、写库和叠加查看"
+        status = "建议补充"
+    }) | Out-Null
+    $checklist | Export-Csv -LiteralPath (Join-Path $Dir "现场证据待办清单.csv") -NoTypeInformation -Encoding UTF8
 }
 
 $figureRoot = Get-FigureRoot

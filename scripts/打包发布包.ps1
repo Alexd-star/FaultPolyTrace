@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "v0.9.0",
+    [string]$Version = "v1.0.0-rc2-unified",
     [string]$GeoEastRoot = $(if ($env:FPT_GEOEAST_ROOT) { $env:FPT_GEOEAST_ROOT } elseif ($env:USERPROFILE) { Join-Path $env:USERPROFILE "GeoEast" } else { "C:\GeoEast" }),
     [switch]$SkipBuild
 )
@@ -51,6 +51,44 @@ function Sanitize-PackageTextFiles {
                 $encoding = $(if ($_.Extension.ToLowerInvariant() -eq ".ps1") { $utf8Bom } else { $utf8NoBom })
                 [System.IO.File]::WriteAllText($_.FullName, $text, $encoding)
             }
+    }
+}
+
+function Get-AggregateSha256 {
+    param([object[]]$Records)
+    $lines = @($Records | Sort-Object path | ForEach-Object { "{0}`t{1}" -f $_.path, $_.sha256 })
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes(($lines -join "`n"))
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        return ([BitConverter]::ToString($sha.ComputeHash($bytes))).Replace("-", "")
+    } finally {
+        $sha.Dispose()
+    }
+}
+
+function Get-SourceSnapshot {
+    param([string]$Root)
+    $paths = @(& git -C $Root -c core.quotepath=false ls-files --cached --others --exclude-standard 2>$null) |
+        Where-Object {
+            $_ -match '^(src/|standalone_app/qt_desktop/|geoeast_plugin/|packaging/windows/|scripts/|tests/|tests_cpp/)' -or
+            $_ -in @('CMakeLists.txt', 'pytest.ini')
+        } |
+        Where-Object { $_ -match '\.(cpp|c|h|hpp|pro|pri|vcxproj|filters|ps1|py|iss|isl|xml|ini|txt)$' } |
+        Sort-Object -Unique
+    $records = @()
+    foreach ($relative in $paths) {
+        $absolute = Join-Path $Root ($relative -replace '/', '\')
+        if (Test-Path -LiteralPath $absolute -PathType Leaf) {
+            $records += [ordered]@{
+                path = $relative
+                sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $absolute).Hash
+            }
+        }
+    }
+    return [ordered]@{
+        fileCount = $records.Count
+        sha256 = Get-AggregateSha256 -Records $records
+        files = $records
     }
 }
 
@@ -161,6 +199,8 @@ $runnerPath = Join-Path $repoRoot "geoeast_plugin\bo_runner\faultpolytrace_geoea
 $runnerIncluded = Copy-FileOptional $runnerPath (Join-Path $geoeastDir "bo_runner\faultpolytrace_geoeast_runner.exe")
 $boRunnerPackageDir = New-Item -ItemType Directory -Force -Path (Join-Path $geoeastDir "bo_runner")
 Copy-Item -Path (Join-Path $repoRoot "geoeast_plugin\bo_runner\*.pro") -Destination $boRunnerPackageDir -Force
+Copy-Item -Path (Join-Path $repoRoot "geoeast_plugin\bo_runner\*.vcxproj") -Destination $boRunnerPackageDir -Force
+Copy-Item -Path (Join-Path $repoRoot "geoeast_plugin\bo_runner\*.vcxproj.filters") -Destination $boRunnerPackageDir -Force
 Copy-Item -Path (Join-Path $repoRoot "geoeast_plugin\bo_runner\*.cpp") -Destination $boRunnerPackageDir -Force
 Copy-Item -Path (Join-Path $repoRoot "geoeast_plugin\bo_runner\*.h") -Destination $boRunnerPackageDir -Force
 Copy-FileOptional (Join-Path $repoRoot "geoeast_plugin\bo_runner\说明.md") (Join-Path $geoeastDir "bo_runner\说明.md") | Out-Null
@@ -180,6 +220,8 @@ foreach ($name in @("FaultPolyTraceMainframePlugin.dll", "manifest.xml")) {
 }
 
 Copy-Item -LiteralPath (Join-Path $repoRoot "docs") -Destination $docsDir -Recurse -Force
+Get-ChildItem -LiteralPath $docsDir -Recurse -File -Include "*.lic", "*.key", "*.pem" |
+    Remove-Item -Force
 $standalonePackageDir = New-Item -ItemType Directory -Force -Path (Join-Path $standaloneDir "qt_desktop")
 foreach ($name in @("FaultPolyTraceDesktop.pro", "main.cpp", "FaultPolyTraceWindow.cpp", "FaultPolyTraceWindow.h")) {
     Copy-FileOptional (Join-Path $repoRoot "standalone_app\qt_desktop\$name") (Join-Path $standalonePackageDir $name) | Out-Null
@@ -217,11 +259,14 @@ foreach ($script in @(
     "run_geoeast_bgpcup2026_test7.ps1",
     "run_smoke_test.ps1",
     "run_official_benchmark.ps1",
+    "运行冲顶候选集成入口.ps1",
     "build_geoeast_bo_runner.ps1",
     "build_geoeast_mainframe_plugin.ps1",
     "build_desktop_app.ps1",
     "build_qt_launcher.ps1",
     "打包发布包.ps1",
+    "GenerateBuildManifest.ps1",
+    "TestWindowsInstaller.ps1",
     "部署到GeoEast.ps1",
     "一键总验收.ps1",
     "验收独立软件发布包.ps1",
@@ -240,7 +285,17 @@ foreach ($script in @(
     "生成漏检质控图.py",
     "生成残余复核层.py",
     "生成前后对比图.py",
+    "生成纯断层多边形图.py",
     "顶尖质量诊断.py",
+    "全图分块视觉复核.py",
+    "冲顶候选集成入口.py",
+    "冲顶候选后处理流水线.py",
+    "生成冲顶候选证据包.py",
+    "局部候选修形实验.py",
+    "分支归属拆分实验.py",
+    "局部形态质量诊断.py",
+    "局部修形拓扑核验.py",
+    "冲顶实验晋级验收.py",
     "漏检根因诊断.py",
     "生成冲顶复核包.py",
     "综合质量评分.py",
@@ -253,11 +308,59 @@ foreach ($script in @(
 Copy-Item -LiteralPath (Join-Path $repoRoot "src") -Destination $srcDir -Recurse -Force
 Copy-FileRequired (Join-Path $repoRoot "README.md") (Join-Path $packageDir "README.md")
 
+$gitHead = (& git -C $repoRoot rev-parse HEAD 2>$null | Select-Object -First 1)
+$gitStatus = @(& git -C $repoRoot status --porcelain 2>$null)
+$sourceSnapshot = Get-SourceSnapshot -Root $repoRoot
+$buildId = "FPT-{0}-{1}" -f $Version, $sourceSnapshot.sha256.Substring(0, 16)
+$buildIdentity = [ordered]@{
+    schemaVersion = 2
+    buildId = $buildId
+    version = $Version
+    generatedAt = (Get-Date).ToString("o")
+    gitHead = $gitHead
+    gitDirty = ($gitStatus.Count -gt 0)
+    gitChangedPathCount = $gitStatus.Count
+    gitStatus = $gitStatus
+    sourceSnapshot = $sourceSnapshot
+    artifacts = @()
+    runtimeDependencies = @()
+}
+foreach ($relative in @(
+    "bin\faultpolytrace.exe",
+    "FaultPolyTrace.exe",
+    "qt_launcher\faultpolytrace_launcher.exe",
+    "geoeast_plugin\bo_runner\faultpolytrace_geoeast_runner.exe",
+    "geoeast_plugin\mainframe_plugin\built\FaultPolyTraceMainframePlugin.dll"
+)) {
+    $artifact = Join-Path $packageDir $relative
+    if (Test-Path -LiteralPath $artifact -PathType Leaf) {
+        $info = Get-Item -LiteralPath $artifact
+        $buildIdentity.artifacts += [ordered]@{
+            path = $relative.Replace("\", "/")
+            sizeBytes = $info.Length
+            modifiedAt = $info.LastWriteTime.ToString("o")
+            sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $artifact).Hash
+        }
+    }
+}
+foreach ($dependency in Get-ChildItem -LiteralPath $packageDir -File -Filter "*.dll") {
+    $buildIdentity.runtimeDependencies += [ordered]@{
+        name = $dependency.Name
+        sizeBytes = $dependency.Length
+        sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $dependency.FullName).Hash
+    }
+}
+$buildIdentity | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $packageDir "构建与依赖清单.json") -Encoding UTF8
+
 $manifest = @()
 $manifest += "# FaultPolyTrace 发布包清单"
 $manifest += ""
 $manifest += "版本：$Version"
+$manifest += "统一构建标识：$buildId"
+$manifest += "源码快照 SHA256：$($sourceSnapshot.sha256)"
 $manifest += "生成时间：$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+$manifest += "源码 Git HEAD：$gitHead"
+$manifest += "源码工作区状态：$(if ($gitStatus.Count -gt 0) { '含未提交改动，详见构建与依赖清单' } else { '干净' })"
 $manifest += ""
 $manifest += "## 包含内容"
 $manifest += ""
@@ -278,13 +381,15 @@ $manifest += '- `src/`：核心源码'
 $manifest += '- `standalone_app/`：独立桌面软件 Qt 工程源码'
 $manifest += '- `geoeast_plugin/`：GeoEast runner、集成控件和主控插件'
 $manifest += '- `prerequisites/`：可选运行库安装包'
+$manifest += '- `构建与依赖清单.json`：源码版本、工作区状态、二进制 SHA256 和运行库清单'
 $manifest += ""
 $manifest += "## 当前状态"
 $manifest += ""
 $manifest += "- 离线 CLI：已构建"
 $manifest += "- 独立桌面软件：已构建"
 $manifest += "- GeoEast 集成控件：已构建"
-$manifest += '- GeoEast 数据库读写：已验证过 `FaultPolyTrace_Result=465`'
+$manifest += '- GeoEast 适配器：SDK 编译通过，并具备字段初始化、含洞拒绝、删除状态检查和写后重读校验'
+$manifest += '- GeoEast 现场数据库往返：待人工确认；必须在有效许可和目标工区中完成读、写、显示、删除截图'
 if ($runnerIncluded) {
     $manifest += '- GeoEast runner exe：已包含'
 } else {
@@ -317,6 +422,18 @@ if (Test-Path -LiteralPath $reviewPackScript) {
 }
 
 Sanitize-PackageTextFiles $packageDir
+
+$packageRecords = @(Get-ChildItem -LiteralPath $packageDir -Recurse -File |
+    Where-Object { $_.Name -ne "构建与依赖清单.json" } |
+    ForEach-Object {
+        [ordered]@{
+            path = $_.FullName.Substring($packageDir.Length).TrimStart('\').Replace('\', '/')
+            sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $_.FullName).Hash
+        }
+    })
+$buildIdentity.packageFileCount = $packageRecords.Count
+$buildIdentity.packageContentSha256 = Get-AggregateSha256 -Records $packageRecords
+$buildIdentity | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $packageDir "构建与依赖清单.json") -Encoding UTF8
 
 $zipPath = Join-Path $releaseRoot ("FaultPolyTrace_" + $Version + ".zip")
 if (Test-Path -LiteralPath $zipPath) {

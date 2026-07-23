@@ -1,5 +1,6 @@
 #include "FaultTraceDialog.h"
 #include "UiLocalization.h"
+#include "TraceParameterModel.h"
 
 #include <QAction>
 #include <QActionGroup>
@@ -9,6 +10,7 @@
 #include <QClipboard>
 #include <QColor>
 #include <QColorDialog>
+#include <QCloseEvent>
 #include <QComboBox>
 #include <QCoreApplication>
 #include <QDateTime>
@@ -39,14 +41,15 @@
 #include <QRegularExpression>
 #include <QScrollArea>
 #include <QSettings>
+#include <QStandardPaths>
+#include <QSignalBlocker>
 #include <QSizePolicy>
 #include <QSpinBox>
 #include <QSplitter>
-#include <QSplashScreen>
-#include <QStandardPaths>
 #include <QTextEdit>
 #include <QTextCursor>
 #include <QToolBar>
+#include <QToolButton>
 #include <QTimer>
 #include <QUrl>
 #include <QVBoxLayout>
@@ -57,6 +60,12 @@
 #include <limits>
 
 namespace {
+
+QString launcherSettingsPath() {
+    const QString directory = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+    QDir().mkpath(directory);
+    return QDir(directory).filePath("faultpolytrace_launcher.ini");
+}
 
 class GuidedCatalogComboBox : public QComboBox {
 public:
@@ -94,45 +103,6 @@ protected:
             return true;
         }
         return QObject::eventFilter(object, event);
-    }
-};
-
-class GeoEastSplashScreen : public QSplashScreen {
-public:
-    GeoEastSplashScreen()
-        : QSplashScreen(makePixmap()) {
-        setWindowFlags(Qt::SplashScreen | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
-    }
-
-private:
-    static QPixmap makePixmap() {
-        QPixmap pixmap(450, 245);
-        pixmap.fill(QColor("#1F4D9B"));
-        QPainter painter(&pixmap);
-        painter.setRenderHint(QPainter::Antialiasing, true);
-        QLinearGradient bg(0, 0, pixmap.width(), pixmap.height());
-        bg.setColorAt(0.0, QColor("#173880"));
-        bg.setColorAt(0.55, QColor("#4E7FC3"));
-        bg.setColorAt(1.0, QColor("#1E3F92"));
-        painter.fillRect(pixmap.rect(), bg);
-        painter.setBrush(QColor(255, 255, 255, 38));
-        painter.setPen(Qt::NoPen);
-        painter.drawEllipse(QRectF(225, 20, 180, 180));
-        painter.drawEllipse(QRectF(70, 65, 90, 90));
-        painter.setBrush(QColor(255, 255, 255, 26));
-        painter.drawPolygon(QPolygonF() << QPointF(150, -30) << QPointF(250, 25)
-                                      << QPointF(180, 115) << QPointF(260, 245)
-                                      << QPointF(125, 245) << QPointF(85, 105));
-        painter.setPen(QColor("#FFFFFF"));
-        QFont title("Times New Roman", 28, QFont::Bold);
-        title.setItalic(true);
-        painter.setFont(title);
-        painter.drawText(QPointF(34, 138), "GeoEast");
-        painter.fillRect(QRect(0, 182, pixmap.width(), 63), QColor(118, 143, 188, 170));
-        painter.setFont(QFont("Arial", 12));
-        painter.setPen(QColor("#FFFF00"));
-        painter.drawText(QPointF(6, 235), "Initializing ......");
-        return pixmap;
     }
 };
 
@@ -416,8 +386,11 @@ QString settingOrCurrent(const QSettings& settings, const QString& key, const QS
 
 QString quoteForLog(const QStringList& args) {
     QStringList quoted;
+    bool redactNext = false;
     for (const QString& arg : args) {
-        quoted << (arg.contains(' ') ? QString("\"%1\"").arg(arg) : arg);
+        const QString value = redactNext ? QString::fromUtf8("<已隐藏>") : arg;
+        quoted << (value.contains(' ') ? QString("\"%1\"").arg(value) : value);
+        redactNext = arg == "--password";
     }
     return quoted.join(' ');
 }
@@ -1064,7 +1037,7 @@ private:
 class ColorBarWidget : public QWidget {
 public:
     explicit ColorBarWidget(QWidget* parent = nullptr) : QWidget(parent) {
-        setFixedWidth(56);
+        setFixedWidth(72);
         setMinimumHeight(360);
     }
 
@@ -1080,15 +1053,23 @@ protected:
         painter.setPen(QColor("#A0A0A0"));
         painter.drawLine(0, 0, 0, height());
 
-        const QRect barRect(20, 34, 18, qMax(120, height() - 88));
+        const QRect barRect(width() / 2 - 8, 58, 16, qMax(120, height() - 124));
         painter.setPen(QColor("#555555"));
         QFont labelFont = painter.font();
         labelFont.setPointSize(8);
         painter.setFont(labelFont);
+        QString title = fpt_ui::translate(QString::fromUtf8("属性"), languageCode_);
+        if (languageCode_ == "zh-CN") {
+            title = QString::fromUtf8("属\n性");
+        } else {
+            title = QString::fromUtf8("Attr.");
+        }
         painter.drawText(
-            QRect(4, 8, 48, 28),
+            QRect(4, 6, width() - 8, 28),
             Qt::AlignCenter | Qt::TextWordWrap,
-            fpt_ui::translate(QString::fromUtf8("属性"), languageCode_) + "\n1.0");
+            title);
+        painter.setPen(QColor("#0B35FF"));
+        painter.drawText(QRect(4, 34, width() - 8, 18), Qt::AlignCenter, QString::fromUtf8("1.0"));
 
         QLinearGradient gradient(barRect.topLeft(), barRect.bottomLeft());
         gradient.setColorAt(0.00, QColor("#0B35FF"));
@@ -1101,7 +1082,7 @@ protected:
         painter.drawRect(barRect.adjusted(0, 0, -1, -1));
 
         painter.setPen(QColor("#DC143C"));
-        painter.drawText(QRect(4, barRect.bottom() + 6, 48, 16), Qt::AlignCenter, "0.0");
+        painter.drawText(QRect(4, barRect.bottom() + 6, width() - 8, 18), Qt::AlignCenter, "0.0");
     }
 
 private:
@@ -1111,7 +1092,7 @@ private:
 QLabel* makeFormLabel(const QString& text, QWidget* parent) {
     QLabel* label = new QLabel(text, parent);
     label->setObjectName("formLabel");
-    label->setMinimumWidth(112);
+    label->setMinimumWidth(124);
     label->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     return label;
 }
@@ -1123,7 +1104,7 @@ void tuneControl(QWidget* widget) {
 
 QGridLayout* makeGroupLayout(QGroupBox* box) {
     QGridLayout* layout = new QGridLayout(box);
-    layout->setContentsMargins(12, 12, 12, 10);
+    layout->setContentsMargins(12, 16, 12, 10);
     layout->setHorizontalSpacing(8);
     layout->setVerticalSpacing(7);
     layout->setColumnStretch(0, 0);
@@ -1140,9 +1121,6 @@ void addFormRow(QGridLayout* layout, int row, const QString& label, QWidget* edi
 } // namespace
 
 FaultTraceDialog::FaultTraceDialog(QWidget* parent) : QDialog(parent), process_(new QProcess(this)) {
-    GeoEastSplashScreen splash;
-    splash.show();
-    QCoreApplication::processEvents();
     buildUi();
     loadSettings();
     updateStatusContext();
@@ -1152,7 +1130,6 @@ FaultTraceDialog::FaultTraceDialog(QWidget* parent) : QDialog(parent), process_(
     connect(process_, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &FaultTraceDialog::onProcessFinished);
     connect(process_, &QProcess::errorOccurred, this, &FaultTraceDialog::onProcessError);
-    splash.finish(this);
 }
 
 void FaultTraceDialog::buildUi() {
@@ -1161,13 +1138,19 @@ void FaultTraceDialog::buildUi() {
     resize(980, 720);
 
     runnerEdit_ = new QLineEdit(defaultRunnerPath(), this);
+    runnerEdit_->setMinimumWidth(0);
+    runnerEdit_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
     QPushButton* browseRunnerButton = new QPushButton(QString::fromUtf8("浏览"), this);
     connect(browseRunnerButton, &QPushButton::clicked, this, &FaultTraceDialog::browseRunner);
 
     const QString detectedGeoEastRoot = detectGeoEastRoot();
     geoEastRootEdit_ = new QLineEdit(detectedGeoEastRoot, this);
+    geoEastRootEdit_->setMinimumWidth(0);
+    geoEastRootEdit_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
     geoEastRootEdit_->setPlaceholderText(QString::fromUtf8("自动识别失败时请手动选择 GeoEast 安装根目录"));
     geoEastDataRootEdit_ = new QLineEdit(detectGeoEastDataRoot(detectedGeoEastRoot), this);
+    geoEastDataRootEdit_->setMinimumWidth(0);
+    geoEastDataRootEdit_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
     geoEastDataRootEdit_->setPlaceholderText(QString::fromUtf8("自动识别失败时请手动选择 GeoEastData 根目录"));
     pgHostEdit_ = new QLineEdit(envOrDefault("FPT_GEOEAST_PG_HOST", "127.0.0.1"), this);
     pgPortEdit_ = new QLineEdit(envOrDefault("FPT_GEOEAST_PG_PORT", "5433"), this);
@@ -1243,6 +1226,8 @@ void FaultTraceDialog::buildUi() {
     });
     outputEdit_ = new QLineEdit(envOrDefault("FPT_GEOEAST_OUTPUT", "FaultPolyTrace_Result"), this);
     polygonColorEdit_ = new QLineEdit(envOrDefault("FPT_POLYGON_COLOR", "#00FFFF"), this);
+    polygonColorEdit_->setMinimumWidth(0);
+    polygonColorEdit_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
     polygonColorEdit_->setReadOnly(true);
     polygonColorButton_ = new QPushButton(QString::fromUtf8("选择颜色"), this);
     polygonLineWidthSpin_ = new QDoubleSpinBox(this);
@@ -1251,6 +1236,8 @@ void FaultTraceDialog::buildUi() {
     polygonLineWidthSpin_->setSingleStep(0.005);
     polygonLineWidthSpin_->setValue(0.025);
     connect(polygonColorButton_, &QPushButton::clicked, this, &FaultTraceDialog::choosePolygonColor);
+    connect(polygonLineWidthSpin_, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            this, [this](double) { updateStatusContext(); });
     setPolygonColor(QColor(polygonColorEdit_->text()));
     refreshButton_ = new QPushButton(QString::fromUtf8("刷新网格列表"), this);
     connect(refreshButton_, &QPushButton::clicked, this, &FaultTraceDialog::refreshGrids);
@@ -1258,6 +1245,8 @@ void FaultTraceDialog::buildUi() {
     importDatCheck_ = new QCheckBox(QString::fromUtf8("从 DAT 导入/覆盖输入网格"), this);
     importDatCheck_->setChecked(false);
     datFileEdit_ = new QLineEdit(defaultOfficialDatPath(), this);
+    datFileEdit_->setMinimumWidth(0);
+    datFileEdit_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
     datFileEdit_->setPlaceholderText(QString::fromUtf8("可选：选择需要导入或覆盖到 GeoEast 的 DAT 文件"));
     QPushButton* browseDatButton = new QPushButton(QString::fromUtf8("浏览"), this);
     overwriteGridCheck_ = new QCheckBox(QString::fromUtf8("覆盖同名 GeoEast 网格"), this);
@@ -1280,21 +1269,20 @@ void FaultTraceDialog::buildUi() {
     styleLayout->addWidget(polygonColorButton_);
     styleLayout->addWidget(new QLabel(QString::fromUtf8("线宽"), this));
     styleLayout->addWidget(polygonLineWidthSpin_);
-    dataLayout->addRow(QString::fromUtf8("结果样式"), styleLayout);
+    dataLayout->addRow(QString::fromUtf8("显示样式"), styleLayout);
     dataLayout->addRow(importDatCheck_);
     dataLayout->addRow(QString::fromUtf8("DAT 文件"), datLayout);
     dataLayout->addRow(overwriteGridCheck_);
 
     QGroupBox* paramsBox = new QGroupBox(QString::fromUtf8("追踪参数"), this);
     presetCombo_ = new QComboBox(this);
-    presetCombo_->addItem(QString::fromUtf8("全覆盖优先"));
-    presetCombo_->addItem(QString::fromUtf8("贴合融合推荐"));
-    presetCombo_->addItem(QString::fromUtf8("防黏连增强"));
-    presetCombo_->addItem(QString::fromUtf8("均衡推荐"));
-    presetCombo_->addItem(QString::fromUtf8("保守高精度"));
-    presetCombo_->addItem(QString::fromUtf8("弱响应高召回"));
-    presetCombo_->addItem(QString::fromUtf8("宽断层带"));
-    presetCombo_->addItem(QString::fromUtf8("细碎断裂"));
+    presetCombo_->addItems(fpt_ui::presetKeys());
+    qualityModeCombo_ = new QComboBox(this);
+    fpt_ui::setComboItems(qualityModeCombo_, {
+        QString::fromUtf8("正式处理"),
+        QString::fromUtf8("质量诊断"),
+        QString::fromUtf8("受控实验")
+    }, languageCode());
 
     traceModeCombo_ = new QComboBox(this);
     traceModeCombo_->addItem("ridge-belt");
@@ -1492,6 +1480,24 @@ void FaultTraceDialog::buildUi() {
                 background: #CCE8FF;
                 border-color: #99D1FF;
             }
+            QWidget#layerPanel {
+                background: #F7F7F7;
+                border: 1px solid #C7C7C7;
+                border-radius: 3px;
+            }
+            QLabel#layerPanelTitle {
+                color: #005A9E;
+                font-weight: bold;
+            }
+            QLabel#layerHint {
+                color: #666666;
+                font-size: 11px;
+            }
+            QCheckBox#layerCheck {
+                background: transparent;
+                min-height: 22px;
+                padding: 2px 0;
+            }
             QFrame#sidebar {
                 background: #F0F0F0;
                 border-right: 1px solid #999999;
@@ -1522,8 +1528,8 @@ void FaultTraceDialog::buildUi() {
                 background: #F0F0F0;
                 border: 1px solid #B5B5B5;
                 border-radius: 3px;
-                margin-top: 9px;
-                padding-top: 5px;
+                margin-top: 14px;
+                padding-top: 10px;
                 font-weight: normal;
             }
             QGroupBox::title {
@@ -1737,7 +1743,7 @@ void FaultTraceDialog::buildUi() {
         viewMenu->addSeparator();
         showInputLayerAction_ = viewMenu->addAction(QString::fromUtf8("显示原始网格层"));
         showInputLayerAction_->setCheckable(true);
-        showInputLayerAction_->setChecked(true);
+        showInputLayerAction_->setChecked(false);
         connect(showInputLayerAction_, &QAction::toggled, this, [this](bool checked) {
             if (showInputLayerCheck_ && showInputLayerCheck_->isChecked() != checked) {
                 showInputLayerCheck_->setChecked(checked);
@@ -1747,7 +1753,7 @@ void FaultTraceDialog::buildUi() {
         });
         showResultLayerAction_ = viewMenu->addAction(QString::fromUtf8("显示结果多边形层"));
         showResultLayerAction_->setCheckable(true);
-        showResultLayerAction_->setChecked(true);
+        showResultLayerAction_->setChecked(false);
         connect(showResultLayerAction_, &QAction::toggled, this, [this](bool checked) {
             if (showResultLayerCheck_ && showResultLayerCheck_->isChecked() != checked) {
                 showResultLayerCheck_->setChecked(checked);
@@ -1838,8 +1844,8 @@ void FaultTraceDialog::buildUi() {
 
         QFrame* sidebar = new QFrame(this);
         sidebar->setObjectName("sidebar");
-        sidebar->setMinimumWidth(330);
-        sidebar->setMaximumWidth(620);
+        sidebar->setMinimumWidth(500);
+        sidebar->setMaximumWidth(720);
         sidebar->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
         QVBoxLayout* sidebarRoot = new QVBoxLayout(sidebar);
         sidebarRoot->setContentsMargins(0, 0, 0, 0);
@@ -1873,16 +1879,16 @@ void FaultTraceDialog::buildUi() {
         QHBoxLayout* colorLineLayout = new QHBoxLayout(colorLineWidget);
         colorLineLayout->setContentsMargins(0, 0, 0, 0);
         colorLineLayout->setSpacing(5);
-        colorLineLayout->addWidget(polygonColorEdit_, 1);
         colorLineLayout->addWidget(polygonColorButton_);
+        colorLineLayout->addWidget(polygonColorEdit_, 1);
         colorLineLayout->addWidget(polygonLineWidthSpin_);
-        addFormRow(dataLayoutNew, 2, QString::fromUtf8("结果样式 / 线宽"), colorLineWidget, dataGroup);
+        addFormRow(dataLayoutNew, 2, QString::fromUtf8("显示样式 / 线宽"), colorLineWidget, dataGroup);
         QWidget* datLineWidget = new QWidget(dataGroup);
         QHBoxLayout* datLineLayout = new QHBoxLayout(datLineWidget);
         datLineLayout->setContentsMargins(0, 0, 0, 0);
         datLineLayout->setSpacing(5);
-        datLineLayout->addWidget(datFileEdit_, 1);
         datLineLayout->addWidget(browseDatButton);
+        datLineLayout->addWidget(datFileEdit_, 1);
         addFormRow(dataLayoutNew, 3, QString::fromUtf8("DAT 文件"), datLineWidget, dataGroup);
         dataLayoutNew->addWidget(overwriteGridCheck_, 4, 0, 1, 2);
         dataLayoutNew->addWidget(importDatCheck_, 5, 0, 1, 2);
@@ -1891,14 +1897,37 @@ void FaultTraceDialog::buildUi() {
 
         QGroupBox* resultGroup = new QGroupBox(QString::fromUtf8("结果查看"), sidebarContent);
         QGridLayout* resultLayout = makeGroupLayout(resultGroup);
-        showInputLayerCheck_ = new QCheckBox(QString::fromUtf8("显示原始网格层"), resultGroup);
-        showInputLayerCheck_->setToolTip(QString::fromUtf8("控制结果视图区是否显示本次追踪生成的原始网格图层。"));
-        showInputLayerCheck_->setChecked(true);
-        showResultLayerCheck_ = new QCheckBox(QString::fromUtf8("显示结果多边形层"), resultGroup);
-        showResultLayerCheck_->setToolTip(QString::fromUtf8("控制结果视图区是否显示本次追踪生成的结果多边形图层。"));
-        showResultLayerCheck_->setChecked(true);
-        resultLayout->addWidget(showInputLayerCheck_, 0, 0);
-        resultLayout->addWidget(showResultLayerCheck_, 0, 1);
+        QWidget* layerPanel = new QWidget(resultGroup);
+        layerPanel->setObjectName("layerPanel");
+        QVBoxLayout* layerPanelLayout = new QVBoxLayout(layerPanel);
+        layerPanelLayout->setContentsMargins(8, 6, 8, 6);
+        layerPanelLayout->setSpacing(4);
+        layerTitleLabel_ = new QLabel(QString::fromUtf8("显示图层"), layerPanel);
+        layerTitleLabel_->setObjectName("layerPanelTitle");
+        showInputLayerCheck_ = new QCheckBox(layerPanel);
+        showInputLayerCheck_->setObjectName("layerCheck");
+        showInputLayerCheck_->setText(QString::fromUtf8("原始网格"));
+        showInputLayerCheck_->setToolTip(QString::fromUtf8("显示或隐藏输入断层属性网格。GeoEast 模式会按需导出当前 BOMapGrid 视图。"));
+        showInputLayerCheck_->setChecked(false);
+        showResultLayerCheck_ = new QCheckBox(layerPanel);
+        showResultLayerCheck_->setObjectName("layerCheck");
+        showResultLayerCheck_->setText(QString::fromUtf8("结果多边形"));
+        showResultLayerCheck_->setToolTip(QString::fromUtf8("显示或隐藏追踪结果多边形。没有结果时请先追踪或选择已有结果。"));
+        showResultLayerCheck_->setChecked(false);
+        layerHintLabel_ = new QLabel(QString::fromUtf8("同时勾选两层即为叠加查看。"), layerPanel);
+        layerHintLabel_->setObjectName("layerHint");
+        layerHintLabel_->setWordWrap(true);
+        showOverlayLayerButton_ = new QPushButton(layerPanel);
+        showOverlayLayerButton_->setText(QString::fromUtf8("叠加查看"));
+        showOverlayLayerButton_->setToolTip(QString::fromUtf8("同时显示原始网格和结果多边形，用于检查贴合关系。"));
+        showOverlayLayerButton_->setMinimumHeight(24);
+        showOverlayLayerButton_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+        layerPanelLayout->addWidget(layerTitleLabel_);
+        layerPanelLayout->addWidget(showInputLayerCheck_);
+        layerPanelLayout->addWidget(showResultLayerCheck_);
+        layerPanelLayout->addWidget(layerHintLabel_);
+        layerPanelLayout->addWidget(showOverlayLayerButton_);
+        resultLayout->addWidget(layerPanel, 0, 0, 1, 2);
         auto* guidedOutputCombo = new GuidedCatalogComboBox(resultGroup);
         outputCatalogCombo_ = guidedOutputCombo;
         outputCatalogCombo_->addItem(QString::fromUtf8("请先配置项目并刷新结果"), QString());
@@ -1973,12 +2002,29 @@ void FaultTraceDialog::buildUi() {
             }
             updateLayerVisibility();
         });
+        connect(showOverlayLayerButton_, &QPushButton::clicked, this, [this]() {
+            if (showInputLayerCheck_ && showResultLayerCheck_) {
+                QSignalBlocker inputBlocker(showInputLayerCheck_);
+                QSignalBlocker resultBlocker(showResultLayerCheck_);
+                showInputLayerCheck_->setChecked(true);
+                showResultLayerCheck_->setChecked(true);
+            }
+            if (showInputLayerAction_ && !showInputLayerAction_->isChecked()) {
+                showInputLayerAction_->setChecked(true);
+            }
+            if (showResultLayerAction_ && !showResultLayerAction_->isChecked()) {
+                showResultLayerAction_->setChecked(true);
+            }
+            updateLayerVisibility();
+        });
         connect(mappingGuideButton, &QPushButton::clicked, this, [this, openLocalFile]() {
             appendLog(QString::fromUtf8("正在打开 GeoEast 叠加查看步骤。官方图层显示和关闭请在 GeoEast 图层树中操作。"));
             openLocalFile("docs/GeoEast使用指南.md");
         });
         connect(refreshOutputsButton_, &QPushButton::clicked, this, &FaultTraceDialog::refreshOutputs);
-        connect(loadSelectedOutputButton_, &QPushButton::clicked, this, &FaultTraceDialog::loadSelectedOutput);
+        connect(loadSelectedOutputButton_, &QPushButton::clicked, this, [this]() {
+            loadSelectedOutputInternal(true);
+        });
         connect(loadResultViewButton_, &QPushButton::clicked, this, &FaultTraceDialog::loadResultView);
         connect(exportViewButton_, &QPushButton::clicked, this, &FaultTraceDialog::exportResultViewPng);
         connect(openBasemapButton_, &QPushButton::clicked, this, &FaultTraceDialog::openGeoEastBasemap);
@@ -1989,7 +2035,9 @@ void FaultTraceDialog::buildUi() {
                 return;
             }
             if (!showResultLayerCheck_ || showResultLayerCheck_->isChecked()) {
-                QTimer::singleShot(0, this, &FaultTraceDialog::loadSelectedOutput);
+                QTimer::singleShot(0, this, [this]() {
+                    loadSelectedOutputInternal(false);
+                });
             } else {
                 outputEdit_->setText(outputCatalogCombo_->currentData().toString().trimmed());
                 updateStatusContext();
@@ -2000,11 +2048,12 @@ void FaultTraceDialog::buildUi() {
         QGroupBox* traceGroup = new QGroupBox(QString::fromUtf8("追踪参数"), sidebarContent);
         QGridLayout* traceLayoutNew = makeGroupLayout(traceGroup);
         addFormRow(traceLayoutNew, 0, QString::fromUtf8("预设模板"), presetCombo_, traceGroup);
-        addFormRow(traceLayoutNew, 1, QString::fromUtf8("追踪模式"), traceModeCombo_, traceGroup);
-        addFormRow(traceLayoutNew, 2, QString::fromUtf8("阈值模式"), thresholdModeCombo_, traceGroup);
-        addFormRow(traceLayoutNew, 3, QString::fromUtf8("分位数"), percentileSpin_, traceGroup);
-        addFormRow(traceLayoutNew, 4, QString::fromUtf8("固定阈值"), thresholdSpin_, traceGroup);
-        addFormRow(traceLayoutNew, 5, QString::fromUtf8("平滑次数"), smoothIterationsSpin_, traceGroup);
+        addFormRow(traceLayoutNew, 1, QString::fromUtf8("质量模式"), qualityModeCombo_, traceGroup);
+        addFormRow(traceLayoutNew, 2, QString::fromUtf8("追踪模式"), traceModeCombo_, traceGroup);
+        addFormRow(traceLayoutNew, 3, QString::fromUtf8("阈值模式"), thresholdModeCombo_, traceGroup);
+        addFormRow(traceLayoutNew, 4, QString::fromUtf8("分位数"), percentileSpin_, traceGroup);
+        addFormRow(traceLayoutNew, 5, QString::fromUtf8("固定阈值"), thresholdSpin_, traceGroup);
+        addFormRow(traceLayoutNew, 6, QString::fromUtf8("平滑次数"), smoothIterationsSpin_, traceGroup);
         sidebarContentLayout->addWidget(traceGroup);
 
         QGroupBox* morphologyGroup = new QGroupBox(QString::fromUtf8("形态与拓扑约束"), sidebarContent);
@@ -2128,7 +2177,7 @@ void FaultTraceDialog::buildUi() {
         mainSplitter_->addWidget(workspace);
         mainSplitter_->setStretchFactor(0, 0);
         mainSplitter_->setStretchFactor(1, 1);
-        mainSplitter_->setSizes({400, 800});
+        mainSplitter_->setSizes({520, 760});
 
         QFrame* statusBar = new QFrame(this);
         statusBar->setObjectName("statusBar");
@@ -2553,10 +2602,10 @@ void FaultTraceDialog::restoreDefaults() {
     importDatCheck_->setChecked(false);
     overwriteGridCheck_->setChecked(true);
     if (showInputLayerCheck_) {
-        showInputLayerCheck_->setChecked(true);
+        showInputLayerCheck_->setChecked(false);
     }
     if (showResultLayerCheck_) {
-        showResultLayerCheck_->setChecked(true);
+        showResultLayerCheck_->setChecked(false);
     }
     updateOptionControls();
     updateLayerVisibility();
@@ -2629,12 +2678,31 @@ void FaultTraceDialog::retranslateUi() {
     setWindowTitle(uiText("FaultPolyTrace 断层多边形自动追踪"));
     fpt_ui::applyTranslatableText(this, languageCode());
     fpt_ui::refreshComboItems(presetCombo_, languageCode());
+    fpt_ui::refreshComboItems(qualityModeCombo_, languageCode());
     fpt_ui::refreshComboItems(outputCatalogCombo_, languageCode());
     if (refreshOutputsButton_) {
         refreshOutputsButton_->setText(uiText(QString::fromUtf8("刷新结果列表")));
     }
     if (loadSelectedOutputButton_) {
         loadSelectedOutputButton_->setText(uiText(QString::fromUtf8("显示所选结果")));
+    }
+    if (layerTitleLabel_) {
+        layerTitleLabel_->setText(uiText(QString::fromUtf8("显示图层")));
+    }
+    if (layerHintLabel_) {
+        layerHintLabel_->setText(uiText(QString::fromUtf8("同时勾选两层即为叠加查看。")));
+    }
+    if (showInputLayerCheck_) {
+        showInputLayerCheck_->setText(uiText(QString::fromUtf8("原始网格")));
+        showInputLayerCheck_->setToolTip(uiText(QString::fromUtf8("显示或隐藏输入断层属性网格。GeoEast 模式会按需导出当前 BOMapGrid 视图。")));
+    }
+    if (showResultLayerCheck_) {
+        showResultLayerCheck_->setText(uiText(QString::fromUtf8("结果多边形")));
+        showResultLayerCheck_->setToolTip(uiText(QString::fromUtf8("显示或隐藏追踪结果多边形。没有结果时请先追踪或选择已有结果。")));
+    }
+    if (showOverlayLayerButton_) {
+        showOverlayLayerButton_->setText(uiText(QString::fromUtf8("叠加查看")));
+        showOverlayLayerButton_->setToolTip(uiText(QString::fromUtf8("同时显示原始网格和结果多边形，用于检查贴合关系。")));
     }
     if (languageChineseAction_) {
         languageChineseAction_->setText(uiText("简体中文"));
@@ -2665,7 +2733,7 @@ void FaultTraceDialog::retranslateUi() {
 }
 
 void FaultTraceDialog::loadSettings() {
-    QSettings settings(QCoreApplication::applicationDirPath() + "/faultpolytrace_launcher.ini", QSettings::IniFormat);
+    QSettings settings(launcherSettingsPath(), QSettings::IniFormat);
     const int schemaVersion = settings.value("configSchemaVersion", 0).toInt();
     currentLanguage_ = fpt_ui::normalizeLanguageCode(settings.value("language", "zh-CN").toString()) == "en"
         ? UiLanguage::English
@@ -2679,6 +2747,7 @@ void FaultTraceDialog::loadSettings() {
     projectEdit_->setText(settingOrCurrent(settings, "project", projectEdit_->text(), schemaVersion));
     userEdit_->setText(settingOrCurrent(settings, "user", userEdit_->text(), schemaVersion));
     setComboByKey(presetCombo_, settings.value("preset", comboKey(presetCombo_)).toString());
+    setComboByKey(qualityModeCombo_, settings.value("qualityMode", QString::fromUtf8("正式处理")).toString());
     gridCombo_->setCurrentText(settingOrCurrent(settings, "grid", gridCombo_->currentText(), schemaVersion));
     outputEdit_->setText(settings.value("output", outputEdit_->text()).toString());
     datFileEdit_->setText(settingOrCurrent(settings, "datFile", datFileEdit_->text(), schemaVersion));
@@ -2724,15 +2793,19 @@ void FaultTraceDialog::loadSettings() {
     residualTraceMinLengthSpin_->setValue(settings.value("residualTraceMinLength", residualTraceMinLengthSpin_->value()).toInt());
     residualTraceMaxCellsSpin_->setValue(settings.value("residualTraceMaxCells", residualTraceMaxCellsSpin_->value()).toInt());
     if (showInputLayerCheck_) {
-        showInputLayerCheck_->setChecked(settings.value("showInputLayer", showInputLayerCheck_->isChecked()).toBool());
+        showInputLayerCheck_->setChecked(false);
     }
     if (showResultLayerCheck_) {
-        showResultLayerCheck_->setChecked(settings.value("showResultLayer", showResultLayerCheck_->isChecked()).toBool());
+        showResultLayerCheck_->setChecked(false);
     }
     if (mainSplitter_) {
         const QByteArray splitterState = settings.value("mainSplitterState").toByteArray();
         if (!splitterState.isEmpty()) {
             mainSplitter_->restoreState(splitterState);
+        }
+        QList<int> sizes = mainSplitter_->sizes();
+        if (sizes.size() >= 2 && sizes.at(0) < 500) {
+            mainSplitter_->setSizes({520, qMax(620, sizes.at(1))});
         }
     }
     updateOptionControls();
@@ -2742,8 +2815,8 @@ void FaultTraceDialog::loadSettings() {
 }
 
 void FaultTraceDialog::saveSettings() const {
-    QSettings settings(QCoreApplication::applicationDirPath() + "/faultpolytrace_launcher.ini", QSettings::IniFormat);
-    settings.setValue("configSchemaVersion", 2);
+    QSettings settings(launcherSettingsPath(), QSettings::IniFormat);
+    settings.setValue("configSchemaVersion", 3);
     settings.setValue("language", languageCode());
     settings.setValue("runner", runnerEdit_->text());
     settings.setValue("geoEastRoot", geoEastRootEdit_->text());
@@ -2754,6 +2827,7 @@ void FaultTraceDialog::saveSettings() const {
     settings.setValue("project", projectEdit_->text());
     settings.setValue("user", userEdit_->text());
     settings.setValue("preset", comboKey(presetCombo_));
+    settings.setValue("qualityMode", comboKey(qualityModeCombo_));
     settings.setValue("grid", gridCombo_->currentText());
     settings.setValue("output", outputEdit_->text());
     settings.setValue("datFile", datFileEdit_->text());
@@ -3058,6 +3132,54 @@ bool FaultTraceDialog::launchGeoEastApp(const QString& exeName, const QString& d
     return true;
 }
 
+fpt_ui::TraceParameters FaultTraceDialog::currentTraceParameters() const {
+    fpt_ui::TraceParameters p;
+    p.traceMode = traceModeCombo_->currentText();
+    p.thresholdMode = thresholdModeCombo_->currentText();
+    p.threshold = thresholdSpin_->value();
+    p.percentile = percentileSpin_->value();
+    p.minArea = minAreaSpin_->value();
+    p.closeRadius = closeRadiusSpin_->value();
+    p.weakPercentile = weakPercentileSpin_->value();
+    p.weakConnectRadius = weakConnectRadiusSpin_->value();
+    p.beltRadius = beltRadiusSpin_->value();
+    p.postBeltCloseRadius = postBeltCloseRadiusSpin_->value();
+    p.attributeConstrainedBelt = attributeConstrainedBeltCheck_->isChecked();
+    p.attributeEnvelopeRadius = attributeEnvelopeRadiusSpin_->value();
+    p.minBranchLength = minBranchLengthSpin_->value();
+    p.minJunctionBranchLength = minJunctionBranchLengthSpin_->value();
+    p.minJunctionBranchMean = minJunctionBranchMeanSpin_->value();
+    p.maxGapDistance = maxGapDistanceSpin_->value();
+    p.maxGapAngle = maxGapAngleSpin_->value();
+    p.rootAntiMerge = rootAntiMergeCheck_->isChecked();
+    p.rootAntiMergeRadius = rootAntiMergeRadiusSpin_->value();
+    p.rootAntiMergeSupportRatio = rootAntiMergeSupportRatioSpin_->value();
+    p.rootAntiMergeMinPartCells = rootAntiMergeMinPartCellsSpin_->value();
+    p.rootAntiMergeMinPartRatio = rootAntiMergeMinPartRatioSpin_->value();
+    p.rootAntiMergeWeakGuardThreshold = rootAntiMergeWeakGuardThresholdSpin_->value();
+    p.rootAntiMergeWeakGuardRadius = rootAntiMergeWeakGuardRadiusSpin_->value();
+    p.localAntiMerge = localAntiMergeCheck_->isChecked();
+    p.localAntiMergeLowThreshold = localAntiMergeLowThresholdSpin_->value();
+    p.localAntiMergeBridgeRadius = localAntiMergeBridgeRadiusSpin_->value();
+    p.localAntiMergeMinPartCells = localAntiMergeMinPartCellsSpin_->value();
+    p.localAntiMergeMinPartRatio = localAntiMergeMinPartRatioSpin_->value();
+    p.localAntiMergeMinBridgeCells = localAntiMergeMinBridgeCellsSpin_->value();
+    p.localAntiMergeMinLowRatio = localAntiMergeMinLowRatioSpin_->value();
+    p.residualTrace = residualTraceCheck_->isChecked();
+    p.residualTraceMinLength = residualTraceMinLengthSpin_->value();
+    p.residualTraceMaxCells = residualTraceMaxCellsSpin_->value();
+    p.simplifyTolerance = simplifyToleranceSpin_->value();
+    p.smoothIterations = smoothIterationsSpin_->value();
+
+    const QString mode = comboKey(qualityModeCombo_);
+    if (mode == QString::fromUtf8("质量诊断")) {
+        p.qualityMode = fpt_ui::QualityMode::Diagnostics;
+    } else if (mode == QString::fromUtf8("受控实验")) {
+        p.qualityMode = fpt_ui::QualityMode::Experimental;
+    }
+    return p;
+}
+
 QStringList FaultTraceDialog::traceArgs() const {
     QStringList args = commonConnectionArgs();
     QDir().mkpath(previewOutputDir());
@@ -3068,273 +3190,54 @@ QStringList FaultTraceDialog::traceArgs() const {
         }
     }
     args << "--grid" << gridCombo_->currentText().trimmed()
-         << "--output" << outputEdit_->text().trimmed()
-         << "--trace-mode" << traceModeCombo_->currentText()
-         << "--threshold-mode" << thresholdModeCombo_->currentText()
-         << "--threshold" << QString::number(thresholdSpin_->value(), 'g', 12)
-         << "--percentile" << QString::number(percentileSpin_->value(), 'g', 12)
-         << "--close-radius" << QString::number(closeRadiusSpin_->value())
-         << "--weak-percentile" << QString::number(weakPercentileSpin_->value(), 'g', 12)
-         << "--weak-connect-radius" << QString::number(weakConnectRadiusSpin_->value())
-         << "--belt-radius" << QString::number(beltRadiusSpin_->value())
-         << "--post-belt-close-radius" << QString::number(postBeltCloseRadiusSpin_->value())
-         << "--attribute-envelope-radius" << QString::number(attributeEnvelopeRadiusSpin_->value())
-         << "--min-branch-length" << QString::number(minBranchLengthSpin_->value())
-         << "--min-junction-branch-length" << QString::number(minJunctionBranchLengthSpin_->value())
-         << "--min-junction-branch-mean" << QString::number(minJunctionBranchMeanSpin_->value(), 'g', 12)
-         << "--max-gap-distance" << QString::number(maxGapDistanceSpin_->value())
-         << "--max-gap-angle" << QString::number(maxGapAngleSpin_->value(), 'g', 12)
-         << "--min-gap-support-ratio" << "0.25"
-         << "--no-separate-branch-belts"
-         << "--root-anti-merge-radius" << QString::number(rootAntiMergeRadiusSpin_->value())
-         << "--root-anti-merge-support-ratio" << QString::number(rootAntiMergeSupportRatioSpin_->value(), 'g', 12)
-         << "--root-anti-merge-max-bridge-value" << "1e-12"
-         << "--root-anti-merge-min-part-cells" << QString::number(rootAntiMergeMinPartCellsSpin_->value())
-         << "--root-anti-merge-min-part-ratio" << QString::number(rootAntiMergeMinPartRatioSpin_->value(), 'g', 12)
-         << "--root-anti-merge-weak-guard-threshold" << QString::number(rootAntiMergeWeakGuardThresholdSpin_->value(), 'g', 12)
-         << "--root-anti-merge-weak-guard-radius" << QString::number(rootAntiMergeWeakGuardRadiusSpin_->value())
-         << "--local-anti-merge-low-threshold" << QString::number(localAntiMergeLowThresholdSpin_->value(), 'g', 12)
-         << "--local-anti-merge-bridge-radius" << QString::number(localAntiMergeBridgeRadiusSpin_->value())
-         << "--local-anti-merge-min-part-cells" << QString::number(localAntiMergeMinPartCellsSpin_->value())
-         << "--local-anti-merge-min-part-ratio" << QString::number(localAntiMergeMinPartRatioSpin_->value(), 'g', 12)
-         << "--local-anti-merge-min-bridge-cells" << QString::number(localAntiMergeMinBridgeCellsSpin_->value())
-         << "--local-anti-merge-min-low-ratio" << QString::number(localAntiMergeMinLowRatioSpin_->value(), 'g', 12)
-         << "--residual-percentile" << "0.955"
-         << "--residual-fill-radius" << "4"
-         << "--residual-edge-fill-radius" << "2"
-         << "--residual-edge-fill-min-value-ratio" << "0.97"
-         << "--residual-edge-fill-max-patch-span" << "5"
-         << "--residual-min-cells" << "2"
-         << "--residual-trace-min-length" << QString::number(residualTraceMinLengthSpin_->value())
-         << "--residual-trace-max-cells" << QString::number(residualTraceMaxCellsSpin_->value())
-         << "--residual-covered-guard-radius" << "0"
-         << "--simplify-tolerance" << QString::number(simplifyToleranceSpin_->value(), 'g', 12)
-         << "--smooth-iterations" << QString::number(smoothIterationsSpin_->value())
-          << "--polygon-color" << polygonColorEdit_->text()
-          << "--polygon-linewidth" << QString::number(polygonLineWidthSpin_->value(), 'g', 12)
-          << "--min-area" << QString::number(minAreaSpin_->value(), 'g', 12)
-          << "--view-grid-output" << previewGridPath()
-          << "--view-polygons-output" << previewPolygonsPath();
-    if (attributeConstrainedBeltCheck_->isChecked()) {
-        args << "--attribute-constrained-belt";
-    } else {
-        args << "--no-attribute-constrained-belt";
-    }
-    if (rootAntiMergeCheck_->isChecked()) {
-        args << "--root-anti-merge";
-    } else {
-        args << "--no-root-anti-merge";
-    }
-    if (localAntiMergeCheck_->isChecked()) {
-        args << "--local-anti-merge";
-    } else {
-        args << "--no-local-anti-merge";
-    }
-    if (residualTraceCheck_->isChecked()) {
-        args << "--residual-trace";
-    } else {
-        args << "--no-residual-trace";
-    }
+         << "--output" << outputEdit_->text().trimmed();
+    args << fpt_ui::traceArguments(currentTraceParameters());
+    args << "--polygon-color" << polygonColorEdit_->text()
+         << "--polygon-linewidth" << QString::number(polygonLineWidthSpin_->value(), 'g', 12)
+         << "--view-grid-output" << previewGridPath()
+         << "--view-polygons-output" << previewPolygonsPath();
     return args;
 }
 
 void FaultTraceDialog::applyParameterPreset(const QString& presetName) {
-    const QString presetKey = fpt_ui::canonical(presetName);
-    traceModeCombo_->setCurrentText("ridge-belt");
-    thresholdModeCombo_->setCurrentText("percentile");
-    thresholdSpin_->setValue(0.95);
-    auto setLocalAntiMergePreset = [&](bool enabled) {
-        localAntiMergeCheck_->setChecked(enabled);
-        localAntiMergeLowThresholdSpin_->setValue(0.05);
-        localAntiMergeBridgeRadiusSpin_->setValue(2);
-        localAntiMergeMinPartCellsSpin_->setValue(80);
-        localAntiMergeMinPartRatioSpin_->setValue(0.08);
-        localAntiMergeMinBridgeCellsSpin_->setValue(6);
-        localAntiMergeMinLowRatioSpin_->setValue(0.55);
-    };
-    auto setRootAntiMergePreset = [&](bool enabled) {
-        rootAntiMergeCheck_->setChecked(enabled);
-        rootAntiMergeRadiusSpin_->setValue(1);
-        rootAntiMergeSupportRatioSpin_->setValue(0.25);
-        rootAntiMergeMinPartCellsSpin_->setValue(0);
-        rootAntiMergeMinPartRatioSpin_->setValue(0.12);
-        rootAntiMergeWeakGuardThresholdSpin_->setValue(0.66);
-        rootAntiMergeWeakGuardRadiusSpin_->setValue(0);
-    };
-    setLocalAntiMergePreset(false);
-    setRootAntiMergePreset(false);
-
-    if (presetKey == QString::fromUtf8("全覆盖优先")) {
-        traceModeCombo_->setCurrentText("ridge-belt");
-        thresholdModeCombo_->setCurrentText("percentile");
-        percentileSpin_->setValue(0.975);
-        minAreaSpin_->setValue(120.0);
-        closeRadiusSpin_->setValue(1);
-        weakPercentileSpin_->setValue(0.955);
-        weakConnectRadiusSpin_->setValue(1);
-        beltRadiusSpin_->setValue(3);
-        postBeltCloseRadiusSpin_->setValue(1);
-        attributeConstrainedBeltCheck_->setChecked(true);
-        attributeEnvelopeRadiusSpin_->setValue(1);
-        minBranchLengthSpin_->setValue(3);
-        minJunctionBranchLengthSpin_->setValue(2);
-        minJunctionBranchMeanSpin_->setValue(0.90);
-        maxGapDistanceSpin_->setValue(12);
-        maxGapAngleSpin_->setValue(60.0);
-        setRootAntiMergePreset(false);
-        residualTraceCheck_->setChecked(true);
-        simplifyToleranceSpin_->setValue(1.5);
-        smoothIterationsSpin_->setValue(0);
-        residualTraceMinLengthSpin_->setValue(5);
-        residualTraceMaxCellsSpin_->setValue(120);
-    } else if (presetKey == QString::fromUtf8("防黏连增强")) {
-        percentileSpin_->setValue(0.98);
-        minAreaSpin_->setValue(120.0);
-        closeRadiusSpin_->setValue(1);
-        weakPercentileSpin_->setValue(0.965);
-        weakConnectRadiusSpin_->setValue(1);
-        beltRadiusSpin_->setValue(3);
-        postBeltCloseRadiusSpin_->setValue(1);
-        attributeConstrainedBeltCheck_->setChecked(true);
-        attributeEnvelopeRadiusSpin_->setValue(1);
-        minBranchLengthSpin_->setValue(4);
-        minJunctionBranchLengthSpin_->setValue(2);
-        minJunctionBranchMeanSpin_->setValue(0.94);
-        maxGapDistanceSpin_->setValue(12);
-        maxGapAngleSpin_->setValue(55.0);
-        setRootAntiMergePreset(true);
-        residualTraceCheck_->setChecked(false);
-        simplifyToleranceSpin_->setValue(2.0);
-        smoothIterationsSpin_->setValue(1);
-        residualTraceMinLengthSpin_->setValue(6);
-        residualTraceMaxCellsSpin_->setValue(80);
-    } else if (presetKey == QString::fromUtf8("保守高精度")) {
-        percentileSpin_->setValue(0.985);
-        minAreaSpin_->setValue(250.0);
-        closeRadiusSpin_->setValue(1);
-        weakPercentileSpin_->setValue(0.0);
-        weakConnectRadiusSpin_->setValue(0);
-        beltRadiusSpin_->setValue(2);
-        postBeltCloseRadiusSpin_->setValue(0);
-        attributeConstrainedBeltCheck_->setChecked(false);
-        attributeEnvelopeRadiusSpin_->setValue(1);
-        minBranchLengthSpin_->setValue(6);
-        minJunctionBranchLengthSpin_->setValue(6);
-        minJunctionBranchMeanSpin_->setValue(1.0);
-        maxGapDistanceSpin_->setValue(8);
-        maxGapAngleSpin_->setValue(45.0);
-        setRootAntiMergePreset(false);
-        residualTraceCheck_->setChecked(false);
-        simplifyToleranceSpin_->setValue(5.0);
-        smoothIterationsSpin_->setValue(1);
-        residualTraceMinLengthSpin_->setValue(8);
-        residualTraceMaxCellsSpin_->setValue(40);
-    } else if (presetKey == QString::fromUtf8("弱响应高召回")) {
-        percentileSpin_->setValue(0.98);
-        minAreaSpin_->setValue(120.0);
-        closeRadiusSpin_->setValue(1);
-        weakPercentileSpin_->setValue(0.965);
-        weakConnectRadiusSpin_->setValue(1);
-        beltRadiusSpin_->setValue(3);
-        postBeltCloseRadiusSpin_->setValue(1);
-        attributeConstrainedBeltCheck_->setChecked(true);
-        attributeEnvelopeRadiusSpin_->setValue(1);
-        minBranchLengthSpin_->setValue(4);
-        minJunctionBranchLengthSpin_->setValue(2);
-        minJunctionBranchMeanSpin_->setValue(0.94);
-        maxGapDistanceSpin_->setValue(12);
-        maxGapAngleSpin_->setValue(55.0);
-        setRootAntiMergePreset(false);
-        residualTraceCheck_->setChecked(true);
-        simplifyToleranceSpin_->setValue(2.0);
-        smoothIterationsSpin_->setValue(1);
-        residualTraceMinLengthSpin_->setValue(5);
-        residualTraceMaxCellsSpin_->setValue(120);
-    } else if (presetKey == QString::fromUtf8("宽断层带")) {
-        percentileSpin_->setValue(0.97);
-        minAreaSpin_->setValue(300.0);
-        closeRadiusSpin_->setValue(2);
-        weakPercentileSpin_->setValue(0.0);
-        weakConnectRadiusSpin_->setValue(0);
-        beltRadiusSpin_->setValue(3);
-        postBeltCloseRadiusSpin_->setValue(1);
-        attributeConstrainedBeltCheck_->setChecked(false);
-        attributeEnvelopeRadiusSpin_->setValue(1);
-        minBranchLengthSpin_->setValue(5);
-        minJunctionBranchLengthSpin_->setValue(5);
-        minJunctionBranchMeanSpin_->setValue(1.0);
-        maxGapDistanceSpin_->setValue(14);
-        maxGapAngleSpin_->setValue(60.0);
-        setRootAntiMergePreset(false);
-        residualTraceCheck_->setChecked(false);
-        simplifyToleranceSpin_->setValue(6.0);
-        smoothIterationsSpin_->setValue(1);
-        residualTraceMinLengthSpin_->setValue(8);
-        residualTraceMaxCellsSpin_->setValue(60);
-    } else if (presetKey == QString::fromUtf8("细碎断裂")) {
-        percentileSpin_->setValue(0.98);
-        minAreaSpin_->setValue(120.0);
-        closeRadiusSpin_->setValue(1);
-        weakPercentileSpin_->setValue(0.0);
-        weakConnectRadiusSpin_->setValue(0);
-        beltRadiusSpin_->setValue(1);
-        postBeltCloseRadiusSpin_->setValue(0);
-        attributeConstrainedBeltCheck_->setChecked(true);
-        attributeEnvelopeRadiusSpin_->setValue(1);
-        minBranchLengthSpin_->setValue(3);
-        minJunctionBranchLengthSpin_->setValue(3);
-        minJunctionBranchMeanSpin_->setValue(1.0);
-        maxGapDistanceSpin_->setValue(8);
-        maxGapAngleSpin_->setValue(50.0);
-        setRootAntiMergePreset(false);
-        residualTraceCheck_->setChecked(false);
-        simplifyToleranceSpin_->setValue(3.0);
-        smoothIterationsSpin_->setValue(1);
-        residualTraceMinLengthSpin_->setValue(4);
-        residualTraceMaxCellsSpin_->setValue(80);
-    } else if (presetKey == QString::fromUtf8("贴合融合推荐")) {
-        percentileSpin_->setValue(0.98);
-        minAreaSpin_->setValue(120.0);
-        closeRadiusSpin_->setValue(1);
-        weakPercentileSpin_->setValue(0.965);
-        weakConnectRadiusSpin_->setValue(1);
-        beltRadiusSpin_->setValue(3);
-        postBeltCloseRadiusSpin_->setValue(1);
-        attributeConstrainedBeltCheck_->setChecked(true);
-        attributeEnvelopeRadiusSpin_->setValue(1);
-        minBranchLengthSpin_->setValue(4);
-        minJunctionBranchLengthSpin_->setValue(2);
-        minJunctionBranchMeanSpin_->setValue(0.94);
-        maxGapDistanceSpin_->setValue(12);
-        maxGapAngleSpin_->setValue(55.0);
-        setRootAntiMergePreset(false);
-        residualTraceCheck_->setChecked(false);
-        simplifyToleranceSpin_->setValue(2.0);
-        smoothIterationsSpin_->setValue(1);
-        residualTraceMinLengthSpin_->setValue(6);
-        residualTraceMaxCellsSpin_->setValue(80);
-    } else {
-        percentileSpin_->setValue(0.98);
-        minAreaSpin_->setValue(120.0);
-        closeRadiusSpin_->setValue(1);
-        weakPercentileSpin_->setValue(0.965);
-        weakConnectRadiusSpin_->setValue(1);
-        beltRadiusSpin_->setValue(3);
-        postBeltCloseRadiusSpin_->setValue(1);
-        attributeConstrainedBeltCheck_->setChecked(true);
-        attributeEnvelopeRadiusSpin_->setValue(1);
-        minBranchLengthSpin_->setValue(4);
-        minJunctionBranchLengthSpin_->setValue(2);
-        minJunctionBranchMeanSpin_->setValue(0.94);
-        maxGapDistanceSpin_->setValue(12);
-        maxGapAngleSpin_->setValue(55.0);
-        setRootAntiMergePreset(false);
-        residualTraceCheck_->setChecked(false);
-        simplifyToleranceSpin_->setValue(2.0);
-        smoothIterationsSpin_->setValue(1);
-        residualTraceMinLengthSpin_->setValue(6);
-        residualTraceMaxCellsSpin_->setValue(80);
-    }
+    const fpt_ui::TraceParameters shared =
+        fpt_ui::presetParameters(fpt_ui::canonical(presetName));
+    traceModeCombo_->setCurrentText(shared.traceMode);
+    thresholdModeCombo_->setCurrentText(shared.thresholdMode);
+    thresholdSpin_->setValue(shared.threshold);
+    percentileSpin_->setValue(shared.percentile);
+    minAreaSpin_->setValue(shared.minArea);
+    closeRadiusSpin_->setValue(shared.closeRadius);
+    weakPercentileSpin_->setValue(shared.weakPercentile);
+    weakConnectRadiusSpin_->setValue(shared.weakConnectRadius);
+    beltRadiusSpin_->setValue(shared.beltRadius);
+    postBeltCloseRadiusSpin_->setValue(shared.postBeltCloseRadius);
+    attributeConstrainedBeltCheck_->setChecked(shared.attributeConstrainedBelt);
+    attributeEnvelopeRadiusSpin_->setValue(shared.attributeEnvelopeRadius);
+    minBranchLengthSpin_->setValue(shared.minBranchLength);
+    minJunctionBranchLengthSpin_->setValue(shared.minJunctionBranchLength);
+    minJunctionBranchMeanSpin_->setValue(shared.minJunctionBranchMean);
+    maxGapDistanceSpin_->setValue(shared.maxGapDistance);
+    maxGapAngleSpin_->setValue(shared.maxGapAngle);
+    rootAntiMergeCheck_->setChecked(shared.rootAntiMerge);
+    rootAntiMergeRadiusSpin_->setValue(shared.rootAntiMergeRadius);
+    rootAntiMergeSupportRatioSpin_->setValue(shared.rootAntiMergeSupportRatio);
+    rootAntiMergeMinPartCellsSpin_->setValue(shared.rootAntiMergeMinPartCells);
+    rootAntiMergeMinPartRatioSpin_->setValue(shared.rootAntiMergeMinPartRatio);
+    rootAntiMergeWeakGuardThresholdSpin_->setValue(shared.rootAntiMergeWeakGuardThreshold);
+    rootAntiMergeWeakGuardRadiusSpin_->setValue(shared.rootAntiMergeWeakGuardRadius);
+    localAntiMergeCheck_->setChecked(shared.localAntiMerge);
+    localAntiMergeLowThresholdSpin_->setValue(shared.localAntiMergeLowThreshold);
+    localAntiMergeBridgeRadiusSpin_->setValue(shared.localAntiMergeBridgeRadius);
+    localAntiMergeMinPartCellsSpin_->setValue(shared.localAntiMergeMinPartCells);
+    localAntiMergeMinPartRatioSpin_->setValue(shared.localAntiMergeMinPartRatio);
+    localAntiMergeMinBridgeCellsSpin_->setValue(shared.localAntiMergeMinBridgeCells);
+    localAntiMergeMinLowRatioSpin_->setValue(shared.localAntiMergeMinLowRatio);
+    residualTraceCheck_->setChecked(shared.residualTrace);
+    residualTraceMinLengthSpin_->setValue(shared.residualTraceMinLength);
+    residualTraceMaxCellsSpin_->setValue(shared.residualTraceMaxCells);
+    simplifyToleranceSpin_->setValue(shared.simplifyTolerance);
+    smoothIterationsSpin_->setValue(shared.smoothIterations);
     updateOptionControls();
     updateStatusContext();
 }
@@ -3438,14 +3341,21 @@ void FaultTraceDialog::loadSelectedGridView() {
 }
 
 void FaultTraceDialog::loadSelectedOutput() {
+    loadSelectedOutputInternal(true);
+}
+
+void FaultTraceDialog::loadSelectedOutputInternal(bool userInitiated) {
     if (!outputCatalogCombo_) {
         return;
     }
     const QString selected = outputCatalogCombo_->currentData().toString();
     if (selected.trimmed().isEmpty()) {
-        QMessageBox::information(this,
-                                 QString::fromUtf8("没有可选择的结果"),
-                                 QString::fromUtf8("请先运行追踪，或点击【刷新结果】读取当前项目中的结果多边形对象。"));
+        appendStatus(QString::fromUtf8("暂无可显示结果，请先运行追踪或刷新结果列表"));
+        if (userInitiated) {
+            QMessageBox::information(this,
+                                     QString::fromUtf8("没有可选择的结果"),
+                                     QString::fromUtf8("请先运行追踪，或点击【刷新结果】读取当前项目中的结果多边形对象。"));
+        }
         return;
     }
     if (process_->state() != QProcess::NotRunning) {
@@ -3722,7 +3632,9 @@ void FaultTraceDialog::onProcessFinished(int exitCode, QProcess::ExitStatus stat
         refreshingOutputs_ = false;
         if (!names.isEmpty() && outputCatalogCombo_ && !outputCatalogCombo_->currentData().toString().trimmed().isEmpty() &&
             (!showResultLayerCheck_ || showResultLayerCheck_->isChecked())) {
-            QTimer::singleShot(0, this, &FaultTraceDialog::loadSelectedOutput);
+            QTimer::singleShot(0, this, [this]() {
+                loadSelectedOutputInternal(false);
+            });
         }
         return;
     }
@@ -3903,7 +3815,9 @@ void FaultTraceDialog::updateLayerVisibility() {
     }
     if (process_ && process_->state() == QProcess::NotRunning) {
         if (showResult && outputCatalogCombo_ && !outputCatalogCombo_->currentData().toString().trimmed().isEmpty()) {
-            QTimer::singleShot(0, this, &FaultTraceDialog::loadSelectedOutput);
+            QTimer::singleShot(0, this, [this]() {
+                loadSelectedOutputInternal(false);
+            });
         } else if (showInput && gridCombo_ && !gridCombo_->currentText().trimmed().isEmpty()) {
             QTimer::singleShot(0, this, &FaultTraceDialog::loadSelectedGridView);
         }
@@ -3941,4 +3855,9 @@ void FaultTraceDialog::updateStatusContext() {
             !showInputLayerCheck_ || showInputLayerCheck_->isChecked(),
             !showResultLayerCheck_ || showResultLayerCheck_->isChecked());
     }
+}
+
+void FaultTraceDialog::closeEvent(QCloseEvent* event) {
+    saveSettings();
+    QDialog::closeEvent(event);
 }

@@ -8,7 +8,7 @@
 
 | 层级 | 含义 | 当前状态 |
 |---|---|---|
-| 数据集成 | 程序读取 GeoEast `BOMapGrid`，写入 GeoEast `BOFaultPolygon` | 已完成并验证 |
+| 数据集成 | 程序读取 GeoEast `BOMapGrid`，写入 GeoEast `BOFaultPolygon` | 工程已实现；最终提交需补有效 GeoEast 工区现场截图和叠加图证据 |
 | 工作流集成 | 用户通过界面选择数据库、项目、输入、输出和参数 | 已通过 Qt 启动器完成 |
 | 主控入口集成 | 在 GeoEast 主程序菜单或 Ribbon 中启动工具 | 已构建并部署，待有效 license 环境中界面点击截图 |
 
@@ -69,7 +69,7 @@ test7_fault_attribute_bo
 
 1. 启动 GeoEast。
 2. 打开数据库 `ndp`。
-3. 打开项目 `BGPCup2026_Test7`。
+3. 打开项目 `<目标项目名>`。
 4. 打开 `Basemap`。
 5. 使用 Basemap 的加载工具加载网格数据层。
 6. 选择网格对象 `test7_fault_attribute_bo`。
@@ -124,11 +124,11 @@ GeoEast 帮助文档中的关键信息：
 
 ```powershell
 .\scripts\run_geoeast_bgpcup2026_test7.ps1 `
-  -GeoEastRoot "C:\Users\26312\GeoEast" `
-  -GeoEastDataRoot "D:\BaiduNetdiskDownload\BGPCup2025\GeoEast-RC\GeoEastData.DataModel+SQLITE.20230728\GeoEastData" `
+  -GeoEastRoot "<GeoEast安装目录>" `
+  -GeoEastDataRoot "<官方数据目录>\GeoEast-RC\GeoEastData.DataModel+SQLITE.20230728\GeoEastData" `
   -Database ndp `
-  -Project BGPCup2026_Test7 `
-  -User 26312 `
+  -Project <目标项目名> `
+  -User <GeoEast用户名> `
   -Grid test7_fault_attribute_bo `
   -Output FaultPolyTrace_Result
 ```
@@ -144,7 +144,7 @@ GeoEast 帮助文档中的关键信息：
 可执行文件：
 
 ```text
-C:\Users\26312\Documents\BGPCup\FaultPolyTrace\geoeast_plugin\qt_launcher\faultpolytrace_launcher.exe
+<项目根目录>\geoeast_plugin\qt_launcher\faultpolytrace_launcher.exe
 ```
 
 建议流程：
@@ -152,7 +152,7 @@ C:\Users\26312\Documents\BGPCup\FaultPolyTrace\geoeast_plugin\qt_launcher\faultp
 1. 确认 `GeoEast 根目录`。
 2. 确认 `GeoEast 数据根目录`。
 3. 确认 PG 主机和端口。
-4. 填写数据库 `ndp`、项目 `BGPCup2026_Test7`、用户 `26312`。
+4. 填写数据库 `ndp`、项目 `<目标项目名>`、用户 `<当前GeoEast用户>`。
 5. 点击 `刷新网格`。
 6. 选择 `test7_fault_attribute_bo`。
 7. 设置输出名，例如 `FaultPolyTrace_Result`。

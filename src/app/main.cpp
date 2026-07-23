@@ -3,12 +3,18 @@
 #include "../io/AsciiGridIO.h"
 #include "../io/DiagnosticsIO.h"
 
+#include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cstdlib>
 #include <exception>
+#include <filesystem>
 #include <iostream>
 #include <limits>
 #include <string>
+#include <unordered_map>
+#include <utility>
+#include <vector>
 
 #ifdef _WIN32
 #define NOMINMAX
@@ -23,6 +29,7 @@ struct CliOptions {
     std::string diagnosticsOutput;
     std::string branchesOutput;
     std::string topologyOutput;
+    std::string branchAttributionDifferencesOutput;
     std::string inputFormat = "auto";
     fpt::TraceMode traceMode = fpt::TraceMode::RidgeBelt;
     fpt::ThresholdMode thresholdMode = fpt::ThresholdMode::Percentile;
@@ -36,6 +43,27 @@ struct CliOptions {
     int weakConnectRadius = 1;
     int maxWeakComponentCells = 20000;
     double minWeakComponentAspect = 3.0;
+    bool weakPathGate = false;
+    double weakPathSupportRatio = 0.50;
+    int weakPathMaxUnsupportedRun = 3;
+    bool branchAttributionShadow = false;
+    bool branchAttributionCandidateGroups = false;
+    bool localPolygonQuality = false;
+    double localQualityWidthRatio = 2.4;
+    int localQualityMinExtraCells = 8;
+    double localQualitySupportThresholdRatio = 0.70;
+    int localQualitySupportBufferCells = 1;
+    double localQualityMaxAreaLossRatio = 0.18;
+    double localQualityMaxStrongCoverageLossRatio = 0.0;
+    double localQualityMaxWeakCoverageLossRatio = 0.0;
+    double localQualityMaxBackgroundLeakageIncreaseRatio = 0.0;
+    double localQualityStabilityThresholdDeltaRatio = 0.02;
+    double localQualityMinStabilityJaccard = 0.90;
+    std::size_t localQualityMaxCandidatesPerObject = 64;
+    std::size_t localQualityMaxTotalCandidates = 4096;
+    std::size_t localQualityMaxWindowCells = 65536;
+    std::size_t localQualityMaxObjectCells = 2000000;
+    std::size_t localQualityMaxEvidenceRecords = 4096;
     int beltRadius = 3;
     int postBeltCloseRadius = 1;
     bool attributeConstrainedBelt = true;
@@ -106,6 +134,32 @@ void printUsage() {
         << "  --weak-connect-radius <n>   Weak continuation growth radius in cells. Default: 1\n"
         << "  --max-weak-component-cells <count> Max accepted weak component cells. Default: 20000\n"
         << "  --min-weak-component-aspect <value> Min accepted weak component aspect ratio. Default: 3\n"
+        << "  --weak-path-gate          Enable experimental path-level weak continuation gate. Default: off\n"
+        << "  --no-weak-path-gate       Disable experimental path-level weak continuation gate\n"
+        << "  --weak-path-support-ratio <v> Support threshold ratio between weak and strong thresholds. Default: 0.50\n"
+        << "  --weak-path-max-unsupported-run <n> Maximum consecutive low-support cells. Default: 3\n"
+        << "  --branch-attribution-shadow Enable experimental multi-scale junction diagnostics without changing output. Default: off\n"
+        << "  --no-branch-attribution-shadow Disable multi-scale junction shadow diagnostics\n"
+        << "  --branch-attribution-candidate-groups Use non-ambiguous multi-scale root groups only for root anti-merge ownership. Default: off\n"
+        << "  --no-branch-attribution-candidate-groups Disable experimental candidate root groups\n"
+        << "  --branch-attribution-differences <path> Write per-junction legacy/new pairing evidence CSV. Requires shadow or candidate mode\n"
+        << "  --local-polygon-quality   Enable experimental local polygon quality repair. Default: off\n"
+        << "  --no-local-polygon-quality Disable experimental local polygon quality repair\n"
+        << "  --local-quality-width-ratio <v> Local width anomaly ratio. Default: 2.4\n"
+        << "  --local-quality-min-extra-cells <n> Minimum excess cells for a candidate. Default: 8\n"
+        << "  --local-quality-support-threshold-ratio <v> Support threshold relative to effective threshold. Default: 0.70\n"
+        << "  --local-quality-support-buffer-cells <n> Support envelope buffer in cells. Default: 1\n"
+        << "  --local-quality-max-area-loss-ratio <v> Maximum accepted polygon area loss. Default: 0.18\n"
+        << "  --local-quality-max-strong-coverage-loss-ratio <v> Maximum strong-response coverage loss. Default: 0\n"
+        << "  --local-quality-max-weak-coverage-loss-ratio <v> Maximum weak-response coverage loss. Default: 0\n"
+        << "  --local-quality-max-background-leakage-increase-ratio <v> Maximum background leakage increase. Default: 0\n"
+        << "  --local-quality-stability-threshold-delta-ratio <v> Threshold perturbation used by the stability gate. Default: 0.02\n"
+        << "  --local-quality-min-stability-jaccard <v> Minimum perturbed-mask Jaccard. Default: 0.90\n"
+        << "  --local-quality-max-candidates-per-object <n> Maximum processed candidates per polygon. Default: 64\n"
+        << "  --local-quality-max-total-candidates <n> Maximum processed candidates per run. Default: 4096\n"
+        << "  --local-quality-max-window-cells <n> Maximum cells in one candidate window. Default: 65536\n"
+        << "  --local-quality-max-object-cells <n> Maximum raster cells evaluated per polygon. Default: 2000000\n"
+        << "  --local-quality-max-evidence-records <n> Maximum candidate evidence records stored. Default: 4096\n"
         << "  --belt-radius <count>       Ridge-belt buffer radius in cells. Default: 3\n"
         << "  --post-belt-close-radius <count> Post-buffer closing radius. Default: 1\n"
         << "  --attribute-constrained-belt Constrain ridge belt by original attribute envelope. Default: on\n"
@@ -166,6 +220,54 @@ void printUsage() {
         << "  --topology-output <path>    Topology detail CSV path. Default: <output>.topology.csv\n";
 }
 
+std::string normalizedPathKey(const std::string& path) {
+    std::string key = std::filesystem::absolute(
+        std::filesystem::path(path)).lexically_normal().generic_string();
+#ifdef _WIN32
+    std::transform(
+        key.begin(),
+        key.end(),
+        key.begin(),
+        [](unsigned char value) {
+            return static_cast<char>(std::tolower(value));
+        });
+#endif
+    return key;
+}
+
+void validateDistinctOutputPaths(const CliOptions& options) {
+    const std::vector<std::pair<std::string, std::string>> outputs = {
+        {"--output", options.output},
+        {"--diagnostics", options.diagnosticsOutput},
+        {"--branches-output", options.branchesOutput},
+        {"--topology-output", options.topologyOutput},
+        {
+            "--branch-attribution-differences",
+            options.branchAttributionDifferencesOutput
+        }
+    };
+    const std::string inputKey = normalizedPathKey(options.input);
+    std::unordered_map<std::string, std::string> optionByPath;
+    for (const auto& output : outputs) {
+        if (output.second.empty()) {
+            continue;
+        }
+        const std::string key = normalizedPathKey(output.second);
+        if (key == inputKey) {
+            throw std::runtime_error(
+                "Output path " + output.first +
+                " must not overwrite --input.");
+        }
+        const auto inserted = optionByPath.emplace(key, output.first);
+        if (!inserted.second) {
+            throw std::runtime_error(
+                "Output paths must be distinct: " +
+                inserted.first->second + " and " + output.first +
+                " resolve to the same file.");
+        }
+    }
+}
+
 bool likelyStartedByDoubleClick() {
 #ifdef _WIN32
     DWORD inputConsoleMode = 0;
@@ -208,6 +310,23 @@ std::string thresholdModeName(fpt::ThresholdMode mode) {
     return mode == fpt::ThresholdMode::Percentile ? "percentile" : "fixed";
 }
 
+std::size_t parseSizeValue(
+    const std::string& value,
+    const std::string& optionName) {
+    if (value.empty() || value.front() == '-') {
+        throw std::runtime_error(
+            optionName + " must be a non-negative integer.");
+    }
+    std::size_t consumed = 0;
+    const unsigned long long parsed = std::stoull(value, &consumed);
+    if (consumed != value.size() ||
+        parsed > std::numeric_limits<std::size_t>::max()) {
+        throw std::runtime_error(
+            optionName + " is outside the supported integer range.");
+    }
+    return static_cast<std::size_t>(parsed);
+}
+
 CliOptions parseArgs(int argc, char** argv) {
     CliOptions options;
     for (int i = 1; i < argc; ++i) {
@@ -236,6 +355,9 @@ CliOptions parseArgs(int argc, char** argv) {
             options.branchesOutput = requireValue(arg);
         } else if (arg == "--topology-output") {
             options.topologyOutput = requireValue(arg);
+        } else if (arg == "--branch-attribution-differences") {
+            options.branchAttributionDifferencesOutput =
+                requireValue(arg);
         } else if (arg == "--trace-mode") {
             const std::string mode = requireValue(arg);
             if (mode == "region") {
@@ -276,6 +398,61 @@ CliOptions parseArgs(int argc, char** argv) {
             options.maxWeakComponentCells = std::stoi(requireValue(arg));
         } else if (arg == "--min-weak-component-aspect") {
             options.minWeakComponentAspect = std::stod(requireValue(arg));
+        } else if (arg == "--weak-path-gate") {
+            options.weakPathGate = true;
+        } else if (arg == "--no-weak-path-gate") {
+            options.weakPathGate = false;
+        } else if (arg == "--weak-path-support-ratio") {
+            options.weakPathSupportRatio = std::stod(requireValue(arg));
+        } else if (arg == "--weak-path-max-unsupported-run") {
+            options.weakPathMaxUnsupportedRun = std::stoi(requireValue(arg));
+        } else if (arg == "--branch-attribution-shadow") {
+            options.branchAttributionShadow = true;
+        } else if (arg == "--no-branch-attribution-shadow") {
+            options.branchAttributionShadow = false;
+        } else if (arg == "--branch-attribution-candidate-groups") {
+            options.branchAttributionCandidateGroups = true;
+        } else if (arg == "--no-branch-attribution-candidate-groups") {
+            options.branchAttributionCandidateGroups = false;
+        } else if (arg == "--local-polygon-quality") {
+            options.localPolygonQuality = true;
+        } else if (arg == "--no-local-polygon-quality") {
+            options.localPolygonQuality = false;
+        } else if (arg == "--local-quality-width-ratio") {
+            options.localQualityWidthRatio = std::stod(requireValue(arg));
+        } else if (arg == "--local-quality-min-extra-cells") {
+            options.localQualityMinExtraCells = std::stoi(requireValue(arg));
+        } else if (arg == "--local-quality-support-threshold-ratio") {
+            options.localQualitySupportThresholdRatio = std::stod(requireValue(arg));
+        } else if (arg == "--local-quality-support-buffer-cells") {
+            options.localQualitySupportBufferCells = std::stoi(requireValue(arg));
+        } else if (arg == "--local-quality-max-area-loss-ratio") {
+            options.localQualityMaxAreaLossRatio = std::stod(requireValue(arg));
+        } else if (arg == "--local-quality-max-strong-coverage-loss-ratio") {
+            options.localQualityMaxStrongCoverageLossRatio = std::stod(requireValue(arg));
+        } else if (arg == "--local-quality-max-weak-coverage-loss-ratio") {
+            options.localQualityMaxWeakCoverageLossRatio = std::stod(requireValue(arg));
+        } else if (arg == "--local-quality-max-background-leakage-increase-ratio") {
+            options.localQualityMaxBackgroundLeakageIncreaseRatio = std::stod(requireValue(arg));
+        } else if (arg == "--local-quality-stability-threshold-delta-ratio") {
+            options.localQualityStabilityThresholdDeltaRatio = std::stod(requireValue(arg));
+        } else if (arg == "--local-quality-min-stability-jaccard") {
+            options.localQualityMinStabilityJaccard = std::stod(requireValue(arg));
+        } else if (arg == "--local-quality-max-candidates-per-object") {
+            options.localQualityMaxCandidatesPerObject =
+                parseSizeValue(requireValue(arg), arg);
+        } else if (arg == "--local-quality-max-total-candidates") {
+            options.localQualityMaxTotalCandidates =
+                parseSizeValue(requireValue(arg), arg);
+        } else if (arg == "--local-quality-max-window-cells") {
+            options.localQualityMaxWindowCells =
+                parseSizeValue(requireValue(arg), arg);
+        } else if (arg == "--local-quality-max-object-cells") {
+            options.localQualityMaxObjectCells =
+                parseSizeValue(requireValue(arg), arg);
+        } else if (arg == "--local-quality-max-evidence-records") {
+            options.localQualityMaxEvidenceRecords =
+                parseSizeValue(requireValue(arg), arg);
         } else if (arg == "--belt-radius") {
             options.beltRadius = std::stoi(requireValue(arg));
         } else if (arg == "--post-belt-close-radius") {
@@ -406,6 +583,63 @@ CliOptions parseArgs(int argc, char** argv) {
     if (options.topologyOutput.empty()) {
         options.topologyOutput = options.output + ".topology.csv";
     }
+    if (!options.branchAttributionDifferencesOutput.empty() &&
+        !options.branchAttributionShadow &&
+        !options.branchAttributionCandidateGroups) {
+        throw std::runtime_error(
+            "--branch-attribution-differences requires "
+            "--branch-attribution-shadow or "
+            "--branch-attribution-candidate-groups.");
+    }
+    if (options.branchAttributionCandidateGroups &&
+        !options.rootAntiMerge) {
+        throw std::runtime_error(
+            "--branch-attribution-candidate-groups requires "
+            "--root-anti-merge.");
+    }
+    if (options.branchAttributionCandidateGroups &&
+        options.separateBranchBelts) {
+        throw std::runtime_error(
+            "--branch-attribution-candidate-groups requires "
+            "--no-separate-branch-belts.");
+    }
+    if (options.branchAttributionCandidateGroups &&
+        options.traceMode != fpt::TraceMode::RidgeBelt) {
+        throw std::runtime_error(
+            "--branch-attribution-candidate-groups requires "
+            "--trace-mode ridge-belt.");
+    }
+    fpt::LocalPolygonQualityOptions localQualityOptions;
+    localQualityOptions.widthRatio = options.localQualityWidthRatio;
+    localQualityOptions.minExtraCells = options.localQualityMinExtraCells;
+    localQualityOptions.supportThresholdRatio =
+        options.localQualitySupportThresholdRatio;
+    localQualityOptions.supportBufferCells =
+        options.localQualitySupportBufferCells;
+    localQualityOptions.maxAreaLossRatio =
+        options.localQualityMaxAreaLossRatio;
+    localQualityOptions.maxStrongCoverageLossRatio =
+        options.localQualityMaxStrongCoverageLossRatio;
+    localQualityOptions.maxWeakCoverageLossRatio =
+        options.localQualityMaxWeakCoverageLossRatio;
+    localQualityOptions.maxBackgroundLeakageIncreaseRatio =
+        options.localQualityMaxBackgroundLeakageIncreaseRatio;
+    localQualityOptions.stabilityThresholdDeltaRatio =
+        options.localQualityStabilityThresholdDeltaRatio;
+    localQualityOptions.minStabilityJaccard =
+        options.localQualityMinStabilityJaccard;
+    localQualityOptions.maxCandidatesPerObject =
+        options.localQualityMaxCandidatesPerObject;
+    localQualityOptions.maxTotalCandidates =
+        options.localQualityMaxTotalCandidates;
+    localQualityOptions.maxWindowCells = options.localQualityMaxWindowCells;
+    localQualityOptions.maxObjectCells = options.localQualityMaxObjectCells;
+    localQualityOptions.maxEvidenceRecords =
+        options.localQualityMaxEvidenceRecords;
+    if (options.localPolygonQuality) {
+        fpt::validateLocalPolygonQualityOptions(localQualityOptions);
+    }
+    validateDistinctOutputPaths(options);
     return options;
 }
 
@@ -448,6 +682,42 @@ int main(int argc, char** argv) {
         traceOptions.weakConnectRadius = cli.weakConnectRadius;
         traceOptions.maxWeakComponentCells = cli.maxWeakComponentCells;
         traceOptions.minWeakComponentAspect = cli.minWeakComponentAspect;
+        traceOptions.weakPathGate = cli.weakPathGate;
+        traceOptions.weakPathSupportRatio = cli.weakPathSupportRatio;
+        traceOptions.weakPathMaxUnsupportedRun = cli.weakPathMaxUnsupportedRun;
+        traceOptions.branchAttributionShadow =
+            cli.branchAttributionShadow;
+        traceOptions.branchAttributionCandidateGroups =
+            cli.branchAttributionCandidateGroups;
+        traceOptions.localPolygonQuality = cli.localPolygonQuality;
+        traceOptions.localQualityWidthRatio = cli.localQualityWidthRatio;
+        traceOptions.localQualityMinExtraCells = cli.localQualityMinExtraCells;
+        traceOptions.localQualitySupportThresholdRatio =
+            cli.localQualitySupportThresholdRatio;
+        traceOptions.localQualitySupportBufferCells =
+            cli.localQualitySupportBufferCells;
+        traceOptions.localQualityMaxAreaLossRatio =
+            cli.localQualityMaxAreaLossRatio;
+        traceOptions.localQualityMaxStrongCoverageLossRatio =
+            cli.localQualityMaxStrongCoverageLossRatio;
+        traceOptions.localQualityMaxWeakCoverageLossRatio =
+            cli.localQualityMaxWeakCoverageLossRatio;
+        traceOptions.localQualityMaxBackgroundLeakageIncreaseRatio =
+            cli.localQualityMaxBackgroundLeakageIncreaseRatio;
+        traceOptions.localQualityStabilityThresholdDeltaRatio =
+            cli.localQualityStabilityThresholdDeltaRatio;
+        traceOptions.localQualityMinStabilityJaccard =
+            cli.localQualityMinStabilityJaccard;
+        traceOptions.localQualityMaxCandidatesPerObject =
+            cli.localQualityMaxCandidatesPerObject;
+        traceOptions.localQualityMaxTotalCandidates =
+            cli.localQualityMaxTotalCandidates;
+        traceOptions.localQualityMaxWindowCells =
+            cli.localQualityMaxWindowCells;
+        traceOptions.localQualityMaxObjectCells =
+            cli.localQualityMaxObjectCells;
+        traceOptions.localQualityMaxEvidenceRecords =
+            cli.localQualityMaxEvidenceRecords;
         traceOptions.beltRadius = cli.beltRadius;
         traceOptions.postBeltCloseRadius = cli.postBeltCloseRadius;
         traceOptions.attributeConstrainedBelt = cli.attributeConstrainedBelt;
@@ -508,6 +778,11 @@ int main(int argc, char** argv) {
         if (cli.traceMode == fpt::TraceMode::RidgeBelt) {
             fpt::writeBranchCsv(cli.branchesOutput, result.branches);
         }
+        if (!cli.branchAttributionDifferencesOutput.empty()) {
+            fpt::writeBranchAttributionDifferencesCsv(
+                cli.branchAttributionDifferencesOutput,
+                result.branchAttributionJunctions);
+        }
         const auto afterWrites = std::chrono::steady_clock::now();
 
         int kept = 0;
@@ -535,6 +810,42 @@ int main(int argc, char** argv) {
         diagnostics.weakConnectRadius = cli.weakConnectRadius;
         diagnostics.maxWeakComponentCells = cli.maxWeakComponentCells;
         diagnostics.minWeakComponentAspect = cli.minWeakComponentAspect;
+        diagnostics.weakPathGate = cli.weakPathGate;
+        diagnostics.weakPathSupportRatio = cli.weakPathSupportRatio;
+        diagnostics.weakPathMaxUnsupportedRun = cli.weakPathMaxUnsupportedRun;
+        diagnostics.branchAttributionShadow =
+            cli.branchAttributionShadow;
+        diagnostics.branchAttributionCandidateGroups =
+            cli.branchAttributionCandidateGroups;
+        diagnostics.localPolygonQuality = cli.localPolygonQuality;
+        diagnostics.localQualityWidthRatio = cli.localQualityWidthRatio;
+        diagnostics.localQualityMinExtraCells = cli.localQualityMinExtraCells;
+        diagnostics.localQualitySupportThresholdRatio =
+            cli.localQualitySupportThresholdRatio;
+        diagnostics.localQualitySupportBufferCells =
+            cli.localQualitySupportBufferCells;
+        diagnostics.localQualityMaxAreaLossRatio =
+            cli.localQualityMaxAreaLossRatio;
+        diagnostics.localQualityMaxStrongCoverageLossRatio =
+            cli.localQualityMaxStrongCoverageLossRatio;
+        diagnostics.localQualityMaxWeakCoverageLossRatio =
+            cli.localQualityMaxWeakCoverageLossRatio;
+        diagnostics.localQualityMaxBackgroundLeakageIncreaseRatio =
+            cli.localQualityMaxBackgroundLeakageIncreaseRatio;
+        diagnostics.localQualityStabilityThresholdDeltaRatio =
+            cli.localQualityStabilityThresholdDeltaRatio;
+        diagnostics.localQualityMinStabilityJaccard =
+            cli.localQualityMinStabilityJaccard;
+        diagnostics.localQualityMaxCandidatesPerObject =
+            cli.localQualityMaxCandidatesPerObject;
+        diagnostics.localQualityMaxTotalCandidates =
+            cli.localQualityMaxTotalCandidates;
+        diagnostics.localQualityMaxWindowCells =
+            cli.localQualityMaxWindowCells;
+        diagnostics.localQualityMaxObjectCells =
+            cli.localQualityMaxObjectCells;
+        diagnostics.localQualityMaxEvidenceRecords =
+            cli.localQualityMaxEvidenceRecords;
         diagnostics.beltRadius = cli.beltRadius;
         diagnostics.postBeltCloseRadius = cli.postBeltCloseRadius;
         diagnostics.attributeConstrainedBelt = cli.attributeConstrainedBelt;
@@ -612,6 +923,104 @@ int main(int argc, char** argv) {
         diagnostics.residualFillCandidateCells = result.residualFillCandidateCells;
         diagnostics.residualFillAddedCells = result.residualFillAddedCells;
         diagnostics.residualFillRejectedComponents = result.residualFillRejectedComponents;
+        diagnostics.weakPathCandidateCells = result.weakPathCandidateCells;
+        diagnostics.weakPathAcceptedCells = result.weakPathAcceptedCells;
+        diagnostics.weakPathRejectedCells = result.weakPathRejectedCells;
+        diagnostics.weakPathSeedCells = result.weakPathSeedCells;
+        diagnostics.weakPathSeedContactCells =
+            result.weakPathSeedContactCells;
+        diagnostics.weakPathRootConflictRejectedCells =
+            result.weakPathRootConflictRejectedCells;
+        diagnostics.weakPathCandidateComponents =
+            result.weakPathCandidateComponents;
+        diagnostics.weakPathAcceptedComponents =
+            result.weakPathAcceptedComponents;
+        diagnostics.weakPathRejectedComponents =
+            result.weakPathRejectedComponents;
+        diagnostics.weakPathPartiallyRejectedComponents =
+            result.weakPathPartiallyRejectedComponents;
+        diagnostics.weakPathEvidenceEvaluatedFragments =
+            result.weakPathEvidenceEvaluatedFragments;
+        diagnostics.weakPathAttributeRejectedFragments =
+            result.weakPathAttributeRejectedFragments;
+        diagnostics.weakPathShapeRejectedFragments =
+            result.weakPathShapeRejectedFragments;
+        diagnostics.weakPathDirectionRejectedFragments =
+            result.weakPathDirectionRejectedFragments;
+        diagnostics.branchAttributionJunctionClusters =
+            result.branchAttributionJunctionClusters;
+        diagnostics.branchAttributionAcceptedPairs =
+            result.branchAttributionAcceptedPairs;
+        diagnostics.branchAttributionAmbiguousClusters =
+            result.branchAttributionAmbiguousClusters;
+        diagnostics.branchAttributionUnmatchedEnds =
+            result.branchAttributionUnmatchedEnds;
+        diagnostics.branchAttributionGreedyFallbackClusters =
+            result.branchAttributionGreedyFallbackClusters;
+        diagnostics.branchAttributionCandidatePairingDifferingClusters =
+            result.branchAttributionCandidatePairingDifferingClusters;
+        diagnostics.branchAttributionCandidateDifferingClusters =
+            result.branchAttributionCandidateDifferingClusters;
+        diagnostics.branchAttributionAcceptedPairingDifferingClusters =
+            result.branchAttributionAcceptedPairingDifferingClusters;
+        diagnostics.branchAttributionAcceptedDifferingClusters =
+            result.branchAttributionAcceptedDifferingClusters;
+        diagnostics.branchAttributionCandidateGroupingAppliedClusters =
+            result.branchAttributionCandidateGroupingAppliedClusters;
+        diagnostics.branchAttributionCandidateGroupingAmbiguousFallbackClusters =
+            result.branchAttributionCandidateGroupingAmbiguousFallbackClusters;
+        diagnostics.branchAttributionCandidateGroupingLegacyFallbackClusters =
+            result.branchAttributionCandidateGroupingLegacyFallbackClusters;
+        diagnostics.branchAttributionCandidateGroupingComplexityFallbackClusters =
+            result.branchAttributionCandidateGroupingComplexityFallbackClusters;
+        diagnostics.branchAttributionCandidateGroupingSpanFallbackClusters =
+            result.branchAttributionCandidateGroupingSpanFallbackClusters;
+        diagnostics.branchAttributionCandidateGroupingExcludedInternalBranches =
+            result.branchAttributionCandidateGroupingExcludedInternalBranches;
+        diagnostics.branchAttributionCandidateGroupingRootGroups =
+            result.branchAttributionCandidateGroupingRootGroups;
+        diagnostics.branchAttributionPairingDifferingClusters =
+            result.branchAttributionPairingDifferingClusters;
+        diagnostics.branchAttributionDifferingClusters =
+            result.branchAttributionDifferingClusters;
+        diagnostics.localQualityDetectedCount =
+            result.localPolygonQualityStats.detectedCount;
+        diagnostics.localQualityAcceptedCount =
+            result.localPolygonQualityStats.acceptedCount;
+        diagnostics.localQualityReviewCount =
+            result.localPolygonQualityStats.reviewCount;
+        diagnostics.localQualityRejectedCount =
+            result.localPolygonQualityStats.rejectedCount;
+        diagnostics.localQualityInsufficientEvidenceRejectedCount =
+            result.localPolygonQualityStats.insufficientEvidenceRejectedCount;
+        diagnostics.localQualityNoMeaningfulChangeRejectedCount =
+            result.localPolygonQualityStats.noMeaningfulChangeRejectedCount;
+        diagnostics.localQualityAreaLossRejectedCount =
+            result.localPolygonQualityStats.areaLossRejectedCount;
+        diagnostics.localQualityStrongCoverageRejectedCount =
+            result.localPolygonQualityStats.strongCoverageRejectedCount;
+        diagnostics.localQualityWeakCoverageRejectedCount =
+            result.localPolygonQualityStats.weakCoverageRejectedCount;
+        diagnostics.localQualityBackgroundLeakageRejectedCount =
+            result.localPolygonQualityStats.backgroundLeakageRejectedCount;
+        diagnostics.localQualityTopologyRejectedCount =
+            result.localPolygonQualityStats.topologyRejectedCount;
+        diagnostics.localQualityStabilityRejectedCount =
+            result.localPolygonQualityStats.stabilityRejectedCount;
+        diagnostics.localQualityInvalidGeometryRejectedCount =
+            result.localPolygonQualityStats.invalidGeometryRejectedCount;
+        diagnostics.localQualityObjectBudgetReviewCount =
+            result.localPolygonQualityStats.objectBudgetReviewCount;
+        diagnostics.localQualityPostRepairFilteredCount =
+            result.localPolygonQualityStats.postRepairFilteredCount;
+        diagnostics.localQualityTotalEvidence =
+            result.localPolygonQualityStats.totalEvidence;
+        diagnostics.localQualityStoredEvidence =
+            result.localPolygonQualityStats.storedEvidence;
+        diagnostics.localQualityTruncatedEvidence =
+            result.localPolygonQualityStats.truncatedEvidence;
+        diagnostics.localPolygonQualityEvidence =
+            result.localPolygonQualityEvidence;
         diagnostics.suppressedInternalRings = result.suppressedInternalRings;
         diagnostics.coveragePreserveSimplifyFallbackPolygons = result.coveragePreserveSimplifyFallbackPolygons;
         diagnostics.coveragePreserveSmoothFallbackPolygons = result.coveragePreserveSmoothFallbackPolygons;
@@ -630,6 +1039,75 @@ int main(int argc, char** argv) {
         std::cout << "Grid: " << grid.nx() << " x " << grid.ny() << "\n";
         std::cout << "Effective threshold: " << result.effectiveThreshold << "\n";
         std::cout << "Active cells: " << result.activeCellCount << "\n";
+        if (cli.weakPathGate) {
+            std::cout << "Weak path candidate/accepted/rejected cells: "
+                      << result.weakPathCandidateCells << "/"
+                      << result.weakPathAcceptedCells << "/"
+                      << result.weakPathRejectedCells << "\n";
+            std::cout << "Weak path candidate/accepted/rejected components: "
+                      << result.weakPathCandidateComponents << "/"
+                      << result.weakPathAcceptedComponents << "/"
+                      << result.weakPathRejectedComponents << "\n";
+            std::cout << "Weak path partial-components/root-conflict-cells/evidence-fragments: "
+                      << result.weakPathPartiallyRejectedComponents << "/"
+                      << result.weakPathRootConflictRejectedCells << "/"
+                      << result.weakPathEvidenceEvaluatedFragments << "\n";
+        }
+        if (cli.branchAttributionShadow) {
+            std::cout << "Branch attribution shadow clusters/pairs/ambiguous/unmatched/fallback: "
+                      << result.branchAttributionJunctionClusters << "/"
+                      << result.branchAttributionAcceptedPairs << "/"
+                      << result.branchAttributionAmbiguousClusters << "/"
+                      << result.branchAttributionUnmatchedEnds << "/"
+                      << result.branchAttributionGreedyFallbackClusters << "\n";
+            std::cout << "Branch attribution candidate root/direct differences: "
+                      << result.branchAttributionCandidateDifferingClusters
+                      << "/"
+                      << result.branchAttributionCandidatePairingDifferingClusters
+                      << "\n";
+            std::cout << "Branch attribution accepted root/direct differences: "
+                      << result.branchAttributionAcceptedDifferingClusters
+                      << "/"
+                      << result.branchAttributionAcceptedPairingDifferingClusters
+                      << "\n";
+        }
+        if (cli.branchAttributionCandidateGroups) {
+            std::cout << "Branch attribution candidate grouping applied/ambiguous-fallback/legacy-fallback/complexity-fallback/span-fallback: "
+                      << result.branchAttributionCandidateGroupingAppliedClusters
+                      << "/"
+                      << result.branchAttributionCandidateGroupingAmbiguousFallbackClusters
+                      << "/"
+                      << result.branchAttributionCandidateGroupingLegacyFallbackClusters
+                      << "/"
+                      << result.branchAttributionCandidateGroupingComplexityFallbackClusters
+                      << "/"
+                      << result.branchAttributionCandidateGroupingSpanFallbackClusters
+                      << "\n";
+            std::cout << "Branch attribution candidate grouping excluded-internal/root-groups: "
+                      << result.branchAttributionCandidateGroupingExcludedInternalBranches
+                      << "/"
+                      << result.branchAttributionCandidateGroupingRootGroups
+                      << "\n";
+        }
+        if (cli.localPolygonQuality) {
+            std::cout << "Local polygon quality detected/accepted/review/rejected: "
+                      << result.localPolygonQualityStats.detectedCount << "/"
+                      << result.localPolygonQualityStats.acceptedCount << "/"
+                      << result.localPolygonQualityStats.reviewCount << "/"
+                      << result.localPolygonQualityStats.rejectedCount << "\n";
+            std::cout << "Local polygon quality rejected evidence/no-change/area/strong/weak/background/topology/stability/invalid-geometry: "
+                      << result.localPolygonQualityStats.insufficientEvidenceRejectedCount << "/"
+                      << result.localPolygonQualityStats.noMeaningfulChangeRejectedCount << "/"
+                      << result.localPolygonQualityStats.areaLossRejectedCount << "/"
+                      << result.localPolygonQualityStats.strongCoverageRejectedCount << "/"
+                      << result.localPolygonQualityStats.weakCoverageRejectedCount << "/"
+                      << result.localPolygonQualityStats.backgroundLeakageRejectedCount << "/"
+                      << result.localPolygonQualityStats.topologyRejectedCount << "/"
+                      << result.localPolygonQualityStats.stabilityRejectedCount << "/"
+                      << result.localPolygonQualityStats.invalidGeometryRejectedCount << "\n";
+            std::cout << "Local polygon quality object-budget reviews: "
+                      << result.localPolygonQualityStats.objectBudgetReviewCount << "\n";
+        }
         if (cli.traceMode == fpt::TraceMode::RidgeBelt) {
             std::cout << "Skeleton endpoints: " << result.skeletonEndpoints << "\n";
             std::cout << "Skeleton junctions: " << result.skeletonJunctions << "\n";

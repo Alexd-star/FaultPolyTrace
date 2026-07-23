@@ -1,6 +1,10 @@
 #include "DiagnosticsIO.h"
 
+#include <algorithm>
+#include <cmath>
 #include <fstream>
+#include <iomanip>
+#include <sstream>
 #include <stdexcept>
 
 namespace fpt {
@@ -34,6 +38,105 @@ std::string escapeJson(const std::string& value) {
     return escaped;
 }
 
+std::string formatPairIds(
+    const std::vector<BranchAttributionPair>& pairs) {
+    std::ostringstream out;
+    for (std::size_t index = 0; index < pairs.size(); ++index) {
+        if (index > 0) {
+            out << ";";
+        }
+        out << pairs[index].firstBranchId
+            << "-"
+            << pairs[index].secondBranchId;
+    }
+    return out.str();
+}
+
+std::string formatPairMetric(
+    const std::vector<BranchAttributionPair>& pairs,
+    double BranchAttributionPair::*member) {
+    std::ostringstream out;
+    out << std::setprecision(12);
+    for (std::size_t index = 0; index < pairs.size(); ++index) {
+        if (index > 0) {
+            out << ";";
+        }
+        out << pairs[index].firstBranchId
+            << "-"
+            << pairs[index].secondBranchId
+            << ":"
+            << pairs[index].*member;
+    }
+    return out.str();
+}
+
+std::string formatIds(const std::vector<int>& ids) {
+    std::ostringstream out;
+    for (std::size_t index = 0; index < ids.size(); ++index) {
+        if (index > 0) {
+            out << ";";
+        }
+        out << ids[index];
+    }
+    return out.str();
+}
+
+const char* localCandidateTypeName(LocalQualityCandidateType type) {
+    switch (type) {
+    case LocalQualityCandidateType::LocalBulge:
+        return "local_bulge";
+    case LocalQualityCandidateType::LowSupportBridge:
+        return "low_support_bridge";
+    case LocalQualityCandidateType::LegalWideBelt:
+        return "legal_wide_belt";
+    case LocalQualityCandidateType::NaturalEndCap:
+        return "natural_end_cap";
+    case LocalQualityCandidateType::ObjectBudgetExceeded:
+        return "object_budget_exceeded";
+    case LocalQualityCandidateType::InvalidGeometry:
+        return "invalid_geometry";
+    }
+    return "unknown";
+}
+
+const char* localDecisionName(LocalQualityDecision decision) {
+    switch (decision) {
+    case LocalQualityDecision::Accepted:
+        return "accepted";
+    case LocalQualityDecision::Review:
+        return "review";
+    case LocalQualityDecision::Rejected:
+        return "rejected";
+    }
+    return "unknown";
+}
+
+const char* localRejectionReasonName(LocalQualityRejectionReason reason) {
+    switch (reason) {
+    case LocalQualityRejectionReason::None:
+        return "none";
+    case LocalQualityRejectionReason::InsufficientEvidence:
+        return "insufficient_evidence";
+    case LocalQualityRejectionReason::NoMeaningfulChange:
+        return "no_meaningful_change";
+    case LocalQualityRejectionReason::ExcessiveAreaLoss:
+        return "excessive_area_loss";
+    case LocalQualityRejectionReason::StrongCoverageLoss:
+        return "strong_coverage_loss";
+    case LocalQualityRejectionReason::WeakCoverageLoss:
+        return "weak_coverage_loss";
+    case LocalQualityRejectionReason::BackgroundLeakage:
+        return "background_leakage";
+    case LocalQualityRejectionReason::TopologyRisk:
+        return "topology_risk";
+    case LocalQualityRejectionReason::StabilityRisk:
+        return "stability_risk";
+    case LocalQualityRejectionReason::InvalidGeometry:
+        return "invalid_geometry";
+    }
+    return "unknown";
+}
+
 } // namespace
 
 void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
@@ -59,6 +162,27 @@ void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
     out << "    \"weakConnectRadius\": " << d.weakConnectRadius << ",\n";
     out << "    \"maxWeakComponentCells\": " << d.maxWeakComponentCells << ",\n";
     out << "    \"minWeakComponentAspect\": " << d.minWeakComponentAspect << ",\n";
+    out << "    \"weakPathGate\": " << (d.weakPathGate ? "true" : "false") << ",\n";
+    out << "    \"weakPathSupportRatio\": " << d.weakPathSupportRatio << ",\n";
+    out << "    \"weakPathMaxUnsupportedRun\": " << d.weakPathMaxUnsupportedRun << ",\n";
+    out << "    \"branchAttributionShadow\": " << (d.branchAttributionShadow ? "true" : "false") << ",\n";
+    out << "    \"branchAttributionCandidateGroups\": " << (d.branchAttributionCandidateGroups ? "true" : "false") << ",\n";
+    out << "    \"localPolygonQuality\": " << (d.localPolygonQuality ? "true" : "false") << ",\n";
+    out << "    \"localQualityWidthRatio\": " << d.localQualityWidthRatio << ",\n";
+    out << "    \"localQualityMinExtraCells\": " << d.localQualityMinExtraCells << ",\n";
+    out << "    \"localQualitySupportThresholdRatio\": " << d.localQualitySupportThresholdRatio << ",\n";
+    out << "    \"localQualitySupportBufferCells\": " << d.localQualitySupportBufferCells << ",\n";
+    out << "    \"localQualityMaxAreaLossRatio\": " << d.localQualityMaxAreaLossRatio << ",\n";
+    out << "    \"localQualityMaxStrongCoverageLossRatio\": " << d.localQualityMaxStrongCoverageLossRatio << ",\n";
+    out << "    \"localQualityMaxWeakCoverageLossRatio\": " << d.localQualityMaxWeakCoverageLossRatio << ",\n";
+    out << "    \"localQualityMaxBackgroundLeakageIncreaseRatio\": " << d.localQualityMaxBackgroundLeakageIncreaseRatio << ",\n";
+    out << "    \"localQualityStabilityThresholdDeltaRatio\": " << d.localQualityStabilityThresholdDeltaRatio << ",\n";
+    out << "    \"localQualityMinStabilityJaccard\": " << d.localQualityMinStabilityJaccard << ",\n";
+    out << "    \"localQualityMaxCandidatesPerObject\": " << d.localQualityMaxCandidatesPerObject << ",\n";
+    out << "    \"localQualityMaxTotalCandidates\": " << d.localQualityMaxTotalCandidates << ",\n";
+    out << "    \"localQualityMaxWindowCells\": " << d.localQualityMaxWindowCells << ",\n";
+    out << "    \"localQualityMaxObjectCells\": " << d.localQualityMaxObjectCells << ",\n";
+    out << "    \"localQualityMaxEvidenceRecords\": " << d.localQualityMaxEvidenceRecords << ",\n";
     out << "    \"beltRadius\": " << d.beltRadius << ",\n";
     out << "    \"postBeltCloseRadius\": " << d.postBeltCloseRadius << ",\n";
     out << "    \"attributeConstrainedBelt\": " << (d.attributeConstrainedBelt ? "true" : "false") << ",\n";
@@ -148,6 +272,107 @@ void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
     out << "    \"coveragePreserveSmoothFallbackPolygons\": " << d.coveragePreserveSmoothFallbackPolygons << ",\n";
     out << "    \"coveragePreserveTopologyOverridePolygons\": " << d.coveragePreserveTopologyOverridePolygons << "\n";
     out << "  },\n";
+    out << "  \"weakPath\": {\n";
+    out << "    \"weakPathCandidateCells\": " << d.weakPathCandidateCells << ",\n";
+    out << "    \"weakPathAcceptedCells\": " << d.weakPathAcceptedCells << ",\n";
+    out << "    \"weakPathRejectedCells\": " << d.weakPathRejectedCells << ",\n";
+    out << "    \"weakPathSeedCells\": " << d.weakPathSeedCells << ",\n";
+    out << "    \"weakPathSeedContactCells\": " << d.weakPathSeedContactCells << ",\n";
+    out << "    \"weakPathRootConflictRejectedCells\": " << d.weakPathRootConflictRejectedCells << ",\n";
+    out << "    \"weakPathCandidateComponents\": " << d.weakPathCandidateComponents << ",\n";
+    out << "    \"weakPathAcceptedComponents\": " << d.weakPathAcceptedComponents << ",\n";
+    out << "    \"weakPathRejectedComponents\": " << d.weakPathRejectedComponents << ",\n";
+    out << "    \"weakPathPartiallyRejectedComponents\": " << d.weakPathPartiallyRejectedComponents << ",\n";
+    out << "    \"weakPathEvidenceEvaluatedComponents\": " << d.weakPathEvidenceEvaluatedFragments << ",\n";
+    out << "    \"weakPathAttributeRejectedComponents\": " << d.weakPathAttributeRejectedFragments << ",\n";
+    out << "    \"weakPathShapeRejectedComponents\": " << d.weakPathShapeRejectedFragments << ",\n";
+    out << "    \"weakPathDirectionRejectedComponents\": " << d.weakPathDirectionRejectedFragments << ",\n";
+    out << "    \"weakPathEvidenceEvaluatedFragments\": " << d.weakPathEvidenceEvaluatedFragments << ",\n";
+    out << "    \"weakPathAttributeRejectedFragments\": " << d.weakPathAttributeRejectedFragments << ",\n";
+    out << "    \"weakPathShapeRejectedFragments\": " << d.weakPathShapeRejectedFragments << ",\n";
+    out << "    \"weakPathDirectionRejectedFragments\": " << d.weakPathDirectionRejectedFragments << "\n";
+    out << "  },\n";
+    out << "  \"branchAttribution\": {\n";
+    out << "    \"branchAttributionJunctionClusters\": " << d.branchAttributionJunctionClusters << ",\n";
+    out << "    \"branchAttributionAcceptedPairs\": " << d.branchAttributionAcceptedPairs << ",\n";
+    out << "    \"branchAttributionAmbiguousClusters\": " << d.branchAttributionAmbiguousClusters << ",\n";
+    out << "    \"branchAttributionUnmatchedEnds\": " << d.branchAttributionUnmatchedEnds << ",\n";
+    out << "    \"branchAttributionGreedyFallbackClusters\": " << d.branchAttributionGreedyFallbackClusters << ",\n";
+    out << "    \"branchAttributionPairingDifferingClusters\": " << d.branchAttributionCandidatePairingDifferingClusters << ",\n";
+    out << "    \"branchAttributionDifferingClusters\": " << d.branchAttributionCandidateDifferingClusters << ",\n";
+    out << "    \"branchAttributionCandidatePairingDifferingClusters\": " << d.branchAttributionCandidatePairingDifferingClusters << ",\n";
+    out << "    \"branchAttributionCandidateDifferingClusters\": " << d.branchAttributionCandidateDifferingClusters << ",\n";
+    out << "    \"branchAttributionAcceptedPairingDifferingClusters\": " << d.branchAttributionAcceptedPairingDifferingClusters << ",\n";
+    out << "    \"branchAttributionAcceptedDifferingClusters\": " << d.branchAttributionAcceptedDifferingClusters << ",\n";
+    out << "    \"branchAttributionCandidateGroupingAppliedClusters\": " << d.branchAttributionCandidateGroupingAppliedClusters << ",\n";
+    out << "    \"branchAttributionCandidateGroupingAmbiguousFallbackClusters\": " << d.branchAttributionCandidateGroupingAmbiguousFallbackClusters << ",\n";
+    out << "    \"branchAttributionCandidateGroupingLegacyFallbackClusters\": " << d.branchAttributionCandidateGroupingLegacyFallbackClusters << ",\n";
+    out << "    \"branchAttributionCandidateGroupingComplexityFallbackClusters\": " << d.branchAttributionCandidateGroupingComplexityFallbackClusters << ",\n";
+    out << "    \"branchAttributionCandidateGroupingSpanFallbackClusters\": " << d.branchAttributionCandidateGroupingSpanFallbackClusters << ",\n";
+    out << "    \"branchAttributionCandidateGroupingExcludedInternalBranches\": " << d.branchAttributionCandidateGroupingExcludedInternalBranches << ",\n";
+    out << "    \"branchAttributionCandidateGroupingRootGroups\": " << d.branchAttributionCandidateGroupingRootGroups << "\n";
+    out << "  },\n";
+    out << "  \"localPolygonQuality\": {\n";
+    out << "    \"detected\": " << d.localQualityDetectedCount << ",\n";
+    out << "    \"accepted\": " << d.localQualityAcceptedCount << ",\n";
+    out << "    \"review\": " << d.localQualityReviewCount << ",\n";
+    out << "    \"rejected\": " << d.localQualityRejectedCount << ",\n";
+    out << "    \"rejectedInsufficientEvidence\": " << d.localQualityInsufficientEvidenceRejectedCount << ",\n";
+    out << "    \"rejectedNoMeaningfulChange\": " << d.localQualityNoMeaningfulChangeRejectedCount << ",\n";
+    out << "    \"rejectedAreaLoss\": " << d.localQualityAreaLossRejectedCount << ",\n";
+    out << "    \"rejectedStrongCoverage\": " << d.localQualityStrongCoverageRejectedCount << ",\n";
+    out << "    \"rejectedWeakCoverage\": " << d.localQualityWeakCoverageRejectedCount << ",\n";
+    out << "    \"rejectedBackgroundLeakage\": " << d.localQualityBackgroundLeakageRejectedCount << ",\n";
+    out << "    \"rejectedTopology\": " << d.localQualityTopologyRejectedCount << ",\n";
+    out << "    \"rejectedStability\": " << d.localQualityStabilityRejectedCount << ",\n";
+    out << "    \"rejectedInvalidGeometry\": " << d.localQualityInvalidGeometryRejectedCount << ",\n";
+    out << "    \"objectBudgetReviewCount\": " << d.localQualityObjectBudgetReviewCount << ",\n";
+    out << "    \"postRepairFilteredCount\": " << d.localQualityPostRepairFilteredCount << ",\n";
+    out << "    \"totalEvidence\": " << d.localQualityTotalEvidence << ",\n";
+    out << "    \"storedEvidence\": " << d.localQualityStoredEvidence << ",\n";
+    out << "    \"truncatedEvidence\": " << d.localQualityTruncatedEvidence << ",\n";
+    out << "    \"candidateEvidence\": [";
+    const std::size_t evidenceCount = std::min(
+        d.localPolygonQualityEvidence.size(),
+        d.localQualityMaxEvidenceRecords);
+    for (std::size_t index = 0;
+         index < evidenceCount;
+         ++index) {
+        const LocalPolygonQualityEvidence& evidence =
+            d.localPolygonQualityEvidence[index];
+        if (index > 0) {
+            out << ",";
+        }
+        out << "\n      {\n";
+        out << "        \"objectIndex\": " << evidence.objectIndex << ",\n";
+        out << "        \"type\": \"" << localCandidateTypeName(evidence.type) << "\",\n";
+        out << "        \"window\": {\n";
+        out << "          \"minGridX\": " << evidence.minGridX << ",\n";
+        out << "          \"maxGridX\": " << evidence.maxGridX << ",\n";
+        out << "          \"minGridY\": " << evidence.minGridY << ",\n";
+        out << "          \"maxGridY\": " << evidence.maxGridY << "\n";
+        out << "        },\n";
+        out << "        \"decision\": \"" << localDecisionName(evidence.decision) << "\",\n";
+        out << "        \"rejectionReason\": \""
+            << localRejectionReasonName(evidence.rejectionReason)
+            << "\",\n";
+        out << "        \"supportRatio\": " << evidence.supportRatio << ",\n";
+        out << "        \"areaLossRatio\": " << evidence.areaLossRatio << ",\n";
+        out << "        \"strongCoverageLossRatio\": "
+            << evidence.strongCoverageLossRatio << ",\n";
+        out << "        \"weakCoverageLossRatio\": "
+            << evidence.weakCoverageLossRatio << ",\n";
+        out << "        \"backgroundLeakageDelta\": "
+            << evidence.backgroundLeakageDelta << ",\n";
+        out << "        \"stabilityJaccard\": "
+            << evidence.stabilityJaccard << "\n";
+        out << "      }";
+    }
+    if (evidenceCount > 0) {
+        out << "\n    ";
+    }
+    out << "]\n";
+    out << "  },\n";
     out << "  \"topology\": {\n";
     out << "    \"openRings\": " << d.openRingCount << ",\n";
     out << "    \"selfIntersectingPolygons\": " << d.selfIntersectingPolygonCount << ",\n";
@@ -187,6 +412,80 @@ void writeTopologyDetailsCsv(const std::string& path, const TopologyDiagnostics&
             << detail.edgeB << ","
             << detail.point.x << ","
             << detail.point.y << "\n";
+    }
+}
+
+void writeBranchAttributionDifferencesCsv(
+    const std::string& path,
+    const std::vector<JunctionAttributionResult>& junctions) {
+    std::ofstream out(path);
+    if (!out) {
+        throw std::runtime_error(
+            "Failed to open branch attribution differences file: " + path);
+    }
+
+    out << "cluster_id,center_grid_x,center_grid_y,center_world_x,center_world_y,"
+        << "min_grid_x,min_grid_y,max_grid_x,max_grid_y,"
+        << "legacy_pairs,new_pairs,legacy_unmatched,new_unmatched,"
+        << "pairing_differs_from_legacy,differs_from_legacy,"
+        << "ambiguous,used_exact_matching,"
+        << "best_cost,alternative_cost,confidence,"
+        << "turn_angle_degrees,angle_cost,attribute_cost,width_cost,background_cost,"
+        << "candidate_pairing_differs_from_legacy,candidate_differs_from_legacy,"
+        << "accepted_pairing_differs_from_legacy,accepted_differs_from_legacy\n";
+    out << std::setprecision(12);
+    for (const JunctionAttributionResult& junction : junctions) {
+        out << junction.clusterId << ","
+            << junction.centerGridX << ","
+            << junction.centerGridY << ","
+            << junction.centerWorldX << ","
+            << junction.centerWorldY << ","
+            << junction.minGridX << ","
+            << junction.minGridY << ","
+            << junction.maxGridX << ","
+            << junction.maxGridY << ","
+            << formatPairIds(junction.legacyPairs) << ","
+            << formatPairIds(junction.pairs) << ","
+            << formatIds(junction.legacyUnmatchedBranchIds) << ","
+            << formatIds(junction.unmatchedBranchIds) << ","
+            << (junction.pairingDiffersFromLegacy ? 1 : 0) << ","
+            << (junction.differsFromLegacy ? 1 : 0) << ","
+            << (junction.ambiguous ? 1 : 0) << ","
+            << (junction.usedExactMatching ? 1 : 0) << ","
+            << junction.bestCost << ",";
+        if (std::isfinite(junction.alternativeCost)) {
+            out << junction.alternativeCost;
+        }
+        out << ","
+            << junction.confidence << ","
+            << formatPairMetric(
+                junction.pairs,
+                &BranchAttributionPair::turnAngleDegrees)
+            << ","
+            << formatPairMetric(
+                junction.pairs,
+                &BranchAttributionPair::angleCost)
+            << ","
+            << formatPairMetric(
+                junction.pairs,
+                &BranchAttributionPair::attributeCost)
+            << ","
+            << formatPairMetric(
+                junction.pairs,
+                &BranchAttributionPair::widthCost)
+            << ","
+            << formatPairMetric(
+                junction.pairs,
+                &BranchAttributionPair::backgroundCost)
+            << ","
+            << (junction.pairingDiffersFromLegacy ? 1 : 0)
+            << ","
+            << (junction.differsFromLegacy ? 1 : 0)
+            << ","
+            << (junction.acceptedPairingDiffersFromLegacy ? 1 : 0)
+            << ","
+            << (junction.acceptedDiffersFromLegacy ? 1 : 0)
+            << "\n";
     }
 }
 

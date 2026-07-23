@@ -1,7 +1,7 @@
 ﻿param(
     [string]$GeoEastRoot = $(if ($env:FPT_GEOEAST_ROOT) { $env:FPT_GEOEAST_ROOT } elseif ($env:USERPROFILE -and (Test-Path -LiteralPath (Join-Path $env:USERPROFILE "GeoEast"))) { Join-Path $env:USERPROFILE "GeoEast" } else { "C:\GeoEast" }),
     [string]$OfficialDat = "",
-    [string]$PackageVersion = "v0.9.5",
+    [string]$PackageVersion = "v1.0.0-rc2-unified",
     [int]$MaxElapsedMs = 5000,
     [double]$MinStrongCoverage = 0.990,
     [double]$MinWeakCoverage = 0.955,
@@ -11,16 +11,21 @@
     [int]$MaxWeakLineReviewComponents = 999999,
     [int]$MaxHighRiskMergePolygons = 999999,
     [int]$MaxMiddleRiskMergePolygons = 999999,
+    [int]$MaxLocalShapeCandidates = 999999,
+    [int]$MaxHighPriorityLocalShapeCandidates = 999999,
+    [switch]$RunParameterStabilityGate,
     [switch]$SkipGeoEastBuild,
     [switch]$SkipPackage
 )
 
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "AcceptanceGate.ps1")
+
 $repoRoot = Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")
 $exe = Join-Path $repoRoot "build\faultpolytrace.exe"
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-$totalSteps = 14
+$totalSteps = 15
 $resultName = "official_root_antimerge"
 $acceptanceName = "acceptance_${timestamp}_official_root_antimerge"
 $acceptanceDir = Join-Path $repoRoot "examples\outputs\$acceptanceName"
@@ -32,7 +37,15 @@ $autoParamsDir = Join-Path $acceptanceDir "自动参数推荐"
 $topReviewDir = Join-Path $acceptanceDir "冲顶局部复核"
 $missRootCauseDir = Join-Path $acceptanceDir "漏检根因诊断"
 $residualReviewLayerDir = Join-Path $acceptanceDir "残余复核层"
+$localShapeQualityDir = Join-Path $acceptanceDir "局部形态质量诊断"
+$parameterStabilityDir = Join-Path $acceptanceDir "参数扰动稳定性"
+$lowerPerturbationCsv = Join-Path $parameterStabilityDir "percentile_0.979_weak_0.964.csv"
+$upperPerturbationCsv = Join-Path $parameterStabilityDir "percentile_0.981_weak_0.966.csv"
+$stabilityReportPath = Join-Path $parameterStabilityDir "参数扰动稳定性报告.md"
+$stabilitySummaryPath = Join-Path $parameterStabilityDir "参数扰动稳定性摘要.json"
 $reportPath = Join-Path $acceptanceDir "本次验收报告.md"
+$stabilityGatePassed = $null
+$stabilityArtifactsPresent = $false
 
 function Read-TextNumber {
     param(
@@ -48,16 +61,18 @@ function Read-TextNumber {
 }
 
 if ([string]::IsNullOrWhiteSpace($OfficialDat)) {
-    $candidate = Get-ChildItem -LiteralPath "D:\BaiduNetdiskDownload\BGPCup2025" -Recurse -Filter "test.dat" -ErrorAction SilentlyContinue |
-        Where-Object { $_.FullName -like "*BGPCup2025*" } |
-        Select-Object -First 1
-    if ($candidate) {
-        $OfficialDat = $candidate.FullName
+    if ($env:FPT_OFFICIAL_DAT) {
+        $OfficialDat = $env:FPT_OFFICIAL_DAT
+    } elseif ($env:FPT_OFFICIAL_DATA_DIR -and (Test-Path -LiteralPath $env:FPT_OFFICIAL_DATA_DIR)) {
+        $candidate = Get-ChildItem -LiteralPath $env:FPT_OFFICIAL_DATA_DIR -Recurse -Filter "test.dat" -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($candidate) {
+            $OfficialDat = $candidate.FullName
+        }
     }
 }
 
 if (!(Test-Path -LiteralPath $OfficialDat)) {
-    throw "官方测试数据不存在：$OfficialDat"
+    throw "官方测试数据不存在：$OfficialDat。请通过 -OfficialDat <test.dat> 或环境变量 FPT_OFFICIAL_DAT 指定。"
 }
 
 New-Item -ItemType Directory -Force -Path $acceptanceDir | Out-Null
@@ -125,6 +140,118 @@ Write-Host "== 4/$totalSteps 运行官方数据推荐参数 =="
     --smooth-iterations 1 | Out-Host
 if ($LASTEXITCODE -ne 0) {
     throw "官方数据推荐参数运行失败。"
+}
+
+if ($RunParameterStabilityGate) {
+    Write-Host "== 4a/$totalSteps 运行参数扰动稳定性门禁 =="
+    New-Item -ItemType Directory -Force -Path $parameterStabilityDir | Out-Null
+
+    & $exe `
+        --input $OfficialDat `
+        --input-format geoeast-dat `
+        --output $lowerPerturbationCsv `
+        --trace-mode ridge-belt `
+        --threshold-mode percentile `
+        --percentile 0.979 `
+        --min-area 120 `
+        --close-radius 1 `
+        --weak-percentile 0.964 `
+        --weak-connect-radius 1 `
+        --max-weak-component-cells 20000 `
+        --min-weak-component-aspect 3 `
+        --belt-radius 3 `
+        --attribute-constrained-belt `
+        --attribute-envelope-radius 1 `
+        --post-belt-close-radius 1 `
+        --min-branch-length 4 `
+        --min-junction-branch-length 2 `
+        --min-junction-branch-mean 0.94 `
+        --max-gap-distance 12 `
+        --max-gap-angle 55 `
+        --min-gap-support-ratio 0.25 `
+        --no-separate-branch-belts `
+        --root-anti-merge `
+        --root-anti-merge-support-ratio 0.25 `
+        --root-anti-merge-min-part-cells 0 `
+        --root-anti-merge-min-part-ratio 0.12 `
+        --root-anti-merge-weak-guard-threshold 0.66 `
+        --root-anti-merge-weak-guard-radius 0 `
+        --residual-percentile 0.955 `
+        --residual-fill-radius 4 `
+        --residual-edge-fill-radius 2 `
+        --residual-edge-fill-min-value-ratio 0.97 `
+        --residual-edge-fill-max-patch-span 5 `
+        --residual-min-cells 2 `
+        --residual-trace-min-length 6 `
+        --residual-trace-max-cells 80 `
+        --residual-covered-guard-radius 0 `
+        --no-residual-trace `
+        --simplify-tolerance 2 `
+        --smooth-iterations 1 | Out-Host
+    if ($LASTEXITCODE -ne 0) {
+        throw "较低分位参数扰动运行失败。"
+    }
+
+    & $exe `
+        --input $OfficialDat `
+        --input-format geoeast-dat `
+        --output $upperPerturbationCsv `
+        --trace-mode ridge-belt `
+        --threshold-mode percentile `
+        --percentile 0.981 `
+        --min-area 120 `
+        --close-radius 1 `
+        --weak-percentile 0.966 `
+        --weak-connect-radius 1 `
+        --max-weak-component-cells 20000 `
+        --min-weak-component-aspect 3 `
+        --belt-radius 3 `
+        --attribute-constrained-belt `
+        --attribute-envelope-radius 1 `
+        --post-belt-close-radius 1 `
+        --min-branch-length 4 `
+        --min-junction-branch-length 2 `
+        --min-junction-branch-mean 0.94 `
+        --max-gap-distance 12 `
+        --max-gap-angle 55 `
+        --min-gap-support-ratio 0.25 `
+        --no-separate-branch-belts `
+        --root-anti-merge `
+        --root-anti-merge-support-ratio 0.25 `
+        --root-anti-merge-min-part-cells 0 `
+        --root-anti-merge-min-part-ratio 0.12 `
+        --root-anti-merge-weak-guard-threshold 0.66 `
+        --root-anti-merge-weak-guard-radius 0 `
+        --residual-percentile 0.955 `
+        --residual-fill-radius 4 `
+        --residual-edge-fill-radius 2 `
+        --residual-edge-fill-min-value-ratio 0.97 `
+        --residual-edge-fill-max-patch-span 5 `
+        --residual-min-cells 2 `
+        --residual-trace-min-length 6 `
+        --residual-trace-max-cells 80 `
+        --residual-covered-guard-radius 0 `
+        --no-residual-trace `
+        --simplify-tolerance 2 `
+        --smooth-iterations 1 | Out-Host
+    if ($LASTEXITCODE -ne 0) {
+        throw "较高分位参数扰动运行失败。"
+    }
+
+    python (Join-Path $PSScriptRoot "参数扰动稳定性验证.py") `
+        --baseline "balanced=$resultCsv" `
+        --candidate "percentile_0.979_weak_0.964=$lowerPerturbationCsv" `
+        --candidate "percentile_0.981_weak_0.966=$upperPerturbationCsv" `
+        --conservative $upperPerturbationCsv `
+        --high-recall $lowerPerturbationCsv `
+        --out-dir $parameterStabilityDir | Out-Host
+    $stabilityArtifactsPresent = (
+        (Test-Path -LiteralPath $stabilityReportPath) -and
+        (Test-Path -LiteralPath $stabilitySummaryPath)
+    )
+    $stabilityGatePassed = ($LASTEXITCODE -eq 0) -and $stabilityArtifactsPresent
+} else {
+    Write-Host "== 4a/$totalSteps 跳过可选参数扰动稳定性门禁 =="
 }
 
 Write-Host "== 5/$totalSteps 生成白底质量评估图 =="
@@ -208,7 +335,20 @@ if ($LASTEXITCODE -ne 0) {
     throw "残余复核层生成失败。"
 }
 
-Write-Host "== 12/$totalSteps 读取验收指标并生成报告 =="
+Write-Host "== 12/$totalSteps 生成局部形态质量诊断 =="
+python (Join-Path $PSScriptRoot "局部形态质量诊断.py") `
+    --dat $OfficialDat `
+    --csv $resultCsv `
+    --out-dir $localShapeQualityDir `
+    --width-ratio 2.35 `
+    --min-extra-cells 24 `
+    --window 11 `
+    --max-figures 30 | Out-Host
+if ($LASTEXITCODE -ne 0) {
+    throw "局部形态质量诊断生成失败。"
+}
+
+Write-Host "== 13/$totalSteps 读取验收指标并生成报告 =="
 $diagnosticsPath = "$resultCsv.diagnostics.json"
 $diagnostics = Get-Content -LiteralPath $diagnosticsPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $qualityCsv = Join-Path $qualityDir "metrics\质量评估汇总.csv"
@@ -242,6 +382,10 @@ $smallPolygonCount = [int]$topQuality.small_polygon_count
 $residualReviewSummaryPath = Join-Path $residualReviewLayerDir "残余复核层摘要.json"
 $residualReviewSummary = Get-Content -LiteralPath $residualReviewSummaryPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $residualReviewCandidateCount = [int]$residualReviewSummary.candidate_count
+$localShapeSummaryPath = Join-Path $localShapeQualityDir "局部形态质量摘要.json"
+$localShapeSummary = Get-Content -LiteralPath $localShapeSummaryPath -Raw -Encoding UTF8 | ConvertFrom-Json
+$localShapeCandidateCount = [int]$localShapeSummary.candidate_count
+$highPriorityLocalShapeCandidateCount = [int]$localShapeSummary.high_priority_count
 
 $checks = @()
 $checks += [pscustomobject]@{ Item = "核心算法耗时"; Pass = ($traceMs -lt 60000); Detail = "${traceMs} ms，赛题要求 60000 ms 以内" }
@@ -256,6 +400,15 @@ $checks += [pscustomobject]@{ Item = "强响应需复核项"; Pass = ($strongRev
 $checks += [pscustomobject]@{ Item = "弱线性需复核项"; Pass = ($weakLineReviewComponents -le $MaxWeakLineReviewComponents); Detail = "$weakLineReviewComponents 个，阈值 $MaxWeakLineReviewComponents 个" }
 $checks += [pscustomobject]@{ Item = "高风险误合并候选"; Pass = ($highRiskMergePolygons -le $MaxHighRiskMergePolygons); Detail = "$highRiskMergePolygons 个，阈值 $MaxHighRiskMergePolygons 个。该项为复核候选，不等同于确定错误" }
 $checks += [pscustomobject]@{ Item = "中风险误合并候选"; Pass = ($middleRiskMergePolygons -le $MaxMiddleRiskMergePolygons); Detail = "$middleRiskMergePolygons 个，阈值 $MaxMiddleRiskMergePolygons 个。该项为复核候选，不等同于确定错误" }
+$checks += [pscustomobject]@{ Item = "局部形态复核候选"; Pass = ($localShapeCandidateCount -le $MaxLocalShapeCandidates); Detail = "$localShapeCandidateCount 个，阈值 $MaxLocalShapeCandidates 个。该项用于定位局部鼓包、内环和长段宽带复核对象" }
+$checks += [pscustomobject]@{ Item = "高优先级局部形态候选"; Pass = ($highPriorityLocalShapeCandidateCount -le $MaxHighPriorityLocalShapeCandidates); Detail = "$highPriorityLocalShapeCandidateCount 个，阈值 $MaxHighPriorityLocalShapeCandidates 个。该项用于跟踪黄框类局部分支/包络风险" }
+if ($RunParameterStabilityGate) {
+    $checks += [pscustomobject]@{
+        Item = "参数扰动稳定性门禁"
+        Pass = $stabilityGatePassed
+        Detail = "比较 percentile/weak-percentile 的 ±0.001 联合扰动；报告位于 $parameterStabilityDir"
+    }
+}
 
 $failedChecks = $checks | Where-Object { -not $_.Pass }
 $resultText = if ($failedChecks.Count -eq 0) { "通过" } else { "未通过" }
@@ -287,6 +440,8 @@ $report.Add("| 高风险误合并候选 | $highRiskMergePolygons |")
 $report.Add("| 中风险误合并候选 | $middleRiskMergePolygons |")
 $report.Add("| 小碎片多边形数量 | $smallPolygonCount |")
 $report.Add("| 残余复核层候选 | $residualReviewCandidateCount |")
+$report.Add("| 局部形态复核候选 | $localShapeCandidateCount |")
+$report.Add("| 高优先级局部形态候选 | $highPriorityLocalShapeCandidateCount |")
 $report.Add("| 核心追踪耗时 | $traceMs ms |")
 $report.Add("| 总耗时 | $elapsedMs ms |")
 $report.Add("| 开放环 | $openRings |")
@@ -363,35 +518,52 @@ $report.Add("- 残余复核层报告：$residualReviewLayerDir\残余复核层�
 $report.Add("- 残余复核层 CSV：$residualReviewLayerDir\残余复核层.csv")
 $report.Add("- 残余复核层 GeoJSON：$residualReviewLayerDir\残余复核层.geojson")
 $report.Add("- 残余复核层图件：$residualReviewLayerDir\残余复核层总览.png")
+$report.Add("- 局部形态质量报告：$localShapeQualityDir\局部形态质量诊断报告.md")
+$report.Add("- 局部形态质量明细：$localShapeQualityDir\局部形态质量诊断.csv")
+$report.Add("- 局部形态质量摘要：$localShapeQualityDir\局部形态质量摘要.json")
+$report.Add("- 局部形态复核图：$localShapeQualityDir\局部形态复核图")
+if ($RunParameterStabilityGate) {
+    if ($stabilityArtifactsPresent) {
+        $report.Add("- 参数扰动稳定性报告：$stabilityReportPath")
+        $report.Add("- 参数扰动稳定性摘要：$stabilitySummaryPath")
+    } else {
+        $report.Add("- 参数扰动稳定性报告：生成失败，未形成可引用证据文件")
+    }
+}
 $report.Add("")
 $report.Add("## 6. 说明")
 $report.Add("")
-$report.Add("本验收报告采用覆盖率、拓扑、耗时、漏检连通域和疑似误合并候选共同评价结果质量。强响应覆盖率用于检查主要断层是否被追踪；弱响应覆盖率用于检查细弱线性响应的召回能力；拓扑指标用于确认输出是否满足闭合、无自相交、无异常交叉；疑似误合并候选用于定位后续局部复核对象，不直接等同于确定错误。")
+$report.Add("本验收报告采用覆盖率、拓扑、耗时、漏检连通域、疑似误合并候选和局部形态候选共同评价结果质量。强响应覆盖率用于检查主要断层是否被追踪；弱响应覆盖率用于检查细弱线性响应的召回能力；拓扑指标用于确认输出是否满足闭合、无自相交、无异常交叉；疑似误合并候选用于检查相邻断层是否被错误合并；局部形态候选用于定位黄框复核中发现的局部鼓包、内环、长段宽带和疑似分支归属风险。局部形态候选不直接等同于确定错误，但它是后续局部瘦身、候选分裂和人工复核的入口。参数扰动稳定性只证明同一数据在邻近参数下的结果一致性，不使用专家标准答案，也不能单独证明地质解释正确。")
 
 Set-Content -LiteralPath $reportPath -Value $report -Encoding UTF8
 Write-Host "验收报告: $reportPath"
 
-if (!$SkipGeoEastBuild) {
-    Write-Host "== 13/$totalSteps 构建并部署 GeoEast 组件 =="
-    & (Join-Path $PSScriptRoot "build_geoeast_bo_runner.ps1") -GeoEastRoot $GeoEastRoot -UseVisualStudioProject
-    & (Join-Path $PSScriptRoot "build_qt_launcher.ps1") -GeoEastRoot $GeoEastRoot
-    & (Join-Path $PSScriptRoot "build_geoeast_mainframe_plugin.ps1") -GeoEastRoot $GeoEastRoot
-    & (Join-Path $PSScriptRoot "部署到GeoEast.ps1") -GeoEastRoot $GeoEastRoot -SkipBuild
-} else {
-    Write-Host "== 13/$totalSteps 跳过 GeoEast 构建部署 =="
-}
+$deployAction = {
+    if (!$SkipGeoEastBuild) {
+        Write-Host "== 14/$totalSteps 构建并部署 GeoEast 组件 =="
+        & (Join-Path $PSScriptRoot "build_geoeast_bo_runner.ps1") -GeoEastRoot $GeoEastRoot -UseVisualStudioProject
+        & (Join-Path $PSScriptRoot "build_qt_launcher.ps1") -GeoEastRoot $GeoEastRoot
+        & (Join-Path $PSScriptRoot "build_geoeast_mainframe_plugin.ps1") -GeoEastRoot $GeoEastRoot
+        & (Join-Path $PSScriptRoot "部署到GeoEast.ps1") -GeoEastRoot $GeoEastRoot -SkipBuild
+    } else {
+        Write-Host "== 14/$totalSteps 跳过 GeoEast 构建部署 =="
+    }
+}.GetNewClosure()
 
-if (!$SkipPackage) {
-    Write-Host "== 14/$totalSteps 生成发布包 =="
-    & (Join-Path $PSScriptRoot "打包发布包.ps1") -Version $PackageVersion -GeoEastRoot $GeoEastRoot -SkipBuild
-} else {
-    Write-Host "== 14/$totalSteps 跳过发布包生成 =="
-}
+$packageAction = {
+    if (!$SkipPackage) {
+        Write-Host "== 15/$totalSteps 生成发布包 =="
+        & (Join-Path $PSScriptRoot "打包发布包.ps1") -Version $PackageVersion -GeoEastRoot $GeoEastRoot -SkipBuild
+    } else {
+        Write-Host "== 15/$totalSteps 跳过发布包生成 =="
+    }
+}.GetNewClosure()
 
-if ($failedChecks.Count -gt 0) {
-    $failedText = ($failedChecks | ForEach-Object { "$($_.Item): $($_.Detail)" }) -join "；"
-    throw "一键总验收未通过：$failedText。详见 $reportPath"
-}
+Invoke-AcceptedDelivery `
+    -Checks $checks `
+    -ReportPath $reportPath `
+    -DeployAction $deployAction `
+    -PackageAction $packageAction
 
 Write-Host "一键总验收通过。"
 Write-Host "验收目录：$acceptanceDir"

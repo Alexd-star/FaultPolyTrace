@@ -1,8 +1,11 @@
 #pragma once
 
+#include "BranchAttribution.h"
+#include "LocalPolygonQuality.h"
 #include "Polygon.h"
 #include "Segmentation.h"
 
+#include <cstddef>
 #include <vector>
 
 namespace fpt {
@@ -25,6 +28,27 @@ struct TraceOptions {
     int weakConnectRadius = 0;
     int maxWeakComponentCells = 20000;
     double minWeakComponentAspect = 3.0;
+    bool weakPathGate = false;
+    double weakPathSupportRatio = 0.50;
+    int weakPathMaxUnsupportedRun = 3;
+    bool branchAttributionShadow = false;
+    bool branchAttributionCandidateGroups = false;
+    bool localPolygonQuality = false;
+    double localQualityWidthRatio = 2.4;
+    int localQualityMinExtraCells = 8;
+    double localQualitySupportThresholdRatio = 0.70;
+    int localQualitySupportBufferCells = 1;
+    double localQualityMaxAreaLossRatio = 0.18;
+    double localQualityMaxStrongCoverageLossRatio = 0.0;
+    double localQualityMaxWeakCoverageLossRatio = 0.0;
+    double localQualityMaxBackgroundLeakageIncreaseRatio = 0.0;
+    double localQualityStabilityThresholdDeltaRatio = 0.02;
+    double localQualityMinStabilityJaccard = 0.90;
+    std::size_t localQualityMaxCandidatesPerObject = 64;
+    std::size_t localQualityMaxTotalCandidates = 4096;
+    std::size_t localQualityMaxWindowCells = 65536;
+    std::size_t localQualityMaxObjectCells = 2000000;
+    std::size_t localQualityMaxEvidenceRecords = 4096;
     int beltRadius = 2;
     int postBeltCloseRadius = 1;
     bool attributeConstrainedBelt = false;
@@ -95,6 +119,7 @@ struct BranchTrace {
 struct TraceResult {
     std::vector<Polygon> polygons;
     std::vector<BranchTrace> branches;
+    // Segmentation/belt mask cells before optional polygon-only local repair.
     int activeCellCount = 0;
     double effectiveThreshold = 0.0;
     int skeletonEndpoints = 0;
@@ -118,6 +143,41 @@ struct TraceResult {
     int residualFillCandidateCells = 0;
     int residualFillAddedCells = 0;
     int residualFillRejectedComponents = 0;
+    int weakPathCandidateCells = 0;
+    int weakPathAcceptedCells = 0;
+    int weakPathRejectedCells = 0;
+    int weakPathSeedCells = 0;
+    int weakPathSeedContactCells = 0;
+    int weakPathRootConflictRejectedCells = 0;
+    int weakPathCandidateComponents = 0;
+    int weakPathAcceptedComponents = 0;
+    int weakPathRejectedComponents = 0;
+    int weakPathPartiallyRejectedComponents = 0;
+    int weakPathEvidenceEvaluatedFragments = 0;
+    int weakPathAttributeRejectedFragments = 0;
+    int weakPathShapeRejectedFragments = 0;
+    int weakPathDirectionRejectedFragments = 0;
+    int branchAttributionJunctionClusters = 0;
+    int branchAttributionAcceptedPairs = 0;
+    int branchAttributionAmbiguousClusters = 0;
+    int branchAttributionUnmatchedEnds = 0;
+    int branchAttributionGreedyFallbackClusters = 0;
+    int branchAttributionCandidatePairingDifferingClusters = 0;
+    int branchAttributionCandidateDifferingClusters = 0;
+    int branchAttributionAcceptedPairingDifferingClusters = 0;
+    int branchAttributionAcceptedDifferingClusters = 0;
+    int branchAttributionPairingDifferingClusters = 0;
+    int branchAttributionDifferingClusters = 0;
+    int branchAttributionCandidateGroupingAppliedClusters = 0;
+    int branchAttributionCandidateGroupingAmbiguousFallbackClusters = 0;
+    int branchAttributionCandidateGroupingLegacyFallbackClusters = 0;
+    int branchAttributionCandidateGroupingComplexityFallbackClusters = 0;
+    int branchAttributionCandidateGroupingSpanFallbackClusters = 0;
+    int branchAttributionCandidateGroupingExcludedInternalBranches = 0;
+    int branchAttributionCandidateGroupingRootGroups = 0;
+    std::vector<JunctionAttributionResult> branchAttributionJunctions;
+    LocalPolygonQualityStats localPolygonQualityStats;
+    std::vector<LocalPolygonQualityEvidence> localPolygonQualityEvidence;
     int suppressedInternalRings = 0;
     int coveragePreserveSimplifyFallbackPolygons = 0;
     int coveragePreserveSmoothFallbackPolygons = 0;

@@ -18,10 +18,12 @@ TARGET = faultpolytrace_launcher
 SOURCES += \
     main.cpp \
     ../../src/ui/UiLocalization.cpp \
+    ../../src/ui/TraceParameterModel.cpp \
     FaultTraceDialog.cpp
 
 HEADERS += \
     ../../src/ui/UiLocalization.h \
+    ../../src/ui/TraceParameterModel.h \
     FaultTraceDialog.h
 
 OBJECTS_DIR = .obj

@@ -226,27 +226,45 @@ function Save-WindowScreenshot {
 
 function Find-ButtonByName {
     param(
-        [IntPtr]$WindowHandle,
+        [System.Diagnostics.Process]$Process,
         [string]$Name,
         [int]$TimeoutSeconds
     )
     Add-UiAutomationTypes
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    $seenButtons = New-Object System.Collections.Generic.List[string]
     while ((Get-Date) -lt $deadline) {
-        $root = [System.Windows.Automation.AutomationElement]::FromHandle($WindowHandle)
-        $condition = New-Object System.Windows.Automation.PropertyCondition(
-            [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
-            [System.Windows.Automation.ControlType]::Button
-        )
-        $buttons = $root.FindAll([System.Windows.Automation.TreeScope]::Descendants, $condition)
-        for ($i = 0; $i -lt $buttons.Count; $i++) {
-            if ($buttons.Item($i).Current.Name -eq $Name) {
-                return $buttons.Item($i)
+        $Process.Refresh()
+        if ($Process.HasExited) {
+            throw "独立软件进程已退出，无法查找按钮：$Name"
+        }
+        if ($Process.MainWindowHandle -ne 0) {
+            try {
+                $root = [System.Windows.Automation.AutomationElement]::FromHandle($Process.MainWindowHandle)
+                if ($null -ne $root) {
+                    $condition = New-Object System.Windows.Automation.PropertyCondition(
+                        [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+                        [System.Windows.Automation.ControlType]::Button
+                    )
+                    $buttons = $root.FindAll([System.Windows.Automation.TreeScope]::Descendants, $condition)
+                    for ($i = 0; $i -lt $buttons.Count; $i++) {
+                        $buttonName = $buttons.Item($i).Current.Name
+                        if (![string]::IsNullOrWhiteSpace($buttonName) -and !$seenButtons.Contains($buttonName)) {
+                            $seenButtons.Add($buttonName) | Out-Null
+                        }
+                        if ($buttonName -eq $Name) {
+                            return $buttons.Item($i)
+                        }
+                    }
+                }
+            } catch {
+                # Qt splash 与主窗口切换时 MainWindowHandle 可能短暂失效，继续等待稳定主窗口。
             }
         }
         Start-Sleep -Milliseconds 250
     }
-    throw "未找到按钮：$Name"
+    $seen = if ($seenButtons.Count -gt 0) { $seenButtons -join "、" } else { "未枚举到按钮" }
+    throw "未找到按钮：$Name；已看到：$seen"
 }
 
 function Invoke-GuiClickAcceptance {
@@ -311,8 +329,8 @@ function Invoke-GuiClickAcceptance {
             throw "独立软件窗口未打开。"
         }
 
+        $button = Find-ButtonByName -Process $process -Name "开始追踪" -TimeoutSeconds $GuiTimeoutSeconds
         Save-WindowScreenshot -Process $process -Path (Join-Path $figureRoot "01_GUI启动.png")
-        $button = Find-ButtonByName -WindowHandle $process.MainWindowHandle -Name "开始追踪" -TimeoutSeconds $GuiTimeoutSeconds
         $button.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
 
         $deadline = (Get-Date).AddSeconds($GuiTimeoutSeconds)

@@ -50,11 +50,11 @@ QMap<QString, QString> buildEnglishTextMap() {
     add("打开平面成图", "Open GeoMapping");
     add("关闭启动器", "Close Launcher");
     add("打开 DAT 文件...", "Open DAT File...");
-    add("打开 DAT 文件", "Open DAT File");
+    add("打开 DAT 文件", "Open DAT");
     add("打开DAT", "Open DAT");
-    add("保存当前配置", "Save Current Settings");
+    add("保存当前配置", "Save Settings");
     add("保存配置", "Save Settings");
-    add("打开输出目录", "Open Output Folder");
+    add("打开输出目录", "Open Output");
     add("复制日志", "Copy Log");
     add("清空日志", "Clear Log");
     add("平移模式", "Pan Mode");
@@ -65,6 +65,9 @@ QMap<QString, QString> buildEnglishTextMap() {
     add("重置", "Reset");
     add("显示原始网格层", "Show Input Grid Layer");
     add("显示结果多边形层", "Show Result Polygon Layer");
+    add("显示图层", "Visible Layers");
+    add("同时勾选两层即为叠加查看。", "Check both layers to view the overlay.");
+    add("叠加查看", "Overlay View");
     add("重新载入结果视图", "Reload Result View");
     add("导出当前视图 PNG", "Export Current View PNG");
     add("开始追踪", "Start Trace");
@@ -74,11 +77,11 @@ QMap<QString, QString> buildEnglishTextMap() {
     add("打开叠合查看指南", "Open Overlay Viewing Guide");
     add("保存当前参数", "Save Current Parameters");
     add("恢复默认配置", "Restore Default Settings");
-    add("恢复默认参数", "Restore Default Parameters");
+    add("恢复默认参数", "Restore Defaults");
     add("恢复默认", "Restore Defaults");
     add("打开用户操作手册", "Open User Manual");
     add("打开异机运行说明", "Open Deployment Guide");
-    add("帮助提示", "Help Tips");
+    add("帮助提示", "Help");
     add("用户操作手册", "User Manual");
     add("产品说明书", "Product Manual");
     add("项目目录结构", "Project Structure");
@@ -146,6 +149,10 @@ QMap<QString, QString> buildEnglishTextMap() {
 
     add("追踪参数", "Trace Parameters");
     add("预设模板", "Preset");
+    add("质量模式", "Quality Mode");
+    add("正式处理", "Production");
+    add("质量诊断", "Diagnostics");
+    add("受控实验", "Controlled Experiment");
     add("追踪模式", "Trace Mode");
     add("阈值模式", "Threshold Mode");
     add("分位数", "Percentile");
@@ -291,6 +298,11 @@ QMap<QString, QString> buildEnglishTextMap() {
     add("从 GeoEast 数据库读取可用输入网格列表", "Read available input grids from the GeoEast database");
     add("控制结果视图区是否显示本次追踪生成的原始网格图层。", "Show or hide the input grid layer generated for this trace.");
     add("控制结果视图区是否显示本次追踪生成的结果多边形图层。", "Show or hide the result polygon layer generated for this trace.");
+    add("显示或隐藏输入断层属性网格。首次打开大 DAT 时会按需载入。", "Show or hide the input fault-attribute grid. Large DAT files are loaded only when needed.");
+    add("显示或隐藏输入断层属性网格。GeoEast 模式会按需导出当前 BOMapGrid 视图。", "Show or hide the input fault-attribute grid. GeoEast mode exports the current BOMapGrid view only when needed.");
+    add("显示或隐藏追踪结果多边形。没有结果时会提示先运行追踪或载入结果。", "Show or hide traced result polygons. If no result exists, the software prompts you to run tracing or load a result first.");
+    add("显示或隐藏追踪结果多边形。没有结果时请先追踪或选择已有结果。", "Show or hide traced result polygons. If no result exists, run tracing or select an existing result first.");
+    add("同时显示原始网格和结果多边形，用于检查贴合关系。", "Show the input grid and result polygons together to inspect their fit.");
     add("重新读取本次计算生成的原始网格和结果多边形文件。", "Reload the generated input grid and result polygon files.");
     add("导出当前结果视图 PNG 图片。", "Export the current result view as a PNG image.");
     add("启动 GeoEast 自带 GeoBasemap，在官方图层树中查看原始网格和结果多边形。", "Open GeoEast GeoBasemap to inspect the input grid and result polygons in the official layer tree.");

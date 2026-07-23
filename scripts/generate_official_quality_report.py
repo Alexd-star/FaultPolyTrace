@@ -92,6 +92,12 @@ def main():
     parser.add_argument("--output", required=True)
     parser.add_argument("--official-dat", default="")
     parser.add_argument("--license-note", default="")
+    parser.add_argument("--geoeast-object", default="")
+    parser.add_argument("--geoeast-polygon-count", default="")
+    parser.add_argument("--geoeast-owner", default="")
+    parser.add_argument("--geoeast-db", default="")
+    parser.add_argument("--geoeast-project", default="")
+    parser.add_argument("--geoeast-screenshot-note", default="")
     args = parser.parse_args()
 
     repo_root = os.getcwd()
@@ -101,9 +107,7 @@ def main():
 
     attr_png = os.path.join(args.figures_dir, "01_original_fault_attribute.png")
     overlay_png = os.path.join(args.figures_dir, "02_faultpolytrace_overlay.png")
-    license_note = args.license_note or (
-        "当前本机 GeoEast 平面成图模块提示 GeoMapping 无许可；已确认现有 license 到期日为 2025-12-02。"
-    )
+    license_note = args.license_note or "GeoEast 现场许可、工区底图叠加截图和数据库对象截图需在有效 GeoEast 环境中补充确认。"
 
     lines = []
     lines.append("# 赛题 7 官方数据运行质量报告")
@@ -205,13 +209,32 @@ def main():
 
     lines.append("## 7. GeoEast 集成证据")
     lines.append("")
-    lines.append("- GeoEast 主界面 `断层组合多边形 -> <All>` 中已出现 `FaultPolyTrace_Result`。")
-    lines.append("- `Fault Polygon Number = 465`，与离线 CSV 和诊断结果一致。")
-    lines.append("- 输出对象 Owner 为 `26312`，数据库为 `ndp`，项目为 `BGPCup2026_Test7`。")
+    if args.geoeast_object:
+        lines.append(f"- GeoEast 输出对象：`{args.geoeast_object}`。")
+    else:
+        lines.append("- GeoEast 输出对象：需在有效 GeoEast 工区中截图确认。")
+    if args.geoeast_polygon_count:
+        lines.append(f"- GeoEast 对象中的多边形数量：`{args.geoeast_polygon_count}`。")
+    else:
+        lines.append("- GeoEast 对象中的多边形数量：需与写库日志或对象属性窗口核对。")
+    context_items = []
+    if args.geoeast_owner:
+        context_items.append(f"Owner=`{args.geoeast_owner}`")
+    if args.geoeast_db:
+        context_items.append(f"数据库=`{args.geoeast_db}`")
+    if args.geoeast_project:
+        context_items.append(f"项目=`{args.geoeast_project}`")
+    if context_items:
+        lines.append("- GeoEast 上下文：" + "，".join(context_items) + "。")
+    else:
+        lines.append("- GeoEast 上下文：需按现场数据库、项目和用户填写，不在脚本中写死。")
     lines.append("")
     lines.append(f"许可说明：{license_note}")
     lines.append("")
-    lines.append("由于当前 `平面成图/GeoMapping` 模块许可证过期，GeoEast 内部叠合截图暂时无法生成；当前报告使用官方 DAT 和输出 CSV 生成离线叠合图作为替代证据。正式提交前建议更换 2026 年有效 GeoEast license 后补充 GeoEast 内部截图。")
+    if args.geoeast_screenshot_note:
+        lines.append(args.geoeast_screenshot_note)
+    else:
+        lines.append("本报告中的离线叠合图只能证明算法输出和文件结果，不能替代 GeoEast 内部叠合截图。正式提交前应补充 GeoEast 菜单入口、输入 BOMapGrid、输出 BOFaultPolygon、工区底图叠加和运行日志截图。")
     lines.append("")
 
     lines.append("## 8. 文件清单")

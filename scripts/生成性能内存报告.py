@@ -157,7 +157,7 @@ def main():
                 "run": i,
                 "code": code,
                 "wall_ms": wall_ms,
-                "core_ms": diag.get("results", {}).get("elapsedMs", 0),
+                "core_ms": diag.get("timing", {}).get("elapsedMs", 0),
                 "read_ms": diag.get("timing", {}).get("readMs", 0),
                 "trace_ms": diag.get("timing", {}).get("traceMs", 0),
                 "topology_ms": diag.get("timing", {}).get("topologyMs", 0),

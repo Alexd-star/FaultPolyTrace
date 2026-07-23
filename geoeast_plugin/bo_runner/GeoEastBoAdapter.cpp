@@ -262,8 +262,23 @@ void writeFaultPolygons(
     if (!project) {
         throw std::runtime_error("GeoEast project is null.");
     }
+    if (outputName.empty()) {
+        throw std::runtime_error("GeoEast BOFaultPolygon output name is empty.");
+    }
+    for (const fpt::Polygon& polygon : polygons) {
+        if ((!keptOnly || polygon.kept) && !polygon.holes.empty()) {
+            throw std::runtime_error(
+                "BOFaultPolygon does not expose hole ownership semantics; "
+                "refusing to flatten polygon holes into independent fault polygons.");
+        }
+    }
 
-    project->eraseChild<geobo::BOFaultPolygon>(outputName);
+    if (project->getChild<geobo::BOFaultPolygon>(outputName)) {
+        NStatus eraseResult = project->eraseChild<geobo::BOFaultPolygon>(outputName);
+        if (eraseResult.Value() == NStatus::NFail) {
+            throw std::runtime_error("Failed to replace existing BOFaultPolygon: " + outputName);
+        }
+    }
     std::shared_ptr<geobo::BOFaultPolygon> boPolygon = project->createChild<geobo::BOFaultPolygon>(outputName);
     if (!boPolygon) {
         throw std::runtime_error("Failed to create BOFaultPolygon: " + outputName);
@@ -310,26 +325,35 @@ void writeFaultPolygons(
     head.blue5 = head.blue;
 
     BAFaultPolygonData data;
+    GINT64 nextSegmentId = 1;
     auto appendRingSegment = [&](const std::vector<fpt::Point>& ring) {
         if (ring.size() < 3) {
             return;
         }
 
         BAFaultPolygonSegment segment;
+        segment.editMode = 2;
+        segment.faultPolygonSegID = nextSegmentId;
+        segment.faultPolygonCombinedID = nextSegmentId;
+        segment.pkID = nextSegmentId;
+        segment.geometryID = 0;
         segment.type = FA_NORMAL;
         segment.closeFlag = 1;
+        segment.level = 0;
 
         for (const fpt::Point& sourcePoint : ring) {
             BAFaultPolygonPoint point;
             point.x = sourcePoint.x;
             point.y = sourcePoint.y;
             point.z = 0.0;
+            point.uplowID = 0;
             segment.faultPolygonData.push_back(point);
             updateBounds(sourcePoint, head.minX, head.minY, head.maxX, head.maxY);
         }
 
         data.faultPolygonList.push_back(segment);
         ++head.fauNum;
+        ++nextSegmentId;
     };
 
     for (const fpt::Polygon& polygon : polygons) {
@@ -341,9 +365,6 @@ void writeFaultPolygons(
         }
 
         appendRingSegment(polygon.points);
-        for (const std::vector<fpt::Point>& hole : polygon.holes) {
-            appendRingSegment(hole);
-        }
     }
 
     if (head.fauNum == 0) {
@@ -368,8 +389,14 @@ void deleteFaultPolygons(
         throw std::runtime_error("GeoEast BOFaultPolygon output name is empty.");
     }
 
-    project->eraseChild<geobo::BOFaultPolygon>(outputName);
-    std::cout << "BOFaultPolygon deleted if it existed: " << outputName << "\n";
+    if (!project->getChild<geobo::BOFaultPolygon>(outputName)) {
+        throw std::runtime_error("BOFaultPolygon does not exist: " + outputName);
+    }
+    NStatus eraseResult = project->eraseChild<geobo::BOFaultPolygon>(outputName);
+    if (eraseResult.Value() == NStatus::NFail) {
+        throw std::runtime_error("Failed to delete BOFaultPolygon: " + outputName);
+    }
+    std::cout << "BOFaultPolygon deleted: " << outputName << "\n";
 }
 
 } // namespace fpt_geoeast

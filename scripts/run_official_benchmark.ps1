@@ -1,12 +1,19 @@
-﻿$ErrorActionPreference = "Stop"
+param(
+    [string]$OfficialDat = $(if ($env:FPT_OFFICIAL_DAT) { $env:FPT_OFFICIAL_DAT } else { "" })
+)
+
+$ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$officialDat = "D:\BaiduNetdiskDownload\BGPCup2025\赛题7-基于平面断层属性的断层多边形自动追踪\test.dat"
 $outputDir = Join-Path $repoRoot "examples\outputs\official"
 $output = Join-Path $outputDir "official_root_antimerge_benchmark.csv"
 
-if (!(Test-Path -LiteralPath $officialDat)) {
-    throw "Official test data not found: $officialDat"
+if ([string]::IsNullOrWhiteSpace($OfficialDat)) {
+    throw "Official test data not specified. Pass -OfficialDat <test.dat> or set FPT_OFFICIAL_DAT."
+}
+
+if (!(Test-Path -LiteralPath $OfficialDat)) {
+    throw "Official test data not found: $OfficialDat"
 }
 
 New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
@@ -17,7 +24,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 & (Join-Path $repoRoot "build\faultpolytrace.exe") `
-    --input $officialDat `
+    --input $OfficialDat `
     --input-format geoeast-dat `
     --output $output `
     --trace-mode ridge-belt `

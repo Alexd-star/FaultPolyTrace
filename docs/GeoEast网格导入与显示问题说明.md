@@ -82,8 +82,8 @@ FaultPolyTrace 的 GeoEast BO 导入逻辑没有直接把 `test.dat` 当普通 A
 
 相关代码位置：
 
-- DAT 解析：[AsciiGridIO.cpp](C:/Users/26312/Documents/BGPCup/FaultPolyTrace/src/io/AsciiGridIO.cpp)
-- GeoEast 网格写入：[GeoEastBoAdapter.cpp](C:/Users/26312/Documents/BGPCup/FaultPolyTrace/geoeast_plugin/bo_runner/GeoEastBoAdapter.cpp)
+- DAT 解析：`src/io/AsciiGridIO.cpp`
+- GeoEast 网格写入：`geoeast_plugin/bo_runner/GeoEastBoAdapter.cpp`
 
 程序写入的关键头字段包括：
 
@@ -133,17 +133,17 @@ GeoEast 官方导入并不是不可靠，问题在于官方赛题给的 `test.da
 项目已提供转换脚本：
 
 ```powershell
-python C:\Users\26312\Documents\BGPCup\FaultPolyTrace\scripts\转换官方DAT为GeoEast标准网格ASCII.py `
-  --input D:\BaiduNetdiskDownload\BGPCup2025\赛题7-基于平面断层属性的断层多边形自动追踪\test.dat `
-  --output C:\Users\26312\Documents\BGPCup\FaultPolyTrace\examples\outputs\geoeast_ascii_import_YYYYMMDD_HHMMSS\test7_fault_attribute_geoeast_grid_ascii.txt `
+python <项目根目录>\scripts\转换官方DAT为GeoEast标准网格ASCII.py `
+  --input <官方数据目录>\赛题7-基于平面断层属性的断层多边形自动追踪\test.dat `
+  --output <项目根目录>\examples\outputs\geoeast_ascii_import_YYYYMMDD_HHMMSS\test7_fault_attribute_geoeast_grid_ascii.txt `
   --grid-name test7_fault_attribute_ascii
 ```
 
 已生成的可复查样例：
 
 ```text
-C:\Users\26312\Documents\BGPCup\FaultPolyTrace\examples\outputs\geoeast_ascii_import_20260505_233936\test7_fault_attribute_geoeast_grid_ascii.txt
-C:\Users\26312\Documents\BGPCup\FaultPolyTrace\examples\outputs\geoeast_ascii_import_20260505_233936\test7_fault_attribute_geoeast_grid_ascii.导入说明.md
+<项目根目录>\examples\outputs\geoeast_ascii_import_20260505_233936\test7_fault_attribute_geoeast_grid_ascii.txt
+<项目根目录>\examples\outputs\geoeast_ascii_import_20260505_233936\test7_fault_attribute_geoeast_grid_ascii.导入说明.md
 ```
 
 该文件头信息如下：
@@ -172,10 +172,10 @@ C:\Users\26312\Documents\BGPCup\FaultPolyTrace\examples\outputs\geoeast_ascii_im
 可使用 GeoEast runner 验证某个 BOMapGrid 的头信息：
 
 ```powershell
-C:\Users\26312\GeoEast\GeoEast-RC\bin\faultpolytrace_geoeast_runner.exe `
+<GeoEast-RC运行目录>\bin\faultpolytrace_geoeast_runner.exe `
   --db ndp `
-  --project BGPCup2026_Test7 `
-  --user 26312 `
+  --project <目标项目名> `
+  --user <当前GeoEast用户> `
   --grid test7_fault_attribute_bo `
   --output FaultPolyTrace_Result_Check `
   --validate-grid

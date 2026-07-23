@@ -1,6 +1,9 @@
 #include "FaultTracer.h"
+#include "BranchAttribution.h"
+#include "LocalPolygonQuality.h"
 #include "SkeletonGraph.h"
 #include "Topology.h"
+#include "WeakPathSupport.h"
 
 #include <algorithm>
 #include <cmath>
@@ -25,11 +28,6 @@ struct OwnershipCell {
     int ownerId = 0;
 };
 
-struct BranchEnd {
-    int branchIndex = -1;
-    SkeletonPoint direction;
-};
-
 struct BranchGroup {
     int id = 0;
     std::vector<const SkeletonBranch*> branches;
@@ -43,6 +41,30 @@ struct ComponentStats {
     int width = 0;
     int height = 0;
     double aspect = 1.0;
+};
+
+constexpr int kWeakPathStableEvidenceMinCells = 64;
+constexpr double kWeakPathMeanEvidenceFraction = 0.25;
+constexpr double kWeakPathMinAspectRatio = 0.5;
+constexpr int kWeakPathMinMaxWidthCells = 32;
+constexpr int kWeakPathWidthRadiusMultiplier = 16;
+constexpr double kWeakPathMaxTurnAngleDegrees = 170.0;
+
+struct WeakExtensionStats {
+    int candidateCells = 0;
+    int acceptedCells = 0;
+    int rejectedCells = 0;
+    int seedCells = 0;
+    int seedContactCells = 0;
+    int rootConflictRejectedCells = 0;
+    int candidateComponents = 0;
+    int acceptedComponents = 0;
+    int rejectedComponents = 0;
+    int partiallyRejectedComponents = 0;
+    int evidenceEvaluatedFragments = 0;
+    int attributeRejectedFragments = 0;
+    int shapeRejectedFragments = 0;
+    int directionRejectedFragments = 0;
 };
 
 class DisjointSet {
@@ -153,24 +175,6 @@ double pointSegmentDistanceSquared(const Point& p, const Point& a, const Point& 
     const double px = p.x - cx;
     const double py = p.y - cy;
     return px * px + py * py;
-}
-
-double vectorNorm(const SkeletonPoint& v) {
-    return std::sqrt(static_cast<double>(v.x * v.x + v.y * v.y));
-}
-
-double angleBetweenDirections(const SkeletonPoint& a, const SkeletonPoint& b) {
-    const double denom = vectorNorm(a) * vectorNorm(b);
-    if (denom <= 1e-12) {
-        return 0.0;
-    }
-    double c = static_cast<double>(a.x * b.x + a.y * b.y) / denom;
-    c = std::max(-1.0, std::min(1.0, c));
-    return std::acos(c) * 180.0 / 3.14159265358979323846;
-}
-
-std::string pointKey(const SkeletonPoint& point) {
-    return std::to_string(point.x) + "," + std::to_string(point.y);
 }
 
 bool gapHasAttributeSupport(const SkeletonPoint& a, const SkeletonPoint& b, void* rawContext) {
@@ -818,83 +822,45 @@ BinaryMask buildLocalAntiMergeCutMask(
 std::vector<BranchGroup> groupBranchesByRootTrace(
     const std::vector<const SkeletonBranch*>& branches,
     double maxTurnAngleDegrees) {
+    const LegacyGreedyBranchPairingResult pairing =
+        computeLegacyGreedyBranchPairing(
+            branches,
+            maxTurnAngleDegrees);
     std::vector<BranchGroup> groups;
-    if (branches.empty()) {
-        return groups;
-    }
-
-    std::unordered_map<int, int> indexById;
-    indexById.reserve(branches.size());
-    for (std::size_t i = 0; i < branches.size(); ++i) {
-        indexById[branches[i]->id] = static_cast<int>(i);
-    }
-
-    std::unordered_map<std::string, std::vector<BranchEnd>> endsByPoint;
-    endsByPoint.reserve(branches.size() * 2);
-    for (std::size_t i = 0; i < branches.size(); ++i) {
-        const SkeletonBranch& branch = *branches[i];
-        if (branch.points.size() < 2) {
-            continue;
-        }
-        const SkeletonPoint& first = branch.points.front();
-        const SkeletonPoint& second = branch.points[1];
-        endsByPoint[pointKey(first)].push_back({
-            static_cast<int>(i),
-            {second.x - first.x, second.y - first.y}
-        });
-
-        const SkeletonPoint& last = branch.points.back();
-        const SkeletonPoint& beforeLast = branch.points[branch.points.size() - 2];
-        endsByPoint[pointKey(last)].push_back({
-            static_cast<int>(i),
-            {beforeLast.x - last.x, beforeLast.y - last.y}
-        });
-    }
-
-    DisjointSet dsu(static_cast<int>(branches.size()));
-    for (const auto& item : endsByPoint) {
-        const std::vector<BranchEnd>& ends = item.second;
-        if (ends.size() < 2) {
-            continue;
-        }
-
-        std::vector<unsigned char> used(ends.size(), 0);
-        for (std::size_t i = 0; i < ends.size(); ++i) {
-            if (used[i]) {
-                continue;
-            }
-            int bestJ = -1;
-            double bestAngle = maxTurnAngleDegrees;
-            for (std::size_t j = i + 1; j < ends.size(); ++j) {
-                if (used[j] || ends[i].branchIndex == ends[j].branchIndex) {
-                    continue;
-                }
-                const SkeletonPoint opposite{-ends[j].direction.x, -ends[j].direction.y};
-                const double angle = angleBetweenDirections(ends[i].direction, opposite);
-                if (angle <= bestAngle) {
-                    bestAngle = angle;
-                    bestJ = static_cast<int>(j);
-                }
-            }
-            if (bestJ >= 0) {
-                dsu.unite(ends[i].branchIndex, ends[static_cast<std::size_t>(bestJ)].branchIndex);
-                used[i] = 1;
-                used[static_cast<std::size_t>(bestJ)] = 1;
-            }
-        }
-    }
-
-    std::map<int, std::vector<const SkeletonBranch*>> grouped;
-    for (std::size_t i = 0; i < branches.size(); ++i) {
-        grouped[dsu.find(static_cast<int>(i))].push_back(branches[i]);
-    }
-
     int nextGroupId = 1;
-    groups.reserve(grouped.size());
-    for (auto& item : grouped) {
+    groups.reserve(pairing.rootBranchIndices.size());
+    for (const std::vector<int>& root : pairing.rootBranchIndices) {
         BranchGroup group;
         group.id = nextGroupId++;
-        group.branches = std::move(item.second);
+        group.branches.reserve(root.size());
+        for (const int branchIndex : root) {
+            group.branches.push_back(
+                branches[static_cast<std::size_t>(branchIndex)]);
+        }
+        groups.push_back(std::move(group));
+    }
+    return groups;
+}
+
+std::vector<BranchGroup> buildBranchGroupsFromIndices(
+    const std::vector<const SkeletonBranch*>& branches,
+    const std::vector<std::vector<int>>& rootBranchIndices) {
+    std::vector<BranchGroup> groups;
+    groups.reserve(rootBranchIndices.size());
+    int nextGroupId = 1;
+    for (const std::vector<int>& root : rootBranchIndices) {
+        BranchGroup group;
+        group.id = nextGroupId++;
+        group.branches.reserve(root.size());
+        for (const int branchIndex : root) {
+            if (branchIndex < 0 ||
+                branchIndex >= static_cast<int>(branches.size())) {
+                throw std::runtime_error(
+                    "Branch group references an invalid branch index.");
+            }
+            group.branches.push_back(
+                branches[static_cast<std::size_t>(branchIndex)]);
+        }
         groups.push_back(std::move(group));
     }
     return groups;
@@ -2350,7 +2316,14 @@ BinaryMask extendThroughWeakAttributes(
     int connectRadius,
     int maxWeakComponentCells,
     double minWeakComponentAspect,
-    bool positivePercentile) {
+    bool positivePercentile,
+    bool weakPathGate,
+    double weakPathSupportRatio,
+    int weakPathMaxUnsupportedRun,
+    WeakExtensionStats* extensionStats) {
+    if (extensionStats) {
+        *extensionStats = WeakExtensionStats{};
+    }
     if (weakPercentile <= 0.0 || connectRadius <= 0) {
         return strongMask;
     }
@@ -2364,6 +2337,7 @@ BinaryMask extendThroughWeakAttributes(
 
     BinaryMask seedMask = dilate(strongMask, connectRadius);
     BinaryMask out = strongMask;
+    BinaryMask eligibleExtension(grid.nx(), grid.ny());
     std::vector<unsigned char> visited(static_cast<std::size_t>(grid.nx() * grid.ny()), 0);
 
     auto indexOf = [&grid](int x, int y) {
@@ -2437,13 +2411,143 @@ BinaryMask extendThroughWeakAttributes(
             const bool shapeOk = minWeakComponentAspect <= 1.0 || aspect >= minWeakComponentAspect;
             if (touchesSeed && (sizeOk || shapeOk)) {
                 for (const Cell& cell : cells) {
-                    out.set(cell.x, cell.y, true);
+                    if (weakPathGate) {
+                        if (!strongMask.get(cell.x, cell.y)) {
+                            eligibleExtension.set(cell.x, cell.y, true);
+                        }
+                    } else {
+                        out.set(cell.x, cell.y, true);
+                    }
                 }
             }
         }
     }
 
+    if (weakPathGate) {
+        WeakPathSupportOptions pathOptions;
+        const double clampedRatio = std::clamp(weakPathSupportRatio, 0.0, 1.0);
+        pathOptions.supportThreshold = weakThreshold +
+            clampedRatio * (strongThreshold - weakThreshold);
+        pathOptions.maxUnsupportedRun = weakPathMaxUnsupportedRun;
+        pathOptions.seedSearchRadius = connectRadius > 0 ? 1 : 0;
+        pathOptions.minEvidenceCells = std::max(
+            kWeakPathStableEvidenceMinCells,
+            2 * connectRadius + 3);
+        pathOptions.minMeanAttribute = weakThreshold +
+            kWeakPathMeanEvidenceFraction *
+                (pathOptions.supportThreshold - weakThreshold);
+        pathOptions.minLowerQuantileAttribute = weakThreshold;
+        pathOptions.minAspectRatio = kWeakPathMinAspectRatio;
+        pathOptions.maxEstimatedWidth =
+            static_cast<double>(std::max(
+                kWeakPathMinMaxWidthCells,
+                kWeakPathWidthRadiusMultiplier * (connectRadius + 1)));
+        pathOptions.maxTurnAngleDegrees =
+            kWeakPathMaxTurnAngleDegrees;
+        pathOptions.directionWindow = std::max(2, connectRadius + 1);
+        const WeakPathSupportResult pathResult = selectWeakPathSupport(
+            grid,
+            eligibleExtension,
+            strongMask,
+            pathOptions);
+        out = unionMask(strongMask, pathResult.acceptedMask);
+        if (extensionStats) {
+            extensionStats->candidateCells = pathResult.stats.candidateCellCount;
+            extensionStats->acceptedCells = pathResult.stats.acceptedCellCount;
+            extensionStats->rejectedCells = pathResult.stats.rejectedCellCount;
+            extensionStats->seedCells = pathResult.stats.seedCellCount;
+            extensionStats->seedContactCells =
+                pathResult.stats.seedContactCellCount;
+            extensionStats->rootConflictRejectedCells =
+                pathResult.stats.rootConflictRejectedCellCount;
+            extensionStats->candidateComponents =
+                pathResult.stats.candidateComponentCount;
+            extensionStats->acceptedComponents =
+                pathResult.stats.acceptedComponentCount;
+            extensionStats->rejectedComponents =
+                pathResult.stats.rejectedComponentCount;
+            extensionStats->partiallyRejectedComponents =
+                pathResult.stats.partiallyRejectedComponentCount;
+            extensionStats->evidenceEvaluatedFragments =
+                pathResult.stats.evidenceEvaluatedFragmentCount;
+            extensionStats->attributeRejectedFragments =
+                pathResult.stats.attributeRejectedFragmentCount;
+            extensionStats->shapeRejectedFragments =
+                pathResult.stats.shapeRejectedFragmentCount;
+            extensionStats->directionRejectedFragments =
+                pathResult.stats.directionRejectedFragmentCount;
+        }
+    }
+
     return out;
+}
+
+LocalPolygonQualityOptions makeLocalPolygonQualityOptions(
+    const TraceOptions& options) {
+    LocalPolygonQualityOptions local;
+    local.widthRatio = options.localQualityWidthRatio;
+    local.minExtraCells = options.localQualityMinExtraCells;
+    local.supportThresholdRatio =
+        options.localQualitySupportThresholdRatio;
+    local.supportBufferCells = options.localQualitySupportBufferCells;
+    local.maxAreaLossRatio = options.localQualityMaxAreaLossRatio;
+    local.maxStrongCoverageLossRatio =
+        options.localQualityMaxStrongCoverageLossRatio;
+    local.maxWeakCoverageLossRatio =
+        options.localQualityMaxWeakCoverageLossRatio;
+    local.maxBackgroundLeakageIncreaseRatio =
+        options.localQualityMaxBackgroundLeakageIncreaseRatio;
+    local.stabilityThresholdDeltaRatio =
+        options.localQualityStabilityThresholdDeltaRatio;
+    local.minStabilityJaccard = options.localQualityMinStabilityJaccard;
+    local.maxCandidatesPerObject =
+        options.localQualityMaxCandidatesPerObject;
+    local.maxTotalCandidates = options.localQualityMaxTotalCandidates;
+    local.maxWindowCells = options.localQualityMaxWindowCells;
+    local.maxObjectCells = options.localQualityMaxObjectCells;
+    local.maxEvidenceRecords = options.localQualityMaxEvidenceRecords;
+    return local;
+}
+
+void applyLocalPolygonQualityIfEnabled(
+    const Grid2D& grid,
+    const TraceOptions& options,
+    TraceResult& result) {
+    if (!options.localPolygonQuality) {
+        return;
+    }
+    const LocalPolygonQualityOptions localOptions =
+        makeLocalPolygonQualityOptions(options);
+    std::vector<double> originalAreas;
+    std::vector<int> originalCellCounts;
+    originalAreas.reserve(result.polygons.size());
+    originalCellCounts.reserve(result.polygons.size());
+    for (const Polygon& polygon : result.polygons) {
+        originalAreas.push_back(polygon.area);
+        originalCellCounts.push_back(polygon.cellCount);
+    }
+    LocalPolygonQualityResult localResult = applyLocalPolygonQuality(
+        grid,
+        result.polygons,
+        result.effectiveThreshold,
+        localOptions);
+    result.polygons = std::move(localResult.polygons);
+    result.localPolygonQualityStats = localResult.stats;
+    result.localPolygonQualityEvidence = std::move(localResult.evidence);
+    for (std::size_t index = 0; index < result.polygons.size(); ++index) {
+        Polygon& polygon = result.polygons[index];
+        const bool repaired =
+            polygon.area + 1e-9 < originalAreas[index] ||
+            polygon.cellCount < originalCellCounts[index];
+        if (!repaired || !polygon.kept) {
+            continue;
+        }
+        if (polygon.cellCount < options.minCells ||
+            polygon.area < options.minArea) {
+            polygon.kept = false;
+            ++result.localPolygonQualityStats.postRepairFilteredCount;
+        }
+    }
 }
 
 } // namespace
@@ -2463,6 +2567,18 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
     }
     if (options.weakConnectRadius < 0) {
         throw std::runtime_error("weakConnectRadius must be non-negative.");
+    }
+    if (!std::isfinite(options.weakPathSupportRatio) ||
+        options.weakPathSupportRatio < 0.0 ||
+        options.weakPathSupportRatio > 1.0) {
+        throw std::runtime_error("weakPathSupportRatio must be between 0 and 1.");
+    }
+    if (options.weakPathMaxUnsupportedRun < 0) {
+        throw std::runtime_error("weakPathMaxUnsupportedRun must be non-negative.");
+    }
+    if (options.localPolygonQuality) {
+        validateLocalPolygonQualityOptions(
+            makeLocalPolygonQualityOptions(options));
     }
     if (options.residualPercentile < 0.0 || options.residualPercentile >= 1.0) {
         throw std::runtime_error("residualPercentile must be 0 or between 0 and 1.");
@@ -2557,6 +2673,21 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
     if (options.smoothIterations < 0 || options.smoothIterations > 5) {
         throw std::runtime_error("smoothIterations must be between 0 and 5.");
     }
+    if (options.branchAttributionCandidateGroups &&
+        options.traceMode != TraceMode::RidgeBelt) {
+        throw std::runtime_error(
+            "branchAttributionCandidateGroups requires RidgeBelt trace mode.");
+    }
+    if (options.branchAttributionCandidateGroups &&
+        !options.rootAntiMerge) {
+        throw std::runtime_error(
+            "branchAttributionCandidateGroups requires rootAntiMerge.");
+    }
+    if (options.branchAttributionCandidateGroups &&
+        options.separateBranchBelts) {
+        throw std::runtime_error(
+            "branchAttributionCandidateGroups requires separateBranchBelts=false.");
+    }
 
     const int nx = grid.nx();
     const int ny = grid.ny();
@@ -2578,6 +2709,7 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
                 : computePercentileThreshold(grid, options.residualPercentile))
             : result.effectiveThreshold;
     BinaryMask activeMask = segmentation.mask;
+    WeakExtensionStats weakExtensionStats;
     activeMask = extendThroughWeakAttributes(
         grid,
         activeMask,
@@ -2586,7 +2718,34 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
         options.weakConnectRadius,
         options.maxWeakComponentCells,
         options.minWeakComponentAspect,
-        options.thresholdMode == ThresholdMode::PositivePercentile);
+        options.thresholdMode == ThresholdMode::PositivePercentile,
+        options.weakPathGate,
+        options.weakPathSupportRatio,
+        options.weakPathMaxUnsupportedRun,
+        &weakExtensionStats);
+    result.weakPathCandidateCells = weakExtensionStats.candidateCells;
+    result.weakPathAcceptedCells = weakExtensionStats.acceptedCells;
+    result.weakPathRejectedCells = weakExtensionStats.rejectedCells;
+    result.weakPathSeedCells = weakExtensionStats.seedCells;
+    result.weakPathSeedContactCells = weakExtensionStats.seedContactCells;
+    result.weakPathRootConflictRejectedCells =
+        weakExtensionStats.rootConflictRejectedCells;
+    result.weakPathCandidateComponents =
+        weakExtensionStats.candidateComponents;
+    result.weakPathAcceptedComponents =
+        weakExtensionStats.acceptedComponents;
+    result.weakPathRejectedComponents =
+        weakExtensionStats.rejectedComponents;
+    result.weakPathPartiallyRejectedComponents =
+        weakExtensionStats.partiallyRejectedComponents;
+    result.weakPathEvidenceEvaluatedFragments =
+        weakExtensionStats.evidenceEvaluatedFragments;
+    result.weakPathAttributeRejectedFragments =
+        weakExtensionStats.attributeRejectedFragments;
+    result.weakPathShapeRejectedFragments =
+        weakExtensionStats.shapeRejectedFragments;
+    result.weakPathDirectionRejectedFragments =
+        weakExtensionStats.directionRejectedFragments;
     if (options.closeRadius > 0) {
         activeMask = closeMask(activeMask, options.closeRadius);
     }
@@ -2644,6 +2803,43 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
                 ++result.prunedBranches;
             }
             result.branches.push_back(std::move(branchTrace));
+        }
+        if (options.branchAttributionShadow ||
+            options.branchAttributionCandidateGroups) {
+            BranchAttributionOptions attributionOptions;
+            attributionOptions.supportThreshold =
+                result.effectiveThreshold;
+            attributionOptions.maxTurnAngleDegrees =
+                options.maxGapAngle;
+            BranchAttributionSummary attribution =
+                analyzeBranchAttribution(
+                    grid,
+                    keptBranchRefs,
+                    attributionOptions);
+            result.branchAttributionJunctionClusters =
+                attribution.junctionClusterCount;
+            result.branchAttributionAcceptedPairs =
+                attribution.acceptedPairCount;
+            result.branchAttributionAmbiguousClusters =
+                attribution.ambiguousClusterCount;
+            result.branchAttributionUnmatchedEnds =
+                attribution.unmatchedEndCount;
+            result.branchAttributionGreedyFallbackClusters =
+                attribution.greedyFallbackClusterCount;
+            result.branchAttributionCandidatePairingDifferingClusters =
+                attribution.candidatePairingDifferingClusterCount;
+            result.branchAttributionCandidateDifferingClusters =
+                attribution.candidateDifferingClusterCount;
+            result.branchAttributionAcceptedPairingDifferingClusters =
+                attribution.acceptedPairingDifferingClusterCount;
+            result.branchAttributionAcceptedDifferingClusters =
+                attribution.acceptedDifferingClusterCount;
+            result.branchAttributionPairingDifferingClusters =
+                attribution.pairingDifferingClusterCount;
+            result.branchAttributionDifferingClusters =
+                attribution.differingClusterCount;
+            result.branchAttributionJunctions =
+                std::move(attribution.junctions);
         }
         int nextId = 1;
         if (options.separateBranchBelts) {
@@ -2724,6 +2920,7 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
                 result,
                 nextId);
             result.activeCellCount = branchMask.countActive();
+            applyLocalPolygonQualityIfEnabled(grid, options, result);
             return result;
         }
 
@@ -2745,7 +2942,40 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
             result);
         if (options.rootAntiMerge && !keptBranchRefs.empty()) {
             const int ownershipRadius = options.beltRadius + options.postBeltCloseRadius + options.attributeEnvelopeRadius + 3;
-            const std::vector<BranchGroup> branchGroups = groupBranchesByRootTrace(keptBranchRefs, options.maxGapAngle);
+            std::vector<BranchGroup> branchGroups;
+            if (options.branchAttributionCandidateGroups) {
+                CandidateRootGroupingOptions groupingOptions;
+                groupingOptions.maxTurnAngleDegrees =
+                    options.maxGapAngle;
+                const CandidateRootGroupingResult candidateGrouping =
+                    computeCandidateRootGrouping(
+                        keptBranchRefs,
+                        result.branchAttributionJunctions,
+                        groupingOptions);
+                result.branchAttributionCandidateGroupingAppliedClusters =
+                    candidateGrouping.appliedDifferingClusterCount;
+                result.branchAttributionCandidateGroupingAmbiguousFallbackClusters =
+                    candidateGrouping.ambiguousFallbackClusterCount;
+                result.branchAttributionCandidateGroupingLegacyFallbackClusters =
+                    candidateGrouping.legacyFallbackClusterCount;
+                result.branchAttributionCandidateGroupingComplexityFallbackClusters =
+                    candidateGrouping.complexityFallbackClusterCount;
+                result.branchAttributionCandidateGroupingSpanFallbackClusters =
+                    candidateGrouping.spanFallbackClusterCount;
+                result.branchAttributionCandidateGroupingExcludedInternalBranches =
+                    static_cast<int>(
+                        candidateGrouping.excludedInternalBranchIndices.size());
+                result.branchAttributionCandidateGroupingRootGroups =
+                    static_cast<int>(
+                        candidateGrouping.rootBranchIndices.size());
+                branchGroups = buildBranchGroupsFromIndices(
+                    keptBranchRefs,
+                    candidateGrouping.rootBranchIndices);
+            } else {
+                branchGroups = groupBranchesByRootTrace(
+                    keptBranchRefs,
+                    options.maxGapAngle);
+            }
             const std::vector<int> groupOwners = buildGroupOwnershipMap(nx, ny, branchGroups, ownershipRadius);
             const BinaryMask candidateCutMask = buildRootAntiMergeCutMask(
                 grid,
@@ -2802,6 +3032,7 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
     int nextId = 1;
     result.activeCellCount = activeMask.countActive();
     appendPolygonsFromMask(grid, activeMask, options, result, nextId);
+    applyLocalPolygonQualityIfEnabled(grid, options, result);
 
     return result;
 }

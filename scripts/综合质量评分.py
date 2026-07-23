@@ -58,6 +58,7 @@ def score_split_benefit(split_summary):
     bridge_split = int(split_summary.get("background_bridge_split_count", 0))
     lossless_split = int(split_summary.get("lossless_split_count", 0))
     unmatched = int(split_summary.get("unmatched_candidate_count", 0))
+    merged = int(split_summary.get("merged_candidate_count", 0))
     strong_loss_objects = int(split_summary.get("strong_value_loss_base_polygon_count", 0))
     weak_loss_objects = int(split_summary.get("weak_value_loss_base_polygon_count", 0))
     lost_strong_cells = int(split_summary.get("lost_strong_cells_total", 0))
@@ -71,6 +72,7 @@ def score_split_benefit(split_summary):
     score -= min(4.0, strong_loss_objects * 1.5 + lost_strong_cells * 0.08)
     score -= min(2.0, weak_loss_objects * 0.45 + lost_weak_cells * 0.01)
     score -= min(2.0, unmatched * 0.5)
+    score -= min(5.0, merged * 1.5)
     if min_cover < 0.88:
         score -= min(2.0, (0.88 - min_cover) * 10.0)
     if multi_part > 0 and safe_split == 0:
@@ -87,6 +89,8 @@ def score_split_benefit(split_summary):
         notes.append(f"损失弱响应像元 {lost_weak_cells} 个")
     if unmatched:
         notes.append(f"无基线来源候选 {unmatched} 个")
+    if merged:
+        notes.append(f"候选误合并多个基线对象 {merged} 个")
     return round(clamp(score, -5.0, 4.0), 2), notes
 
 

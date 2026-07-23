@@ -1,6 +1,14 @@
 build/
 release/
 examples/outputs/
+outputs/
+archive/
+third_party/
+可视化证据包_*/
+赛题项目全流程导师资料包_*/
+docs/*_render/
+docs/*_pages/
+docs/render_ascii/
 .geoeast_config_backups/
 *.exe
 *.obj
@@ -12,6 +20,9 @@ examples/outputs/
 *.ilk
 *.log
 *.lic
+*.key
+*.pem
+geoeast_plugin/qt_launcher/faultpolytrace_launcher.ini
 *.pyc
 __pycache__/
 .qmake.stash
@@ -47,3 +58,4 @@ standalone_app/qt_desktop/faultpolytrace_32.png
 geoeast_plugin/qt_launcher/faultpolytrace_launcher_resource.rc
 geoeast_plugin/qt_launcher/faultpolytrace.ico
 geoeast_plugin/qt_launcher/faultpolytrace_32.png
+.pytest_tmp/

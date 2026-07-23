@@ -45,15 +45,38 @@ $env:PATH = (Join-Path $env:GEOEAST "bin") + ";" +
     (Join-Path $env:NGP "Qt\Qt5.15.2\5.15.2\msvc2019_64\bin") + ";" +
     $env:PATH
 
-$qmakeCommand = @"
-call "$VcVars" && cd /d "$pluginDir" && "$QMake" FaultPolyTraceMainframePlugin.pro -spec win32-msvc
-"@
+function Invoke-VsBatchCommand {
+    param(
+        [string]$Name,
+        [string[]]$Commands
+    )
 
-cmd /c $qmakeCommand
-
-if ($LASTEXITCODE -ne 0) {
-    throw "GeoEast mainframe plugin qmake failed with exit code $LASTEXITCODE."
+    $tempBat = Join-Path $env:TEMP ("faultpolytrace_{0}_{1}.cmd" -f $Name, ([guid]::NewGuid().ToString("N")))
+    $lines = [System.Collections.Generic.List[string]]::new()
+    $lines.Add("@echo off") | Out-Null
+    $lines.Add("call `"$VcVars`"") | Out-Null
+    $lines.Add("if errorlevel 1 exit /b %ERRORLEVEL%") | Out-Null
+    foreach ($commandLine in $Commands) {
+        $lines.Add($commandLine) | Out-Null
+        $lines.Add("if errorlevel 1 exit /b %ERRORLEVEL%") | Out-Null
+    }
+    $lines.Add("exit /b 0") | Out-Null
+    $lines | Set-Content -LiteralPath $tempBat -Encoding ASCII
+    try {
+        $process = Start-Process -FilePath "cmd.exe" -ArgumentList @("/d", "/c", "`"$tempBat`"") -Wait -PassThru -NoNewWindow
+        if ($process.ExitCode -ne 0) {
+            throw "$Name failed with exit code $($process.ExitCode)."
+        }
+    }
+    finally {
+        Remove-Item -LiteralPath $tempBat -Force -ErrorAction SilentlyContinue
+    }
 }
+
+Invoke-VsBatchCommand -Name "GeoEast mainframe plugin qmake" -Commands @(
+    "cd /d `"$pluginDir`"",
+    "`"$QMake`" FaultPolyTraceMainframePlugin.pro -spec win32-msvc"
+)
 
 foreach ($makefileName in @("Makefile.Release", "Makefile.Debug", "Makefile")) {
     $makefilePath = Join-Path $pluginDir $makefileName
@@ -78,18 +101,21 @@ foreach ($makefileName in @("Makefile.Release", "Makefile.Debug", "Makefile")) {
     Set-Content -LiteralPath $makefilePath -Value $text -Encoding UTF8
 }
 
-$command = @"
-call "$VcVars" && cd /d "$pluginDir" && nmake
-"@
+Invoke-VsBatchCommand -Name "GeoEast mainframe plugin nmake" -Commands @(
+    "cd /d `"$pluginDir`"",
+    "nmake"
+)
 
-cmd /c $command
-
-if ($LASTEXITCODE -ne 0) {
-    $partialPluginDir = Join-Path $env:GEOEAST "bin\plugins\GeoAttribute\FaultPolyTraceMainframePlugin"
-    if (Test-Path -LiteralPath $partialPluginDir) {
-        Remove-Item -LiteralPath $partialPluginDir -Recurse -Force
-    }
-    throw "GeoEast mainframe plugin build failed with exit code $LASTEXITCODE."
+$deployedDir = Join-Path $env:GEOEAST "bin\plugins\GeoAttribute\FaultPolyTraceMainframePlugin"
+$deployedDll = Join-Path $deployedDir "FaultPolyTraceMainframePlugin.dll"
+$deployedManifest = Join-Path $deployedDir "manifest.xml"
+if (!(Test-Path -LiteralPath $deployedDll)) {
+    throw "GeoEast mainframe plugin build finished but deployed DLL was not found: $deployedDll"
+}
+if (!(Test-Path -LiteralPath $deployedManifest)) {
+    throw "GeoEast mainframe plugin build finished but deployed manifest was not found: $deployedManifest"
 }
 
-Write-Host "GeoEast mainframe plugin built under:" $pluginDir
+Write-Host "GeoEast mainframe plugin built and deployed:"
+Write-Host "  DLL:" $deployedDll
+Write-Host "  Manifest:" $deployedManifest

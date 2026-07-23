@@ -1,142 +1,110 @@
 # FaultPolyTrace
 
-FaultPolyTrace 是面向第十三届“东方杯”开发赛道赛题 7 的断层多边形自动追踪项目：
+FaultPolyTrace 是“基于平面断层属性的断层多边形自动追踪”赛题项目。系统从二维断层属性网格中提取断层响应带，输出闭合断层多边形、面积和拓扑诊断，并同时提供独立桌面软件、命令行程序和 GeoEast 集成入口。
 
-**基于平面断层属性的断层多边形自动追踪。**
+> 新 AI 或新维护者请先阅读 [AI_PROJECT_CONTEXT.md](AI_PROJECT_CONTEXT.md)。该文档是当前事实、代码入口、指标、边界和待办事项的唯一总入口。
 
-项目目标是做成一个可运行、可集成、可展示、可复现的 GeoEast 工具，而不是单纯的离线算法脚本。
+## 当前状态
 
-## 1. 项目结构
+- 当前发布候选：`v1.0.0-rc2-unified`
+- 统一构建标识：`FPT-v1.0.0-rc2-unified-F1A056425714ABF0`
+- 官方数据网格：`1501 x 701`
+- 正式结果：`232` 个总多边形，面积过滤后保留 `214` 个
+- 强响应覆盖率：`99.845866%`
+- 弱响应覆盖率：`97.149367%`
+- 拓扑：开放环 `0`、自相交 `0`、多边形异常相交 `0`
+- 最新一键验收：核心追踪 `630 ms`，总耗时 `1890 ms`
+- 自动测试：Python `150 passed`；C++ 核心测试全部通过
+- 交付审计：`64` 项通过、`0` 项失败、`4` 项待人工确认
 
-```text
-docs/                 中文开发文档、操作手册、算法方案、需求追踪
-src/core/             算法核心
-src/io/               文件和 GeoEast 数据适配层
-src/app/              离线 CLI 程序
-scripts/              构建、运行、测试脚本
-examples/             合成测试数据和输出结果
-tests/                回归测试和性能门禁说明
-geoeast_plugin/       GeoEast runner、Qt 启动器、主控插件
-```
+四项待确认均依赖有效 GeoEast 许可证和真实工区：菜单入口、数据库写入、原始网格与结果叠加、结果删除和重新读取的现场证据。不得将其描述为已自动验证。
 
-## 2. 当前能力
+## 仓库入口
 
-当前项目已经完成以下核心能力：
+| 路径 | 作用 |
+|---|---|
+| `src/` | 核心算法、文件读写、诊断和共享参数模型。 |
+| `standalone_app/qt_desktop/` | 独立桌面软件源码。 |
+| `geoeast_plugin/qt_launcher/` | GeoEast Qt 交互入口。 |
+| `geoeast_plugin/bo_runner/` | GeoEast `BOMapGrid` / `BOFaultPolygon` 数据库适配程序。 |
+| `geoeast_plugin/mainframe_plugin/` | GeoEast 主框架菜单插件。 |
+| `scripts/` | 构建、测试、打包、质量评估和验收脚本。 |
+| `tests/`、`tests_cpp/` | Python 契约/回归测试与 C++ 核心测试。 |
+| `packaging/windows/` | Inno Setup 安装器配置。 |
+| `docs/` | 精简后的当前中文文档体系。 |
+| `examples/synthetic/` | 可提交、可复现的合成示例数据。 |
 
-- 读取外部二维网格和官方 DAT 转换数据。
-- 支持 `region` 和 `ridge-belt` 两种追踪模式。
-- 自动生成闭合断层多边形。
-- 计算面积、周长和属性统计。
-- 按用户设定的面积阈值过滤小多边形。
-- 输出 CSV 和诊断 JSON。
-- 读取 GeoEast `BOMapGrid`。
-- 写入 GeoEast `BOFaultPolygon`。
-- 提供 Qt 启动器进行输入选择、输出命名和参数设置。
+完整文件说明见 [PROJECT_INDEX.md](PROJECT_INDEX.md)，文档阅读路径见 [docs/文档目录.md](docs/文档目录.md)。
 
-已验证赛题 7 GeoEast 数据：
+## 构建
 
-```text
-数据库: ndp
-项目: BGPCup2026_Test7
-用户: 26312
-输入网格: test7_fault_attribute_bo
-输出多边形: FaultPolyTrace_Result
-```
-
-## 3. 最快看到界面的方式
-
-如果使用发布包，优先双击根目录的：
-
-```text
-01_打开图形界面.cmd
-```
-
-没有 GeoEast 环境时，可双击：
-
-```text
-02_运行离线演示.cmd
-```
-
-该入口会使用发布包自带合成网格验证算法模块的独立运行能力。
-
-直接运行 Qt 启动器：
+Windows PowerShell：
 
 ```powershell
-.\geoeast_plugin\qt_launcher\faultpolytrace_launcher.exe
+.\scripts\build.ps1
+.\scripts\build_desktop_app.ps1 -GeoEastRoot <GeoEast根目录>
+.\scripts\build_qt_launcher.ps1 -GeoEastRoot <GeoEast根目录>
+.\scripts\build_geoeast_bo_runner.ps1 -GeoEastRoot <GeoEast根目录> -UseVisualStudioProject
+.\scripts\build_geoeast_mainframe_plugin.ps1 -GeoEastRoot <GeoEast根目录>
 ```
 
-或先部署到 GeoEast 主程序可发现的位置：
+核心 CLI 构建结果位于 `build/faultpolytrace.exe`。Qt 软件的可执行文件分别位于各自源码目录；正式分发应使用发布脚本生成完整运行目录，不能只复制裸 EXE。
+
+## 测试
 
 ```powershell
-.\scripts\部署到GeoEast.ps1
+python -m pytest -q
+.\scripts\test_cpp_core.ps1
+.\scripts\检查参数一致性.ps1
+.\scripts\检查独立软件界面功能.ps1
+.\scripts\检查GeoEast插件界面功能.ps1
+.\scripts\检查客户机硬编码.ps1
 ```
 
-部署后可在 GeoEast 主界面查找 `断层多边形追踪 -> 赛题7` 入口。
-
-启动器界面用于：
-
-- 设置 GeoEast 根目录和数据根目录。
-- 设置数据库、项目、用户。
-- 刷新并选择输入网格。
-- 设置输出多边形对象名。
-- 设置追踪模式、阈值、面积阈值等算法参数。
-- 启动追踪并查看运行日志。
-
-## 4. 一键运行官方赛题 7 数据
-
-从项目根目录运行：
+官方数据不提交到仓库。使用时显式指定：
 
 ```powershell
-.\scripts\run_geoeast_bgpcup2026_test7.ps1
+.\scripts\一键总验收.ps1 `
+  -OfficialDat <官方test.dat> `
+  -SkipGeoEastBuild `
+  -SkipPackage
 ```
 
-默认会：
-
-1. 设置 GeoEast 环境变量。
-2. 必要时从官方 `test.dat` 导入或覆盖输入网格。
-3. 读取 `test7_fault_attribute_bo`。
-4. 使用 `ridge-belt` 模式追踪断层多边形。
-5. 写入 `FaultPolyTrace_Result`。
-
-如果不想重新导入 DAT，只从已有 GeoEast 网格运行：
+## 发布
 
 ```powershell
-.\scripts\run_geoeast_bgpcup2026_test7.ps1 -NoImportDat
+.\scripts\打包发布包.ps1 `
+  -Version v1.0.0-rc2-unified `
+  -GeoEastRoot <GeoEast根目录>
+
+.\scripts\构建Windows安装器.ps1 `
+  -PackageDir .\release\FaultPolyTrace_v1.0.0-rc2-unified `
+  -Version 1.0.0-rc2
 ```
 
-## 5. 重要中文文档
+发布目录、ZIP、安装器和验收输出均为可重建产物，不进入 Git 主分支。构建脚本会生成源码快照哈希、二进制哈希和统一构建清单。
 
-优先阅读：
+## 算法边界
 
-- `docs/用户操作手册.md`：从打开 Qt 到查看 GeoEast 原图和结果图的用户操作手册。
-- `docs/GeoEast使用指南.md`：GeoEast 数据查看和验证说明。
-- `docs/开发指南.md`：开发指南。
-- `docs/软件设计说明.md`：正式软件设计说明。
-- `docs/代码编制说明.md`：源码组织、模块职责和构建运行说明。
-- `docs/总体蓝图.md`：总体蓝图。
-- `docs/需求追踪矩阵.md`：赛题要求完成情况追踪。
-- `docs/Ridge-Belt断层多边形算法方案.md`：核心算法方案。
-- `docs/算法原理说明.md`：面向答辩和评审的算法原理完整说明。
-- `docs/顶尖质量差距分析与推进计划.md`：当前成熟度、问题清单、诊断方法和冲顶路线。
-- `docs/赛题7官方数据运行质量报告.md`：当前推荐的官方数据运行质量报告。
-- `docs/官方数据最新验收报告.md`：当前根系防黏连推荐方案的最新验收指标和残余复核层说明。
-- `docs/面积保持型平滑优化复盘.md`：本轮边界保真优化、对照实验和验收结论。
-- `docs/发布说明与验收清单.md`：当前发布包内容和评分项验收清单。
+正式默认线使用确定性的 Ridge-Belt 追踪、属性约束包络、骨架分支分析、根系防黏连、面积过滤、边界简化/平滑和拓扑检查。多尺度分支归属、弱路径门控和局部多边形修形仍属于诊断或受控实验能力，默认关闭；未经覆盖率、拓扑、误合并、稳定性和视觉复核门禁，不得进入正式默认结果。
 
-质量复核脚本：
+当前覆盖率是对属性阈值响应像元的覆盖评价，并不等同于相对专家真值的 Recall。没有专家标准答案时，应结合合成真值、对象拆分/合并、边界指标、参数扰动稳定性、全图分块复核和多解释者局部标注评价结果。
 
-```powershell
-.\scripts\运行顶尖质量诊断.ps1
-```
+## 重要文档
 
-该脚本会输出强响应漏检、弱线性残余、疑似误合并多边形和逐多边形质量诊断表，用于后续把结果质量继续推到顶尖。
+- [当前项目上下文](AI_PROJECT_CONTEXT.md)
+- [项目文件索引](PROJECT_INDEX.md)
+- [用户手册](docs/02_用户手册.md)
+- [开发者文档](docs/04_开发者文档.md)
+- [算法说明](docs/08_算法说明.md)
+- [测试说明](docs/13_测试说明.md)
+- [当前验收报告](docs/官方数据最新验收报告.md)
+- [需求追踪矩阵](docs/需求追踪矩阵.md)
+- [交付说明](docs/17_项目交付说明.md)
 
-## 6. 当前下一步
+## 安全与提交规则
 
-比赛交付的下一阶段重点是：
-
-1. 在 GeoEast 中补原始属性图、根系防黏连结果叠合图和结果对象列表截图。
-2. 用最新一键验收目录 `acceptance_20260523_062319_official_root_antimerge` 作为答辩证据锚点。
-3. 展示正式结果层与残余复核层的区别，说明弱残余被质控记录而不是被忽略。
-4. 把中文文档、发布包、截图和演示视频整理为最终提交材料。
-
+- 不提交数据库密码、许可证、个人路径、本地 INI、构建目录、发布包或测试输出。
+- 不针对固定坐标、固定数据集名称或固定 polygon ID 编写算法规则。
+- 不把实验候选结果表述为正式 GeoEast 默认结果。
+- 修改算法、参数、数据库适配或 UI 后，必须重新运行对应自动门禁。

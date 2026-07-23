@@ -6,6 +6,7 @@
 #include "../../src/io/DiagnosticsIO.h"
 
 #include <chrono>
+#include <array>
 #include <cctype>
 #include <cstdlib>
 #include <exception>
@@ -75,6 +76,9 @@ void printUsage() {
         << "  --weak-connect-radius <count>\n"
         << "  --max-weak-component-cells <count>\n"
         << "  --min-weak-component-aspect <value>\n"
+        << "  --weak-path-gate | --no-weak-path-gate\n"
+        << "  --branch-attribution-shadow | --no-branch-attribution-shadow\n"
+        << "  --local-polygon-quality | --no-local-polygon-quality\n"
         << "  --belt-radius <count>\n"
         << "  --post-belt-close-radius <count>\n"
         << "  --attribute-constrained-belt\n"
@@ -342,6 +346,18 @@ Options parseArgs(int argc, char** argv) {
             options.trace.maxWeakComponentCells = std::stoi(requireValue(arg));
         } else if (arg == "--min-weak-component-aspect") {
             options.trace.minWeakComponentAspect = std::stod(requireValue(arg));
+        } else if (arg == "--weak-path-gate") {
+            options.trace.weakPathGate = true;
+        } else if (arg == "--no-weak-path-gate") {
+            options.trace.weakPathGate = false;
+        } else if (arg == "--branch-attribution-shadow") {
+            options.trace.branchAttributionShadow = true;
+        } else if (arg == "--no-branch-attribution-shadow") {
+            options.trace.branchAttributionShadow = false;
+        } else if (arg == "--local-polygon-quality") {
+            options.trace.localPolygonQuality = true;
+        } else if (arg == "--no-local-polygon-quality") {
+            options.trace.localPolygonQuality = false;
         } else if (arg == "--belt-radius") {
             options.trace.beltRadius = std::stoi(requireValue(arg));
         } else if (arg == "--post-belt-close-radius") {
@@ -543,6 +559,55 @@ void writePreviewGrid(const std::string& path, const fpt::Grid2D& grid) {
     }
 }
 
+void verifyFaultPolygonRoundTrip(
+    const fpt_geoeast::GeoEastProjectPtr& project,
+    const std::string& outputName,
+    const std::vector<fpt::Polygon>& source) {
+    std::vector<const fpt::Polygon*> expected;
+    for (const fpt::Polygon& polygon : source) {
+        if (polygon.kept && polygon.points.size() >= 3) {
+            expected.push_back(&polygon);
+        }
+    }
+    const std::vector<fpt::Polygon> actual =
+        fpt_geoeast::readFaultPolygons(project, outputName);
+    if (actual.size() != expected.size()) {
+        throw std::runtime_error(
+            "GeoEast round-trip polygon count mismatch: expected " +
+            std::to_string(expected.size()) + ", got " +
+            std::to_string(actual.size()));
+    }
+
+    auto bounds = [](const std::vector<fpt::Point>& points) {
+        double minX = std::numeric_limits<double>::max();
+        double minY = std::numeric_limits<double>::max();
+        double maxX = -std::numeric_limits<double>::max();
+        double maxY = -std::numeric_limits<double>::max();
+        for (const fpt::Point& point : points) {
+            minX = std::min(minX, point.x);
+            minY = std::min(minY, point.y);
+            maxX = std::max(maxX, point.x);
+            maxY = std::max(maxY, point.y);
+        }
+        return std::array<double, 4>{minX, minY, maxX, maxY};
+    };
+    constexpr double tolerance = 1e-7;
+    for (std::size_t index = 0; index < expected.size(); ++index) {
+        const auto expectedBounds = bounds(expected[index]->points);
+        const auto actualBounds = bounds(actual[index].points);
+        for (std::size_t axis = 0; axis < expectedBounds.size(); ++axis) {
+            const double scale = std::max(1.0, std::abs(expectedBounds[axis]));
+            if (std::abs(expectedBounds[axis] - actualBounds[axis]) > tolerance * scale) {
+                throw std::runtime_error(
+                    "GeoEast round-trip bounds mismatch at polygon " +
+                    std::to_string(index + 1));
+            }
+        }
+    }
+    std::cout << "GeoEast round-trip verified: " << actual.size()
+              << " polygons, bounds preserved.\n";
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -652,6 +717,7 @@ int main(int argc, char** argv) {
         }
         debugLog("Writing BOFaultPolygon: " + options.outputName);
         fpt_geoeast::writeFaultPolygons(project, options.outputName, result.polygons, true, options.polygonStyle);
+        verifyFaultPolygonRoundTrip(project, options.outputName, result.polygons);
         debugLog("BOFaultPolygon write completed.");
 
         int kept = 0;

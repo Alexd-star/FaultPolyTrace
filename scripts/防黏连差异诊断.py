@@ -66,6 +66,7 @@ def read_geoeast_dat(path):
 
 def read_polygons(path):
     polygons = []
+    seen_ids = set()
     with open(path, "r", encoding="utf-8", errors="ignore", newline="") as f:
         reader = csv.DictReader(f)
         for row in reader:
@@ -74,9 +75,13 @@ def read_polygons(path):
             coords, holes = parse_wkt_polygon_with_holes(row.get("wkt", ""))
             if len(coords) < 3:
                 continue
+            polygon_id = int(float(row.get("id", len(polygons) + 1) or 0))
+            if polygon_id in seen_ids:
+                raise ValueError(f"Duplicate polygon id: {polygon_id}")
+            seen_ids.add(polygon_id)
             polygons.append(
                 {
-                    "id": int(float(row.get("id", len(polygons) + 1) or 0)),
+                    "id": polygon_id,
                     "area": float(row.get("area", 0.0) or 0.0),
                     "perimeter": float(row.get("perimeter", 0.0) or 0.0),
                     "cell_count": int(float(row.get("cell_count", 0) or 0)),
@@ -126,33 +131,115 @@ def ratio(numerator, denominator):
     return float(numerator) / float(denominator) if denominator else 0.0
 
 
-def summarize_mapping(base_items, candidate_items, values):
+def summarize_global_mask_change(base_items, candidate_items, values):
+    shape = np.asarray(values).shape
+    baseline_mask = np.zeros(shape, dtype=bool)
+    candidate_mask = np.zeros(shape, dtype=bool)
+    for item in base_items:
+        baseline_mask |= np.asarray(item["mask"], dtype=bool)
+    for item in candidate_items:
+        candidate_mask |= np.asarray(item["mask"], dtype=bool)
+
+    lost_mask = baseline_mask & ~candidate_mask
+    added_mask = candidate_mask & ~baseline_mask
+    lost_values = np.asarray(values)[lost_mask]
+    added_values = np.asarray(values)[added_mask]
+    return {
+        "lost_cells_total": int(np.count_nonzero(lost_mask)),
+        "lost_weak_cells_total": int(np.count_nonzero(lost_values >= 0.66)),
+        "lost_strong_cells_total": int(np.count_nonzero(lost_values >= 0.95)),
+        "added_cells_total": int(np.count_nonzero(added_mask)),
+        "added_weak_cells_total": int(np.count_nonzero(added_values >= 0.66)),
+        "added_strong_cells_total": int(np.count_nonzero(added_values >= 0.95)),
+        "added_zero_value_cells_total": int(np.count_nonzero(added_values <= 0.0)),
+    }
+
+
+def summarize_merge_relations(candidate_source_rows):
+    sources_by_candidate = {}
+    for row in candidate_source_rows:
+        sources_by_candidate.setdefault(row["candidate_id"], set()).add(
+            row["source_base_id"]
+        )
+    merged_candidate_ids = sorted(
+        candidate_id
+        for candidate_id, source_ids in sources_by_candidate.items()
+        if len(source_ids) >= 2
+    )
+    return {
+        "merged_candidate_count": len(merged_candidate_ids),
+        "merged_candidate_ids": merged_candidate_ids,
+    }
+
+
+def summarize_mapping(
+    base_items,
+    candidate_items,
+    values,
+    overlap_fraction=0.20,
+    min_base_part_fraction=0.12,
+    min_candidate_source_fraction=0.50,
+):
+    if not 0.0 <= float(overlap_fraction) <= 1.0:
+        raise ValueError("overlap_fraction must be between 0 and 1")
+    if not 0.0 <= float(min_base_part_fraction) <= 1.0:
+        raise ValueError("min_base_part_fraction must be between 0 and 1")
+    if not 0.0 <= float(min_candidate_source_fraction) <= 1.0:
+        raise ValueError("min_candidate_source_fraction must be between 0 and 1")
+
     rows = []
     candidate_source_rows = []
-    candidate_used = set()
+    candidate_used_indices = set()
+    baseline_global_mask = np.zeros_like(np.asarray(values), dtype=bool)
+    for base in base_items:
+        baseline_global_mask |= np.asarray(base["mask"], dtype=bool)
     for base in base_items:
         base_mask = base["mask"]
         base_cells = int(np.count_nonzero(base_mask))
         overlaps = []
-        for cand in candidate_items:
+        for candidate_index, cand in enumerate(candidate_items):
             inter = int(np.count_nonzero(base_mask & cand["mask"]))
             if inter <= 0:
                 continue
-            overlaps.append((inter, cand))
+            candidate_cells = int(np.count_nonzero(cand["mask"]))
+            base_cover_ratio = ratio(inter, base_cells)
+            source_overlap_ratio = ratio(inter, candidate_cells)
+            linked = (
+                base_cover_ratio >= float(overlap_fraction)
+                or source_overlap_ratio >= float(overlap_fraction)
+            )
+            if not linked:
+                continue
+            overlaps.append(
+                (
+                    inter,
+                    candidate_index,
+                    cand,
+                    base_cover_ratio,
+                    source_overlap_ratio,
+                )
+            )
         overlaps.sort(key=lambda item: item[0], reverse=True)
 
-        cand_count = len(overlaps)
+        substantial_overlaps = [
+            item
+            for item in overlaps
+            if item[3] >= float(min_base_part_fraction)
+            and item[4] >= float(min_candidate_source_fraction)
+        ]
         covered_by_candidate = np.zeros_like(base_mask, dtype=bool)
-        for _, cand in overlaps:
+        linked_candidate_ids = []
+        for inter, candidate_index, cand, base_cover_ratio, source_overlap_ratio in overlaps:
             covered_by_candidate |= cand["mask"]
-            candidate_used.add(cand["id"])
+            candidate_used_indices.add(candidate_index)
+            linked_candidate_ids.append(cand["id"])
             candidate_source_rows.append(
                 {
                     "candidate_id": cand["id"],
                     "source_base_id": base["id"],
-                    "intersection_cells": overlaps[0][0] if overlaps and cand["id"] == overlaps[0][1]["id"] else int(np.count_nonzero(base_mask & cand["mask"])),
-                    "source_overlap_ratio": ratio(int(np.count_nonzero(base_mask & cand["mask"])), int(np.count_nonzero(cand["mask"]))),
-                    "base_cover_ratio": ratio(int(np.count_nonzero(base_mask & cand["mask"])), base_cells),
+                    "intersection_cells": inter,
+                    "source_overlap_ratio": source_overlap_ratio,
+                    "base_cover_ratio": base_cover_ratio,
                     "candidate_area": cand["area"],
                     "candidate_raster_cells": cand["raster_cells"],
                     "candidate_mean": cand["value_mean_raster"],
@@ -161,24 +248,62 @@ def summarize_mapping(base_items, candidate_items, values):
             )
 
         lost_mask = base_mask & ~covered_by_candidate
+        added_mask = covered_by_candidate & ~baseline_global_mask
         lost_values = values[lost_mask]
+        added_values = values[added_mask]
         row = {
             "base_id": base["id"],
             "base_area": base["area"],
             "base_raster_cells": base_cells,
-            "candidate_parts": cand_count,
-            "top_candidate_ids": ";".join(str(cand["id"]) for _, cand in overlaps[:8]),
+            "linked_candidate_count": len(overlaps),
+            "linked_candidate_ids": ";".join(
+                str(item[2]["id"])
+                for item in overlaps
+            ),
+            "candidate_parts": len(substantial_overlaps),
+            "top_candidate_ids": ";".join(
+                str(item[2]["id"])
+                for item in substantial_overlaps[:8]
+            ),
+            "min_base_part_ratio": min(
+                (item[3] for item in substantial_overlaps),
+                default=0.0,
+            ),
             "covered_ratio": ratio(int(np.count_nonzero(base_mask & covered_by_candidate)), base_cells),
             "lost_cells": int(np.count_nonzero(lost_mask)),
             "lost_mean": float(np.mean(lost_values)) if lost_values.size else 0.0,
             "lost_max": float(np.max(lost_values)) if lost_values.size else 0.0,
             "lost_strong_cells": int(np.count_nonzero(lost_values >= 0.95)) if lost_values.size else 0,
             "lost_weak_cells": int(np.count_nonzero(lost_values >= 0.66)) if lost_values.size else 0,
+            "added_cells": int(np.count_nonzero(added_mask)),
+            "added_mean": float(np.mean(added_values)) if added_values.size else 0.0,
+            "added_max": float(np.max(added_values)) if added_values.size else 0.0,
+            "added_strong_cells": int(np.count_nonzero(added_values >= 0.95)) if added_values.size else 0,
+            "added_weak_cells": int(np.count_nonzero(added_values >= 0.66)) if added_values.size else 0,
             "base_mean": base["value_mean_raster"],
             "base_high_ratio": base["high_value_ratio"],
+            "_linked_candidate_ids": linked_candidate_ids,
         }
-        row["risk_hint"] = classify_split(row)
         rows.append(row)
+
+    candidate_source_sets = {}
+    for source_row in candidate_source_rows:
+        candidate_source_sets.setdefault(
+            source_row["candidate_id"],
+            set(),
+        ).add(source_row["source_base_id"])
+    merged_candidate_ids = {
+        candidate_id
+        for candidate_id, source_ids in candidate_source_sets.items()
+        if len(source_ids) >= 2
+    }
+    for row in rows:
+        row["merged_candidate_parts"] = sum(
+            1
+            for candidate_id in row.pop("_linked_candidate_ids")
+            if candidate_id in merged_candidate_ids
+        )
+        row["risk_hint"] = classify_split(row)
 
     unmatched_candidates = [
         {
@@ -188,15 +313,23 @@ def summarize_mapping(base_items, candidate_items, values):
             "candidate_mean": cand["value_mean_raster"],
             "candidate_high_ratio": cand["high_value_ratio"],
         }
-        for cand in candidate_items
-        if cand["id"] not in candidate_used
+        for candidate_index, cand in enumerate(candidate_items)
+        if candidate_index not in candidate_used_indices
     ]
     rows.sort(key=lambda row: (row["candidate_parts"], row["lost_weak_cells"], row["lost_cells"]), reverse=True)
     return rows, candidate_source_rows, unmatched_candidates
 
 
 def classify_split(row):
-    if row["candidate_parts"] <= 1 and row["lost_cells"] <= 0:
+    if int(row.get("merged_candidate_parts", 0)) > 0:
+        return "高风险：候选合并多个基线对象"
+    linked_count = int(row.get("linked_candidate_count", 0))
+    substantial_count = int(row.get("candidate_parts", 0))
+    if linked_count >= 2 and substantial_count < linked_count:
+        if substantial_count == 0:
+            return "需复核：存在多个小碎片"
+        return "需复核：主片段附带小碎片"
+    if row["candidate_parts"] <= 1 and row["lost_cells"] <= 0 and row.get("added_cells", 0) <= 0:
         return "基本不变"
     if row["lost_strong_cells"] > 0:
         return "高风险：切掉强响应像元"
@@ -206,9 +339,52 @@ def classify_split(row):
         return "需复核：一个基线多边形被拆成多段"
     if row["candidate_parts"] >= 2:
         return "可能合理：轻度拆分且未损失高值响应"
+    if row.get("added_cells", 0) > 0:
+        if row.get("added_weak_cells", 0) > 0:
+            return "需复核：新增属性响应包络"
+        return "需复核：新增低值背景包络"
     if row["lost_cells"] > 0 and row["lost_mean"] <= 0.05:
         return "可能合理：只剔除低值背景桥"
     return "需复核"
+
+
+def is_safe_split(row):
+    return (
+        int(row.get("candidate_parts", 0)) == 2
+        and int(row.get("linked_candidate_count", 0)) == 2
+        and float(row.get("covered_ratio", 0.0)) >= 0.98
+        and float(row.get("min_base_part_ratio", 0.0)) >= 0.12
+        and int(row.get("lost_strong_cells", 0)) == 0
+        and int(row.get("lost_weak_cells", 0)) == 0
+        and int(row.get("added_cells", 0)) == 0
+        and int(row.get("merged_candidate_parts", 0)) == 0
+        and (
+            int(row.get("lost_cells", 0)) == 0
+            or float(row.get("lost_mean", 1.0)) <= 0.05
+        )
+    )
+
+
+def is_changed_mapping_row(row):
+    return (
+        int(row.get("linked_candidate_count", 0)) >= 2
+        or int(row.get("candidate_parts", 0)) >= 2
+        or int(row.get("lost_cells", 0)) > 0
+        or int(row.get("added_cells", 0)) > 0
+        or int(row.get("merged_candidate_parts", 0)) > 0
+    )
+
+
+def candidate_ids_for_review(row):
+    candidate_id_text = (
+        row.get("linked_candidate_ids", "")
+        or row.get("top_candidate_ids", "")
+    )
+    return [
+        int(text)
+        for text in str(candidate_id_text).split(";")
+        if text.strip()
+    ]
 
 
 def write_csv(path, rows, fields):
@@ -278,12 +454,14 @@ def render_split_figures(values, xs, ys, base_items, candidate_items, rows, out_
     interesting = [
         row
         for row in rows
-        if row["candidate_parts"] >= 2 or row["lost_weak_cells"] > 0 or row["lost_cells"] >= 20
+        if is_changed_mapping_row(row)
+        or row["lost_weak_cells"] > 0
+        or row["lost_cells"] >= 20
     ][:max_figures]
 
     for row in interesting:
         base = base_by_id[row["base_id"]]
-        candidate_ids = [int(text) for text in str(row["top_candidate_ids"]).split(";") if text.strip()]
+        candidate_ids = candidate_ids_for_review(row)
         candidates = [candidate_by_id[cid] for cid in candidate_ids if cid in candidate_by_id]
         if not candidates:
             continue
@@ -317,7 +495,7 @@ def render_split_figures(values, xs, ys, base_items, candidate_items, rows, out_
         axes[2].set_title(row["risk_hint"])
 
         fig.suptitle(
-            f"基线 {base['id']} -> 候选 {row['top_candidate_ids']}；"
+            f"基线 {base['id']} -> 候选 {';'.join(str(value) for value in candidate_ids)}；"
             f"覆盖 {row['covered_ratio']:.2%}；丢失弱/强 {row['lost_weak_cells']}/{row['lost_strong_cells']}",
             fontsize=10,
         )
@@ -352,14 +530,23 @@ def main():
             "base_id",
             "base_area",
             "base_raster_cells",
+            "linked_candidate_count",
+            "linked_candidate_ids",
             "candidate_parts",
             "top_candidate_ids",
+            "min_base_part_ratio",
             "covered_ratio",
             "lost_cells",
             "lost_mean",
             "lost_max",
             "lost_strong_cells",
             "lost_weak_cells",
+            "added_cells",
+            "added_mean",
+            "added_max",
+            "added_strong_cells",
+            "added_weak_cells",
+            "merged_candidate_parts",
             "base_mean",
             "base_high_ratio",
             "risk_hint",
@@ -387,14 +574,15 @@ def main():
     )
     render_split_figures(values, xs, ys, base_items, candidate_items, split_rows, out_dir, args.max_figures)
 
-    changed = [row for row in split_rows if row["candidate_parts"] >= 2 or row["lost_cells"] > 0]
+    changed = [row for row in split_rows if is_changed_mapping_row(row)]
     high_value_loss = [row for row in split_rows if row["lost_strong_cells"] > 0]
     weak_value_loss = [row for row in split_rows if row["lost_weak_cells"] > 0]
-    multi_part = [row for row in split_rows if row["candidate_parts"] >= 2]
-    safe_splits = [
-        row for row in multi_part
-        if row["lost_strong_cells"] == 0 and row["lost_weak_cells"] == 0
+    multi_part = [
+        row
+        for row in split_rows
+        if int(row.get("linked_candidate_count", 0)) >= 2
     ]
+    safe_splits = [row for row in multi_part if is_safe_split(row)]
     background_bridge_splits = [
         row for row in safe_splits
         if row["lost_cells"] > 0 and row["lost_mean"] <= 0.05
@@ -404,9 +592,8 @@ def main():
         row for row in multi_part
         if row["lost_strong_cells"] == 0 and row["lost_weak_cells"] > 0
     ]
-    lost_cells_total = int(sum(int(row["lost_cells"]) for row in changed))
-    lost_weak_cells_total = int(sum(int(row["lost_weak_cells"]) for row in changed))
-    lost_strong_cells_total = int(sum(int(row["lost_strong_cells"]) for row in changed))
+    global_change = summarize_global_mask_change(base_items, candidate_items, values)
+    merge_summary = summarize_merge_relations(candidate_source_rows)
     changed_covered_ratios = [float(row["covered_ratio"]) for row in changed]
     summary = {
         "baseline_csv": str(Path(args.baseline_csv)),
@@ -421,9 +608,8 @@ def main():
         "background_bridge_split_count": len(background_bridge_splits),
         "lossless_split_count": len(lossless_splits),
         "weak_loss_split_count": len(weak_loss_splits),
-        "lost_cells_total": lost_cells_total,
-        "lost_weak_cells_total": lost_weak_cells_total,
-        "lost_strong_cells_total": lost_strong_cells_total,
+        **global_change,
+        **merge_summary,
         "min_changed_covered_ratio": min(changed_covered_ratios) if changed_covered_ratios else 1.0,
         "mean_changed_covered_ratio": (
             sum(changed_covered_ratios) / len(changed_covered_ratios)
@@ -454,6 +640,10 @@ def main():
         f"- 完全不损失覆盖的拆分：{summary['lossless_split_count']}",
         f"- 丢失弱响应像元总数：{summary['lost_weak_cells_total']}",
         f"- 丢失强响应像元总数：{summary['lost_strong_cells_total']}",
+        f"- 新增像元总数：{summary['added_cells_total']}",
+        f"- 新增强/弱响应像元：{summary['added_strong_cells_total']}/{summary['added_weak_cells_total']}",
+        f"- 新增零值背景像元：{summary['added_zero_value_cells_total']}",
+        f"- 合并多个基线对象的候选多边形：{summary['merged_candidate_count']}",
         f"- 发生变化对象的最低覆盖保持率：{summary['min_changed_covered_ratio']:.2%}",
         f"- 没有明显基线来源的候选多边形：{summary['unmatched_candidate_count']}",
         "",
