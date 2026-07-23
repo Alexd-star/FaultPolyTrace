@@ -2,8 +2,6 @@
 
 FaultPolyTrace 是“基于平面断层属性的断层多边形自动追踪”赛题项目。系统从二维断层属性网格中提取断层响应带，输出闭合断层多边形、面积和拓扑诊断，并同时提供独立桌面软件、命令行程序和 GeoEast 集成入口。
 
-> 新 AI 或新维护者请先阅读 [AI_PROJECT_CONTEXT.md](AI_PROJECT_CONTEXT.md)。该文档是当前事实、代码入口、指标、边界和待办事项的唯一总入口。
-
 ## 当前状态
 
 - 当前发布候选：`v1.0.0-rc2-unified`
@@ -92,7 +90,6 @@ python -m pytest -q
 
 ## 重要文档
 
-- [当前项目上下文](AI_PROJECT_CONTEXT.md)
 - [项目文件索引](PROJECT_INDEX.md)
 - [用户手册](docs/02_用户手册.md)
 - [开发者文档](docs/04_开发者文档.md)

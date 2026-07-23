@@ -7,7 +7,6 @@
 | 文件 | 作用 |
 |---|---|
 | `README.md` | 项目入口、当前指标、构建和测试命令。 |
-| `AI_PROJECT_CONTEXT.md` | 新 AI 接手时的唯一完整上下文。 |
 | `PROJECT_INDEX.md` | 文件与目录索引。 |
 | `CHANGELOG.md` | 当前版本变更记录。 |
 | `PRODUCT.md` | 产品定位和界面原则。 |
