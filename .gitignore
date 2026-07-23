@@ -59,3 +59,7 @@ geoeast_plugin/qt_launcher/faultpolytrace_launcher_resource.rc
 geoeast_plugin/qt_launcher/faultpolytrace.ico
 geoeast_plugin/qt_launcher/faultpolytrace_32.png
 .pytest_tmp/
+data/external/
+data/cache/
+data/generated/
+data/processed/

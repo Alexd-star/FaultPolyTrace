@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-07-23",
+  "datasets": [
+    {
+      "id": "thebe",
+      "name": "Thebe expert-labelled field seismic dataset",
+      "is_real": true,
+      "has_fault_labels": true,
+      "direct_planar_input": false,
+      "planar_validation_role": "primary_after_attribute_conversion",
+      "source_url": "https://doi.org/10.7910/DVN/YBYGBK",
+      "license": "CC BY 4.0",
+      "citation": "An et al., A gigabyte interpreted seismic dataset for automatic fault recognition, 2021",
+      "usage_boundary": "The volume and expert labels must be sliced at identical coordinates. Compute a fault attribute from seismic; never use the label itself as input. Labels focus on interpreted faults and are not guaranteed to include every subtle response.",
+      "access_mode": "selective_manual_or_dataverse_api",
+      "downloads": []
+    },
+    {
+      "id": "f3_netherlands",
+      "name": "F3 Netherlands 3D seismic survey",
+      "is_real": true,
+      "has_fault_labels": false,
+      "direct_planar_input": false,
+      "planar_validation_role": "unlabelled_cross_survey_and_manual_qc",
+      "source_url": "https://wiki.seg.org/wiki/F3_Netherlands",
+      "license": "CC BY-SA; verify the selected distribution terms",
+      "citation": "Netherlands Offshore F3 Block, Dutch Government/TNO and dGB Earth Sciences",
+      "usage_boundary": "Generate horizon or time-slice similarity/coherency attributes. Quantitative geological accuracy requires an independent local interpretation; unlabelled visual review alone is not precision or recall evidence.",
+      "access_mode": "interactive_repository_download",
+      "downloads": []
+    },
+    {
+      "id": "penobscot",
+      "name": "Penobscot 3D seismic survey",
+      "is_real": true,
+      "has_fault_labels": false,
+      "direct_planar_input": false,
+      "planar_validation_role": "independent_cross_survey_manual_qc",
+      "source_url": "https://callforbids.cnsopb.ns.ca/2015/01/data-environment/digital-data.html",
+      "license": "Public access subject to CNSOPB/CNSOER data terms",
+      "citation": "Penobscot 3D survey NS24-N011-001E, offshore Nova Scotia",
+      "usage_boundary": "Registration may be required. Use as an independent survey and preserve SEG-Y geometry; do not claim labelled accuracy without a separately documented interpretation.",
+      "access_mode": "registered_manual_download",
+      "downloads": []
+    },
+    {
+      "id": "cracks",
+      "name": "CRACKS subsurface fault delineation dataset",
+      "is_real": true,
+      "has_fault_labels": true,
+      "direct_planar_input": false,
+      "planar_validation_role": "auxiliary_vertical_section_boundary_and_interpreter_uncertainty",
+      "source_url": "https://doi.org/10.5281/zenodo.13926822",
+      "license": "CC BY 4.0",
+      "citation": "Prabhushankar et al., CRACKS: Crowdsourcing Resources for Analysis and Categorization of Key Subsurface faults, 2024",
+      "usage_boundary": "Images are vertical F3 seismic sections, not planar fault-attribute maps. Use for auxiliary boundary and annotation uncertainty studies, not as direct contest-format evidence.",
+      "access_mode": "automatic",
+      "downloads": [
+        {
+          "filename": "images.zip",
+          "url": "https://zenodo.org/api/records/13926822/files/images.zip/content",
+          "checksum": "md5:6557236191763af7bd8298ecb136d41e"
+        },
+        {
+          "filename": "Fault segmentations.zip",
+          "url": "https://zenodo.org/api/records/13926822/files/Fault%20segmentations.zip/content",
+          "checksum": "md5:01e1697e886da2079ff3c1967334a7ca"
+        }
+      ]
+    },
+    {
+      "id": "faultseg3d",
+      "name": "FaultSeg3D synthetic seismic and fault labels",
+      "is_real": false,
+      "has_fault_labels": true,
+      "direct_planar_input": false,
+      "planar_validation_role": "physics_informed_synthetic_reference",
+      "source_url": "https://github.com/xinwucwp/faultSeg",
+      "license": "CC BY-NC 4.0; research and non-commercial use",
+      "citation": "Wu et al., FaultSeg3D, Geophysics 84(3), 2019",
+      "usage_boundary": "Synthetic labels provide exact controlled truth but do not prove field-data generalization. Use held-out geometries and separate real surveys for final evidence.",
+      "access_mode": "follow_upstream_repository",
+      "downloads": []
+    }
+  ]
+}

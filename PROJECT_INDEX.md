@@ -55,18 +55,22 @@ BO Adapter 对含洞多边形采用显式拒绝策略，因为当前 SDK 的 `BA
 - `scripts/构建Windows安装器.ps1`：生成 Inno Setup 安装器。
 - `scripts/TestWindowsInstaller.ps1`：真实安装、官方数据运行、哈希比对和卸载。
 - `scripts/GenerateBuildManifest.ps1`：统一源码、二进制、ZIP 和安装器构建身份。
+- `scripts/运行完整泛化验证.ps1`：生成并运行平面真值基准，按条件运行公开真实剖面压力测试。
+- `scripts/generalization_validation/`：公开数据登记、属性转换、合成真值、统一指标和报告生成模块。
 
 ## 6. 数据与输出
 
 - `examples/synthetic/`：可提交的最小演示数据。
 - `examples/synthetic_generalization/`：泛化回归的合成场景。
 - `examples/outputs/`：本地验收证据，默认忽略，不提交。
+- `data/registry/`：可提交的公开数据来源与许可证清单。
+- `data/external/`、`data/generated/`、`data/processed/`：本地第三方数据、生成真值和转换数据，默认忽略。
 - 官方 `test.dat`：外部赛题数据，不提交，运行时通过参数指定。
 - `release/`、`build/`、`outputs/`：可重建产物，不提交。
 
 ## 7. 文档
 
-主文档采用 `docs/01_项目简介.md` 至 `docs/17_项目交付说明.md`。特殊主题只保留当前仍由代码或交付流程引用的文档。完整清单见 `docs/文档目录.md`。
+主文档采用 `docs/01_项目简介.md` 至 `docs/18_泛化验证与公开数据指南.md`。特殊主题只保留当前仍由代码或交付流程引用的文档。完整清单见 `docs/文档目录.md`。
 
 ## 8. 项目入口
 
