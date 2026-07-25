@@ -92,7 +92,7 @@ try {
         & (Join-Path $PSScriptRoot "fix_geoeast_vcxproj_libs.ps1")
         Invoke-VsBatchCommand -Name "GeoEast BO runner msbuild" -Commands @(
             "cd /d `"$projectDir`"",
-            "msbuild `"$vcxproj`" /m /p:Configuration=$Configuration /p:Platform=x64"
+            "msbuild `"$vcxproj`" /m /t:Rebuild /p:Configuration=$Configuration /p:Platform=x64"
         )
     } else {
         $configAdd = $Configuration.ToLowerInvariant()
@@ -104,6 +104,7 @@ try {
 
         Invoke-VsBatchCommand -Name "GeoEast BO runner nmake" -Commands @(
             "cd /d `"$projectDir`"",
+            "nmake /NOLOGO clean",
             "nmake /NOLOGO"
         )
     }

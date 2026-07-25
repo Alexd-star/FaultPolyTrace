@@ -78,7 +78,7 @@ call "$VcVars" >nul && set "PATH=$qtBin;!PATH!" && "$DeployTool" --force "$Execu
 }
 
 $command = @"
-call "$VcVars" && set "PATH=$qtBin;!PATH!" && cd /d "$desktopDir" && "$QMake" FaultPolyTraceDesktop.pro -spec win32-msvc && nmake
+call "$VcVars" && set "PATH=$qtBin;!PATH!" && cd /d "$desktopDir" && "$QMake" FaultPolyTraceDesktop.pro -spec win32-msvc && nmake clean && nmake
 "@
 
 cmd /v:on /c $command

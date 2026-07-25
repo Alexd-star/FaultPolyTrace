@@ -78,7 +78,7 @@ call "$VcVars" >nul && set "PATH=$qtBin;!PATH!" && "$DeployTool" --force "$Execu
 }
 
 $command = @"
-call "$VcVars" && set "PATH=$qtBin;!PATH!" && cd /d "$launcherDir" && "$QMake" FaultPolyTraceLauncher.pro -spec win32-msvc && nmake
+call "$VcVars" && set "PATH=$qtBin;!PATH!" && cd /d "$launcherDir" && "$QMake" FaultPolyTraceLauncher.pro -spec win32-msvc && nmake clean && nmake
 "@
 
 cmd /v:on /c $command
