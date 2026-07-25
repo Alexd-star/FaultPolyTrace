@@ -58,6 +58,52 @@ def small_grid(tmp_path):
     return path
 
 
+def test_diagnostics_paths_are_utf8_in_chinese_directory(core_exe, tmp_path):
+    chinese_dir = tmp_path / "中文路径"
+    chinese_dir.mkdir()
+    grid = chinese_dir / "输入网格.txt"
+    output = chinese_dir / "结果.csv"
+    diagnostics = chinese_dir / "诊断.json"
+    grid.write_text(
+        "\n".join(
+            (
+                "5 5",
+                "0 0",
+                "1 1",
+                "0 0 0 0 0",
+                "0 1 0.7 0 0",
+                "0 1 0.7 0.7 0",
+                "0 0 0 0.7 0",
+                "0 0 0 0 0",
+            )
+        ),
+        encoding="ascii",
+    )
+
+    result = subprocess.run(
+        [
+            str(core_exe),
+            "--input",
+            str(grid),
+            "--input-format",
+            "matrix",
+            "--output",
+            str(output),
+            "--diagnostics",
+            str(diagnostics),
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    document = json.loads(diagnostics.read_text(encoding="utf-8"))
+    assert "中文路径" in document["inputPath"]
+    assert "中文路径" in document["outputPath"]
+
+
 def test_cli_rejects_non_finite_weak_path_ratio(core_exe, small_grid, tmp_path):
     output = tmp_path / "result.csv"
     diagnostics = tmp_path / "diagnostics.json"

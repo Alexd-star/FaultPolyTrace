@@ -7,8 +7,89 @@
 #include <sstream>
 #include <stdexcept>
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 namespace fpt {
 namespace {
+
+bool isValidUtf8(const std::string& value) {
+    const auto* bytes = reinterpret_cast<const unsigned char*>(value.data());
+    std::size_t index = 0;
+    while (index < value.size()) {
+        const unsigned char lead = bytes[index];
+        if (lead <= 0x7F) {
+            ++index;
+            continue;
+        }
+
+        std::size_t continuationCount = 0;
+        unsigned int codePoint = 0;
+        if (lead >= 0xC2 && lead <= 0xDF) {
+            continuationCount = 1;
+            codePoint = lead & 0x1F;
+        } else if (lead >= 0xE0 && lead <= 0xEF) {
+            continuationCount = 2;
+            codePoint = lead & 0x0F;
+        } else if (lead >= 0xF0 && lead <= 0xF4) {
+            continuationCount = 3;
+            codePoint = lead & 0x07;
+        } else {
+            return false;
+        }
+        if (index + continuationCount >= value.size()) {
+            return false;
+        }
+        for (std::size_t offset = 1; offset <= continuationCount; ++offset) {
+            const unsigned char continuation = bytes[index + offset];
+            if ((continuation & 0xC0) != 0x80) {
+                return false;
+            }
+            codePoint = (codePoint << 6) | (continuation & 0x3F);
+        }
+        if ((continuationCount == 2 && codePoint < 0x800) ||
+            (continuationCount == 3 && codePoint < 0x10000) ||
+            (codePoint >= 0xD800 && codePoint <= 0xDFFF) ||
+            codePoint > 0x10FFFF) {
+            return false;
+        }
+        index += continuationCount + 1;
+    }
+    return true;
+}
+
+std::string jsonUtf8(const std::string& value) {
+#ifdef _WIN32
+    if (value.empty() || isValidUtf8(value)) {
+        return value;
+    }
+    const int wideLength = MultiByteToWideChar(
+        CP_ACP, MB_ERR_INVALID_CHARS, value.data(),
+        static_cast<int>(value.size()), nullptr, 0);
+    if (wideLength <= 0) {
+        return value;
+    }
+    std::wstring wide(static_cast<std::size_t>(wideLength), L'\0');
+    if (MultiByteToWideChar(
+            CP_ACP, MB_ERR_INVALID_CHARS, value.data(),
+            static_cast<int>(value.size()), wide.data(), wideLength) <= 0) {
+        return value;
+    }
+    const int utf8Length = WideCharToMultiByte(
+        CP_UTF8, 0, wide.data(), wideLength, nullptr, 0, nullptr, nullptr);
+    if (utf8Length <= 0) {
+        return value;
+    }
+    std::string utf8(static_cast<std::size_t>(utf8Length), '\0');
+    WideCharToMultiByte(
+        CP_UTF8, 0, wide.data(), wideLength,
+        utf8.data(), utf8Length, nullptr, nullptr);
+    return utf8;
+#else
+    return value;
+#endif
+}
 
 std::string escapeJson(const std::string& value) {
     std::string escaped;
@@ -146,8 +227,8 @@ void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
     }
 
     out << "{\n";
-    out << "  \"inputPath\": \"" << escapeJson(d.inputPath) << "\",\n";
-    out << "  \"outputPath\": \"" << escapeJson(d.outputPath) << "\",\n";
+    out << "  \"inputPath\": \"" << escapeJson(jsonUtf8(d.inputPath)) << "\",\n";
+    out << "  \"outputPath\": \"" << escapeJson(jsonUtf8(d.outputPath)) << "\",\n";
     out << "  \"traceMode\": \"" << escapeJson(d.traceMode) << "\",\n";
     out << "  \"thresholdMode\": \"" << escapeJson(d.thresholdMode) << "\",\n";
     out << "  \"parameters\": {\n";
