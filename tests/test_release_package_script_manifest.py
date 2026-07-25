@@ -40,8 +40,13 @@ def test_release_manifest_is_evidence_driven_and_records_build_identity():
 
 def test_one_click_acceptance_defaults_to_current_release_candidate():
     script = (ROOT / "scripts" / "一键总验收.ps1").read_text(encoding="utf-8-sig")
-    assert '[string]$PackageVersion = "v1.0.0-rc2-unified"' in script
+    assert '[string]$PackageVersion = "v1.0.1-contest-final"' in script
     assert "v0.9.55-enterprise-audit-fix" not in script
+
+
+def test_release_package_defaults_to_current_contest_version():
+    script = (ROOT / "scripts" / "打包发布包.ps1").read_text(encoding="utf-8-sig")
+    assert '[string]$Version = "v1.0.1-contest-final"' in script
 
 
 def test_final_manifest_binds_package_zip_and_installer_to_one_build_id():

@@ -2,7 +2,7 @@
   #error PackageSource must point to a verified FaultPolyTrace package directory.
 #endif
 #ifndef AppVersion
-  #define AppVersion "1.0.0"
+  #define AppVersion "1.0.1"
 #endif
 #ifndef InstallerOutput
   #define InstallerOutput "."

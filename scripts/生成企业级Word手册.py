@@ -14,7 +14,7 @@ from docx.shared import Cm, Inches, Pt, RGBColor
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SOURCE = REPO_ROOT / "docs" / "企业级用户操作手册与产品说明书.md"
-OUTPUT = REPO_ROOT / "docs" / "FaultPolyTrace企业级用户操作手册与产品说明书_V1.0.0.docx"
+OUTPUT = REPO_ROOT / "docs" / "FaultPolyTrace企业级用户操作手册与产品说明书_V1.0.1.docx"
 
 
 def set_east_asia_font(run, east_asia: str = "宋体", ascii_font: str = "Times New Roman") -> None:
@@ -285,9 +285,9 @@ def add_cover(doc: Document) -> None:
     run.bold = True
 
     meta = [
-        ["文档版本", "V1.0.0"],
-        ["产品版本", "FaultPolyTrace V1.0.0"],
-        ["发布日期", "2026-05-23"],
+        ["文档版本", "V1.0.1"],
+        ["产品版本", "FaultPolyTrace V1.0.1"],
+        ["发布日期", "2026-07-26"],
         ["产品类型", "Windows 桌面软件系统 / GeoEast 集成工具 / 本地部署软件"],
         ["适用对象", "构造解释人员、地球物理解释人员、客户管理员、系统管理员、运维人员、验收人员、竞赛评审人员"],
         ["保密等级", "内部资料 / 项目交付资料"],
