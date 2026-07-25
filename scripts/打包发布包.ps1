@@ -228,7 +228,16 @@ foreach ($name in @("FaultPolyTraceDesktop.pro", "main.cpp", "FaultPolyTraceWind
 }
 $releaseFigureDir = Join-Path $releaseRoot "figure"
 if (Test-Path -LiteralPath $releaseFigureDir) {
-    Copy-Item -LiteralPath $releaseFigureDir -Destination $figureDir -Recurse -Force
+    New-Item -ItemType Directory -Force -Path $figureDir | Out-Null
+    foreach ($pattern in @("standalone_acceptance_*", "geoeast_acceptance_*")) {
+        $latestEvidence = Get-ChildItem -LiteralPath $releaseFigureDir -Directory |
+            Where-Object { $_.Name -like $pattern } |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+        if ($latestEvidence) {
+            Copy-Item -LiteralPath $latestEvidence.FullName -Destination (Join-Path $figureDir $latestEvidence.Name) -Recurse -Force
+        }
+    }
 }
 Copy-Item -LiteralPath (Join-Path $repoRoot "examples\outputs\official") -Destination (Join-Path $examplesDir "outputs\official") -Recurse -Force
 Copy-Item -LiteralPath (Join-Path $repoRoot "examples\synthetic") -Destination (Join-Path $examplesDir "synthetic") -Recurse -Force

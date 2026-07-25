@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QJsonObject>
 #include <QString>
 #include <QStringList>
 
@@ -66,5 +67,11 @@ TraceParameters presetParameters(const QString& canonicalPresetName);
 QStringList traceArguments(const TraceParameters& parameters);
 QString qualityModeKey(QualityMode mode);
 QualityMode qualityModeFromKey(const QString& key);
+QJsonObject traceParametersToJson(const TraceParameters& parameters,
+                                  const QString& presetKey = QString());
+bool traceParametersFromJson(const QJsonObject& object,
+                             TraceParameters* parameters,
+                             QString* presetKey = nullptr,
+                             QString* errorMessage = nullptr);
 
 } // namespace fpt_ui

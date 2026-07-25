@@ -26,6 +26,10 @@
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLinearGradient>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonParseError>
+#include <QKeySequence>
 #include <QMenu>
 #include <QMenuBar>
 #include <QLabel>
@@ -39,6 +43,7 @@
 #include <QProcessEnvironment>
 #include <QPushButton>
 #include <QRegularExpression>
+#include <QSaveFile>
 #include <QScrollArea>
 #include <QSettings>
 #include <QStandardPaths>
@@ -48,6 +53,7 @@
 #include <QSplitter>
 #include <QTextEdit>
 #include <QTextCursor>
+#include <QTextStream>
 #include <QToolBar>
 #include <QToolButton>
 #include <QTimer>
@@ -374,6 +380,16 @@ QString settingOrCurrent(const QSettings& settings, const QString& key, const QS
     return schemaVersion < 2 ? current : settings.value(key, current).toString();
 }
 
+QString userExportDirectory() {
+    QString base = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+    if (base.isEmpty()) {
+        base = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+    }
+    const QString path = QDir(base).absoluteFilePath("FaultPolyTrace");
+    QDir().mkpath(path);
+    return path;
+}
+
 QString quoteForLog(const QStringList& args) {
     QStringList quoted;
     bool redactNext = false;
@@ -553,7 +569,8 @@ public:
                     double threshold,
                     double minArea,
                     const QColor& polygonColor,
-                    double polygonLineWidth) {
+                    double polygonLineWidth,
+                    double polygonOpacity) {
         database_ = database;
         project_ = project;
         gridName_ = grid;
@@ -566,6 +583,7 @@ public:
         minArea_ = minArea;
         polygonColor_ = polygonColor.isValid() ? polygonColor : QColor("#00FFFF");
         polygonLineWidth_ = polygonLineWidth;
+        polygonOpacity_ = qBound(0.05, polygonOpacity, 1.0);
         update();
     }
 
@@ -767,6 +785,15 @@ public:
         return !polygons_.isEmpty();
     }
 
+    bool hasVisibleContent() const {
+        return (showInputLayer_ && !grid_.isEmpty()) ||
+               (showResultLayer_ && !polygons_.isEmpty());
+    }
+
+    QString dataStatus() const {
+        return dataStatus_;
+    }
+
     bool savePng(const QString& path) {
         QPixmap pixmap(size());
         render(&pixmap);
@@ -831,7 +858,10 @@ protected:
                 uiText(QString::fromUtf8("输入网格：%1")).arg(gridName_.isEmpty() ? uiText(QString::fromUtf8("未选择")) : gridName_),
                 uiText(QString::fromUtf8("输出多边形：%1")).arg(output_.isEmpty() ? uiText(QString::fromUtf8("未命名")) : output_),
                 uiText(QString::fromUtf8("方案：%1    模式：%2    阈值：%3")).arg(uiText(preset_), traceMode_, thresholdText),
-                uiText(QString::fromUtf8("面积过滤：小于 %1 的多边形不输出    结果线宽：%2")).arg(minArea_, 0, 'f', 2).arg(polygonLineWidth_, 0, 'f', 3),
+                uiText(QString::fromUtf8("面积过滤：小于 %1 的多边形不输出    结果线宽：%2    透明度：%3"))
+                    .arg(minArea_, 0, 'f', 2)
+                    .arg(polygonLineWidth_, 0, 'f', 3)
+                    .arg(polygonOpacity_, 0, 'f', 2),
                 uiText(QString::fromUtf8("结果查看：追踪完成后自动显示原始网格和结果多边形；如需复查，可在左侧重新载入结果视图。")),
                 uiText(QString::fromUtf8("官方查看：点击【打开工区底图】或【打开平面成图】，在 GeoEast 图层树中加载 Grids 和 Fault Polygons。")),
                 uiText(QString::fromUtf8("当前状态：%1")).arg(activity_.isEmpty() ? uiText(QString::fromUtf8("等待运行")) : uiText(activity_))
@@ -963,7 +993,7 @@ private:
 
     void drawPolygons(QPainter& painter, const QRectF& available) const {
         QColor color = polygonColor_;
-        color.setAlphaF(1.0);
+        color.setAlphaF(polygonOpacity_);
         painter.setRenderHint(QPainter::Antialiasing, true);
         painter.setPen(QPen(color, qMax(1.2, polygonLineWidth_ * 42.0), Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
         painter.setBrush(Qt::NoBrush);
@@ -1013,6 +1043,7 @@ private:
     double minArea_ = 120.0;
     QColor polygonColor_ = QColor("#00FFFF");
     double polygonLineWidth_ = 0.03;
+    double polygonOpacity_ = 1.0;
     std::function<void(const QPointF&)> coordinateCallback_;
 };
 
@@ -1214,8 +1245,17 @@ void FaultTraceDialog::buildUi() {
     polygonLineWidthSpin_->setDecimals(2);
     polygonLineWidthSpin_->setSingleStep(0.005);
     polygonLineWidthSpin_->setValue(0.025);
+    polygonLineWidthSpin_->setToolTip(QString::fromUtf8("设置结果多边形在当前视图中的显示线宽"));
+    polygonOpacitySpin_ = new QDoubleSpinBox(this);
+    polygonOpacitySpin_->setRange(0.05, 1.0);
+    polygonOpacitySpin_->setDecimals(2);
+    polygonOpacitySpin_->setSingleStep(0.05);
+    polygonOpacitySpin_->setValue(1.0);
+    polygonOpacitySpin_->setToolTip(QString::fromUtf8("设置结果多边形在当前视图中的透明度，不修改数据库几何"));
     connect(polygonColorButton_, &QPushButton::clicked, this, &FaultTraceDialog::choosePolygonColor);
     connect(polygonLineWidthSpin_, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            this, [this](double) { updateStatusContext(); });
+    connect(polygonOpacitySpin_, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
             this, [this](double) { updateStatusContext(); });
     setPolygonColor(QColor(polygonColorEdit_->text()));
     refreshButton_ = new QPushButton(QString::fromUtf8("刷新网格列表"), this);
@@ -1248,6 +1288,8 @@ void FaultTraceDialog::buildUi() {
     styleLayout->addWidget(polygonColorButton_);
     styleLayout->addWidget(new QLabel(QString::fromUtf8("线宽"), this));
     styleLayout->addWidget(polygonLineWidthSpin_);
+    styleLayout->addWidget(new QLabel(QString::fromUtf8("透明度"), this));
+    styleLayout->addWidget(polygonOpacitySpin_);
     dataLayout->addRow(QString::fromUtf8("显示样式"), styleLayout);
     dataLayout->addRow(importDatCheck_);
     dataLayout->addRow(QString::fromUtf8("DAT 文件"), datLayout);
@@ -1409,10 +1451,11 @@ void FaultTraceDialog::buildUi() {
         dataBox->hide();
         paramsBox->hide();
 
-        polygonColorButton_->setText("v");
+        polygonColorButton_->setText(QString::fromUtf8("▼"));
         polygonColorButton_->setToolTip(QString::fromUtf8("选择结果多边形颜色"));
         polygonColorButton_->setFixedWidth(24);
         polygonLineWidthSpin_->setFixedWidth(64);
+        polygonOpacitySpin_->setFixedWidth(64);
         browseDatButton->setText(QString::fromUtf8("浏览"));
         browseDatButton->setFixedWidth(52);
         refreshButton_->setText(QString::fromUtf8("刷新网格列表"));
@@ -1662,13 +1705,17 @@ void FaultTraceDialog::buildUi() {
         QAction* openAction = fileMenu->addAction(makeToolIcon(ToolIconKind::Open), QString::fromUtf8("打开 DAT 文件..."));
         openAction->setText(QString::fromUtf8("打开DAT"));
         openAction->setToolTip(QString::fromUtf8("打开或选择 DAT 文件"));
+        openAction->setShortcut(QKeySequence::Open);
         connect(openAction, &QAction::triggered, this, &FaultTraceDialog::browseDatFile);
         QAction* saveAction = fileMenu->addAction(makeToolIcon(ToolIconKind::Save), QString::fromUtf8("保存当前配置"));
         saveAction->setText(QString::fromUtf8("保存配置"));
         saveAction->setToolTip(QString::fromUtf8("保存当前界面配置和参数"));
+        saveAction->setShortcut(QKeySequence("Ctrl+Alt+S"));
         connect(saveAction, &QAction::triggered, this, &FaultTraceDialog::saveCurrentPreset);
         QAction* outputDirAction = fileMenu->addAction(QString::fromUtf8("打开输出目录"));
-        connect(outputDirAction, &QAction::triggered, this, [openLocalDir]() { openLocalDir("examples/outputs"); });
+        connect(outputDirAction, &QAction::triggered, this, []() {
+            QDesktopServices::openUrl(QUrl::fromLocalFile(userExportDirectory()));
+        });
         fileMenu->addSeparator();
         fileMenu->addAction(exitAction);
 
@@ -1685,6 +1732,12 @@ void FaultTraceDialog::buildUi() {
             }
             appendStatus(QString::fromUtf8("日志已清空"));
         });
+        QAction* saveLogAction = editMenu->addAction(QString::fromUtf8("保存运行日志..."));
+        saveLogAction->setShortcut(QKeySequence("Ctrl+Shift+S"));
+        connect(saveLogAction, &QAction::triggered, this, &FaultTraceDialog::saveRunLog);
+        editMenu->addSeparator();
+        QAction* copySummaryAction = editMenu->addAction(QString::fromUtf8("复制当前结果摘要"));
+        connect(copySummaryAction, &QAction::triggered, this, &FaultTraceDialog::copyResultSummary);
 
         QMenu* viewMenu = menuBar->addMenu(QString::fromUtf8("视图(V)"));
         QAction* panAction = viewMenu->addAction(makeToolIcon(ToolIconKind::Pan), QString::fromUtf8("平移模式"));
@@ -1712,6 +1765,7 @@ void FaultTraceDialog::buildUi() {
         });
         QAction* resetViewAction = viewMenu->addAction(makeToolIcon(ToolIconKind::Reset), QString::fromUtf8("重置视图"));
         resetViewAction->setText(QString::fromUtf8("重置"));
+        resetViewAction->setShortcut(QKeySequence(Qt::Key_Home));
         connect(resetViewAction, &QAction::triggered, this, [this, renderView, panAction]() {
             if (renderView()) {
                 renderView()->resetView();
@@ -1744,13 +1798,16 @@ void FaultTraceDialog::buildUi() {
         loadResultViewAction_ = viewMenu->addAction(QString::fromUtf8("重新载入结果视图"));
         connect(loadResultViewAction_, &QAction::triggered, this, &FaultTraceDialog::loadResultView);
         exportViewAction_ = viewMenu->addAction(QString::fromUtf8("导出当前视图 PNG"));
+        exportViewAction_->setShortcut(QKeySequence("Ctrl+Shift+P"));
         connect(exportViewAction_, &QAction::triggered, this, &FaultTraceDialog::exportResultViewPng);
 
         QMenu* faultMenu = menuBar->addMenu(QString::fromUtf8("断层(L)"));
         runTraceAction_ = faultMenu->addAction(makeToolIcon(ToolIconKind::Run), QString::fromUtf8("开始追踪"));
+        runTraceAction_->setShortcut(QKeySequence(Qt::Key_F5));
         connect(runTraceAction_, &QAction::triggered, this, &FaultTraceDialog::runTrace);
         stopTraceAction_ = faultMenu->addAction(makeToolIcon(ToolIconKind::Stop), QString::fromUtf8("停止追踪"));
         stopTraceAction_->setEnabled(false);
+        stopTraceAction_->setShortcut(QKeySequence("Shift+F5"));
         connect(stopTraceAction_, &QAction::triggered, this, &FaultTraceDialog::stopProcess);
         faultMenu->addSeparator();
         QAction* colorAction = faultMenu->addAction(QString::fromUtf8("选择结果颜色..."));
@@ -1764,8 +1821,12 @@ void FaultTraceDialog::buildUi() {
         });
 
         QMenu* toolMenu = menuBar->addMenu(QString::fromUtf8("工具(T)"));
-        QAction* savePresetAction = toolMenu->addAction(makeToolIcon(ToolIconKind::Preset), QString::fromUtf8("保存当前参数"));
-        connect(savePresetAction, &QAction::triggered, this, &FaultTraceDialog::saveCurrentPreset);
+        QAction* savePresetAction = toolMenu->addAction(makeToolIcon(ToolIconKind::Preset), QString::fromUtf8("保存参数模板..."));
+        savePresetAction->setShortcut(QKeySequence::Save);
+        connect(savePresetAction, &QAction::triggered, this, &FaultTraceDialog::saveParameterTemplate);
+        QAction* loadPresetAction = toolMenu->addAction(makeToolIcon(ToolIconKind::Open), QString::fromUtf8("打开参数模板..."));
+        loadPresetAction->setShortcut(QKeySequence("Ctrl+Shift+O"));
+        connect(loadPresetAction, &QAction::triggered, this, &FaultTraceDialog::loadParameterTemplate);
         restoreDefaultsAction_ = toolMenu->addAction(makeToolIcon(ToolIconKind::Reset), QString::fromUtf8("恢复默认配置"));
         restoreDefaultsAction_->setText(QString::fromUtf8("恢复默认"));
         restoreDefaultsAction_->setToolTip(QString::fromUtf8("恢复推荐算法参数、显示样式和默认输出名，不清空数据库连接信息"));
@@ -1860,8 +1921,11 @@ void FaultTraceDialog::buildUi() {
         colorLineLayout->setSpacing(5);
         colorLineLayout->addWidget(polygonColorButton_);
         colorLineLayout->addWidget(polygonColorEdit_, 1);
+        colorLineLayout->addWidget(new QLabel(QString::fromUtf8("线宽"), colorLineWidget));
         colorLineLayout->addWidget(polygonLineWidthSpin_);
-        addFormRow(dataLayoutNew, 2, QString::fromUtf8("显示样式 / 线宽"), colorLineWidget, dataGroup);
+        colorLineLayout->addWidget(new QLabel(QString::fromUtf8("透明度"), colorLineWidget));
+        colorLineLayout->addWidget(polygonOpacitySpin_);
+        addFormRow(dataLayoutNew, 2, QString::fromUtf8("显示样式"), colorLineWidget, dataGroup);
         QWidget* datLineWidget = new QWidget(dataGroup);
         QHBoxLayout* datLineLayout = new QHBoxLayout(datLineWidget);
         datLineLayout->setContentsMargins(0, 0, 0, 0);
@@ -2567,6 +2631,120 @@ void FaultTraceDialog::saveCurrentPreset() {
     appendLog(QString::fromUtf8("当前参数和界面配置已保存。"));
 }
 
+void FaultTraceDialog::saveParameterTemplate() {
+    const QString suggested = QDir(userExportDirectory()).absoluteFilePath("FaultPolyTrace_参数模板.json");
+    const QString path = QFileDialog::getSaveFileName(
+        this,
+        uiText(QString::fromUtf8("保存参数模板")),
+        suggested,
+        uiText(QString::fromUtf8("参数模板 (*.json);;所有文件 (*.*)")));
+    if (path.isEmpty()) {
+        return;
+    }
+    QSaveFile file(path);
+    if (!file.open(QIODevice::WriteOnly)) {
+        QMessageBox::warning(this, uiText(QString::fromUtf8("保存失败")),
+                             uiText(QString::fromUtf8("无法写入参数模板：%1")).arg(QDir::toNativeSeparators(path)));
+        return;
+    }
+    file.write(QJsonDocument(fpt_ui::traceParametersToJson(currentTraceParameters(), comboKey(presetCombo_)))
+                   .toJson(QJsonDocument::Indented));
+    if (!file.commit()) {
+        QMessageBox::warning(this, uiText(QString::fromUtf8("保存失败")),
+                             uiText(QString::fromUtf8("参数模板未能安全写入磁盘。")));
+        return;
+    }
+    appendLog(QString::fromUtf8("参数模板已保存：%1").arg(QDir::toNativeSeparators(path)));
+    appendStatus(QString::fromUtf8("参数模板已保存"));
+}
+
+void FaultTraceDialog::loadParameterTemplate() {
+    const QString path = QFileDialog::getOpenFileName(
+        this,
+        uiText(QString::fromUtf8("打开参数模板")),
+        userExportDirectory(),
+        uiText(QString::fromUtf8("参数模板 (*.json);;所有文件 (*.*)")));
+    if (path.isEmpty()) {
+        return;
+    }
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) {
+        QMessageBox::warning(this, uiText(QString::fromUtf8("打开失败")),
+                             uiText(QString::fromUtf8("无法读取参数模板：%1")).arg(QDir::toNativeSeparators(path)));
+        return;
+    }
+    QJsonParseError parseError;
+    const QJsonDocument document = QJsonDocument::fromJson(file.readAll(), &parseError);
+    if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
+        QMessageBox::warning(this, uiText(QString::fromUtf8("模板无效")),
+                             uiText(QString::fromUtf8("JSON 解析失败：%1")).arg(parseError.errorString()));
+        return;
+    }
+    fpt_ui::TraceParameters parameters = currentTraceParameters();
+    QString preset;
+    QString validationError;
+    if (!fpt_ui::traceParametersFromJson(document.object(), &parameters, &preset, &validationError)) {
+        QMessageBox::warning(this, uiText(QString::fromUtf8("模板无效")), uiText(validationError));
+        return;
+    }
+    if (!preset.isEmpty() && fpt_ui::presetKeys().contains(preset)) {
+        QSignalBlocker blocker(presetCombo_);
+        setComboByKey(presetCombo_, preset);
+    }
+    applyTraceParameters(parameters);
+    saveSettings();
+    appendLog(QString::fromUtf8("参数模板已载入：%1").arg(QDir::toNativeSeparators(path)));
+    appendStatus(QString::fromUtf8("参数模板已载入并通过校验"));
+}
+
+void FaultTraceDialog::saveRunLog() {
+    const QString logText = logEdit_ ? logEdit_->toPlainText().trimmed() : QString();
+    if (logText.isEmpty()) {
+        QMessageBox::information(this, uiText(QString::fromUtf8("日志为空")),
+                                 uiText(QString::fromUtf8("当前没有可保存的运行日志。")));
+        return;
+    }
+    const QString suggested = QDir(userExportDirectory()).absoluteFilePath(
+        QString("FaultPolyTrace_%1.log").arg(QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss")));
+    const QString path = QFileDialog::getSaveFileName(
+        this, uiText(QString::fromUtf8("保存运行日志")), suggested,
+        uiText(QString::fromUtf8("日志文件 (*.log *.txt);;所有文件 (*.*)")));
+    if (path.isEmpty()) {
+        return;
+    }
+    QSaveFile file(path);
+    if (!file.open(QIODevice::WriteOnly) || file.write(logText.toUtf8()) < 0 || !file.commit()) {
+        QMessageBox::warning(this, uiText(QString::fromUtf8("保存失败")),
+                             uiText(QString::fromUtf8("无法保存运行日志：%1")).arg(QDir::toNativeSeparators(path)));
+        return;
+    }
+    appendStatus(QString::fromUtf8("运行日志已保存"));
+}
+
+void FaultTraceDialog::copyResultSummary() {
+    const QString selectedResult = outputCatalogCombo_ && !outputCatalogCombo_->currentData().toString().trimmed().isEmpty()
+        ? outputCatalogCombo_->currentData().toString().trimmed()
+        : (outputEdit_ ? outputEdit_->text().trimmed() : QString());
+    const QString viewStatus = renderViewWidget_
+        ? static_cast<RenderViewWidget*>(renderViewWidget_)->dataStatus()
+        : QString();
+    const QString summary = QString::fromUtf8(
+        "FaultPolyTrace 结果摘要\n数据库：%1\n项目：%2\n输入网格：%3\n结果对象：BOFaultPolygon/%4\n"
+        "预设模板：%5\n质量模式：%6\n显示样式：%7，线宽 %8，透明度 %9\n视图状态：%10")
+        .arg(databaseEdit_->text().trimmed())
+        .arg(projectEdit_->text().trimmed())
+        .arg(gridCombo_->currentText().trimmed())
+        .arg(selectedResult)
+        .arg(comboKey(presetCombo_))
+        .arg(comboKey(qualityModeCombo_))
+        .arg(polygonColorEdit_->text())
+        .arg(QString::number(polygonLineWidthSpin_->value(), 'f', 3))
+        .arg(QString::number(polygonOpacitySpin_->value(), 'f', 2))
+        .arg(viewStatus.isEmpty() ? uiText(QString::fromUtf8("尚未载入图层")) : uiText(viewStatus));
+    QApplication::clipboard()->setText(summary);
+    appendStatus(QString::fromUtf8("当前结果摘要已复制"));
+}
+
 void FaultTraceDialog::restoreDefaults() {
     outputEdit_->setText("FaultPolyTrace_Result");
     setComboByKey(presetCombo_, QString::fromUtf8("防黏连增强"));
@@ -2578,6 +2756,7 @@ void FaultTraceDialog::restoreDefaults() {
     minAreaSpin_->setValue(120.0);
     setPolygonColor(QColor("#00FFFF"));
     polygonLineWidthSpin_->setValue(0.03);
+    polygonOpacitySpin_->setValue(1.0);
     importDatCheck_->setChecked(false);
     overwriteGridCheck_->setChecked(true);
     if (showInputLayerCheck_) {
@@ -2735,6 +2914,7 @@ void FaultTraceDialog::loadSettings() {
     polygonColorEdit_->setText(settings.value("polygonColor", polygonColorEdit_->text()).toString());
     setPolygonColor(QColor(polygonColorEdit_->text()));
     polygonLineWidthSpin_->setValue(settings.value("polygonLineWidth", polygonLineWidthSpin_->value()).toDouble());
+    polygonOpacitySpin_->setValue(settings.value("polygonOpacity", polygonOpacitySpin_->value()).toDouble());
     traceModeCombo_->setCurrentText(settings.value("traceMode", traceModeCombo_->currentText()).toString());
     thresholdModeCombo_->setCurrentText(settings.value("thresholdMode", thresholdModeCombo_->currentText()).toString());
     thresholdSpin_->setValue(settings.value("threshold", thresholdSpin_->value()).toDouble());
@@ -2814,6 +2994,7 @@ void FaultTraceDialog::saveSettings() const {
     settings.setValue("overwriteGrid", overwriteGridCheck_->isChecked());
     settings.setValue("polygonColor", polygonColorEdit_->text());
     settings.setValue("polygonLineWidth", polygonLineWidthSpin_->value());
+    settings.setValue("polygonOpacity", polygonOpacitySpin_->value());
     settings.setValue("traceMode", traceModeCombo_->currentText());
     settings.setValue("thresholdMode", thresholdModeCombo_->currentText());
     settings.setValue("threshold", thresholdSpin_->value());
@@ -3181,6 +3362,10 @@ QStringList FaultTraceDialog::traceArgs() const {
 void FaultTraceDialog::applyParameterPreset(const QString& presetName) {
     const fpt_ui::TraceParameters shared =
         fpt_ui::presetParameters(fpt_ui::canonical(presetName));
+    applyTraceParameters(shared);
+}
+
+void FaultTraceDialog::applyTraceParameters(const fpt_ui::TraceParameters& shared) {
     traceModeCombo_->setCurrentText(shared.traceMode);
     thresholdModeCombo_->setCurrentText(shared.thresholdMode);
     thresholdSpin_->setValue(shared.threshold);
@@ -3217,6 +3402,13 @@ void FaultTraceDialog::applyParameterPreset(const QString& presetName) {
     residualTraceMaxCellsSpin_->setValue(shared.residualTraceMaxCells);
     simplifyToleranceSpin_->setValue(shared.simplifyTolerance);
     smoothIterationsSpin_->setValue(shared.smoothIterations);
+    if (shared.qualityMode == fpt_ui::QualityMode::Diagnostics) {
+        setComboByKey(qualityModeCombo_, QString::fromUtf8("质量诊断"));
+    } else if (shared.qualityMode == fpt_ui::QualityMode::Experimental) {
+        setComboByKey(qualityModeCombo_, QString::fromUtf8("受控实验"));
+    } else {
+        setComboByKey(qualityModeCombo_, QString::fromUtf8("正式处理"));
+    }
     updateOptionControls();
     updateStatusContext();
 }
@@ -3479,13 +3671,22 @@ void FaultTraceDialog::exportResultViewPng() {
     if (!renderViewWidget_) {
         return;
     }
+    RenderViewWidget* view = static_cast<RenderViewWidget*>(renderViewWidget_);
+    if (!view->hasVisibleContent()) {
+        QMessageBox::information(
+            this,
+            uiText(QString::fromUtf8("没有可导出的图层")),
+            uiText(QString::fromUtf8("请先载入并显示原始网格或结果多边形图层，再导出当前视图 PNG。")));
+        appendStatus(QString::fromUtf8("请先显示可导出的图层"));
+        return;
+    }
     QDir().mkpath(previewOutputDir());
     const QString fileName = QString("%1_%2_%3.png")
         .arg(sanitizeFileComponent(gridCombo_ ? gridCombo_->currentText() : QString(), "grid"),
              sanitizeFileComponent(outputEdit_ ? outputEdit_->text() : QString(), "output"),
              QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss"));
     const QString path = QDir(previewOutputDir()).absoluteFilePath(fileName);
-    if (static_cast<RenderViewWidget*>(renderViewWidget_)->savePng(path)) {
+    if (view->savePng(path)) {
         appendLog(QString::fromUtf8("结果视图 PNG 已导出：%1").arg(QDir::toNativeSeparators(path)));
         appendStatus(QString::fromUtf8("结果视图 PNG 已导出"));
     } else {
@@ -3829,7 +4030,8 @@ void FaultTraceDialog::updateStatusContext() {
             thresholdSpin_ ? thresholdSpin_->value() : 0.0,
             minAreaSpin_ ? minAreaSpin_->value() : 0.0,
             polygonColorEdit_ ? QColor(polygonColorEdit_->text()) : QColor("#00FFFF"),
-            polygonLineWidthSpin_ ? polygonLineWidthSpin_->value() : 0.03);
+            polygonLineWidthSpin_ ? polygonLineWidthSpin_->value() : 0.03,
+            polygonOpacitySpin_ ? polygonOpacitySpin_->value() : 1.0);
         static_cast<RenderViewWidget*>(renderViewWidget_)->setLayerVisibility(
             !showInputLayerCheck_ || showInputLayerCheck_->isChecked(),
             !showResultLayerCheck_ || showResultLayerCheck_->isChecked());

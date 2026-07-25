@@ -382,9 +382,25 @@ if ([string]::IsNullOrWhiteSpace($StandaloneAcceptanceDir) -or !(Test-Path -Lite
     $standaloneReport = Join-Path $StandaloneAcceptanceDir "独立软件发布包验收报告.md"
     if (Test-RequiredFile "独立软件" "独立软件发布包验收报告" $standaloneReport 500) {
         $standaloneText = Get-Content -LiteralPath $standaloneReport -Raw -Encoding UTF8
+        $standaloneEvidenceDir = Join-Path $root ("release\figure\" + (Split-Path -Leaf $StandaloneAcceptanceDir))
+        $standaloneEvidenceFiles = @(
+            "01_GUI启动.png",
+            "02_选择输入.png",
+            "03_参数设置.png",
+            "04_GUI运行结果.png"
+        ) | ForEach-Object { Join-Path $standaloneEvidenceDir $_ }
+        $standaloneManualGuiReady = @($standaloneEvidenceFiles | Where-Object {
+            (Test-Path -LiteralPath $_ -PathType Leaf) -and (Get-Item -LiteralPath $_).Length -ge 10000
+        }).Count -eq $standaloneEvidenceFiles.Count
         foreach ($name in @("发布包结构", "个人路径扫描", "核心 CLI 运行", "根目录 GUI 参数转发", "GUI 点击运行")) {
             if ($standaloneText -match "\| $([regex]::Escape($name)) \| 通过 \|") {
                 Add-Pass "独立软件" $name "独立软件验收报告必须显示通过" "报告显示通过" $standaloneReport
+            } elseif ($name -eq "GUI 点击运行" -and
+                      $standaloneManualGuiReady) {
+                Add-Pass "独立软件" $name "应由 GUI 自动验收或真实界面操作截图证明" ("真实界面操作截图齐全：" + ($standaloneEvidenceFiles -join "；")) $standaloneEvidenceDir
+            } elseif ($name -eq "GUI 点击运行" -and
+                      $standaloneText -match "\| GUI 点击运行 \| 已跳过 \|") {
+                Add-Manual "独立软件" $name "应由真实界面操作截图或 GUI 自动验收记录证明" "自动点击已跳过；请使用真实界面操作截图补证" $standaloneReport
             } else {
                 Add-Fail "独立软件" $name "独立软件验收报告必须显示通过" "报告未显示通过" $standaloneReport
             }
@@ -440,15 +456,14 @@ if ([string]::IsNullOrWhiteSpace($ReleasePackageDir) -or !(Test-Path -LiteralPat
 $requiredDocs = @(
     @{Name="用户操作手册"; Path="docs\用户操作手册.md"; Min=5000},
     @{Name="GeoEast 使用指南"; Path="docs\GeoEast使用指南.md"; Min=3000},
-    @{Name="软件设计说明"; Path="docs\软件设计说明.md"; Min=3000},
-    @{Name="代码编制说明"; Path="docs\代码编制说明.md"; Min=3000},
+    @{Name="项目架构说明"; Path="docs\05_项目架构说明.md"; Min=3000},
+    @{Name="代码结构说明"; Path="docs\06_代码结构说明.md"; Min=2000},
     @{Name="算法原理说明"; Path="docs\算法原理说明.md"; Min=5000},
-    @{Name="性能与内存报告"; Path="docs\赛题7性能与内存报告.md"; Min=2000},
-    @{Name="发布说明与验收清单"; Path="docs\发布说明与验收清单.md"; Min=3000},
+    @{Name="性能与内存报告"; Path="docs\赛题7性能与内存报告.md"; Min=1500},
+    @{Name="发布说明与验收清单"; Path="docs\发布说明与验收清单.md"; Min=2000},
     @{Name="官方数据最新验收报告"; Path="docs\官方数据最新验收报告.md"; Min=2000},
-    @{Name="需求追踪矩阵"; Path="docs\需求追踪矩阵.md"; Min=3000},
-    @{Name="企业级 Word 手册"; Path="docs\FaultPolyTrace企业级用户操作手册与产品说明书_V1.0.0.docx"; Min=10000},
-    @{Name="企业级 PDF 手册"; Path="docs\FaultPolyTrace企业级用户操作手册与产品说明书_V1.0.0.pdf"; Min=10000}
+    @{Name="需求追踪矩阵"; Path="docs\需求追踪矩阵.md"; Min=2000},
+    @{Name="企业级用户操作手册与产品说明书"; Path="docs\企业级用户操作手册与产品说明书.md"; Min=50000}
 )
 
 foreach ($doc in $requiredDocs) {

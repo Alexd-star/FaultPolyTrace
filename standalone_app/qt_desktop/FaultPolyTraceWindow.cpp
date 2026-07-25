@@ -28,6 +28,8 @@
 #include <QImage>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonParseError>
+#include <QKeySequence>
 #include <QLabel>
 #include <QLineEdit>
 #include <QLinearGradient>
@@ -42,6 +44,7 @@
 #include <QProcessEnvironment>
 #include <QPushButton>
 #include <QRegularExpression>
+#include <QSaveFile>
 #include <QScrollArea>
 #include <QSettings>
 #include <QSignalBlocker>
@@ -818,6 +821,11 @@ public:
         update();
     }
 
+    bool hasVisibleContent() const {
+        return (showGridLayer_ && !grid_.isEmpty()) ||
+               (showPolygonLayer_ && !polygons_.isEmpty());
+    }
+
     bool savePng(const QString& path) {
         QPixmap pixmap(size());
         render(&pixmap);
@@ -1158,22 +1166,28 @@ void FaultPolyTraceWindow::buildUi() {
 
     QAction* openAction = new QAction(style()->standardIcon(QStyle::SP_DirOpenIcon), QString::fromUtf8("打开 DAT 文件"), this);
     openAction->setToolTip(QString::fromUtf8("选择外部断层属性网格文件"));
+    openAction->setShortcut(QKeySequence::Open);
     connect(openAction, &QAction::triggered, this, &FaultPolyTraceWindow::browseInput);
     runAction_ = new QAction(style()->standardIcon(QStyle::SP_MediaPlay), QString::fromUtf8("开始追踪"), this);
     runAction_->setToolTip(QString::fromUtf8("按当前参数运行断层多边形自动追踪"));
+    runAction_->setShortcut(QKeySequence(Qt::Key_F5));
     connect(runAction_, &QAction::triggered, this, &FaultPolyTraceWindow::runTrace);
     stopAction_ = new QAction(style()->standardIcon(QStyle::SP_MediaStop), QString::fromUtf8("停止"), this);
     stopAction_->setToolTip(QString::fromUtf8("终止当前正在运行的追踪任务"));
     stopAction_->setEnabled(false);
+    stopAction_->setShortcut(QKeySequence("Shift+F5"));
     connect(stopAction_, &QAction::triggered, this, &FaultPolyTraceWindow::stopTrace);
     QAction* pngAction = new QAction(style()->standardIcon(QStyle::SP_DialogSaveButton), QString::fromUtf8("导出PNG"), this);
     pngAction->setToolTip(QString::fromUtf8("导出当前视图区图像"));
+    pngAction->setShortcut(QKeySequence("Ctrl+Shift+P"));
     connect(pngAction, &QAction::triggered, this, &FaultPolyTraceWindow::exportPng);
-    QAction* saveTplAction = new QAction(style()->standardIcon(QStyle::SP_DialogSaveButton), QString::fromUtf8("保存当前配置"), this);
+    QAction* saveTplAction = new QAction(style()->standardIcon(QStyle::SP_DialogSaveButton), QString::fromUtf8("保存参数模板"), this);
     saveTplAction->setToolTip(QString::fromUtf8("保存当前算法参数模板"));
+    saveTplAction->setShortcut(QKeySequence::Save);
     connect(saveTplAction, &QAction::triggered, this, &FaultPolyTraceWindow::saveTemplate);
-    QAction* loadTplAction = new QAction(style()->standardIcon(QStyle::SP_DialogOpenButton), QString::fromUtf8("打开配置"), this);
+    QAction* loadTplAction = new QAction(style()->standardIcon(QStyle::SP_DialogOpenButton), QString::fromUtf8("打开参数模板"), this);
     loadTplAction->setToolTip(QString::fromUtf8("读取已保存的参数模板"));
+    loadTplAction->setShortcut(QKeySequence("Ctrl+Shift+O"));
     connect(loadTplAction, &QAction::triggered, this, &FaultPolyTraceWindow::loadTemplate);
     QAction* resetAction = new QAction(style()->standardIcon(QStyle::SP_BrowserReload), QString::fromUtf8("恢复默认参数"), this);
     resetAction->setToolTip(QString::fromUtf8("恢复推荐默认参数"));
@@ -1200,9 +1214,16 @@ void FaultPolyTraceWindow::buildUi() {
     fileMenu->addSeparator();
     fileMenu->addAction(saveTplAction);
     fileMenu->addAction(loadTplAction);
+    fileMenu->addSeparator();
+    QAction* saveLogAction = fileMenu->addAction(QString::fromUtf8("保存运行日志..."));
+    saveLogAction->setShortcut(QKeySequence("Ctrl+Shift+S"));
+    connect(saveLogAction, &QAction::triggered, this, &FaultPolyTraceWindow::saveRunLog);
 
     QMenu* editMenu = menuBar()->addMenu(QString::fromUtf8("编辑(&E)"));
     editMenu->addAction(resetAction);
+    editMenu->addSeparator();
+    QAction* copySummaryAction = editMenu->addAction(QString::fromUtf8("复制当前结果摘要"));
+    connect(copySummaryAction, &QAction::triggered, this, &FaultPolyTraceWindow::copyResultSummary);
 
     QMenu* viewMenu = menuBar()->addMenu(QString::fromUtf8("视图(&V)"));
     QAction* taskViewAction = viewMenu->addAction(QString::fromUtf8("任务预览"));
@@ -1237,6 +1258,7 @@ void FaultPolyTraceWindow::buildUi() {
         updateStatus(QString::fromUtf8("视图区已缩小"));
     });
     QAction* resetViewAction = viewMenu->addAction(makeToolIcon(ToolIconKind::Reset), QString::fromUtf8("重置视图"));
+    resetViewAction->setShortcut(QKeySequence(Qt::Key_Home));
     connect(resetViewAction, &QAction::triggered, this, [this, panAction]() {
         if (view_) {
             view_->resetView();
@@ -2642,9 +2664,10 @@ void FaultPolyTraceWindow::updateTaskPreview() {
         uiText(QString::fromUtf8("输出目录：%1")).arg(outputDirText),
         uiText(QString::fromUtf8("方案：%1    模式：%2    阈值：%3"))
             .arg(presetText, traceModeCombo_->currentText(), thresholdText),
-        uiText(QString::fromUtf8("面积过滤：小于 %1 的多边形不输出    结果线宽：%2"))
+        uiText(QString::fromUtf8("面积过滤：小于 %1 的多边形不输出    结果线宽：%2    透明度：%3"))
             .arg(minAreaSpin_->value(), 0, 'f', 2)
-            .arg(lineWidthSpin_->value(), 0, 'f', 3),
+            .arg(lineWidthSpin_->value(), 0, 'f', 3)
+            .arg(alphaSpin_->value(), 0, 'f', 2),
         uiText(QString::fromUtf8("弱响应：分位 %1 / 半径 %2    根系防黏连：%3    残余补追：%4"))
             .arg(weakPercentileSpin_->value(), 0, 'f', 4)
             .arg(weakConnectRadiusSpin_->value())
@@ -3725,6 +3748,10 @@ void FaultPolyTraceWindow::updateLayerVisibility() {
 void FaultPolyTraceWindow::applyPreset(const QString& preset) {
     const fpt_ui::TraceParameters shared =
         fpt_ui::presetParameters(fpt_ui::canonical(preset));
+    applyTraceParameters(shared);
+}
+
+void FaultPolyTraceWindow::applyTraceParameters(const fpt_ui::TraceParameters& shared) {
     traceModeCombo_->setCurrentText(shared.traceMode);
     thresholdModeCombo_->setCurrentText(shared.thresholdMode);
     thresholdSpin_->setValue(shared.threshold);
@@ -3761,6 +3788,13 @@ void FaultPolyTraceWindow::applyPreset(const QString& preset) {
     residualTraceMaxCellsSpin_->setValue(shared.residualTraceMaxCells);
     simplifyToleranceSpin_->setValue(shared.simplifyTolerance);
     smoothIterationsSpin_->setValue(shared.smoothIterations);
+    if (shared.qualityMode == fpt_ui::QualityMode::Diagnostics) {
+        setComboByKey(qualityModeCombo_, QString::fromUtf8("质量诊断"));
+    } else if (shared.qualityMode == fpt_ui::QualityMode::Experimental) {
+        setComboByKey(qualityModeCombo_, QString::fromUtf8("受控实验"));
+    } else {
+        setComboByKey(qualityModeCombo_, QString::fromUtf8("正式处理"));
+    }
     updateOptionControls();
     updateTaskPreview();
 }
@@ -3815,6 +3849,13 @@ void FaultPolyTraceWindow::openDiagnosticsJson() {
 }
 
 void FaultPolyTraceWindow::exportPng() {
+    if (!view_->hasVisibleContent()) {
+        QMessageBox::information(
+            this,
+            uiText(QString::fromUtf8("没有可导出的图层")),
+            uiText(QString::fromUtf8("请先载入并显示原始网格或结果多边形图层，再导出当前视图 PNG。")));
+        return;
+    }
     const QString path = QFileDialog::getSaveFileName(this, QString::fromUtf8("导出当前视图 PNG"), QDir(outputDirEdit_->text()).absoluteFilePath("FaultPolyTrace_View.png"), QString::fromUtf8("PNG 图像 (*.png);;所有文件 (*.*)"));
     if (path.isEmpty()) {
         return;
@@ -3825,103 +3866,116 @@ void FaultPolyTraceWindow::exportPng() {
 }
 
 void FaultPolyTraceWindow::saveTemplate() {
-    const QString path = QFileDialog::getSaveFileName(this, QString::fromUtf8("保存参数模板"), QDir(outputDirEdit_->text()).absoluteFilePath("FaultPolyTrace_参数模板.json"), QString::fromUtf8("参数模板 (*.json);;所有文件 (*.*)"));
+    const QString path = QFileDialog::getSaveFileName(
+        this,
+        uiText(QString::fromUtf8("保存参数模板")),
+        QDir(outputDirEdit_->text()).absoluteFilePath("FaultPolyTrace_参数模板.json"),
+        uiText(QString::fromUtf8("参数模板 (*.json);;所有文件 (*.*)")));
     if (path.isEmpty()) {
         return;
     }
-    QJsonObject obj;
-    obj["preset"] = comboKey(presetCombo_);
-    obj["traceMode"] = traceModeCombo_->currentText();
-    obj["thresholdMode"] = thresholdModeCombo_->currentText();
-    obj["percentile"] = percentileSpin_->value();
-    obj["threshold"] = thresholdSpin_->value();
-    obj["minArea"] = minAreaSpin_->value();
-    obj["closeRadius"] = closeRadiusSpin_->value();
-    obj["weakPercentile"] = weakPercentileSpin_->value();
-    obj["weakConnectRadius"] = weakConnectRadiusSpin_->value();
-    obj["beltRadius"] = beltRadiusSpin_->value();
-    obj["postBeltCloseRadius"] = postBeltCloseRadiusSpin_->value();
-    obj["attributeConstrainedBelt"] = attributeConstrainedBeltCheck_->isChecked();
-    obj["attributeEnvelopeRadius"] = attributeEnvelopeRadiusSpin_->value();
-    obj["minBranchLength"] = minBranchLengthSpin_->value();
-    obj["minJunctionBranchLength"] = minJunctionBranchLengthSpin_->value();
-    obj["minJunctionBranchMean"] = minJunctionBranchMeanSpin_->value();
-    obj["maxGapDistance"] = maxGapDistanceSpin_->value();
-    obj["maxGapAngle"] = maxGapAngleSpin_->value();
-    obj["rootAntiMerge"] = rootAntiMergeCheck_->isChecked();
-    obj["rootAntiMergeRadius"] = rootAntiMergeRadiusSpin_->value();
-    obj["rootAntiMergeSupportRatio"] = rootAntiMergeSupportRatioSpin_->value();
-    obj["rootAntiMergeMinPartCells"] = rootAntiMergeMinPartCellsSpin_->value();
-    obj["rootAntiMergeMinPartRatio"] = rootAntiMergeMinPartRatioSpin_->value();
-    obj["rootAntiMergeWeakGuardThreshold"] = rootAntiMergeWeakGuardThresholdSpin_->value();
-    obj["rootAntiMergeWeakGuardRadius"] = rootAntiMergeWeakGuardRadiusSpin_->value();
-    obj["localAntiMerge"] = localAntiMergeCheck_->isChecked();
-    obj["localAntiMergeLowThreshold"] = localAntiMergeLowThresholdSpin_->value();
-    obj["localAntiMergeBridgeRadius"] = localAntiMergeBridgeRadiusSpin_->value();
-    obj["localAntiMergeMinPartCells"] = localAntiMergeMinPartCellsSpin_->value();
-    obj["localAntiMergeMinPartRatio"] = localAntiMergeMinPartRatioSpin_->value();
-    obj["localAntiMergeMinBridgeCells"] = localAntiMergeMinBridgeCellsSpin_->value();
-    obj["localAntiMergeMinLowRatio"] = localAntiMergeMinLowRatioSpin_->value();
-    obj["residualTrace"] = residualTraceCheck_->isChecked();
-    obj["residualTraceMinLength"] = residualTraceMinLengthSpin_->value();
-    obj["residualTraceMaxCells"] = residualTraceMaxCellsSpin_->value();
-    obj["smoothIterations"] = smoothIterationsSpin_->value();
-    obj["simplifyTolerance"] = simplifyToleranceSpin_->value();
-    QFile file(path);
-    if (file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-        file.write(QJsonDocument(obj).toJson(QJsonDocument::Indented));
+    QSaveFile file(path);
+    if (!file.open(QIODevice::WriteOnly)) {
+        QMessageBox::warning(this, uiText(QString::fromUtf8("保存失败")),
+                             uiText(QString::fromUtf8("无法写入参数模板：%1")).arg(QDir::toNativeSeparators(path)));
+        return;
     }
+    file.write(QJsonDocument(fpt_ui::traceParametersToJson(currentTraceParameters(), comboKey(presetCombo_)))
+                   .toJson(QJsonDocument::Indented));
+    if (!file.commit()) {
+        QMessageBox::warning(this, uiText(QString::fromUtf8("保存失败")),
+                             uiText(QString::fromUtf8("参数模板未能安全写入磁盘。")));
+        return;
+    }
+    appendLog(QString::fromUtf8("参数模板已保存：%1").arg(QDir::toNativeSeparators(path)));
+    updateStatus(QString::fromUtf8("参数模板已保存"));
 }
 
 void FaultPolyTraceWindow::loadTemplate() {
-    const QString path = QFileDialog::getOpenFileName(this, QString::fromUtf8("打开参数模板"), outputDirEdit_->text(), QString::fromUtf8("参数模板 (*.json);;所有文件 (*.*)"));
+    const QString path = QFileDialog::getOpenFileName(
+        this,
+        uiText(QString::fromUtf8("打开参数模板")),
+        outputDirEdit_->text(),
+        uiText(QString::fromUtf8("参数模板 (*.json);;所有文件 (*.*)")));
     if (path.isEmpty()) {
         return;
     }
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly)) {
+        QMessageBox::warning(this, uiText(QString::fromUtf8("打开失败")),
+                             uiText(QString::fromUtf8("无法读取参数模板：%1")).arg(QDir::toNativeSeparators(path)));
         return;
     }
-    const QJsonObject obj = QJsonDocument::fromJson(file.readAll()).object();
-    setComboByKey(presetCombo_, obj.value("preset").toString(comboKey(presetCombo_)));
-    traceModeCombo_->setCurrentText(obj.value("traceMode").toString(traceModeCombo_->currentText()));
-    thresholdModeCombo_->setCurrentText(obj.value("thresholdMode").toString(thresholdModeCombo_->currentText()));
-    percentileSpin_->setValue(obj.value("percentile").toDouble(percentileSpin_->value()));
-    thresholdSpin_->setValue(obj.value("threshold").toDouble(thresholdSpin_->value()));
-    minAreaSpin_->setValue(obj.value("minArea").toDouble(minAreaSpin_->value()));
-    closeRadiusSpin_->setValue(obj.value("closeRadius").toInt(closeRadiusSpin_->value()));
-    weakPercentileSpin_->setValue(obj.value("weakPercentile").toDouble(weakPercentileSpin_->value()));
-    weakConnectRadiusSpin_->setValue(obj.value("weakConnectRadius").toInt(weakConnectRadiusSpin_->value()));
-    beltRadiusSpin_->setValue(obj.value("beltRadius").toInt(beltRadiusSpin_->value()));
-    postBeltCloseRadiusSpin_->setValue(obj.value("postBeltCloseRadius").toInt(postBeltCloseRadiusSpin_->value()));
-    attributeConstrainedBeltCheck_->setChecked(obj.value("attributeConstrainedBelt").toBool(attributeConstrainedBeltCheck_->isChecked()));
-    attributeEnvelopeRadiusSpin_->setValue(obj.value("attributeEnvelopeRadius").toInt(attributeEnvelopeRadiusSpin_->value()));
-    minBranchLengthSpin_->setValue(obj.value("minBranchLength").toInt(minBranchLengthSpin_->value()));
-    minJunctionBranchLengthSpin_->setValue(obj.value("minJunctionBranchLength").toInt(minJunctionBranchLengthSpin_->value()));
-    minJunctionBranchMeanSpin_->setValue(obj.value("minJunctionBranchMean").toDouble(minJunctionBranchMeanSpin_->value()));
-    maxGapDistanceSpin_->setValue(obj.value("maxGapDistance").toInt(maxGapDistanceSpin_->value()));
-    maxGapAngleSpin_->setValue(obj.value("maxGapAngle").toDouble(maxGapAngleSpin_->value()));
-    rootAntiMergeCheck_->setChecked(obj.value("rootAntiMerge").toBool(rootAntiMergeCheck_->isChecked()));
-    rootAntiMergeRadiusSpin_->setValue(obj.value("rootAntiMergeRadius").toInt(rootAntiMergeRadiusSpin_->value()));
-    rootAntiMergeSupportRatioSpin_->setValue(obj.value("rootAntiMergeSupportRatio").toDouble(rootAntiMergeSupportRatioSpin_->value()));
-    rootAntiMergeMinPartCellsSpin_->setValue(obj.value("rootAntiMergeMinPartCells").toInt(rootAntiMergeMinPartCellsSpin_->value()));
-    rootAntiMergeMinPartRatioSpin_->setValue(obj.value("rootAntiMergeMinPartRatio").toDouble(rootAntiMergeMinPartRatioSpin_->value()));
-    rootAntiMergeWeakGuardThresholdSpin_->setValue(obj.value("rootAntiMergeWeakGuardThreshold").toDouble(rootAntiMergeWeakGuardThresholdSpin_->value()));
-    rootAntiMergeWeakGuardRadiusSpin_->setValue(obj.value("rootAntiMergeWeakGuardRadius").toInt(rootAntiMergeWeakGuardRadiusSpin_->value()));
-    localAntiMergeCheck_->setChecked(obj.value("localAntiMerge").toBool(localAntiMergeCheck_->isChecked()));
-    localAntiMergeLowThresholdSpin_->setValue(obj.value("localAntiMergeLowThreshold").toDouble(localAntiMergeLowThresholdSpin_->value()));
-    localAntiMergeBridgeRadiusSpin_->setValue(obj.value("localAntiMergeBridgeRadius").toInt(localAntiMergeBridgeRadiusSpin_->value()));
-    localAntiMergeMinPartCellsSpin_->setValue(obj.value("localAntiMergeMinPartCells").toInt(localAntiMergeMinPartCellsSpin_->value()));
-    localAntiMergeMinPartRatioSpin_->setValue(obj.value("localAntiMergeMinPartRatio").toDouble(localAntiMergeMinPartRatioSpin_->value()));
-    localAntiMergeMinBridgeCellsSpin_->setValue(obj.value("localAntiMergeMinBridgeCells").toInt(localAntiMergeMinBridgeCellsSpin_->value()));
-    localAntiMergeMinLowRatioSpin_->setValue(obj.value("localAntiMergeMinLowRatio").toDouble(localAntiMergeMinLowRatioSpin_->value()));
-    residualTraceCheck_->setChecked(obj.value("residualTrace").toBool(residualTraceCheck_->isChecked()));
-    residualTraceMinLengthSpin_->setValue(obj.value("residualTraceMinLength").toInt(residualTraceMinLengthSpin_->value()));
-    residualTraceMaxCellsSpin_->setValue(obj.value("residualTraceMaxCells").toInt(residualTraceMaxCellsSpin_->value()));
-    smoothIterationsSpin_->setValue(obj.value("smoothIterations").toInt(smoothIterationsSpin_->value()));
-    simplifyToleranceSpin_->setValue(obj.value("simplifyTolerance").toDouble(simplifyToleranceSpin_->value()));
-    updateOptionControls();
-    updateTaskPreview();
+    QJsonParseError parseError;
+    const QJsonDocument document = QJsonDocument::fromJson(file.readAll(), &parseError);
+    if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
+        QMessageBox::warning(this, uiText(QString::fromUtf8("模板无效")),
+                             uiText(QString::fromUtf8("JSON 解析失败：%1")).arg(parseError.errorString()));
+        return;
+    }
+    fpt_ui::TraceParameters parameters = currentTraceParameters();
+    QString preset;
+    QString validationError;
+    if (!fpt_ui::traceParametersFromJson(document.object(), &parameters, &preset, &validationError)) {
+        QMessageBox::warning(this, uiText(QString::fromUtf8("模板无效")), uiText(validationError));
+        return;
+    }
+    if (!preset.isEmpty() && fpt_ui::presetKeys().contains(preset)) {
+        QSignalBlocker blocker(presetCombo_);
+        setComboByKey(presetCombo_, preset);
+    }
+    applyTraceParameters(parameters);
+    saveSettings();
+    appendLog(QString::fromUtf8("参数模板已载入：%1").arg(QDir::toNativeSeparators(path)));
+    updateStatus(QString::fromUtf8("参数模板已载入并通过校验"));
+}
+
+void FaultPolyTraceWindow::saveRunLog() {
+    const QString logText = logEdit_ ? logEdit_->toPlainText().trimmed() : QString();
+    if (logText.isEmpty()) {
+        QMessageBox::information(this, uiText(QString::fromUtf8("日志为空")),
+                                 uiText(QString::fromUtf8("当前没有可保存的运行日志。")));
+        return;
+    }
+    const QString suggested = QDir(outputDirEdit_->text()).absoluteFilePath(
+        QString("FaultPolyTrace_%1.log").arg(QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss")));
+    const QString path = QFileDialog::getSaveFileName(
+        this, uiText(QString::fromUtf8("保存运行日志")), suggested,
+        uiText(QString::fromUtf8("日志文件 (*.log *.txt);;所有文件 (*.*)")));
+    if (path.isEmpty()) {
+        return;
+    }
+    QSaveFile file(path);
+    if (!file.open(QIODevice::WriteOnly) || file.write(logText.toUtf8()) < 0 || !file.commit()) {
+        QMessageBox::warning(this, uiText(QString::fromUtf8("保存失败")),
+                             uiText(QString::fromUtf8("无法保存运行日志：%1")).arg(QDir::toNativeSeparators(path)));
+        return;
+    }
+    updateStatus(QString::fromUtf8("运行日志已保存"));
+}
+
+void FaultPolyTraceWindow::copyResultSummary() {
+    const QString source = isGeoEastMode()
+        ? QString::fromUtf8("GeoEast数据库：%1 / %2 / BOMapGrid/%3")
+              .arg(databaseEdit_->text().trimmed(), projectEdit_->text().trimmed(), geoEastGridCombo_->currentText().trimmed())
+        : QString::fromUtf8("外部文件：%1").arg(QDir::toNativeSeparators(inputEdit_->text().trimmed()));
+    const QString result = isGeoEastMode() && !lastGeoEastOutput_.trimmed().isEmpty()
+        ? QString::fromUtf8("BOFaultPolygon/%1").arg(lastGeoEastOutput_.trimmed())
+        : QDir::toNativeSeparators(lastOutputCsv_.trimmed());
+    const QString summary = QString::fromUtf8(
+        "FaultPolyTrace 结果摘要\n数据源：%1\n结果：%2\n预设模板：%3\n质量模式：%4\n"
+        "显示样式：%5，线宽 %6，透明度 %7\n%8\n%9")
+        .arg(source)
+        .arg(result.isEmpty() ? uiText(QString::fromUtf8("尚未生成结果")) : result)
+        .arg(comboKey(presetCombo_))
+        .arg(comboKey(qualityModeCombo_))
+        .arg(colorEdit_->text())
+        .arg(QString::number(lineWidthSpin_->value(), 'f', 3))
+        .arg(QString::number(alphaSpin_->value(), 'f', 2))
+        .arg(elapsedLabel_ ? elapsedLabel_->text() : QString())
+        .arg(resultSummaryLabel_ ? resultSummaryLabel_->text() : QString());
+    QApplication::clipboard()->setText(summary);
+    updateStatus(QString::fromUtf8("当前结果摘要已复制"));
 }
 
 void FaultPolyTraceWindow::restoreDefaults() {

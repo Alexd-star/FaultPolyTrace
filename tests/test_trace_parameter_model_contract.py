@@ -95,6 +95,56 @@ def test_shared_serializer_owns_complete_trace_parameter_contract():
         assert switch in source
 
 
+def test_parameter_templates_use_one_versioned_validated_json_contract():
+    header = read("src/ui/TraceParameterModel.h")
+    model = read("src/ui/TraceParameterModel.cpp")
+    desktop = read("standalone_app/qt_desktop/FaultPolyTraceWindow.cpp")
+    launcher = read("geoeast_plugin/qt_launcher/FaultTraceDialog.cpp")
+
+    assert "traceParametersToJson" in header
+    assert "traceParametersFromJson" in header
+    assert 'object["format"] = "FaultPolyTrace.TraceParameters"' in model
+    assert 'object["schemaVersion"] = 1' in model
+    assert "参数模板版本不受支持" in model
+    assert "参数“%1”的类型或取值范围无效" in model
+    for source in (desktop, launcher):
+        assert "fpt_ui::traceParametersToJson" in source
+        assert "fpt_ui::traceParametersFromJson" in source
+        assert "QJsonParseError" in source
+        assert "QSaveFile" in source
+
+
+def test_both_qt_entries_expose_productivity_actions_and_shortcuts():
+    desktop = read("standalone_app/qt_desktop/FaultPolyTraceWindow.cpp")
+    launcher = read("geoeast_plugin/qt_launcher/FaultTraceDialog.cpp")
+
+    for source, owner in (
+        (desktop, "FaultPolyTraceWindow"),
+        (launcher, "FaultTraceDialog"),
+    ):
+        assert f"void {owner}::saveRunLog()" in source
+        assert f"void {owner}::copyResultSummary()" in source
+        assert "保存运行日志..." in source
+        assert "复制当前结果摘要" in source
+        assert 'QKeySequence(Qt::Key_F5)' in source
+        assert 'QKeySequence("Shift+F5")' in source
+        assert 'QKeySequence("Ctrl+Shift+P")' in source
+        assert "QKeySequence(Qt::Key_Home)" in source
+
+
+def test_geoeast_view_opacity_is_persisted_but_never_written_as_geometry_style():
+    launcher = read("geoeast_plugin/qt_launcher/FaultTraceDialog.cpp")
+    runner = read("geoeast_plugin/bo_runner/main.cpp")
+
+    assert "polygonOpacitySpin_" in launcher
+    assert 'settings.setValue("polygonOpacity"' in launcher
+    assert 'settings.value("polygonOpacity"' in launcher
+    assert "color.setAlphaF(polygonOpacity_)" in launcher
+    assert "不修改数据库几何" in launcher
+    assert '"--polygon-opacity"' not in launcher
+    assert '"--polygon-opacity"' not in runner
+
+
 def test_both_qt_entries_delegate_trace_serialization_to_shared_model():
     desktop = read("standalone_app/qt_desktop/FaultPolyTraceWindow.cpp")
     launcher = read("geoeast_plugin/qt_launcher/FaultTraceDialog.cpp")
@@ -156,3 +206,19 @@ def test_geoeast_loaded_result_style_updates_without_rerunning_trace():
     )
     assert "polygonLineWidthSpin_, QOverload<double>::of(&QDoubleSpinBox::valueChanged)" in launcher
     assert "updateStatusContext();" in launcher
+
+
+def test_both_qt_entries_block_blank_view_png_export():
+    desktop = read("standalone_app/qt_desktop/FaultPolyTraceWindow.cpp")
+    launcher = read("geoeast_plugin/qt_launcher/FaultTraceDialog.cpp")
+
+    assert "bool hasVisibleContent() const" in desktop
+    assert "bool hasVisibleContent() const" in launcher
+    for source, signature in (
+        (desktop, "void FaultPolyTraceWindow::exportPng"),
+        (launcher, "void FaultTraceDialog::exportResultViewPng"),
+    ):
+        body = function_body(source, signature)
+        assert "hasVisibleContent()" in body
+        assert "没有可导出的图层" in body
+        assert "请先载入并显示原始网格或结果多边形图层" in body

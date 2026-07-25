@@ -265,12 +265,19 @@ void writeFaultPolygons(
     if (outputName.empty()) {
         throw std::runtime_error("GeoEast BOFaultPolygon output name is empty.");
     }
+    std::size_t omittedHoleCount = 0;
     for (const fpt::Polygon& polygon : polygons) {
-        if ((!keptOnly || polygon.kept) && !polygon.holes.empty()) {
-            throw std::runtime_error(
-                "BOFaultPolygon does not expose hole ownership semantics; "
-                "refusing to flatten polygon holes into independent fault polygons.");
+        if (!keptOnly || polygon.kept) {
+            omittedHoleCount += polygon.holes.size();
         }
+    }
+    if (omittedHoleCount > 0) {
+        // BOFaultPolygon has no parent-ring field for interior rings.  Writing
+        // them as independent segments would create false fault polygons, so
+        // the GeoEast display layer keeps each exterior ring and fills holes.
+        // The full polygon-with-holes geometry remains available in CSV/WKT.
+        std::cerr << "GeoEast compatibility: omitted " << omittedHoleCount
+                  << " interior ring(s); exterior fault polygons are preserved.\n";
     }
 
     if (project->getChild<geobo::BOFaultPolygon>(outputName)) {

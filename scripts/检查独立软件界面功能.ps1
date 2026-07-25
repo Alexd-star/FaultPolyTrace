@@ -132,8 +132,8 @@ $actions = @(
     @{ Name="开始追踪"; Var="runAction_"; Label="开始追踪"; Slot="runTrace"; Menu="faultMenu"; Toolbar=$true },
     @{ Name="停止"; Var="stopAction_"; Label="停止"; Slot="stopTrace"; Menu="faultMenu"; Toolbar=$true },
     @{ Name="导出 PNG"; Var="pngAction"; Label="导出PNG"; Slot="exportPng"; Menu="fileMenu"; Toolbar=$true },
-    @{ Name="保存参数模板"; Var="saveTplAction"; Label="保存当前配置"; Slot="saveTemplate"; Menu="fileMenu"; Toolbar=$true },
-    @{ Name="打开参数模板"; Var="loadTplAction"; Label="打开配置"; Slot="loadTemplate"; Menu="fileMenu"; Toolbar=$false },
+    @{ Name="保存参数模板"; Var="saveTplAction"; Label="保存参数模板"; Slot="saveTemplate"; Menu="fileMenu"; Toolbar=$true },
+    @{ Name="打开参数模板"; Var="loadTplAction"; Label="打开参数模板"; Slot="loadTemplate"; Menu="fileMenu"; Toolbar=$false },
     @{ Name="恢复默认"; Var="resetAction"; Label="恢复默认参数"; Slot="restoreDefaults"; Menu="editMenu"; Toolbar=$true },
     @{ Name="打开输出目录"; Var="outputDirAction"; Label="打开输出目录"; Slot="openOutputDir"; Menu="toolsMenu"; Toolbar=$true },
     @{ Name="帮助"; Var="helpAction"; Label="帮助提示"; Slot="openHelp"; Menu="helpMenu"; Toolbar=$true }
@@ -301,6 +301,13 @@ Add-ContainsCheck -Rows $rows -Group "语言切换" -Name "本地化源码编译
 Add-ContainsCheck -Rows $rows -Group "语言切换" -Name "本地化头文件纳入工程" -Requirement "构建脚本必须纳入共享本地化头文件" -Text $pro -Needle "../../src/ui/UiLocalization.h" -Detail "$proPath 纳入 UiLocalization.h"
 
 Add-ContainsCheck -Rows $rows -Group "发布链路" -Name "界面检查脚本" -Requirement "发布包携带本检查脚本" -Text $packageScript -Needle "检查独立软件界面功能.ps1" -Detail "$packageScriptPath 脚本清单包含 检查独立软件界面功能.ps1"
+
+Add-ContainsCheck -Rows $rows -Group "产品效率" -Name "保存运行日志" -Requirement "运行日志可由用户选择位置保存" -Text $cpp -Needle "void FaultPolyTraceWindow::saveRunLog()" -Detail "$cppPath 实现日志保存槽函数"
+Add-ContainsCheck -Rows $rows -Group "产品效率" -Name "复制结果摘要" -Requirement "当前数据源、结果、样式和耗时可复制为摘要" -Text $cpp -Needle "void FaultPolyTraceWindow::copyResultSummary()" -Detail "$cppPath 实现结果摘要复制"
+Add-ContainsCheck -Rows $rows -Group "产品效率" -Name "运行快捷键" -Requirement "F5 启动追踪" -Text $cpp -Needle 'runAction_->setShortcut(QKeySequence(Qt::Key_F5))' -Detail "$cppPath 配置 F5"
+Add-ContainsCheck -Rows $rows -Group "产品效率" -Name "停止快捷键" -Requirement "Shift+F5 停止追踪" -Text $cpp -Needle 'stopAction_->setShortcut(QKeySequence("Shift+F5"))' -Detail "$cppPath 配置 Shift+F5"
+Add-ContainsCheck -Rows $rows -Group "参数模板" -Name "共享模板写入" -Requirement "独立软件使用版本化共享 JSON 参数契约" -Text $cpp -Needle "fpt_ui::traceParametersToJson" -Detail "$cppPath 使用共享模板序列化"
+Add-ContainsCheck -Rows $rows -Group "参数模板" -Name "共享模板校验" -Requirement "模板载入前校验 JSON、版本、类型和取值范围" -Text $cpp -Needle "fpt_ui::traceParametersFromJson" -Detail "$cppPath 使用共享模板校验"
 
 $failed = @($rows | Where-Object { $_.Status -eq "失败" })
 $passed = @($rows | Where-Object { $_.Status -eq "通过" })

@@ -243,6 +243,15 @@ Add-ContainsCheck -Rows $rows -Group "help-docs" -Name "portable-docs-deploy-tar
 Add-ContainsCheck -Rows $rows -Group "help-docs" -Name "relative-doc-locator" -Requirement "Launcher must locate documents relative to source, release package, or GeoEast portable launcher directory." -Text $dialogCpp -Needle "locateBundledPath" -Detail "$dialogCppPath uses locateBundledPath"
 Add-ContainsCheck -Rows $rows -Group "help-docs" -Name "project-structure-doc-link" -Requirement "Launcher help menu should expose project directory structure documentation." -Text $dialogCpp -Needle "docs/项目目录结构与文件说明.md" -Detail "$dialogCppPath links project structure doc"
 
+Add-ContainsCheck -Rows $rows -Group "productivity" -Name "save-run-log" -Requirement "User can save the current run log to a chosen file." -Text $dialogCpp -Needle "void FaultTraceDialog::saveRunLog()" -Detail "$dialogCppPath implements run-log saving"
+Add-ContainsCheck -Rows $rows -Group "productivity" -Name "copy-result-summary" -Requirement "User can copy the current GeoEast result context and display style." -Text $dialogCpp -Needle "void FaultTraceDialog::copyResultSummary()" -Detail "$dialogCppPath implements result-summary copying"
+Add-ContainsCheck -Rows $rows -Group "productivity" -Name "parameter-template-save" -Requirement "Launcher can save a portable parameter template." -Text $dialogCpp -Needle "void FaultTraceDialog::saveParameterTemplate()" -Detail "$dialogCppPath implements template save"
+Add-ContainsCheck -Rows $rows -Group "productivity" -Name "parameter-template-load" -Requirement "Launcher validates and opens a portable parameter template." -Text $dialogCpp -Needle "void FaultTraceDialog::loadParameterTemplate()" -Detail "$dialogCppPath implements template load"
+Add-ContainsCheck -Rows $rows -Group "productivity" -Name "run-shortcut" -Requirement "F5 starts tracing." -Text $dialogCpp -Needle 'runTraceAction_->setShortcut(QKeySequence(Qt::Key_F5))' -Detail "$dialogCppPath configures F5"
+Add-ContainsCheck -Rows $rows -Group "result-style" -Name "view-opacity" -Requirement "Result opacity can be adjusted for display without changing GeoEast geometry." -Text $dialogCpp -Needle "color.setAlphaF(polygonOpacity_)" -Detail "$dialogCppPath applies view-only opacity"
+Add-ContainsCheck -Rows $rows -Group "result-style" -Name "persist-opacity" -Requirement "View opacity is remembered per user." -Text $dialogCpp -Needle 'settings.setValue("polygonOpacity"' -Detail "$dialogCppPath persists opacity"
+Add-NotContainsCheck -Rows $rows -Group "result-style" -Name "no-opacity-write-option" -Requirement "View opacity must not be passed to GeoEast BO geometry writing." -Text $dialogCpp -Needle '"--polygon-opacity"' -Detail "$dialogCppPath does not pass opacity to runner"
+
 $failed = @($rows | Where-Object { $_.Status -eq "FAIL" })
 New-Item -ItemType Directory -Force -Path $reportDir | Out-Null
 $passCount = $rows.Count - $failed.Count

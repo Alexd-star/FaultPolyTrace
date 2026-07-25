@@ -85,6 +85,10 @@ $rows = [System.Collections.Generic.List[object]]::new()
 
 Add-ContainsCheck -Rows $rows -Group "共享参数架构" -Name "独立软件参数委托" -Requirement "独立软件必须调用共享序列化器" -Text $standalone -Needle "fpt_ui::traceArguments(currentTraceParameters())" -Detail "$standalonePath 委托 TraceParameterModel"
 Add-ContainsCheck -Rows $rows -Group "共享参数架构" -Name "GeoEast 控件参数委托" -Requirement "GeoEast 控件必须调用共享序列化器" -Text $geoEast -Needle "fpt_ui::traceArguments(currentTraceParameters())" -Detail "$geoEastPath 委托 TraceParameterModel"
+Add-ContainsCheck -Rows $rows -Group "共享参数架构" -Name "独立软件模板写入" -Requirement "独立软件使用共享版本化模板序列化" -Text $standalone -Needle "fpt_ui::traceParametersToJson" -Detail "$standalonePath 委托共享模板写入"
+Add-ContainsCheck -Rows $rows -Group "共享参数架构" -Name "独立软件模板读取" -Requirement "独立软件使用共享模板校验" -Text $standalone -Needle "fpt_ui::traceParametersFromJson" -Detail "$standalonePath 委托共享模板读取"
+Add-ContainsCheck -Rows $rows -Group "共享参数架构" -Name "GeoEast 模板写入" -Requirement "GeoEast 控件使用共享版本化模板序列化" -Text $geoEast -Needle "fpt_ui::traceParametersToJson" -Detail "$geoEastPath 委托共享模板写入"
+Add-ContainsCheck -Rows $rows -Group "共享参数架构" -Name "GeoEast 模板读取" -Requirement "GeoEast 控件使用共享模板校验" -Text $geoEast -Needle "fpt_ui::traceParametersFromJson" -Detail "$geoEastPath 委托共享模板读取"
 
 $algorithmParams = @(
     @{ Key="traceMode"; Label="追踪模式"; Cli="--trace-mode"; Control="traceModeCombo_"; Type="value" },
@@ -135,8 +139,8 @@ foreach ($paramSpec in $algorithmParams) {
     Add-ContainsCheck -Rows $rows -Group "独立软件参数" -Name $label -Requirement "界面控件存在" -Text $standalone -Needle $control -Detail "$standalonePath 包含 $control"
     Add-ContainsCheck -Rows $rows -Group "独立软件参数" -Name $label -Requirement "配置读取" -Text $standalone -Needle "settings.value(`"$key`"" -Detail "$standalonePath 读取 $key"
     Add-ContainsCheck -Rows $rows -Group "独立软件参数" -Name $label -Requirement "配置保存" -Text $standalone -Needle "settings.setValue(`"$key`"" -Detail "$standalonePath 保存 $key"
-    Add-ContainsCheck -Rows $rows -Group "独立软件参数" -Name $label -Requirement "模板保存" -Text $standalone -Needle "obj[`"$key`"]" -Detail "$standalonePath 模板写入 $key"
-    Add-ContainsCheck -Rows $rows -Group "独立软件参数" -Name $label -Requirement "模板读取" -Text $standalone -Needle "obj.value(`"$key`")" -Detail "$standalonePath 模板读取 $key"
+    Add-ContainsCheck -Rows $rows -Group "独立软件参数" -Name $label -Requirement "模板保存" -Text $sharedParameterModel -Needle "object[`"$key`"]" -Detail "$sharedParameterPath 模板写入 $key"
+    Add-ContainsCheck -Rows $rows -Group "独立软件参数" -Name $label -Requirement "模板读取" -Text $sharedParameterModel -Needle "(`"$key`", parsed.$key" -Detail "$sharedParameterPath 校验并读取 $key"
     Add-ContainsCheck -Rows $rows -Group "共享参数序列化" -Name $label -Requirement "共享模型传入核心 CLI" -Text $sharedParameterModel -Needle $cli -Detail "$sharedParameterPath traceArguments 包含 $cli"
 
     if (![string]::IsNullOrWhiteSpace($noCli)) {
@@ -182,7 +186,8 @@ $displayParams = @(
     @{ Key="lineWidth"; Label="独立软件结果线宽"; Control="lineWidthSpin_"; Text=$standalone; Path=$standalonePath },
     @{ Key="alpha"; Label="独立软件结果透明度"; Control="alphaSpin_"; Text=$standalone; Path=$standalonePath },
     @{ Key="polygonColor"; Label="GeoEast 多边形颜色"; Control="polygonColorEdit_"; Text=$geoEast; Path=$geoEastPath; Cli="--polygon-color" },
-    @{ Key="polygonLineWidth"; Label="GeoEast 多边形线宽"; Control="polygonLineWidthSpin_"; Text=$geoEast; Path=$geoEastPath; Cli="--polygon-linewidth" }
+    @{ Key="polygonLineWidth"; Label="GeoEast 多边形线宽"; Control="polygonLineWidthSpin_"; Text=$geoEast; Path=$geoEastPath; Cli="--polygon-linewidth" },
+    @{ Key="polygonOpacity"; Label="GeoEast 视图透明度"; Control="polygonOpacitySpin_"; Text=$geoEast; Path=$geoEastPath }
 )
 
 foreach ($display in $displayParams) {

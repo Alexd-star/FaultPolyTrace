@@ -42,6 +42,10 @@ private slots:
     void choosePolygonColor();
     void showDatabaseConfigDialog();
     void saveCurrentPreset();
+    void saveParameterTemplate();
+    void loadParameterTemplate();
+    void saveRunLog();
+    void copyResultSummary();
     void restoreDefaults();
     void showHelpHint();
     void refreshGrids();
@@ -87,6 +91,7 @@ private:
     QString previewPolygonsPath() const;
     bool launchGeoEastApp(const QString& exeName, const QString& displayName);
     void applyParameterPreset(const QString& presetName);
+    void applyTraceParameters(const fpt_ui::TraceParameters& parameters);
     void setPolygonColor(const QColor& color);
     void updateStatusContext();
     void updateOptionControls();
@@ -111,6 +116,7 @@ private:
     QPushButton* polygonColorButton_ = nullptr;
     QLineEdit* polygonColorEdit_ = nullptr;
     QDoubleSpinBox* polygonLineWidthSpin_ = nullptr;
+    QDoubleSpinBox* polygonOpacitySpin_ = nullptr;
     QCheckBox* importDatCheck_ = nullptr;
     QLineEdit* datFileEdit_ = nullptr;
     QCheckBox* overwriteGridCheck_ = nullptr;

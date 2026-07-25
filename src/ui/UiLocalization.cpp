@@ -54,9 +54,14 @@ QMap<QString, QString> buildEnglishTextMap() {
     add("打开DAT", "Open DAT");
     add("保存当前配置", "Save Settings");
     add("保存配置", "Save Settings");
+    add("保存参数模板", "Save Parameter Template");
+    add("打开参数模板", "Open Parameter Template");
     add("打开输出目录", "Open Output");
     add("复制日志", "Copy Log");
     add("清空日志", "Clear Log");
+    add("保存运行日志...", "Save Run Log...");
+    add("保存运行日志", "Save Run Log");
+    add("复制当前结果摘要", "Copy Current Result Summary");
     add("平移模式", "Pan Mode");
     add("平移", "Pan");
     add("放大", "Zoom In");
@@ -76,6 +81,12 @@ QMap<QString, QString> buildEnglishTextMap() {
     add("选择结果颜色...", "Choose Result Color...");
     add("打开叠合查看指南", "Open Overlay Viewing Guide");
     add("保存当前参数", "Save Current Parameters");
+    add("保存参数模板...", "Save Parameter Template...");
+    add("打开参数模板...", "Open Parameter Template...");
+    add("保存参数模板", "Save Parameter Template");
+    add("打开参数模板", "Open Parameter Template");
+    add("参数模板 (*.json);;所有文件 (*.*)", "Parameter Templates (*.json);;All Files (*.*)");
+    add("日志文件 (*.log *.txt);;所有文件 (*.*)", "Log Files (*.log *.txt);;All Files (*.*)");
     add("恢复默认配置", "Restore Default Settings");
     add("恢复默认参数", "Restore Defaults");
     add("恢复默认", "Restore Defaults");
@@ -125,9 +136,12 @@ QMap<QString, QString> buildEnglishTextMap() {
         "4. Use the left checkboxes to show or hide layers independently.");
     add("查看模式  缩放 %1%", "View Mode  Zoom %1%");
     add("显示样式", "Display Style");
+    add("显示样式 / 线宽", "Display Style / Line Width");
     add("颜色", "Color");
     add("线宽", "Line Width");
     add("透明度", "Opacity");
+    add("设置结果多边形在当前视图中的显示线宽", "Set the display line width of result polygons in the current view");
+    add("设置结果多边形在当前视图中的透明度，不修改数据库几何", "Set result polygon opacity in the current view without changing database geometry");
     add("结果样式 / 线宽", "Result Style / Width");
     add("DAT 文件", "DAT File");
     add("覆盖同名 GeoEast 网格", "Overwrite Same-name GeoEast Grid");
@@ -251,8 +265,24 @@ QMap<QString, QString> buildEnglishTextMap() {
     add("输出目录：%1", "Output Folder: %1");
     add("方案：%1    模式：%2    阈值：%3", "Preset: %1    Mode: %2    Threshold: %3");
     add("面积过滤：小于 %1 的多边形不输出    结果线宽：%2", "Area Filter: polygons below %1 are excluded    Line Width: %2");
+    add("面积过滤：小于 %1 的多边形不输出    结果线宽：%2    透明度：%3", "Area Filter: polygons below %1 are excluded    Line Width: %2    Opacity: %3");
     add("弱响应：分位 %1 / 半径 %2    根系防黏连：%3    残余补追：%4", "Weak Response: percentile %1 / radius %2    Root Anti-merge: %3    Residual Trace: %4");
     add("当前状态：%1", "Status: %1");
+    add("保存失败", "Save Failed");
+    add("打开失败", "Open Failed");
+    add("模板无效", "Invalid Template");
+    add("日志为空", "Empty Log");
+    add("当前没有可保存的运行日志。", "There is no run log to save.");
+    add("无法写入参数模板：%1", "Cannot write parameter template: %1");
+    add("无法读取参数模板：%1", "Cannot read parameter template: %1");
+    add("参数模板未能安全写入磁盘。", "The parameter template could not be written safely to disk.");
+    add("JSON 解析失败：%1", "JSON parsing failed: %1");
+    add("无法保存运行日志：%1", "Cannot save run log: %1");
+    add("参数模板已保存", "Parameter template saved");
+    add("参数模板已载入并通过校验", "Parameter template loaded and validated");
+    add("运行日志已保存", "Run log saved");
+    add("当前结果摘要已复制", "Current result summary copied");
+    add("尚未载入图层", "No layer loaded");
     add("结果查看：追踪完成后自动显示原始网格和结果多边形；如需复查，可在左侧重新载入结果视图。",
         "Result Review: the input grid and result polygons are shown automatically after tracing. Use Reload in the sidebar to review them again.");
     add("官方查看：点击【打开工区底图】或【打开平面成图】，在 GeoEast 图层树中加载 Grids 和 Fault Polygons。",
@@ -441,6 +471,9 @@ QMap<QString, QString> buildEnglishTextMap() {
     add("GeoJSON 不存在", "GeoJSON does not exist");
     add("诊断 JSON 不存在", "Diagnostics JSON does not exist");
     add("导出当前视图 PNG", "Export Current View PNG");
+    add("没有可导出的图层", "No Layers to Export");
+    add("请先载入并显示原始网格或结果多边形图层，再导出当前视图 PNG。", "Load and show the original grid or result polygon layer before exporting the current view as PNG.");
+    add("请先显示可导出的图层", "Show an exportable layer first");
     add("保存参数模板", "Save Parameter Template");
     add("打开参数模板", "Open Parameter Template");
     add("PNG 已导出：%1", "PNG exported: %1");

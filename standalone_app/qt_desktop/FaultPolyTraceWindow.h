@@ -58,6 +58,8 @@ private slots:
     void deleteGeoEastResult();
     void saveTemplate();
     void loadTemplate();
+    void saveRunLog();
+    void copyResultSummary();
     void restoreDefaults();
     void loadHistory();
     void openOutputDir();
@@ -99,6 +101,7 @@ private:
     void updateStatus(const QString& text);
     void setPolygonColor(const QColor& color);
     void applyPreset(const QString& preset);
+    void applyTraceParameters(const fpt_ui::TraceParameters& parameters);
     void refreshHistory();
     void appendHistory(qint64 elapsedMs);
     void updateResultPanel();

@@ -1,5 +1,9 @@
 #include "TraceParameterModel.h"
 
+#include <QJsonValue>
+
+#include <cmath>
+
 namespace fpt_ui {
 namespace {
 
@@ -180,6 +184,202 @@ QualityMode qualityModeFromKey(const QString& key) {
         return QualityMode::Experimental;
     }
     return QualityMode::Production;
+}
+
+QJsonObject traceParametersToJson(const TraceParameters& p, const QString& presetKey) {
+    QJsonObject object;
+    object["format"] = "FaultPolyTrace.TraceParameters";
+    object["schemaVersion"] = 1;
+    if (!presetKey.trimmed().isEmpty()) {
+        object["preset"] = presetKey.trimmed();
+    }
+    object["qualityMode"] = qualityModeKey(p.qualityMode);
+    object["traceMode"] = p.traceMode;
+    object["thresholdMode"] = p.thresholdMode;
+    object["threshold"] = p.threshold;
+    object["percentile"] = p.percentile;
+    object["minArea"] = p.minArea;
+    object["closeRadius"] = p.closeRadius;
+    object["weakPercentile"] = p.weakPercentile;
+    object["weakConnectRadius"] = p.weakConnectRadius;
+    object["beltRadius"] = p.beltRadius;
+    object["postBeltCloseRadius"] = p.postBeltCloseRadius;
+    object["attributeConstrainedBelt"] = p.attributeConstrainedBelt;
+    object["attributeEnvelopeRadius"] = p.attributeEnvelopeRadius;
+    object["minBranchLength"] = p.minBranchLength;
+    object["minJunctionBranchLength"] = p.minJunctionBranchLength;
+    object["minJunctionBranchMean"] = p.minJunctionBranchMean;
+    object["maxGapDistance"] = p.maxGapDistance;
+    object["maxGapAngle"] = p.maxGapAngle;
+    object["minGapSupportRatio"] = p.minGapSupportRatio;
+    object["separateBranchBelts"] = p.separateBranchBelts;
+    object["rootAntiMerge"] = p.rootAntiMerge;
+    object["rootAntiMergeRadius"] = p.rootAntiMergeRadius;
+    object["rootAntiMergeSupportRatio"] = p.rootAntiMergeSupportRatio;
+    object["rootAntiMergeMaxBridgeValue"] = p.rootAntiMergeMaxBridgeValue;
+    object["rootAntiMergeMinPartCells"] = p.rootAntiMergeMinPartCells;
+    object["rootAntiMergeMinPartRatio"] = p.rootAntiMergeMinPartRatio;
+    object["rootAntiMergeWeakGuardThreshold"] = p.rootAntiMergeWeakGuardThreshold;
+    object["rootAntiMergeWeakGuardRadius"] = p.rootAntiMergeWeakGuardRadius;
+    object["localAntiMerge"] = p.localAntiMerge;
+    object["localAntiMergeLowThreshold"] = p.localAntiMergeLowThreshold;
+    object["localAntiMergeBridgeRadius"] = p.localAntiMergeBridgeRadius;
+    object["localAntiMergeMinPartCells"] = p.localAntiMergeMinPartCells;
+    object["localAntiMergeMinPartRatio"] = p.localAntiMergeMinPartRatio;
+    object["localAntiMergeMinBridgeCells"] = p.localAntiMergeMinBridgeCells;
+    object["localAntiMergeMinLowRatio"] = p.localAntiMergeMinLowRatio;
+    object["residualTrace"] = p.residualTrace;
+    object["residualPercentile"] = p.residualPercentile;
+    object["residualFillRadius"] = p.residualFillRadius;
+    object["residualEdgeFillRadius"] = p.residualEdgeFillRadius;
+    object["residualEdgeFillMinValueRatio"] = p.residualEdgeFillMinValueRatio;
+    object["residualEdgeFillMaxPatchSpan"] = p.residualEdgeFillMaxPatchSpan;
+    object["residualMinCells"] = p.residualMinCells;
+    object["residualTraceMinLength"] = p.residualTraceMinLength;
+    object["residualTraceMaxCells"] = p.residualTraceMaxCells;
+    object["residualCoveredGuardRadius"] = p.residualCoveredGuardRadius;
+    object["simplifyTolerance"] = p.simplifyTolerance;
+    object["smoothIterations"] = p.smoothIterations;
+    return object;
+}
+
+bool traceParametersFromJson(const QJsonObject& object,
+                             TraceParameters* parameters,
+                             QString* presetKey,
+                             QString* errorMessage) {
+    auto fail = [&](const QString& message) {
+        if (errorMessage) {
+            *errorMessage = message;
+        }
+        return false;
+    };
+    if (!parameters || object.isEmpty()) {
+        return fail(QString::fromUtf8("参数模板为空或根节点不是 JSON 对象。"));
+    }
+    if (object.contains("format") && !object.value("format").isString()) {
+        return fail(QString::fromUtf8("参数模板格式标识必须是字符串。"));
+    }
+    const QString format = object.value("format").toString();
+    if (!format.isEmpty() && format != "FaultPolyTrace.TraceParameters") {
+        return fail(QString::fromUtf8("参数模板格式标识无效。"));
+    }
+    if (object.contains("schemaVersion") && !object.value("schemaVersion").isDouble()) {
+        return fail(QString::fromUtf8("参数模板版本必须是整数。"));
+    }
+    const double schemaRaw = object.value("schemaVersion").toDouble(1.0);
+    if (!std::isfinite(schemaRaw) || std::floor(schemaRaw) != schemaRaw) {
+        return fail(QString::fromUtf8("参数模板版本必须是整数。"));
+    }
+    const int schemaVersion = static_cast<int>(schemaRaw);
+    if (schemaVersion < 1 || schemaVersion > 1) {
+        return fail(QString::fromUtf8("参数模板版本不受支持：%1。").arg(schemaVersion));
+    }
+
+    TraceParameters parsed = *parameters;
+    auto readString = [&](const char* key, QString& target, const QStringList& allowed) {
+        const QString name = QString::fromLatin1(key);
+        if (!object.contains(name)) return true;
+        if (!object.value(name).isString()) return false;
+        const QString value = object.value(name).toString().trimmed();
+        if (!allowed.isEmpty() && !allowed.contains(value)) return false;
+        target = value;
+        return true;
+    };
+    auto readDouble = [&](const char* key, double& target, double minimum, double maximum) {
+        const QString name = QString::fromLatin1(key);
+        if (!object.contains(name)) return true;
+        if (!object.value(name).isDouble()) return false;
+        const double value = object.value(name).toDouble();
+        if (!std::isfinite(value) || value < minimum || value > maximum) return false;
+        target = value;
+        return true;
+    };
+    auto readInt = [&](const char* key, int& target, int minimum, int maximum) {
+        const QString name = QString::fromLatin1(key);
+        if (!object.contains(name) || !object.value(name).isDouble()) return !object.contains(name);
+        const double raw = object.value(name).toDouble();
+        if (!std::isfinite(raw) || std::floor(raw) != raw || raw < minimum || raw > maximum) return false;
+        const int value = static_cast<int>(raw);
+        target = value;
+        return true;
+    };
+    auto readBool = [&](const char* key, bool& target) {
+        const QString name = QString::fromLatin1(key);
+        if (!object.contains(name)) return true;
+        if (!object.value(name).isBool()) return false;
+        target = object.value(name).toBool();
+        return true;
+    };
+    auto invalid = [&](const char* key) {
+        return fail(QString::fromUtf8("参数“%1”的类型或取值范围无效。").arg(QString::fromLatin1(key)));
+    };
+
+#define FPT_READ(call, key) do { if (!(call)) return invalid(key); } while (false)
+    FPT_READ(readString("traceMode", parsed.traceMode, {"ridge-belt", "region"}), "traceMode");
+    FPT_READ(readString("thresholdMode", parsed.thresholdMode, {"percentile", "positive-percentile", "fixed"}), "thresholdMode");
+    FPT_READ(readDouble("threshold", parsed.threshold, 0.0, 1.0), "threshold");
+    FPT_READ(readDouble("percentile", parsed.percentile, 0.0, 1.0), "percentile");
+    FPT_READ(readDouble("minArea", parsed.minArea, 0.0, 1.0e9), "minArea");
+    FPT_READ(readInt("closeRadius", parsed.closeRadius, 0, 20), "closeRadius");
+    FPT_READ(readDouble("weakPercentile", parsed.weakPercentile, 0.0, 0.9999), "weakPercentile");
+    FPT_READ(readInt("weakConnectRadius", parsed.weakConnectRadius, 0, 20), "weakConnectRadius");
+    FPT_READ(readInt("beltRadius", parsed.beltRadius, 0, 20), "beltRadius");
+    FPT_READ(readInt("postBeltCloseRadius", parsed.postBeltCloseRadius, 0, 20), "postBeltCloseRadius");
+    FPT_READ(readBool("attributeConstrainedBelt", parsed.attributeConstrainedBelt), "attributeConstrainedBelt");
+    FPT_READ(readInt("attributeEnvelopeRadius", parsed.attributeEnvelopeRadius, 0, 20), "attributeEnvelopeRadius");
+    FPT_READ(readInt("minBranchLength", parsed.minBranchLength, 0, 1000), "minBranchLength");
+    FPT_READ(readInt("minJunctionBranchLength", parsed.minJunctionBranchLength, 1, 1000), "minJunctionBranchLength");
+    FPT_READ(readDouble("minJunctionBranchMean", parsed.minJunctionBranchMean, 0.0, 1.0), "minJunctionBranchMean");
+    FPT_READ(readInt("maxGapDistance", parsed.maxGapDistance, 0, 1000), "maxGapDistance");
+    FPT_READ(readDouble("maxGapAngle", parsed.maxGapAngle, 0.0, 180.0), "maxGapAngle");
+    FPT_READ(readDouble("minGapSupportRatio", parsed.minGapSupportRatio, 0.0, 1.0), "minGapSupportRatio");
+    FPT_READ(readBool("separateBranchBelts", parsed.separateBranchBelts), "separateBranchBelts");
+    FPT_READ(readBool("rootAntiMerge", parsed.rootAntiMerge), "rootAntiMerge");
+    FPT_READ(readInt("rootAntiMergeRadius", parsed.rootAntiMergeRadius, 0, 10), "rootAntiMergeRadius");
+    FPT_READ(readDouble("rootAntiMergeSupportRatio", parsed.rootAntiMergeSupportRatio, 0.0, 1.0), "rootAntiMergeSupportRatio");
+    FPT_READ(readDouble("rootAntiMergeMaxBridgeValue", parsed.rootAntiMergeMaxBridgeValue, 0.0, 1.0), "rootAntiMergeMaxBridgeValue");
+    FPT_READ(readInt("rootAntiMergeMinPartCells", parsed.rootAntiMergeMinPartCells, 0, 1000000), "rootAntiMergeMinPartCells");
+    FPT_READ(readDouble("rootAntiMergeMinPartRatio", parsed.rootAntiMergeMinPartRatio, 0.0, 0.5), "rootAntiMergeMinPartRatio");
+    FPT_READ(readDouble("rootAntiMergeWeakGuardThreshold", parsed.rootAntiMergeWeakGuardThreshold, 0.0, 1.0), "rootAntiMergeWeakGuardThreshold");
+    FPT_READ(readInt("rootAntiMergeWeakGuardRadius", parsed.rootAntiMergeWeakGuardRadius, 0, 20), "rootAntiMergeWeakGuardRadius");
+    FPT_READ(readBool("localAntiMerge", parsed.localAntiMerge), "localAntiMerge");
+    FPT_READ(readDouble("localAntiMergeLowThreshold", parsed.localAntiMergeLowThreshold, 0.0, 1.0), "localAntiMergeLowThreshold");
+    FPT_READ(readInt("localAntiMergeBridgeRadius", parsed.localAntiMergeBridgeRadius, 0, 20), "localAntiMergeBridgeRadius");
+    FPT_READ(readInt("localAntiMergeMinPartCells", parsed.localAntiMergeMinPartCells, 1, 1000000), "localAntiMergeMinPartCells");
+    FPT_READ(readDouble("localAntiMergeMinPartRatio", parsed.localAntiMergeMinPartRatio, 0.0, 0.5), "localAntiMergeMinPartRatio");
+    FPT_READ(readInt("localAntiMergeMinBridgeCells", parsed.localAntiMergeMinBridgeCells, 1, 1000000), "localAntiMergeMinBridgeCells");
+    FPT_READ(readDouble("localAntiMergeMinLowRatio", parsed.localAntiMergeMinLowRatio, 0.0, 1.0), "localAntiMergeMinLowRatio");
+    FPT_READ(readBool("residualTrace", parsed.residualTrace), "residualTrace");
+    FPT_READ(readDouble("residualPercentile", parsed.residualPercentile, 0.0, 1.0), "residualPercentile");
+    FPT_READ(readInt("residualFillRadius", parsed.residualFillRadius, 0, 1024), "residualFillRadius");
+    FPT_READ(readInt("residualEdgeFillRadius", parsed.residualEdgeFillRadius, 0, 1024), "residualEdgeFillRadius");
+    FPT_READ(readDouble("residualEdgeFillMinValueRatio", parsed.residualEdgeFillMinValueRatio, 0.0, 1.0), "residualEdgeFillMinValueRatio");
+    FPT_READ(readInt("residualEdgeFillMaxPatchSpan", parsed.residualEdgeFillMaxPatchSpan, 0, 100000000), "residualEdgeFillMaxPatchSpan");
+    FPT_READ(readInt("residualMinCells", parsed.residualMinCells, 0, 100000000), "residualMinCells");
+    FPT_READ(readInt("residualTraceMinLength", parsed.residualTraceMinLength, 1, 1000), "residualTraceMinLength");
+    FPT_READ(readInt("residualTraceMaxCells", parsed.residualTraceMaxCells, 0, 1000000), "residualTraceMaxCells");
+    FPT_READ(readInt("residualCoveredGuardRadius", parsed.residualCoveredGuardRadius, 0, 1024), "residualCoveredGuardRadius");
+    FPT_READ(readDouble("simplifyTolerance", parsed.simplifyTolerance, 0.0, 1000.0), "simplifyTolerance");
+    FPT_READ(readInt("smoothIterations", parsed.smoothIterations, 0, 5), "smoothIterations");
+#undef FPT_READ
+
+    if (object.contains("qualityMode")) {
+        if (!object.value("qualityMode").isString()) return invalid("qualityMode");
+        const QString mode = object.value("qualityMode").toString();
+        if (mode != "production" && mode != "diagnostics" && mode != "experimental") return invalid("qualityMode");
+        parsed.qualityMode = qualityModeFromKey(mode);
+    }
+    if (object.contains("preset") && !object.value("preset").isString()) {
+        return invalid("preset");
+    }
+    if (presetKey) {
+        *presetKey = object.value("preset").toString().trimmed();
+    }
+    *parameters = parsed;
+    if (errorMessage) {
+        errorMessage->clear();
+    }
+    return true;
 }
 
 } // namespace fpt_ui

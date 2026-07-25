@@ -591,13 +591,24 @@ void verifyFaultPolygonRoundTrip(
         }
         return std::array<double, 4>{minX, minY, maxX, maxY};
     };
+    std::vector<std::array<double, 4>> expectedBounds;
+    std::vector<std::array<double, 4>> actualBounds;
+    expectedBounds.reserve(expected.size());
+    actualBounds.reserve(actual.size());
+    for (const fpt::Polygon* polygon : expected) {
+        expectedBounds.push_back(bounds(polygon->points));
+    }
+    for (const fpt::Polygon& polygon : actual) {
+        actualBounds.push_back(bounds(polygon.points));
+    }
+    std::sort(expectedBounds.begin(), expectedBounds.end());
+    std::sort(actualBounds.begin(), actualBounds.end());
+
     constexpr double tolerance = 1e-7;
-    for (std::size_t index = 0; index < expected.size(); ++index) {
-        const auto expectedBounds = bounds(expected[index]->points);
-        const auto actualBounds = bounds(actual[index].points);
-        for (std::size_t axis = 0; axis < expectedBounds.size(); ++axis) {
-            const double scale = std::max(1.0, std::abs(expectedBounds[axis]));
-            if (std::abs(expectedBounds[axis] - actualBounds[axis]) > tolerance * scale) {
+    for (std::size_t index = 0; index < expectedBounds.size(); ++index) {
+        for (std::size_t axis = 0; axis < expectedBounds[index].size(); ++axis) {
+            const double scale = std::max(1.0, std::abs(expectedBounds[index][axis]));
+            if (std::abs(expectedBounds[index][axis] - actualBounds[index][axis]) > tolerance * scale) {
                 throw std::runtime_error(
                     "GeoEast round-trip bounds mismatch at polygon " +
                     std::to_string(index + 1));
