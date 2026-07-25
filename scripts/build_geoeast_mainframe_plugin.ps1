@@ -101,8 +101,9 @@ foreach ($makefileName in @("Makefile.Release", "Makefile.Debug", "Makefile")) {
     Set-Content -LiteralPath $makefilePath -Value $text -Encoding UTF8
 }
 
-Invoke-VsBatchCommand -Name "GeoEast mainframe plugin nmake" -Commands @(
+Invoke-VsBatchCommand -Name "GeoEast mainframe plugin clean rebuild" -Commands @(
     "cd /d `"$pluginDir`"",
+    "nmake clean",
     "nmake"
 )
 
