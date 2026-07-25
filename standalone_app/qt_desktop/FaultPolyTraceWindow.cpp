@@ -926,16 +926,8 @@ protected:
 private:
     QColor heatColor(double value) const {
         const double t = qBound(0.0, (value - min_) / (max_ - min_), 1.0);
-        if (t < 0.25) {
-            return QColor::fromRgbF(1.0, t / 0.25, 0.0);
-        }
-        if (t < 0.50) {
-            return QColor::fromRgbF(1.0 - (t - 0.25) / 0.25, 1.0, 0.0);
-        }
-        if (t < 0.75) {
-            return QColor::fromRgbF(0.0, 1.0, (t - 0.50) / 0.25);
-        }
-        return QColor::fromRgbF(0.0, 1.0 - (t - 0.75) / 0.25, 1.0);
+        const double gray = 1.0 - 0.86 * t;
+        return QColor::fromRgbF(gray, gray, gray);
     }
 
     QRectF fittedRect(const QRectF& available) const {
@@ -1091,11 +1083,8 @@ protected:
 
         const QRect bar(width() / 2 - 8, 58, 16, qMax(120, height() - 124));
         QLinearGradient gradient(bar.left(), bar.bottom(), bar.left(), bar.top());
-        gradient.setColorAt(0.00, QColor("#FF0000"));
-        gradient.setColorAt(0.25, QColor("#FFFF00"));
-        gradient.setColorAt(0.50, QColor("#00FF00"));
-        gradient.setColorAt(0.75, QColor("#00FFFF"));
-        gradient.setColorAt(1.00, QColor("#0000FF"));
+        gradient.setColorAt(0.00, QColor("#FFFFFF"));
+        gradient.setColorAt(1.00, QColor("#242424"));
         painter.fillRect(bar, gradient);
         painter.setPen(QColor("#666666"));
         painter.drawRect(bar.adjusted(0, 0, -1, -1));
@@ -1114,9 +1103,9 @@ protected:
             QRect(4, 6, width() - 8, 28),
             Qt::AlignCenter | Qt::TextWordWrap,
             title);
-        painter.setPen(QColor("#004CFF"));
+        painter.setPen(QColor("#333333"));
         painter.drawText(QRect(4, 34, width() - 8, 18), Qt::AlignCenter, QString::fromUtf8("1.0"));
-        painter.setPen(QColor("#FF0000"));
+        painter.setPen(QColor("#333333"));
         painter.drawText(QRect(4, bar.bottom() + 6, width() - 8, 18), Qt::AlignCenter, QString::fromUtf8("0.0"));
     }
 

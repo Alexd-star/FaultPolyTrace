@@ -909,16 +909,8 @@ protected:
 private:
     QColor heatColor(double value) const {
         const double t = qBound(0.0, (value - valueMin_) / (valueMax_ - valueMin_), 1.0);
-        if (t < 0.25) {
-            return QColor::fromRgbF(1.0, t / 0.25, 0.0);
-        }
-        if (t < 0.50) {
-            return QColor::fromRgbF(1.0 - (t - 0.25) / 0.25, 1.0, 0.0);
-        }
-        if (t < 0.75) {
-            return QColor::fromRgbF(0.0, 1.0, (t - 0.50) / 0.25);
-        }
-        return QColor::fromRgbF(0.0, 1.0 - (t - 0.75) / 0.25, 1.0);
+        const double gray = 1.0 - 0.86 * t;
+        return QColor::fromRgbF(gray, gray, gray);
     }
 
     QRectF transformedCanvas(const QRectF& canvas) const {
@@ -1068,20 +1060,17 @@ protected:
             QRect(4, 6, width() - 8, 28),
             Qt::AlignCenter | Qt::TextWordWrap,
             title);
-        painter.setPen(QColor("#0B35FF"));
+        painter.setPen(QColor("#333333"));
         painter.drawText(QRect(4, 34, width() - 8, 18), Qt::AlignCenter, QString::fromUtf8("1.0"));
 
         QLinearGradient gradient(barRect.topLeft(), barRect.bottomLeft());
-        gradient.setColorAt(0.00, QColor("#0B35FF"));
-        gradient.setColorAt(0.25, QColor("#00D7FF"));
-        gradient.setColorAt(0.50, QColor("#00E84A"));
-        gradient.setColorAt(0.75, QColor("#FFE600"));
-        gradient.setColorAt(1.00, QColor("#FF0000"));
+        gradient.setColorAt(0.00, QColor("#242424"));
+        gradient.setColorAt(1.00, QColor("#FFFFFF"));
         painter.fillRect(barRect, gradient);
         painter.setPen(QColor("#333333"));
         painter.drawRect(barRect.adjusted(0, 0, -1, -1));
 
-        painter.setPen(QColor("#DC143C"));
+        painter.setPen(QColor("#333333"));
         painter.drawText(QRect(4, barRect.bottom() + 6, width() - 8, 18), Qt::AlignCenter, "0.0");
     }
 
