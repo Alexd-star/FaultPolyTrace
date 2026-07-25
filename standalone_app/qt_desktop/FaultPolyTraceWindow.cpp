@@ -343,17 +343,8 @@ QString defaultUserName() {
     return username.isEmpty() ? envValue("USER") : username;
 }
 
-bool isLegacyDeveloperDefault(const QString& value) {
-    const QString normalized = QDir::fromNativeSeparators(value).toLower();
-    return normalized.contains("baidunetdiskdownload/bgpcup2025") ||
-           normalized == "bgpcup2026_test7" ||
-           normalized == "test7_fault_attribute_bo" ||
-           normalized == "test7_fault_attribute";
-}
-
 QString settingOrCurrent(const QSettings& settings, const QString& key, const QString& current, int schemaVersion) {
-    const QString value = settings.value(key, current).toString();
-    return schemaVersion < 2 && isLegacyDeveloperDefault(value) ? current : value;
+    return schemaVersion < 2 ? current : settings.value(key, current).toString();
 }
 
 QString elapsedText(qint64 ms) {
