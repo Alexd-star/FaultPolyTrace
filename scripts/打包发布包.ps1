@@ -206,7 +206,9 @@ Copy-Item -Path (Join-Path $repoRoot "geoeast_plugin\bo_runner\*.h") -Destinatio
 Copy-FileOptional (Join-Path $repoRoot "geoeast_plugin\bo_runner\说明.md") (Join-Path $geoeastDir "bo_runner\说明.md") | Out-Null
 $qtLauncherPackageDir = New-Item -ItemType Directory -Force -Path (Join-Path $geoeastDir "qt_launcher")
 foreach ($pattern in @("*.pro", "*.cpp", "*.h", "*.md", "*.ini")) {
-    Get-ChildItem -LiteralPath $launcherSource -Filter $pattern -File | ForEach-Object {
+    Get-ChildItem -LiteralPath $launcherSource -Filter $pattern -File |
+        Where-Object { $_.Name -ne "faultpolytrace_launcher.ini" } |
+        ForEach-Object {
         Copy-Item -LiteralPath $_.FullName -Destination $qtLauncherPackageDir -Force
     }
 }
@@ -431,6 +433,19 @@ if (Test-Path -LiteralPath $reviewPackScript) {
 }
 
 Sanitize-PackageTextFiles $packageDir
+
+# Build and test caches, generated local configuration, and Python bytecode are
+# not product deliverables. Remove them before computing package identity.
+Get-ChildItem -LiteralPath $packageDir -Recurse -Directory |
+    Where-Object { $_.Name -in @("__pycache__", ".pytest_cache", ".moc", ".obj") } |
+    Sort-Object FullName -Descending |
+    Remove-Item -Recurse -Force
+Get-ChildItem -LiteralPath $packageDir -Recurse -File |
+    Where-Object {
+        $_.Extension.ToLowerInvariant() -eq ".pyc" -or
+        $_.Name -eq "faultpolytrace_launcher.ini"
+    } |
+    Remove-Item -Force
 
 $packageRecords = @(Get-ChildItem -LiteralPath $packageDir -Recurse -File |
     Where-Object { $_.Name -ne "构建与依赖清单.json" } |

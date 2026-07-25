@@ -66,7 +66,7 @@ def verification_matrix() -> None:
     matrix = np.array([
         [1,1,1,1,1], [0,1,1,0,1], [0,1,1,1,1], [1,1,1,1,1], [1,0,0,0,0], [1,1,1,0,1], [0,1,1,1,1]
     ])
-    notes = ["179 passed", "209/209", "135/135", "465/465", "5 PASS", "PASS", "PASS"]
+    notes = ["180 passed", "209/209", "135/135", "465/465", "5 PASS", "PASS", "PASS"]
     fig, ax = plt.subplots(figsize=(7.2, 3.5), constrained_layout=True)
     cmap = __import__("matplotlib.colors").colors.ListedColormap(["#F0F2F3", COLORS["blue"]])
     ax.imshow(matrix, cmap=cmap, vmin=0, vmax=1, aspect="auto")

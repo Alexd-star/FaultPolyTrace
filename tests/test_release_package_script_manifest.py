@@ -49,6 +49,13 @@ def test_release_package_defaults_to_current_contest_version():
     assert '[string]$Version = "v1.0.1-contest-final"' in script
 
 
+def test_release_package_excludes_generated_cache_and_local_launcher_config():
+    script = (ROOT / "scripts" / "打包发布包.ps1").read_text(encoding="utf-8-sig")
+    assert '$_.Name -ne "faultpolytrace_launcher.ini"' in script
+    for forbidden in ("__pycache__", ".pytest_cache", ".pyc"):
+        assert forbidden in script
+
+
 def test_final_manifest_binds_package_zip_and_installer_to_one_build_id():
     script = (ROOT / "scripts" / "GenerateBuildManifest.ps1").read_text(encoding="utf-8-sig")
     for required in (
