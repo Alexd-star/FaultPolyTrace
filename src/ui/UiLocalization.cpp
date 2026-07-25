@@ -45,6 +45,10 @@ QMap<QString, QString> buildEnglishTextMap() {
     add("刷新网格列表", "Refresh Grid List");
     add("刷新结果列表", "Refresh Result List");
     add("显示所选结果", "Display Selected Result");
+    add("重新载入结果", "Reload Result");
+    add("导出视图 PNG", "Export View PNG");
+    add("保存界面设置", "Save Interface Settings");
+    add("线条", "Line Style");
     add("删除当前结果", "Delete Current Result");
     add("打开工区底图", "Open Basemap");
     add("打开平面成图", "Open GeoMapping");
@@ -73,6 +77,8 @@ QMap<QString, QString> buildEnglishTextMap() {
     add("显示图层", "Visible Layers");
     add("同时勾选两层即为叠加查看。", "Check both layers to view the overlay.");
     add("叠加查看", "Overlay View");
+    add("平台复核：在工区底图或平面成图中勾选网格与结果图层。",
+        "Platform review: enable the grid and result layers in GeoBasemap or GeoMapping.");
     add("重新载入结果视图", "Reload Result View");
     add("导出当前视图 PNG", "Export Current View PNG");
     add("开始追踪", "Start Trace");

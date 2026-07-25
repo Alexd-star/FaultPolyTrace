@@ -32,6 +32,7 @@ GeoEast 现场已经完成菜单入口、自动环境检测、`BOMapGrid` 列表
 | `tests/`、`tests_cpp/` | Python 契约/回归测试与 C++ 核心测试。 |
 | `packaging/windows/` | Inno Setup 安装器配置。 |
 | `docs/` | 精简后的当前中文文档体系。 |
+| `docs/作品说明书图件/` | 作品说明书流程图、算法图、架构图的参考索引、分类绘图代码、矢量图、高清 PNG 和灰度审阅结果。 |
 | `examples/synthetic/` | 可提交、可复现的合成示例数据。 |
 | `data/registry/` | 公开泛化数据来源、许可证和用途边界。 |
 
@@ -113,6 +114,7 @@ python -m pip install -r requirements-validation.txt
 - [需求追踪矩阵](docs/需求追踪矩阵.md)
 - [交付说明](docs/17_项目交付说明.md)
 - [泛化验证与公开数据指南](docs/18_泛化验证与公开数据指南.md)
+- [作品说明书图件清单](docs/作品说明书图件/05_作品说明书图件清单.md)
 
 ## 安全与提交规则
 

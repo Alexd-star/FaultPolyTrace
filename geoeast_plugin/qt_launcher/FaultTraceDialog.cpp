@@ -1050,7 +1050,7 @@ private:
 class ColorBarWidget : public QWidget {
 public:
     explicit ColorBarWidget(QWidget* parent = nullptr) : QWidget(parent) {
-        setFixedWidth(72);
+        setFixedWidth(78);
         setMinimumHeight(360);
     }
 
@@ -1071,15 +1071,10 @@ protected:
         QFont labelFont = painter.font();
         labelFont.setPointSize(8);
         painter.setFont(labelFont);
-        QString title = fpt_ui::translate(QString::fromUtf8("属性"), languageCode_);
-        if (languageCode_ == "zh-CN") {
-            title = QString::fromUtf8("属\n性");
-        } else {
-            title = QString::fromUtf8("Attr.");
-        }
+        const QString title = languageCode_ == "zh-CN" ? QString::fromUtf8("属性") : QString::fromUtf8("Attr.");
         painter.drawText(
-            QRect(4, 6, width() - 8, 28),
-            Qt::AlignCenter | Qt::TextWordWrap,
+            QRect(4, 8, width() - 8, 20),
+            Qt::AlignCenter,
             title);
         painter.setPen(QColor("#333333"));
         painter.drawText(QRect(4, 34, width() - 8, 18), Qt::AlignCenter, QString::fromUtf8("1.0"));
@@ -1102,7 +1097,7 @@ private:
 QLabel* makeFormLabel(const QString& text, QWidget* parent) {
     QLabel* label = new QLabel(text, parent);
     label->setObjectName("formLabel");
-    label->setMinimumWidth(124);
+    label->setMinimumWidth(110);
     label->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     return label;
 }
@@ -1451,7 +1446,9 @@ void FaultTraceDialog::buildUi() {
         dataBox->hide();
         paramsBox->hide();
 
-        polygonColorButton_->setText(QString::fromUtf8("▼"));
+        polygonColorButton_->setText(QString());
+        polygonColorButton_->setIcon(style()->standardIcon(QStyle::SP_ArrowDown));
+        polygonColorButton_->setIconSize(QSize(12, 12));
         polygonColorButton_->setToolTip(QString::fromUtf8("选择结果多边形颜色"));
         polygonColorButton_->setFixedWidth(24);
         polygonLineWidthSpin_->setFixedWidth(64);
@@ -1503,9 +1500,8 @@ void FaultTraceDialog::buildUi() {
                 border-color: #99D1FF;
             }
             QWidget#layerPanel {
-                background: #F7F7F7;
-                border: 1px solid #C7C7C7;
-                border-radius: 3px;
+                background: transparent;
+                border: 0;
             }
             QLabel#layerPanelTitle {
                 color: #005A9E;
@@ -1532,10 +1528,12 @@ void FaultTraceDialog::buildUi() {
                 background: #6AA9D8;
             }
             QFrame#sidebarHeader {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #FAFAFA, stop:1 #E4E4E4);
+                background: #EBECEE;
                 border-bottom: 1px solid #A0A0A0;
             }
             QLabel#sidebarTitle {
+                font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
+                font-size: 12px;
                 font-weight: bold;
                 color: #111111;
             }
@@ -1592,6 +1590,16 @@ void FaultTraceDialog::buildUi() {
                 color: #222222;
             }
             QPushButton:hover {
+                background: #E5F1FB;
+                border-color: #0078D7;
+            }
+            QPushButton#emphasisButton {
+                background: #F2F8FD;
+                border-color: #5B9BD5;
+                color: #124B73;
+                font-weight: bold;
+            }
+            QPushButton#emphasisButton:hover {
                 background: #E5F1FB;
                 border-color: #0078D7;
             }
@@ -1654,7 +1662,7 @@ void FaultTraceDialog::buildUi() {
             }
             QLabel#statusText {
                 color: #555555;
-                font-size: 11px;
+                font-size: 12px;
             }
         )"));
 
@@ -1708,7 +1716,7 @@ void FaultTraceDialog::buildUi() {
         openAction->setShortcut(QKeySequence::Open);
         connect(openAction, &QAction::triggered, this, &FaultTraceDialog::browseDatFile);
         QAction* saveAction = fileMenu->addAction(makeToolIcon(ToolIconKind::Save), QString::fromUtf8("保存当前配置"));
-        saveAction->setText(QString::fromUtf8("保存配置"));
+        saveAction->setText(QString::fromUtf8("保存界面设置"));
         saveAction->setToolTip(QString::fromUtf8("保存当前界面配置和参数"));
         saveAction->setShortcut(QKeySequence("Ctrl+Alt+S"));
         connect(saveAction, &QAction::triggered, this, &FaultTraceDialog::saveCurrentPreset);
@@ -1864,6 +1872,8 @@ void FaultTraceDialog::buildUi() {
         });
 
         QToolBar* toolbar = new QToolBar(this);
+        toolbar->setMovable(false);
+        toolbar->setFloatable(false);
         toolbar->setIconSize(QSize(22, 22));
         toolbar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
         toolbar->addAction(openAction);
@@ -1884,8 +1894,8 @@ void FaultTraceDialog::buildUi() {
 
         QFrame* sidebar = new QFrame(this);
         sidebar->setObjectName("sidebar");
-        sidebar->setMinimumWidth(500);
-        sidebar->setMaximumWidth(720);
+        sidebar->setMinimumWidth(440);
+        sidebar->setMaximumWidth(660);
         sidebar->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
         QVBoxLayout* sidebarRoot = new QVBoxLayout(sidebar);
         sidebarRoot->setContentsMargins(0, 0, 0, 0);
@@ -1915,27 +1925,34 @@ void FaultTraceDialog::buildUi() {
         QGridLayout* dataLayoutNew = makeGroupLayout(dataGroup);
         addFormRow(dataLayoutNew, 0, QString::fromUtf8("输入网格"), gridCombo_, dataGroup);
         addFormRow(dataLayoutNew, 1, QString::fromUtf8("输出多边形"), outputEdit_, dataGroup);
-        QWidget* colorLineWidget = new QWidget(dataGroup);
-        QHBoxLayout* colorLineLayout = new QHBoxLayout(colorLineWidget);
-        colorLineLayout->setContentsMargins(0, 0, 0, 0);
-        colorLineLayout->setSpacing(5);
-        colorLineLayout->addWidget(polygonColorButton_);
-        colorLineLayout->addWidget(polygonColorEdit_, 1);
-        colorLineLayout->addWidget(new QLabel(QString::fromUtf8("线宽"), colorLineWidget));
-        colorLineLayout->addWidget(polygonLineWidthSpin_);
-        colorLineLayout->addWidget(new QLabel(QString::fromUtf8("透明度"), colorLineWidget));
-        colorLineLayout->addWidget(polygonOpacitySpin_);
-        addFormRow(dataLayoutNew, 2, QString::fromUtf8("显示样式"), colorLineWidget, dataGroup);
+        QWidget* colorWidget = new QWidget(dataGroup);
+        QHBoxLayout* colorLayout = new QHBoxLayout(colorWidget);
+        colorLayout->setContentsMargins(0, 0, 0, 0);
+        colorLayout->setSpacing(5);
+        colorLayout->addWidget(polygonColorButton_);
+        colorLayout->addWidget(polygonColorEdit_, 1);
+        addFormRow(dataLayoutNew, 2, QString::fromUtf8("颜色"), colorWidget, dataGroup);
+        QWidget* lineStyleWidget = new QWidget(dataGroup);
+        QHBoxLayout* lineStyleLayout = new QHBoxLayout(lineStyleWidget);
+        lineStyleLayout->setContentsMargins(0, 0, 0, 0);
+        lineStyleLayout->setSpacing(5);
+        lineStyleLayout->addWidget(new QLabel(QString::fromUtf8("线宽"), lineStyleWidget));
+        lineStyleLayout->addWidget(polygonLineWidthSpin_);
+        lineStyleLayout->addSpacing(4);
+        lineStyleLayout->addWidget(new QLabel(QString::fromUtf8("透明度"), lineStyleWidget));
+        lineStyleLayout->addWidget(polygonOpacitySpin_);
+        lineStyleLayout->addStretch(1);
+        addFormRow(dataLayoutNew, 3, QString::fromUtf8("线条"), lineStyleWidget, dataGroup);
         QWidget* datLineWidget = new QWidget(dataGroup);
         QHBoxLayout* datLineLayout = new QHBoxLayout(datLineWidget);
         datLineLayout->setContentsMargins(0, 0, 0, 0);
         datLineLayout->setSpacing(5);
         datLineLayout->addWidget(browseDatButton);
         datLineLayout->addWidget(datFileEdit_, 1);
-        addFormRow(dataLayoutNew, 3, QString::fromUtf8("DAT 文件"), datLineWidget, dataGroup);
-        dataLayoutNew->addWidget(overwriteGridCheck_, 4, 0, 1, 2);
-        dataLayoutNew->addWidget(importDatCheck_, 5, 0, 1, 2);
-        dataLayoutNew->addWidget(refreshButton_, 6, 0, 1, 2);
+        addFormRow(dataLayoutNew, 4, QString::fromUtf8("DAT 文件"), datLineWidget, dataGroup);
+        dataLayoutNew->addWidget(overwriteGridCheck_, 5, 0, 1, 2);
+        dataLayoutNew->addWidget(importDatCheck_, 6, 0, 1, 2);
+        dataLayoutNew->addWidget(refreshButton_, 7, 0, 1, 2);
         sidebarContentLayout->addWidget(dataGroup);
 
         QGroupBox* resultGroup = new QGroupBox(QString::fromUtf8("结果查看"), sidebarContent);
@@ -1943,7 +1960,7 @@ void FaultTraceDialog::buildUi() {
         QWidget* layerPanel = new QWidget(resultGroup);
         layerPanel->setObjectName("layerPanel");
         QVBoxLayout* layerPanelLayout = new QVBoxLayout(layerPanel);
-        layerPanelLayout->setContentsMargins(8, 6, 8, 6);
+        layerPanelLayout->setContentsMargins(0, 0, 0, 4);
         layerPanelLayout->setSpacing(4);
         layerTitleLabel_ = new QLabel(QString::fromUtf8("显示图层"), layerPanel);
         layerTitleLabel_->setObjectName("layerPanelTitle");
@@ -2004,13 +2021,14 @@ void FaultTraceDialog::buildUi() {
         refreshOutputsButton_ = new QPushButton(QString::fromUtf8("刷新结果列表"), resultGroup);
         refreshOutputsButton_->setToolTip(QString::fromUtf8("刷新当前项目中的 BOFaultPolygon 结果列表。"));
         loadSelectedOutputButton_ = new QPushButton(QString::fromUtf8("显示所选结果"), resultGroup);
+        loadSelectedOutputButton_->setObjectName("emphasisButton");
         loadSelectedOutputButton_->setToolTip(QString::fromUtf8("导出并显示当前选择的结果多边形，同时叠加当前输入网格。"));
         resultLayout->addWidget(outputCatalogCombo_, 1, 0, 1, 2);
         resultLayout->addWidget(refreshOutputsButton_, 2, 0);
         resultLayout->addWidget(loadSelectedOutputButton_, 2, 1);
-        loadResultViewButton_ = new QPushButton(QString::fromUtf8("重新载入"), resultGroup);
+        loadResultViewButton_ = new QPushButton(QString::fromUtf8("重新载入结果"), resultGroup);
         loadResultViewButton_->setToolTip(QString::fromUtf8("重新读取本次计算生成的原始网格和结果多边形文件。"));
-        exportViewButton_ = new QPushButton(QString::fromUtf8("导出PNG"), resultGroup);
+        exportViewButton_ = new QPushButton(QString::fromUtf8("导出视图 PNG"), resultGroup);
         exportViewButton_->setToolTip(QString::fromUtf8("导出当前结果视图 PNG 图片。"));
         resultLayout->addWidget(loadResultViewButton_, 3, 0);
         resultLayout->addWidget(exportViewButton_, 3, 1);
@@ -2027,7 +2045,7 @@ void FaultTraceDialog::buildUi() {
         deleteOutputButton_->setToolTip(QString::fromUtf8("删除当前输出名称对应的结果多边形对象"));
         resultLayout->addWidget(mappingGuideButton, 5, 0);
         resultLayout->addWidget(deleteOutputButton_, 5, 1);
-        QLabel* displayHint = new QLabel(QString::fromUtf8("提示：本窗口显示本次计算结果；官方复核请在工区底图或平面成图中勾选网格和断层多边形图层。"), resultGroup);
+        QLabel* displayHint = new QLabel(QString::fromUtf8("平台复核：在工区底图或平面成图中勾选网格与结果图层。"), resultGroup);
         displayHint->setWordWrap(true);
         displayHint->setObjectName("displayHint");
         resultLayout->addWidget(displayHint, 6, 0, 1, 2);
@@ -2220,11 +2238,11 @@ void FaultTraceDialog::buildUi() {
         mainSplitter_->addWidget(workspace);
         mainSplitter_->setStretchFactor(0, 0);
         mainSplitter_->setStretchFactor(1, 1);
-        mainSplitter_->setSizes({520, 760});
+        mainSplitter_->setSizes({480, 800});
 
         QFrame* statusBar = new QFrame(this);
         statusBar->setObjectName("statusBar");
-        statusBar->setFixedHeight(25);
+        statusBar->setFixedHeight(27);
         QHBoxLayout* statusLayout = new QHBoxLayout(statusBar);
         statusLayout->setContentsMargins(12, 0, 12, 0);
         statusLayout->setSpacing(16);
@@ -2367,8 +2385,8 @@ void FaultTraceDialog::showDatabaseConfigDialog() {
                           ~Qt::WindowMaximizeButtonHint &
                           ~Qt::WindowContextHelpButtonHint);
     dialog.setModal(true);
-    dialog.resize(680, 350);
-    dialog.setMinimumSize(660, 340);
+    dialog.resize(760, 380);
+    dialog.setMinimumSize(720, 360);
     dialog.setStyleSheet(QString::fromUtf8(R"(
         QDialog {
             background: #F0F0F0;
@@ -2462,6 +2480,10 @@ void FaultTraceDialog::showDatabaseConfigDialog() {
     QLineEdit* userCopy = new QLineEdit(userEdit_->text(), body);
     QLineEdit* passwordCopy = new QLineEdit(passwordEdit_->text(), body);
     passwordCopy->setEchoMode(QLineEdit::Password);
+    for (QLineEdit* pathEdit : {runnerCopy, geoEastRootCopy, dataRootCopy}) {
+        pathEdit->setCursorPosition(0);
+        pathEdit->setToolTip(pathEdit->text());
+    }
 
     auto addPathRow = [&](int row, const QString& labelText, QLineEdit* edit, const QString& dialogTitle, bool directory) {
         QLabel* label = new QLabel(labelText, body);
@@ -2546,6 +2568,10 @@ void FaultTraceDialog::showDatabaseConfigDialog() {
         }
         if (!dataRootPath.isEmpty()) {
             dataRootCopy->setText(dataRootPath);
+        }
+        for (QLineEdit* pathEdit : {runnerCopy, geoEastRootCopy, dataRootCopy}) {
+            pathEdit->setCursorPosition(0);
+            pathEdit->setToolTip(pathEdit->text());
         }
         if (hostCopy->text().trimmed().isEmpty()) {
             hostCopy->setText("127.0.0.1");
@@ -2963,8 +2989,8 @@ void FaultTraceDialog::loadSettings() {
             mainSplitter_->restoreState(splitterState);
         }
         QList<int> sizes = mainSplitter_->sizes();
-        if (sizes.size() >= 2 && sizes.at(0) < 500) {
-            mainSplitter_->setSizes({520, qMax(620, sizes.at(1))});
+        if (sizes.size() >= 2 && sizes.at(0) < 440) {
+            mainSplitter_->setSizes({480, qMax(620, sizes.at(1))});
         }
     }
     updateOptionControls();
@@ -3525,7 +3551,7 @@ void FaultTraceDialog::loadSelectedOutputInternal(bool userInitiated) {
         if (userInitiated) {
             QMessageBox::information(this,
                                      QString::fromUtf8("没有可选择的结果"),
-                                     QString::fromUtf8("请先运行追踪，或点击【刷新结果】读取当前项目中的结果多边形对象。"));
+                                     QString::fromUtf8("请先运行追踪，或点击【刷新结果列表】读取当前项目中的结果多边形对象。"));
         }
         return;
     }

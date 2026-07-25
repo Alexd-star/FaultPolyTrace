@@ -1,0 +1,212 @@
+{
+  "figures": [
+    {
+      "figure": "F01_产品总体架构",
+      "width": 2155,
+      "height": 1300,
+      "contrast_std": 33.19,
+      "white_ratio": 0.8083,
+      "status": "PASS",
+      "failed_checks": []
+    },
+    {
+      "figure": "F02_代码分层与职责",
+      "width": 2155,
+      "height": 1315,
+      "contrast_std": 28.32,
+      "white_ratio": 0.7359,
+      "status": "PASS",
+      "failed_checks": []
+    },
+    {
+      "figure": "F03_独立软件与插件解耦部署",
+      "width": 2155,
+      "height": 1285,
+      "contrast_std": 30.34,
+      "white_ratio": 0.8641,
+      "status": "PASS",
+      "failed_checks": []
+    },
+    {
+      "figure": "F04_双数据源与输出契约",
+      "width": 2155,
+      "height": 1270,
+      "contrast_std": 30.36,
+      "white_ratio": 0.8178,
+      "status": "PASS",
+      "failed_checks": []
+    },
+    {
+      "figure": "F05_独立软件全流程",
+      "width": 2155,
+      "height": 1105,
+      "contrast_std": 26.23,
+      "white_ratio": 0.8347,
+      "status": "PASS",
+      "failed_checks": []
+    },
+    {
+      "figure": "F06_GeoEast插件标准流程",
+      "width": 2155,
+      "height": 1195,
+      "contrast_std": 27.43,
+      "white_ratio": 0.855,
+      "status": "PASS",
+      "failed_checks": []
+    },
+    {
+      "figure": "F07_结果查看与图层叠加逻辑",
+      "width": 2155,
+      "height": 1225,
+      "contrast_std": 32.58,
+      "white_ratio": 0.8735,
+      "status": "PASS",
+      "failed_checks": []
+    },
+    {
+      "figure": "F08_前置条件与错误引导状态",
+      "width": 2155,
+      "height": 1315,
+      "contrast_std": 31.48,
+      "white_ratio": 0.8486,
+      "status": "PASS",
+      "failed_checks": []
+    },
+    {
+      "figure": "F09_Ridge-Belt核心算法总流程",
+      "width": 2155,
+      "height": 1300,
+      "contrast_std": 29.7,
+      "white_ratio": 0.8393,
+      "status": "PASS",
+      "failed_checks": []
+    },
+    {
+      "figure": "F10_从属性响应到闭合多边形",
+      "width": 2155,
+      "height": 700,
+      "contrast_std": 58.84,
+      "white_ratio": 0.8158,
+      "status": "PASS",
+      "failed_checks": []
+    },
+    {
+      "figure": "F11_弱响应路径门控",
+      "width": 2155,
+      "height": 1195,
+      "contrast_std": 29.57,
+      "white_ratio": 0.8834,
+      "status": "PASS",
+      "failed_checks": []
+    },
+    {
+      "figure": "F12_分支归属与交切处理",
+      "width": 2155,
+      "height": 1225,
+      "contrast_std": 26.18,
+      "white_ratio": 0.9402,
+      "status": "PASS",
+      "failed_checks": []
+    },
+    {
+      "figure": "F13_根系防黏连机制",
+      "width": 2155,
+      "height": 760,
+      "contrast_std": 40.79,
+      "white_ratio": 0.9028,
+      "status": "PASS",
+      "failed_checks": []
+    },
+    {
+      "figure": "F14_多边形拓扑与覆盖门控",
+      "width": 2155,
+      "height": 1195,
+      "contrast_std": 26.22,
+      "white_ratio": 0.8715,
+      "status": "PASS",
+      "failed_checks": []
+    },
+    {
+      "figure": "F15_面积阈值与自适应保留",
+      "width": 2155,
+      "height": 1195,
+      "contrast_std": 28.59,
+      "white_ratio": 0.8876,
+      "status": "PASS",
+      "failed_checks": []
+    },
+    {
+      "figure": "F16_官方数据质量指标总览",
+      "width": 2155,
+      "height": 805,
+      "contrast_std": 46.29,
+      "white_ratio": 0.8751,
+      "status": "PASS",
+      "failed_checks": []
+    },
+    {
+      "figure": "F17_官方数据耗时分解",
+      "width": 2155,
+      "height": 820,
+      "contrast_std": 70.81,
+      "white_ratio": 0.6238,
+      "status": "PASS",
+      "failed_checks": []
+    },
+    {
+      "figure": "F18_自动测试与交付验证矩阵",
+      "width": 2155,
+      "height": 1045,
+      "contrast_std": 94.03,
+      "white_ratio": 0.2757,
+      "status": "PASS",
+      "failed_checks": []
+    },
+    {
+      "figure": "F19_赛题评分点证据矩阵",
+      "width": 2155,
+      "height": 1015,
+      "contrast_std": 76.38,
+      "white_ratio": 0.2355,
+      "status": "PASS",
+      "failed_checks": []
+    },
+    {
+      "figure": "F20_官方数据输入与结果证据板",
+      "width": 2155,
+      "height": 687,
+      "contrast_std": 112.26,
+      "white_ratio": 0.6315,
+      "status": "PASS",
+      "failed_checks": []
+    },
+    {
+      "figure": "F21_Windows产品化构建与交付流程",
+      "width": 2155,
+      "height": 1225,
+      "contrast_std": 28.42,
+      "white_ratio": 0.8573,
+      "status": "PASS",
+      "failed_checks": []
+    },
+    {
+      "figure": "F22_GeoEast数据库读写闭环",
+      "width": 2155,
+      "height": 1240,
+      "contrast_std": 30.03,
+      "white_ratio": 0.8567,
+      "status": "PASS",
+      "failed_checks": []
+    },
+    {
+      "figure": "F23_显示属性与几何结果作用范围",
+      "width": 2155,
+      "height": 1210,
+      "contrast_std": 29.57,
+      "white_ratio": 0.8962,
+      "status": "PASS",
+      "failed_checks": []
+    }
+  ],
+  "failures": []
+}

@@ -1064,7 +1064,7 @@ private:
 class ColorBarWidget : public QWidget {
 public:
     explicit ColorBarWidget(QWidget* parent = nullptr) : QWidget(parent) {
-        setFixedWidth(72);
+        setFixedWidth(78);
         setMinimumHeight(360);
     }
 
@@ -1092,15 +1092,10 @@ protected:
         QFont labelFont = painter.font();
         labelFont.setPointSize(8);
         painter.setFont(labelFont);
-        QString title = fpt_ui::translate(QString::fromUtf8("属性"), languageCode_);
-        if (languageCode_ == "zh-CN") {
-            title = QString::fromUtf8("属\n性");
-        } else {
-            title = QString::fromUtf8("Attr.");
-        }
+        const QString title = languageCode_ == "zh-CN" ? QString::fromUtf8("属性") : QString::fromUtf8("Attr.");
         painter.drawText(
-            QRect(4, 6, width() - 8, 28),
-            Qt::AlignCenter | Qt::TextWordWrap,
+            QRect(4, 8, width() - 8, 20),
+            Qt::AlignCenter,
             title);
         painter.setPen(QColor("#333333"));
         painter.drawText(QRect(4, 34, width() - 8, 18), Qt::AlignCenter, QString::fromUtf8("1.0"));
@@ -1155,6 +1150,8 @@ void FaultPolyTraceWindow::buildUi() {
         QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox { background: white; border: 1px solid #A0A0A0; border-radius: 2px; min-height: 23px; padding: 1px 5px; }
         QPushButton { background: #E1E1E1; border: 1px solid #A0A0A0; border-radius: 2px; min-height: 24px; padding: 2px 10px; }
         QPushButton:hover { background: #E5F1FB; border-color: #0078D7; }
+        QPushButton#emphasisButton { background: #F2F8FD; border-color: #5B9BD5; color: #124B73; font-weight: bold; }
+        QPushButton#emphasisButton:hover { background: #E5F1FB; border-color: #0078D7; }
         QPushButton#runButton { background: #0078D7; color: white; border-color: #005A9E; font-weight: bold; min-height: 30px; }
         QLabel#logHeader { background: #E6E6E6; border-top: 1px solid #A8A8A8; border-bottom: 1px solid #C8C8C8; padding-left: 10px; font-weight: bold; }
         QTextEdit { background: #F8F9FA; border-top: 1px solid #B8B8B8; font-family: Consolas, "Courier New"; }
@@ -1298,6 +1295,7 @@ void FaultPolyTraceWindow::buildUi() {
 
     QToolBar* toolbar = addToolBar(QString::fromUtf8("工具栏"));
     toolbar->setMovable(false);
+    toolbar->setFloatable(false);
     toolbar->setIconSize(QSize(20, 20));
     toolbar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
     toolbar->addAction(openAction);
@@ -1589,15 +1587,16 @@ void FaultPolyTraceWindow::buildUi() {
                     this,
                     uiText(QString::fromUtf8("暂无可查看结果")),
                     uiText(QString::fromUtf8("当前输出目录中没有可查看的结果 CSV。\n\n"
-                                             "请先选择输入数据并完成一次追踪，或检查“输出目录”后点击【刷新结果】。")));
+                                             "请先选择输入数据并完成一次追踪，或检查“输出目录”后点击【刷新结果列表】。")));
                 updateStatus(uiText(QString::fromUtf8("当前输出目录暂无结果，请先运行追踪或检查输出目录")));
             }
         });
         return true;
     });
-    refreshResultsButton_ = new QPushButton(QString::fromUtf8("刷新结果"), resultBox);
+    refreshResultsButton_ = new QPushButton(QString::fromUtf8("刷新结果列表"), resultBox);
     refreshResultsButton_->setToolTip(QString::fromUtf8("刷新已有结果列表"));
-    loadSelectedResultButton_ = new QPushButton(QString::fromUtf8("载入结果"), resultBox);
+    loadSelectedResultButton_ = new QPushButton(QString::fromUtf8("显示所选结果"), resultBox);
+    loadSelectedResultButton_->setObjectName("emphasisButton");
     loadSelectedResultButton_->setToolTip(QString::fromUtf8("载入当前选择的已有结果；GeoEast 数据库对象会同步为当前输出名称"));
     resultCatalogCombo_->setMinimumWidth(0);
     resultCatalogCombo_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
@@ -1605,7 +1604,7 @@ void FaultPolyTraceWindow::buildUi() {
     configureElasticButton(loadSelectedResultButton_);
     resultLayout->addWidget(resultCatalogCombo_, 2, 0);
     resultLayout->addWidget(refreshResultsButton_, 2, 1);
-    showOverlayButton_ = new QPushButton(QString::fromUtf8("查看叠加"), resultBox);
+    showOverlayButton_ = new QPushButton(QString::fromUtf8("叠加查看"), resultBox);
     openCsvButton_ = new QPushButton(QString::fromUtf8("打开CSV"), resultBox);
     openGeoJsonButton_ = new QPushButton(QString::fromUtf8("GeoJSON"), resultBox);
     openDiagnosticsButton_ = new QPushButton(QString::fromUtf8("诊断JSON"), resultBox);
@@ -2794,8 +2793,8 @@ void FaultPolyTraceWindow::showGeoEastConfigDialog() {
     dialog.setWindowFlags((dialog.windowFlags() | Qt::WindowMinimizeButtonHint | Qt::WindowCloseButtonHint) &
                           ~Qt::WindowMaximizeButtonHint &
                           ~Qt::WindowContextHelpButtonHint);
-    dialog.resize(680, 350);
-    dialog.setMinimumSize(660, 340);
+    dialog.resize(760, 380);
+    dialog.setMinimumSize(720, 360);
     dialog.setStyleSheet(QString::fromUtf8(R"(
         QDialog {
             background: #F0F0F0;
@@ -2881,6 +2880,8 @@ void FaultPolyTraceWindow::showGeoEastConfigDialog() {
 
     auto addPathRow = [&](int row, const QString& label, QLineEdit* source, bool directory) {
         QLineEdit* edit = new QLineEdit(source->text(), &dialog);
+        edit->setCursorPosition(0);
+        edit->setToolTip(edit->text());
         QPushButton* browse = new QPushButton(QString::fromUtf8("浏览"), &dialog);
         configureSmallButton(browse);
         QWidget* holder = new QWidget(&dialog);
@@ -2974,6 +2975,10 @@ void FaultPolyTraceWindow::showGeoEastConfigDialog() {
         }
         if (!dataRootPath.isEmpty()) {
             dataRootCopy->setText(dataRootPath);
+        }
+        for (QLineEdit* pathEdit : {runnerCopy, rootCopy, dataRootCopy}) {
+            pathEdit->setCursorPosition(0);
+            pathEdit->setToolTip(pathEdit->text());
         }
         if (hostCopy->text().trimmed().isEmpty()) {
             hostCopy->setText("127.0.0.1");
@@ -3230,7 +3235,7 @@ void FaultPolyTraceWindow::loadSelectedResultInternal(bool userInitiated) {
         if (userInitiated) {
             QMessageBox::information(this,
                                      QString::fromUtf8("没有可载入的结果"),
-                                     QString::fromUtf8("请先运行追踪，或点击【刷新结果】读取输出目录/GeoEast 数据库中的已有结果。"));
+                                     QString::fromUtf8("请先运行追踪，或点击【刷新结果列表】读取输出目录/GeoEast 数据库中的已有结果。"));
         }
         return;
     }

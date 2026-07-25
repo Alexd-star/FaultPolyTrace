@@ -182,7 +182,7 @@ Add-ContainsCheck -Rows $rows -Group "运行状态联动" -Name "动作成员" -
 
 $resultChecks = @(
     @{ Name="结果查看分组"; Needle="QGroupBox* resultBox = new QGroupBox(QString::fromUtf8(`"结果查看`")"; Requirement="左侧结果查看入口存在" },
-    @{ Name="查看叠加按钮"; Needle="showOverlayButton_ = new QPushButton(QString::fromUtf8(`"查看叠加`")"; Requirement="可直接切换到叠加结果" },
+    @{ Name="叠加查看按钮"; Needle="showOverlayButton_ = new QPushButton(QString::fromUtf8(`"叠加查看`")"; Requirement="可直接切换到叠加结果" },
     @{ Name="打开 CSV 按钮"; Needle="openCsvButton_ = new QPushButton(QString::fromUtf8(`"打开CSV`")"; Requirement="可直接打开结果 CSV" },
     @{ Name="打开 GeoJSON 按钮"; Needle="openGeoJsonButton_ = new QPushButton(QString::fromUtf8(`"GeoJSON`")"; Requirement="可直接打开 GeoJSON" },
     @{ Name="打开诊断按钮"; Needle="openDiagnosticsButton_ = new QPushButton(QString::fromUtf8(`"诊断JSON`")"; Requirement="可直接打开诊断 JSON" },
