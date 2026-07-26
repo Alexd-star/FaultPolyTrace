@@ -428,35 +428,40 @@ enum class ToolIconKind {
 };
 
 QIcon makeToolIcon(ToolIconKind kind) {
-    // 按设备像素比绘制，高分屏图标不发虚。
+    // 按设备像素比绘制，高分屏图标不发虚（视觉与 V1.0.1 一致）。
     const qreal dpr = qApp ? qApp->devicePixelRatio() : 1.0;
     QPixmap pixmap(qRound(24 * dpr), qRound(24 * dpr));
     pixmap.setDevicePixelRatio(dpr);
     pixmap.fill(Qt::transparent);
     QPainter painter(&pixmap);
     painter.setRenderHint(QPainter::Antialiasing, true);
-    const QColor ink("#5A6472");
-    const QColor accentBlue("#0078D7");
-    const QColor accentRed("#B42318");
-    const QColor accentGreen("#1A7F37");
-    painter.setPen(QPen(ink, 1.6, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-    painter.setBrush(Qt::NoBrush);
+    painter.setPen(QPen(QColor("#4A4A4A"), 1.4));
+
+    const QColor blue("#1D7FC1");
+    const QColor darkBlue("#005A9E");
+    const QColor green("#2E8B57");
+    const QColor yellow("#F4B844");
+    const QColor red("#C94040");
+    const QColor purple("#6A5ACD");
 
     switch (kind) {
     case ToolIconKind::Open:
-        painter.drawPolygon(QPolygonF({QPointF(4, 8), QPointF(9, 8), QPointF(11, 10),
-                                       QPointF(20, 10), QPointF(20, 19), QPointF(4, 19)}));
-        painter.drawLine(QPointF(4, 8), QPointF(4, 6));
+        painter.setPen(QPen(QColor("#C58A1D"), 1.2));
+        painter.setBrush(yellow);
+        painter.drawRoundedRect(QRectF(3, 8, 18, 11), 2, 2);
+        painter.setBrush(QColor("#FFD36A"));
+        painter.drawRoundedRect(QRectF(3, 6, 8, 5), 1.5, 1.5);
         break;
     case ToolIconKind::Save:
-        painter.drawRoundedRect(QRectF(5, 5, 14, 14), 2, 2);
-        painter.drawRect(QRectF(9, 5, 6, 5));
-        painter.drawLine(QPointF(8, 19), QPointF(8, 13));
-        painter.drawLine(QPointF(8, 13), QPointF(16, 13));
-        painter.drawLine(QPointF(16, 13), QPointF(16, 19));
+        painter.setPen(QPen(darkBlue, 1.2));
+        painter.setBrush(QColor("#3F8ED0"));
+        painter.drawRoundedRect(QRectF(5, 4, 14, 16), 1.5, 1.5);
+        painter.setBrush(QColor("#EAF4FF"));
+        painter.drawRect(QRectF(8, 5.5, 7, 4.5));
+        painter.drawRect(QRectF(8, 14, 8, 5));
         break;
     case ToolIconKind::Pan:
-        painter.setPen(QPen(ink, 1.8, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        painter.setPen(QPen(green, 1.8, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
         painter.drawLine(QPointF(8, 12), QPointF(8, 7));
         painter.drawLine(QPointF(11, 12), QPointF(11, 5));
         painter.drawLine(QPointF(14, 13), QPointF(14, 7));
@@ -467,17 +472,19 @@ QIcon makeToolIcon(ToolIconKind kind) {
         break;
     case ToolIconKind::ZoomIn:
     case ToolIconKind::ZoomOut:
+        painter.setPen(QPen(blue, 2.0));
+        painter.setBrush(QColor("#EAF6FF"));
         painter.drawEllipse(QRectF(4, 4, 11, 11));
         painter.drawLine(QPointF(13, 13), QPointF(20, 20));
-        painter.setPen(QPen(ink, 1.7, Qt::SolidLine, Qt::RoundCap));
+        painter.setPen(QPen(darkBlue, 1.7, Qt::SolidLine, Qt::RoundCap));
         painter.drawLine(QPointF(7, 9.5), QPointF(12, 9.5));
         if (kind == ToolIconKind::ZoomIn) {
             painter.drawLine(QPointF(9.5, 7), QPointF(9.5, 12));
         }
         break;
     case ToolIconKind::Database:
-        painter.setPen(QPen(ink, 1.4));
-        painter.setBrush(Qt::NoBrush);
+        painter.setPen(QPen(darkBlue, 1.3));
+        painter.setBrush(QColor("#DFF0FF"));
         painter.drawEllipse(QRectF(5, 4, 14, 5));
         painter.drawRect(QRectF(5, 6.5, 14, 11));
         painter.drawEllipse(QRectF(5, 15, 14, 5));
@@ -485,36 +492,38 @@ QIcon makeToolIcon(ToolIconKind kind) {
         painter.drawLine(QPointF(5, 13), QPointF(19, 13));
         break;
     case ToolIconKind::Preset:
-        painter.setPen(QPen(ink, 1.4));
+        painter.setPen(QPen(purple, 1.4));
+        painter.setBrush(QColor("#EEEAFE"));
         painter.drawRoundedRect(QRectF(5, 4, 14, 16), 2, 2);
-        painter.setPen(QPen(ink, 1.6, Qt::SolidLine, Qt::RoundCap));
+        painter.setPen(QPen(purple, 1.6, Qt::SolidLine, Qt::RoundCap));
         painter.drawLine(QPointF(8, 9), QPointF(16, 9));
         painter.drawLine(QPointF(8, 13), QPointF(16, 13));
-        painter.setPen(QPen(accentGreen, 2.1, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        painter.setPen(QPen(green, 2.1, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
         painter.drawLine(QPointF(8, 17), QPointF(10.5, 19));
         painter.drawLine(QPointF(10.5, 19), QPointF(17, 12));
         break;
     case ToolIconKind::Help:
-        painter.setPen(QPen(ink, 1.5));
+        painter.setPen(QPen(QColor("#DC143C"), 1.5));
+        painter.setBrush(QColor("#FFF5F7"));
         painter.drawEllipse(QRectF(4, 4, 16, 16));
-        painter.setPen(QPen(ink, 2.0, Qt::SolidLine, Qt::RoundCap));
+        painter.setPen(QPen(QColor("#DC143C"), 2.0, Qt::SolidLine, Qt::RoundCap));
         painter.drawText(QRect(4, 4, 16, 16), Qt::AlignCenter, "?");
         break;
     case ToolIconKind::Reset:
-        painter.setPen(QPen(ink, 1.8, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        painter.setPen(QPen(blue, 1.8, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
         painter.drawArc(QRectF(5, 5, 14, 14), 35 * 16, 285 * 16);
         painter.drawLine(QPointF(6, 8), QPointF(5, 4));
         painter.drawLine(QPointF(6, 8), QPointF(10, 7));
         break;
     case ToolIconKind::Run:
         painter.setPen(Qt::NoPen);
-        painter.setBrush(accentBlue);
+        painter.setBrush(blue);
         painter.drawPolygon(QPolygonF() << QPointF(7, 5) << QPointF(19, 12) << QPointF(7, 19));
         break;
     case ToolIconKind::Stop:
         painter.setPen(Qt::NoPen);
-        painter.setBrush(accentRed);
-        painter.drawRoundedRect(QRectF(7, 7, 10, 10), 2, 2);
+        painter.setBrush(red);
+        painter.drawRect(QRectF(7, 7, 10, 10));
         break;
     }
 
@@ -829,17 +838,16 @@ protected:
         }
 
         QFont titleFont = painter.font();
-        titleFont.setPointSize(12);
+        titleFont.setPointSize(16);
         titleFont.setBold(true);
         painter.setFont(titleFont);
+        painter.setPen(QColor("#7A7A7A"));
         const QString viewTitle = showInputLayer_ && showResultLayer_
-            ? uiText(QString::fromUtf8("原始网格 + 结果多边形"))
-            : (showInputLayer_ ? uiText(QString::fromUtf8("原始网格"))
-            : (showResultLayer_ ? uiText(QString::fromUtf8("结果多边形"))
-            : uiText(QString::fromUtf8("图层显示已关闭"))));
-        painter.fillRect(QRectF(26, 24, 3, 16), QColor("#0078D7"));
-        painter.setPen(QColor("#1F2328"));
-        painter.drawText(QPoint(35, 38), viewTitle);
+            ? uiText(QString::fromUtf8("[结果视图区] 原始网格 + 结果多边形"))
+            : (showInputLayer_ ? uiText(QString::fromUtf8("[结果视图区] 原始网格"))
+            : (showResultLayer_ ? uiText(QString::fromUtf8("[结果视图区] 结果多边形"))
+            : uiText(QString::fromUtf8("[结果视图区] 图层显示已关闭"))));
+        painter.drawText(QPoint(26, 38), viewTitle);
 
         QFont hintFont = painter.font();
         hintFont.setPointSize(10);
@@ -848,6 +856,7 @@ protected:
             drawGuideCard(painter, rect().adjusted(24, 56, -24, -24));
         }
 
+        painter.setFont(hintFont);
         painter.setPen(QColor("#8A8A8A"));
         painter.drawText(QRect(width() - 210, 18, 180, 20), Qt::AlignRight,
                          uiText(QString::fromUtf8("%1  缩放 %2%"))
@@ -930,14 +939,14 @@ private:
                           canvas.center().y() - cardH / 2.0, cardW, cardH);
         painter.save();
         painter.setRenderHint(QPainter::Antialiasing, true);
-        painter.setPen(QPen(QColor("#E3E6EA"), 1));
+        painter.setPen(QPen(QColor("#C8C8C8"), 1));
         painter.setBrush(QColor("#FFFFFF"));
-        painter.drawRoundedRect(card, 8, 8);
+        painter.drawRoundedRect(card, 3, 3);
         QFont bold = painter.font();
         bold.setPointSize(11);
         bold.setBold(true);
         painter.setFont(bold);
-        painter.setPen(QColor("#1F2328"));
+        painter.setPen(QColor("#005A9E"));
         painter.drawText(QRectF(card.left() + 20, card.top() + 12, card.width() - 40, 24),
                          Qt::AlignLeft | Qt::AlignVCenter,
                          uiText(QString::fromUtf8("三步完成工区断层多边形追踪")));
@@ -953,12 +962,12 @@ private:
         for (int i = 0; i < steps.size(); ++i) {
             const double y = card.top() + 44 + i * 26;
             painter.setPen(Qt::NoPen);
-            painter.setBrush(QColor("#E4EEF9"));
+            painter.setBrush(QColor("#DDECF8"));
             painter.drawEllipse(QRectF(card.left() + 20, y, 18, 18));
-            painter.setPen(QColor("#0B62A4"));
+            painter.setPen(QColor("#005A9E"));
             painter.drawText(QRectF(card.left() + 20, y, 18, 18), Qt::AlignCenter,
                              QString::number(i + 1));
-            painter.setPen(QColor("#374151"));
+            painter.setPen(QColor("#444444"));
             painter.drawText(QRectF(card.left() + 46, y - 2, card.width() - 66, 22),
                              Qt::AlignLeft | Qt::AlignVCenter, steps.at(i));
         }
@@ -1029,7 +1038,7 @@ private:
         const QRectF target = fittedRect(available);
         painter.setRenderHint(QPainter::SmoothPixmapTransform, target.width() < nx_);
         painter.drawImage(target, gridImage_);
-        painter.setPen(QColor("#A8B0BA"));
+        painter.setPen(QColor("#222222"));
         painter.drawRect(target);
     }
 
@@ -1106,41 +1115,32 @@ public:
 protected:
     void paintEvent(QPaintEvent*) override {
         QPainter painter(this);
-        painter.fillRect(rect(), QColor("#F7F8FA"));
-        painter.setPen(QColor("#E3E6EA"));
+        painter.fillRect(rect(), QColor("#F0F0F0"));
+        painter.setPen(QColor("#A0A0A0"));
         painter.drawLine(0, 0, 0, height());
 
-        const QRect barRect(width() / 2 - 7, 58, 14, qMax(120, height() - 124));
+        const QRect barRect(width() / 2 - 8, 58, 16, qMax(120, height() - 124));
+        painter.setPen(QColor("#555555"));
+        QFont labelFont = painter.font();
+        labelFont.setPointSize(8);
+        painter.setFont(labelFont);
+        const QString title = languageCode_ == "zh-CN" ? QString::fromUtf8("属性") : QString::fromUtf8("Attr.");
+        painter.drawText(
+            QRect(4, 8, width() - 8, 20),
+            Qt::AlignCenter,
+            title);
+        painter.setPen(QColor("#333333"));
+        painter.drawText(QRect(4, 34, width() - 8, 18), Qt::AlignCenter, QString::fromUtf8("1.0"));
+
         QLinearGradient gradient(barRect.topLeft(), barRect.bottomLeft());
         gradient.setColorAt(0.00, QColor("#242424"));
         gradient.setColorAt(1.00, QColor("#FFFFFF"));
-        painter.setRenderHint(QPainter::Antialiasing, true);
-        painter.setPen(QPen(QColor("#C9CDD4"), 1));
-        painter.setBrush(gradient);
-        painter.drawRoundedRect(barRect, 2, 2);
+        painter.fillRect(barRect, gradient);
+        painter.setPen(QColor("#333333"));
+        painter.drawRect(barRect.adjusted(0, 0, -1, -1));
 
-        QFont labelFont = painter.font();
-        labelFont.setPointSize(7);
-        painter.setFont(labelFont);
-        painter.setRenderHint(QPainter::Antialiasing, false);
-        for (int i = 0; i <= 4; ++i) {
-            const double tRatio = i / 4.0;
-            const int y = qRound(barRect.bottom() - tRatio * barRect.height());
-            painter.setPen(QColor("#C9CDD4"));
-            painter.drawLine(barRect.right() + 2, y, barRect.right() + 6, y);
-            painter.setPen(QColor("#6B7280"));
-            painter.drawText(QRect(barRect.right() + 7, y - 8, width() - barRect.right() - 8, 16),
-                             Qt::AlignLeft | Qt::AlignVCenter,
-                             QString::number(tRatio, 'f', 2));
-        }
-
-        QFont titleFont = painter.font();
-        titleFont.setPointSize(8);
-        titleFont.setBold(true);
-        painter.setFont(titleFont);
-        painter.setPen(QColor("#57606A"));
-        const QString title = languageCode_ == "zh-CN" ? QString::fromUtf8("属性") : QString::fromUtf8("Attr.");
-        painter.drawText(QRect(4, 8, width() - 8, 20), Qt::AlignCenter, title);
+        painter.setPen(QColor("#333333"));
+        painter.drawText(QRect(4, barRect.bottom() + 6, width() - 8, 18), Qt::AlignCenter, "0.0");
     }
 
 private:
@@ -1283,10 +1283,6 @@ void FaultTraceDialog::buildUi() {
         return true;
     });
     outputEdit_ = new QLineEdit(envOrDefault("FPT_GEOEAST_OUTPUT", "FaultPolyTrace_Result"), this);
-    polygonColorSwatch_ = new QToolButton(this);
-    polygonColorSwatch_->setObjectName("colorSwatch");
-    polygonColorSwatch_->setToolTip(QString::fromUtf8("当前结果多边形颜色，点击修改"));
-    connect(polygonColorSwatch_, &QToolButton::clicked, this, &FaultTraceDialog::choosePolygonColor);
     polygonColorEdit_ = new QLineEdit(envOrDefault("FPT_POLYGON_COLOR", "#00FFFF"), this);
     polygonColorEdit_->setMinimumWidth(0);
     polygonColorEdit_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
@@ -1797,9 +1793,8 @@ void FaultTraceDialog::buildUi() {
         QHBoxLayout* colorLayout = new QHBoxLayout(colorWidget);
         colorLayout->setContentsMargins(0, 0, 0, 0);
         colorLayout->setSpacing(5);
-        colorLayout->addWidget(polygonColorSwatch_);
+        colorLayout->addWidget(polygonColorButton_);
         colorLayout->addWidget(polygonColorEdit_, 1);
-        polygonColorButton_->hide();
         addFormRow(dataLayoutNew, 2, QString::fromUtf8("颜色"), colorWidget, dataGroup);
         QWidget* lineStyleWidget = new QWidget(dataGroup);
         QHBoxLayout* lineStyleLayout = new QHBoxLayout(lineStyleWidget);
@@ -2042,6 +2037,8 @@ void FaultTraceDialog::buildUi() {
                 for (QWidget* child : children) {
                     child->setVisible(on);
                 }
+                // 收起时压到标题高度，避免留下空白分组框。
+                box->setMaximumHeight(on ? QWIDGETSIZE_MAX : 26);
             };
             applyVisibility(expanded);
             connect(box, &QGroupBox::toggled, this, [this, applyVisibility](bool on) {
@@ -3088,11 +3085,10 @@ void FaultTraceDialog::choosePolygonColor() {
 void FaultTraceDialog::setPolygonColor(const QColor& color) {
     const QColor effective = color.isValid() ? color : QColor(0, 255, 255);
     polygonColorEdit_->setText(effective.name(QColor::HexRgb).toUpper());
-    if (polygonColorSwatch_) {
-        polygonColorSwatch_->setStyleSheet(
-            QString("QToolButton#colorSwatch { background: %1; }")
-                .arg(effective.name(QColor::HexRgb)));
-    }
+    const QString style = QString("background-color:%1; color:%2; font-weight:bold;")
+        .arg(effective.name(QColor::HexRgb))
+        .arg(effective.lightness() < 128 ? "#FFFFFF" : "#000000");
+    polygonColorEdit_->setStyleSheet(style);
     updateStatusContext();
 }
 

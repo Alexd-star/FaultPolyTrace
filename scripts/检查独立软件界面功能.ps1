@@ -111,7 +111,7 @@ Add-ContainsCheck -Rows $rows -Group "窗口与布局" -Name "首个分组留白
 $themePath = "src\ui\FptTheme.cpp"
 $theme = Read-TextFile $themePath
 Add-ContainsCheck -Rows $rows -Group "窗口与布局" -Name "统一主题接入" -Requirement "主窗口使用共享主题 fpt_ui::appStyle()，换肤只改一处" -Text $cpp -Needle "setStyleSheet(fpt_ui::appStyle());" -Detail "$cppPath 接入 FptTheme"
-Add-ContainsCheck -Rows $rows -Group "窗口与布局" -Name "分组卡片标题" -Requirement "分组标题移出边框上方且背景透明，避免标题骑线与子控件混叠" -Text $theme -Needle "subcontrol-origin: margin; left: 2px; top: 0; padding: 0;" -Detail "$themePath 卡片式 QGroupBox 标题"
+Add-ContainsCheck -Rows $rows -Group "窗口与布局" -Name "分组标题背景" -Requirement "分组标题应使用稳定背景，避免浮动标题与边框或子控件混叠" -Text $theme -Needle "background: #F0F0F0; color: #005A9E; font-weight: bold;" -Detail "$themePath 设置 QGroupBox 标题背景"
 Add-ContainsCheck -Rows $rows -Group "窗口与布局" -Name "首组内嵌标题" -Requirement "第一个分组不使用容易被滚动区裁剪的浮动标题，应使用组内稳定标题行" -Text $cpp -Needle 'dataTitle->setObjectName("sectionTitle")' -Detail "$cppPath 数据与输出使用组内标题"
 Add-ContainsCheck -Rows $rows -Group "窗口与布局" -Name "首组非浮动标题容器" -Requirement "第一个分组应使用 QFrame 容器，避免空 QGroupBox 标题槽形成白框" -Text $cpp -Needle 'dataBox->setObjectName("sectionBox")' -Detail "$cppPath 数据与输出使用 sectionBox"
 Add-ContainsCheck -Rows $rows -Group "窗口与布局" -Name "输入文件占位提示" -Requirement "独立软件默认不选择样例文件，输入框必须提示用户主动选择" -Text $cpp -Needle "请选择平面断层属性文件" -Detail "$cppPath 设置输入文件占位提示"

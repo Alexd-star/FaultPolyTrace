@@ -123,7 +123,6 @@ private:
     QProgressBar* busyBar_ = nullptr;
     QFrame* doneBanner_ = nullptr;
     QLabel* doneBannerLabel_ = nullptr;
-    QToolButton* polygonColorSwatch_ = nullptr;
     QLineEdit* polygonColorEdit_ = nullptr;
     QDoubleSpinBox* polygonLineWidthSpin_ = nullptr;
     QDoubleSpinBox* polygonOpacitySpin_ = nullptr;

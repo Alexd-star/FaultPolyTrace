@@ -468,20 +468,11 @@ enum class ToolIconKind {
     Pan,
     ZoomIn,
     ZoomOut,
-    Reset,
-    Open,
-    Save,
-    Load,
-    Run,
-    Stop,
-    Restore,
-    Image,
-    Folder,
-    Help
+    Reset
 };
 
 QIcon makeToolIcon(ToolIconKind kind) {
-    // 按设备像素比绘制，高分屏图标不发虚。
+    // 按设备像素比绘制，高分屏图标不发虚（视觉与 V1.0.1 一致）。
     const qreal dpr = qApp ? qApp->devicePixelRatio() : 1.0;
     QPixmap pixmap(qRound(24 * dpr), qRound(24 * dpr));
     pixmap.setDevicePixelRatio(dpr);
@@ -511,63 +502,6 @@ QIcon makeToolIcon(ToolIconKind kind) {
         if (kind == ToolIconKind::ZoomIn) {
             painter.drawLine(QPointF(9.5, 7), QPointF(9.5, 12));
         }
-    } else if (kind == ToolIconKind::Open) {
-        painter.setPen(QPen(QColor("#5A6472"), 1.6, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-        painter.setBrush(Qt::NoBrush);
-        painter.drawPolygon(QPolygonF({QPointF(4, 8), QPointF(9, 8), QPointF(11, 10),
-                                       QPointF(20, 10), QPointF(20, 19), QPointF(4, 19)}));
-        painter.drawLine(QPointF(4, 8), QPointF(4, 6));
-    } else if (kind == ToolIconKind::Save) {
-        painter.setPen(QPen(QColor("#5A6472"), 1.6, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-        painter.setBrush(Qt::NoBrush);
-        painter.drawRoundedRect(QRectF(5, 5, 14, 14), 2, 2);
-        painter.drawRect(QRectF(9, 5, 6, 5));
-        painter.drawLine(QPointF(8, 19), QPointF(8, 13));
-        painter.drawLine(QPointF(8, 13), QPointF(16, 13));
-        painter.drawLine(QPointF(16, 13), QPointF(16, 19));
-    } else if (kind == ToolIconKind::Load) {
-        painter.setPen(QPen(QColor("#5A6472"), 1.6, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-        painter.setBrush(Qt::NoBrush);
-        painter.drawPolyline(QPolygonF({QPointF(19, 15), QPointF(19, 19), QPointF(5, 19),
-                                        QPointF(5, 15)}));
-        painter.drawLine(QPointF(12, 4), QPointF(12, 14));
-        painter.drawLine(QPointF(8, 10), QPointF(12, 14));
-        painter.drawLine(QPointF(16, 10), QPointF(12, 14));
-    } else if (kind == ToolIconKind::Run) {
-        painter.setPen(Qt::NoPen);
-        painter.setBrush(QColor("#0078D7"));
-        painter.drawPolygon(QPolygonF({QPointF(8, 5), QPointF(19, 12), QPointF(8, 19)}));
-    } else if (kind == ToolIconKind::Stop) {
-        painter.setPen(Qt::NoPen);
-        painter.setBrush(QColor("#B42318"));
-        painter.drawRoundedRect(QRectF(6, 6, 12, 12), 2, 2);
-    } else if (kind == ToolIconKind::Restore) {
-        painter.setPen(QPen(QColor("#5A6472"), 1.6, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-        painter.setBrush(Qt::NoBrush);
-        painter.drawArc(QRectF(5.5, 5.5, 13, 13), 40 * 16, 250 * 16);
-        painter.drawLine(QPointF(15.4, 4.2), QPointF(16.6, 8.4));
-        painter.drawLine(QPointF(16.6, 8.4), QPointF(12.4, 9.4));
-    } else if (kind == ToolIconKind::Image) {
-        painter.setPen(QPen(QColor("#5A6472"), 1.6, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-        painter.setBrush(Qt::NoBrush);
-        painter.drawRoundedRect(QRectF(4.5, 5.5, 15, 13), 2, 2);
-        painter.drawPolyline(QPolygonF({QPointF(6, 16), QPointF(10.5, 11), QPointF(13.5, 14),
-                                        QPointF(16, 11.5), QPointF(18, 13.5)}));
-        painter.drawEllipse(QPointF(9.2, 9.2), 1.2, 1.2);
-    } else if (kind == ToolIconKind::Folder) {
-        painter.setPen(QPen(QColor("#5A6472"), 1.6, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-        painter.setBrush(Qt::NoBrush);
-        painter.drawPolygon(QPolygonF({QPointF(4, 7), QPointF(10, 7), QPointF(12, 9),
-                                       QPointF(20, 9), QPointF(20, 18), QPointF(4, 18)}));
-    } else if (kind == ToolIconKind::Help) {
-        painter.setPen(QPen(QColor("#5A6472"), 1.6, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-        painter.setBrush(Qt::NoBrush);
-        painter.drawEllipse(QRectF(4.5, 4.5, 15, 15));
-        QFont helpFont = painter.font();
-        helpFont.setPointSizeF(9.5);
-        helpFont.setBold(true);
-        painter.setFont(helpFont);
-        painter.drawText(QRectF(4.5, 4.5, 15, 15), Qt::AlignCenter, QStringLiteral("?"));
     } else {
         painter.setBrush(Qt::NoBrush);
         painter.drawArc(QRectF(5, 5, 14, 14), 40 * 16, 280 * 16);
@@ -939,17 +873,16 @@ protected:
         painter.restore();
 
         QFont title = painter.font();
-        title.setPointSize(12);
+        title.setPointSize(15);
         title.setBold(true);
         painter.setFont(title);
+        painter.setPen(QColor("#666666"));
         const QString modeText = showGridLayer_ && showPolygonLayer_ ? uiText(QString::fromUtf8("叠加结果")) :
             (showGridLayer_ ? uiText(QString::fromUtf8("原始网格")) :
             (showPolygonLayer_ ? uiText(QString::fromUtf8("结果多边形")) : uiText(QString::fromUtf8("图层已关闭"))));
-        painter.fillRect(QRectF(24, 20, 3, 16), QColor("#0078D7"));
-        painter.setPen(QColor("#1F2328"));
-        painter.drawText(QPoint(33, 34), modeText);
+        painter.drawText(QPoint(24, 34), uiText(QString::fromUtf8("[视图区] %1")).arg(modeText));
         painter.setFont(QFont(painter.font().family(), 9));
-        painter.setPen(QColor("#6B7280"));
+        painter.setPen(QColor("#777777"));
         painter.drawText(QRect(width() - 280, 18, 250, 20), Qt::AlignRight, status_);
         painter.drawText(QRect(width() - 280, 38, 250, 20), Qt::AlignRight,
                          uiText(QString::fromUtf8("缩放 %1%")).arg(qRound(zoom_ * 100)));
@@ -1022,14 +955,14 @@ private:
                           canvas.center().y() - cardH / 2.0, cardW, cardH);
         painter.save();
         painter.setRenderHint(QPainter::Antialiasing, true);
-        painter.setPen(QPen(QColor("#E3E6EA"), 1));
+        painter.setPen(QPen(QColor("#C8C8C8"), 1));
         painter.setBrush(QColor("#FFFFFF"));
-        painter.drawRoundedRect(card, 8, 8);
+        painter.drawRoundedRect(card, 3, 3);
         QFont bold = painter.font();
         bold.setPointSize(11);
         bold.setBold(true);
         painter.setFont(bold);
-        painter.setPen(QColor("#1F2328"));
+        painter.setPen(QColor("#005A9E"));
         painter.drawText(QRectF(card.left() + 20, card.top() + 12, card.width() - 40, 24),
                          Qt::AlignLeft | Qt::AlignVCenter,
                          uiText(QString::fromUtf8("三步完成断层多边形追踪")));
@@ -1045,12 +978,12 @@ private:
         for (int i = 0; i < steps.size(); ++i) {
             const double y = card.top() + 44 + i * 26;
             painter.setPen(Qt::NoPen);
-            painter.setBrush(QColor("#E4EEF9"));
+            painter.setBrush(QColor("#DDECF8"));
             painter.drawEllipse(QRectF(card.left() + 20, y, 18, 18));
-            painter.setPen(QColor("#0B62A4"));
+            painter.setPen(QColor("#005A9E"));
             painter.drawText(QRectF(card.left() + 20, y, 18, 18), Qt::AlignCenter,
                              QString::number(i + 1));
-            painter.setPen(QColor("#374151"));
+            painter.setPen(QColor("#444444"));
             painter.drawText(QRectF(card.left() + 46, y - 2, card.width() - 66, 22),
                              Qt::AlignLeft | Qt::AlignVCenter, steps.at(i));
         }
@@ -1104,7 +1037,7 @@ private:
         // 缩小显示时平滑采样避免摩尔纹，放大时保留像元边界。
         painter.setRenderHint(QPainter::SmoothPixmapTransform, target.width() < nx_);
         painter.drawImage(target, gridImage_);
-        painter.setPen(QColor("#A8B0BA"));
+        painter.setPen(QColor("#222222"));
         painter.drawRect(target);
     }
 
@@ -1128,18 +1061,17 @@ private:
 
     void drawTaskPreview(QPainter& painter, const QRectF& canvas) const {
         QFont titleFont = painter.font();
-        titleFont.setPointSize(12);
+        titleFont.setPointSize(16);
         titleFont.setBold(true);
         painter.setFont(titleFont);
-        painter.fillRect(QRectF(26, 24, 3, 16), QColor("#0078D7"));
-        painter.setPen(QColor("#1F2328"));
-        painter.drawText(QPoint(35, 38), uiText(QString::fromUtf8("任务预览")));
+        painter.setPen(QColor("#7A7A7A"));
+        painter.drawText(QPoint(26, 38), uiText(QString::fromUtf8("[任务视图区] 结果查看")));
 
         QFont hintFont = painter.font();
         hintFont.setPointSize(10);
         hintFont.setBold(false);
         painter.setFont(hintFont);
-        painter.setPen(QColor("#57606A"));
+        painter.setPen(QColor("#666666"));
         painter.drawText(rect().adjusted(26, 60, -26, -26), Qt::AlignLeft | Qt::AlignTop, taskLines_.join('\n'));
 
         const qreal guideWidth = qMin(440.0, qMax(310.0, canvas.width() - 100.0));
@@ -1212,42 +1144,31 @@ public:
 protected:
     void paintEvent(QPaintEvent*) override {
         QPainter painter(this);
-        painter.fillRect(rect(), QColor("#F7F8FA"));
-        painter.setPen(QColor("#E3E6EA"));
+        painter.fillRect(rect(), QColor("#F0F0F0"));
+        painter.setPen(QColor("#A0A0A0"));
         painter.drawLine(0, 0, 0, height());
 
-        const QRect bar(width() / 2 - 7, 58, 14, qMax(120, height() - 124));
+        const QRect bar(width() / 2 - 8, 58, 16, qMax(120, height() - 124));
         QLinearGradient gradient(bar.left(), bar.bottom(), bar.left(), bar.top());
         gradient.setColorAt(0.00, QColor("#FFFFFF"));
         gradient.setColorAt(1.00, QColor("#242424"));
-        painter.setRenderHint(QPainter::Antialiasing, true);
-        painter.setPen(QPen(QColor("#C9CDD4"), 1));
-        painter.setBrush(gradient);
-        painter.drawRoundedRect(bar, 2, 2);
+        painter.fillRect(bar, gradient);
+        painter.setPen(QColor("#666666"));
+        painter.drawRect(bar.adjusted(0, 0, -1, -1));
 
-        // 0.25 间隔刻度线与数值
+        painter.setPen(QColor("#333333"));
         QFont labelFont = painter.font();
-        labelFont.setPointSize(7);
+        labelFont.setPointSize(8);
         painter.setFont(labelFont);
-        painter.setRenderHint(QPainter::Antialiasing, false);
-        for (int i = 0; i <= 4; ++i) {
-            const double t = i / 4.0;
-            const int y = qRound(bar.bottom() - t * bar.height());
-            painter.setPen(QColor("#C9CDD4"));
-            painter.drawLine(bar.right() + 2, y, bar.right() + 6, y);
-            painter.setPen(QColor("#6B7280"));
-            painter.drawText(QRect(bar.right() + 7, y - 8, width() - bar.right() - 8, 16),
-                             Qt::AlignLeft | Qt::AlignVCenter,
-                             QString::number(t, 'f', 2));
-        }
-
-        QFont titleFont = painter.font();
-        titleFont.setPointSize(8);
-        titleFont.setBold(true);
-        painter.setFont(titleFont);
-        painter.setPen(QColor("#57606A"));
         const QString title = languageCode_ == "zh-CN" ? QString::fromUtf8("属性") : QString::fromUtf8("Attr.");
-        painter.drawText(QRect(4, 8, width() - 8, 20), Qt::AlignCenter, title);
+        painter.drawText(
+            QRect(4, 8, width() - 8, 20),
+            Qt::AlignCenter,
+            title);
+        painter.setPen(QColor("#333333"));
+        painter.drawText(QRect(4, 34, width() - 8, 18), Qt::AlignCenter, QString::fromUtf8("1.0"));
+        painter.setPen(QColor("#333333"));
+        painter.drawText(QRect(4, bar.bottom() + 6, width() - 8, 18), Qt::AlignCenter, QString::fromUtf8("0.0"));
     }
 
 private:
@@ -1277,38 +1198,38 @@ void FaultPolyTraceWindow::buildUi() {
     resize(1280, 780);
     setStyleSheet(fpt_ui::appStyle());
 
-    QAction* openAction = new QAction(makeToolIcon(ToolIconKind::Open), QString::fromUtf8("打开 DAT 文件"), this);
+    QAction* openAction = new QAction(style()->standardIcon(QStyle::SP_DirOpenIcon), QString::fromUtf8("打开 DAT 文件"), this);
     openAction->setToolTip(QString::fromUtf8("选择外部断层属性网格文件 (Ctrl+O)"));
     openAction->setShortcut(QKeySequence::Open);
     connect(openAction, &QAction::triggered, this, &FaultPolyTraceWindow::browseInput);
-    runAction_ = new QAction(makeToolIcon(ToolIconKind::Run), QString::fromUtf8("开始追踪"), this);
+    runAction_ = new QAction(style()->standardIcon(QStyle::SP_MediaPlay), QString::fromUtf8("开始追踪"), this);
     runAction_->setToolTip(QString::fromUtf8("按当前参数运行断层多边形自动追踪 (F5)"));
     runAction_->setShortcut(QKeySequence(Qt::Key_F5));
     connect(runAction_, &QAction::triggered, this, &FaultPolyTraceWindow::runTrace);
-    stopAction_ = new QAction(makeToolIcon(ToolIconKind::Stop), QString::fromUtf8("停止"), this);
+    stopAction_ = new QAction(style()->standardIcon(QStyle::SP_MediaStop), QString::fromUtf8("停止"), this);
     stopAction_->setToolTip(QString::fromUtf8("终止当前正在运行的追踪任务 (Shift+F5)"));
     stopAction_->setEnabled(false);
     stopAction_->setShortcut(QKeySequence("Shift+F5"));
     connect(stopAction_, &QAction::triggered, this, &FaultPolyTraceWindow::stopTrace);
-    QAction* pngAction = new QAction(makeToolIcon(ToolIconKind::Image), QString::fromUtf8("导出PNG"), this);
+    QAction* pngAction = new QAction(style()->standardIcon(QStyle::SP_DialogSaveButton), QString::fromUtf8("导出PNG"), this);
     pngAction->setToolTip(QString::fromUtf8("导出当前视图区图像 (Ctrl+Shift+P)"));
     pngAction->setShortcut(QKeySequence("Ctrl+Shift+P"));
     connect(pngAction, &QAction::triggered, this, &FaultPolyTraceWindow::exportPng);
-    QAction* saveTplAction = new QAction(makeToolIcon(ToolIconKind::Save), QString::fromUtf8("保存参数模板"), this);
+    QAction* saveTplAction = new QAction(style()->standardIcon(QStyle::SP_DialogSaveButton), QString::fromUtf8("保存参数模板"), this);
     saveTplAction->setToolTip(QString::fromUtf8("保存当前算法参数模板 (Ctrl+S)"));
     saveTplAction->setShortcut(QKeySequence::Save);
     connect(saveTplAction, &QAction::triggered, this, &FaultPolyTraceWindow::saveTemplate);
-    QAction* loadTplAction = new QAction(makeToolIcon(ToolIconKind::Load), QString::fromUtf8("打开参数模板"), this);
+    QAction* loadTplAction = new QAction(style()->standardIcon(QStyle::SP_DialogOpenButton), QString::fromUtf8("打开参数模板"), this);
     loadTplAction->setToolTip(QString::fromUtf8("读取已保存的参数模板 (Ctrl+Shift+O)"));
     loadTplAction->setShortcut(QKeySequence("Ctrl+Shift+O"));
     connect(loadTplAction, &QAction::triggered, this, &FaultPolyTraceWindow::loadTemplate);
-    QAction* resetAction = new QAction(makeToolIcon(ToolIconKind::Restore), QString::fromUtf8("恢复默认参数"), this);
+    QAction* resetAction = new QAction(style()->standardIcon(QStyle::SP_BrowserReload), QString::fromUtf8("恢复默认参数"), this);
     resetAction->setToolTip(QString::fromUtf8("恢复推荐默认参数"));
     connect(resetAction, &QAction::triggered, this, &FaultPolyTraceWindow::restoreDefaults);
-    QAction* outputDirAction = new QAction(makeToolIcon(ToolIconKind::Folder), QString::fromUtf8("打开输出目录"), this);
+    QAction* outputDirAction = new QAction(style()->standardIcon(QStyle::SP_DirIcon), QString::fromUtf8("打开输出目录"), this);
     outputDirAction->setToolTip(QString::fromUtf8("打开当前结果输出目录"));
     connect(outputDirAction, &QAction::triggered, this, &FaultPolyTraceWindow::openOutputDir);
-    QAction* helpAction = new QAction(makeToolIcon(ToolIconKind::Help), QString::fromUtf8("帮助提示"), this);
+    QAction* helpAction = new QAction(style()->standardIcon(QStyle::SP_MessageBoxQuestion), QString::fromUtf8("帮助提示"), this);
     helpAction->setToolTip(QString::fromUtf8("查看独立软件使用说明"));
     connect(helpAction, &QAction::triggered, this, &FaultPolyTraceWindow::openHelp);
     QAction* userManualAction = new QAction(QString::fromUtf8("用户操作手册"), this);
@@ -1595,10 +1516,6 @@ void FaultPolyTraceWindow::buildUi() {
     QGroupBox* styleBox = new QGroupBox(QString::fromUtf8("显示样式"), sidebarContent);
     QGridLayout* styleLayout = new QGridLayout(styleBox);
     configureFormGrid(styleLayout);
-    colorSwatch_ = new QToolButton(styleBox);
-    colorSwatch_->setObjectName("colorSwatch");
-    colorSwatch_->setToolTip(QString::fromUtf8("当前结果多边形颜色，点击修改"));
-    connect(colorSwatch_, &QToolButton::clicked, this, &FaultPolyTraceWindow::chooseColor);
     colorEdit_ = new QLineEdit("#00FFFF", styleBox);
     configurePathLineEdit(colorEdit_);
     colorEdit_->setReadOnly(true);
@@ -1609,7 +1526,6 @@ void FaultPolyTraceWindow::buildUi() {
     QHBoxLayout* colorRowLayout = new QHBoxLayout(colorRow);
     colorRowLayout->setContentsMargins(0, 0, 0, 0);
     colorRowLayout->setSpacing(6);
-    colorRowLayout->addWidget(colorSwatch_);
     colorRowLayout->addWidget(colorEdit_, 1);
     colorRowLayout->addWidget(colorButton);
     addRow(styleLayout, 0, QString::fromUtf8("颜色"), colorRow, styleBox);
@@ -1990,6 +1906,8 @@ void FaultPolyTraceWindow::buildUi() {
             for (QWidget* child : children) {
                 child->setVisible(on);
             }
+            // 收起时压到标题高度，避免留下空白分组框。
+            box->setMaximumHeight(on ? QWIDGETSIZE_MAX : 26);
         };
         applyVisibility(expanded);
         connect(box, &QGroupBox::toggled, this, [this, applyVisibility](bool on) {
@@ -3829,26 +3747,8 @@ void FaultPolyTraceWindow::setRunning(bool running) {
 }
 
 void FaultPolyTraceWindow::appendLog(const QString& text) {
-    // 按行分级着色：错误红、完成绿、常规灰墨。
     logEdit_->moveCursor(QTextCursor::End);
-    const QStringList lines = text.split('\n', Qt::SkipEmptyParts);
-    QString html;
-    for (const QString& line : lines) {
-        QString color = "#374151";
-        if (line.contains(QString::fromUtf8("错误")) || line.contains(QString::fromUtf8("失败")) ||
-            line.contains(QLatin1String("error"), Qt::CaseInsensitive) ||
-            line.contains(QLatin1String("failed"), Qt::CaseInsensitive)) {
-            color = "#B42318";
-        } else if (line.contains(QString::fromUtf8("完成")) || line.contains(QString::fromUtf8("成功")) ||
-                   line.contains(QString::fromUtf8("就绪"))) {
-            color = "#1A7F37";
-        }
-        html += QString("<span style=\"color:%1;\">%2</span><br>")
-                    .arg(color, line.toHtmlEscaped());
-    }
-    if (!html.isEmpty()) {
-        logEdit_->insertHtml(html);
-    }
+    logEdit_->insertPlainText(text.endsWith('\n') ? text : text + "\n");
     logEdit_->moveCursor(QTextCursor::End);
 }
 
@@ -3859,10 +3759,9 @@ void FaultPolyTraceWindow::setPolygonColor(const QColor& color) {
     const QColor effective = color.isValid() ? color : QColor(0, 255, 255);
     const QString hex = effective.name(QColor::HexRgb).toUpper();
     colorEdit_->setText(hex);
-    if (colorSwatch_) {
-        colorSwatch_->setStyleSheet(
-            QString("QToolButton#colorSwatch { background: %1; }").arg(hex));
-    }
+    const QString textColor = effective.lightness() < 128 ? "#FFFFFF" : "#000000";
+    colorEdit_->setStyleSheet(QString("background-color:%1; color:%2; font-weight:bold;")
+        .arg(hex, textColor));
 }
 
 void FaultPolyTraceWindow::updateStatus(const QString& text) {

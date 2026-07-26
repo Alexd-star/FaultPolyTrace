@@ -207,7 +207,6 @@ private:
     QSpinBox* residualTraceMinLengthSpin_ = nullptr;
     QSpinBox* residualTraceMaxCellsSpin_ = nullptr;
     QLineEdit* colorEdit_ = nullptr;
-    QToolButton* colorSwatch_ = nullptr;
     QProgressBar* busyBar_ = nullptr;
     QDoubleSpinBox* lineWidthSpin_ = nullptr;
     QDoubleSpinBox* alphaSpin_ = nullptr;
