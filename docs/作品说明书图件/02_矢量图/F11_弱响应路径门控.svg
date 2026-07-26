@@ -6,11 +6,11 @@
   <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:date>2026-07-26T13:11:32.761596</dc:date>
+    <dc:date>2026-07-26T15:27:59.041252</dc:date>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
-      <dc:title>Matplotlib v3.10.9, https://matplotlib.org/</dc:title>
+      <dc:title>Matplotlib v3.9.4, https://matplotlib.org/</dc:title>
      </cc:Agent>
     </dc:creator>
    </cc:Work>
@@ -37,7 +37,7 @@ L 29.337344 14.915
 z
 " style="fill: #ffffff"/>
    </g>
-   <g id="FillBetweenPolyCollection_1">
+   <g id="PolyCollection_1">
     <path d="M 59.786081 100.078353 
 L 59.786081 101.015515 
 L 60.588419 101.015515 
@@ -105,7 +105,7 @@ L 61.390758 91.474551
 L 60.588419 95.778457 
 L 59.786081 100.078353 
 z
-" clip-path="url(#p9181c78479)" style="fill: #ddedea; fill-opacity: 0.9; stroke: #ddedea; stroke-opacity: 0.9; stroke-width: 0.7"/>
+" clip-path="url(#pd29b3d04f3)" style="fill: #ddedea; fill-opacity: 0.9; stroke: #ddedea; stroke-opacity: 0.9; stroke-width: 0.7"/>
     <path d="M 117.554437 99.419692 
 L 117.554437 101.015515 
 L 118.356775 101.015515 
@@ -183,146 +183,146 @@ L 119.159113 95.761702
 L 118.356775 97.55881 
 L 117.554437 99.419692 
 z
-" clip-path="url(#p9181c78479)" style="fill: #ddedea; fill-opacity: 0.9; stroke: #ddedea; stroke-opacity: 0.9; stroke-width: 0.7"/>
+" clip-path="url(#pd29b3d04f3)" style="fill: #ddedea; fill-opacity: 0.9; stroke: #ddedea; stroke-opacity: 0.9; stroke-width: 0.7"/>
    </g>
    <g id="matplotlib.axis_1">
     <g id="xtick_1">
      <g id="line2d_1">
       <defs>
-       <path id="md780ab79f2" d="M 0 0 
+       <path id="m5964a2e77d" d="M 0 0 
 L 0 3.5 
 " style="stroke: #000000; stroke-width: 0.8"/>
       </defs>
       <g>
-       <use xlink:href="#md780ab79f2" x="36.518271" y="169.895926" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#m5964a2e77d" x="36.518271" y="169.895926" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_1">
-      <text style="font-size: 6px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="36.518271" y="181.692176" transform="rotate(-0 36.518271 181.692176)">0.0</text>
+      <text style="font: 6px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="36.518271" y="181.692176" transform="rotate(-0 36.518271 181.692176)">0.0</text>
      </g>
     </g>
     <g id="xtick_2">
      <g id="line2d_2">
       <g>
-       <use xlink:href="#md780ab79f2" x="65.241981" y="169.895926" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#m5964a2e77d" x="65.241981" y="169.895926" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_2">
-      <text style="font-size: 6px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="65.241981" y="181.692176" transform="rotate(-0 65.241981 181.692176)">0.2</text>
+      <text style="font: 6px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="65.241981" y="181.692176" transform="rotate(-0 65.241981 181.692176)">0.2</text>
      </g>
     </g>
     <g id="xtick_3">
      <g id="line2d_3">
       <g>
-       <use xlink:href="#md780ab79f2" x="93.965691" y="169.895926" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#m5964a2e77d" x="93.965691" y="169.895926" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_3">
-      <text style="font-size: 6px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="93.965691" y="181.692176" transform="rotate(-0 93.965691 181.692176)">0.4</text>
+      <text style="font: 6px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="93.965691" y="181.692176" transform="rotate(-0 93.965691 181.692176)">0.4</text>
      </g>
     </g>
     <g id="xtick_4">
      <g id="line2d_4">
       <g>
-       <use xlink:href="#md780ab79f2" x="122.689401" y="169.895926" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#m5964a2e77d" x="122.689401" y="169.895926" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_4">
-      <text style="font-size: 6px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="122.689401" y="181.692176" transform="rotate(-0 122.689401 181.692176)">0.6</text>
+      <text style="font: 6px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="122.689401" y="181.692176" transform="rotate(-0 122.689401 181.692176)">0.6</text>
      </g>
     </g>
     <g id="xtick_5">
      <g id="line2d_5">
       <g>
-       <use xlink:href="#md780ab79f2" x="151.413112" y="169.895926" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#m5964a2e77d" x="151.413112" y="169.895926" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_5">
-      <text style="font-size: 6px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="151.413112" y="181.692176" transform="rotate(-0 151.413112 181.692176)">0.8</text>
+      <text style="font: 6px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="151.413112" y="181.692176" transform="rotate(-0 151.413112 181.692176)">0.8</text>
      </g>
     </g>
     <g id="xtick_6">
      <g id="line2d_6">
       <g>
-       <use xlink:href="#md780ab79f2" x="180.136822" y="169.895926" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#m5964a2e77d" x="180.136822" y="169.895926" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_6">
-      <text style="font-size: 6px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="180.136822" y="181.692176" transform="rotate(-0 180.136822 181.692176)">1.0</text>
+      <text style="font: 6px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="180.136822" y="181.692176" transform="rotate(-0 180.136822 181.692176)">1.0</text>
      </g>
     </g>
     <g id="text_7">
-     <text style="font-size: 7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="108.327546" y="192.779364" transform="rotate(-0 108.327546 192.779364)">路径位置</text>
+     <text style="font: 7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="108.327546" y="192.779364" transform="rotate(-0 108.327546 192.779364)">路径位置</text>
     </g>
    </g>
    <g id="matplotlib.axis_2">
     <g id="ytick_1">
      <g id="line2d_7">
       <defs>
-       <path id="m72ea700bc0" d="M 0 0 
+       <path id="mf6587d1e76" d="M 0 0 
 L -3.5 0 
 " style="stroke: #000000; stroke-width: 0.8"/>
       </defs>
       <g>
-       <use xlink:href="#m72ea700bc0" x="29.337344" y="169.895926" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#mf6587d1e76" x="29.337344" y="169.895926" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_8">
-      <text style="font-size: 6px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: end" x="22.337344" y="172.294051" transform="rotate(-0 22.337344 172.294051)">0.0</text>
+      <text style="font: 6px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: end" x="22.337344" y="172.294051" transform="rotate(-0 22.337344 172.294051)">0.0</text>
      </g>
     </g>
     <g id="ytick_2">
      <g id="line2d_8">
       <g>
-       <use xlink:href="#m72ea700bc0" x="29.337344" y="141.195755" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#mf6587d1e76" x="29.337344" y="141.195755" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_9">
-      <text style="font-size: 6px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: end" x="22.337344" y="143.59388" transform="rotate(-0 22.337344 143.59388)">0.2</text>
+      <text style="font: 6px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: end" x="22.337344" y="143.59388" transform="rotate(-0 22.337344 143.59388)">0.2</text>
      </g>
     </g>
     <g id="ytick_3">
      <g id="line2d_9">
       <g>
-       <use xlink:href="#m72ea700bc0" x="29.337344" y="112.495583" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#mf6587d1e76" x="29.337344" y="112.495583" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_10">
-      <text style="font-size: 6px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: end" x="22.337344" y="114.893708" transform="rotate(-0 22.337344 114.893708)">0.4</text>
+      <text style="font: 6px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: end" x="22.337344" y="114.893708" transform="rotate(-0 22.337344 114.893708)">0.4</text>
      </g>
     </g>
     <g id="ytick_4">
      <g id="line2d_10">
       <g>
-       <use xlink:href="#m72ea700bc0" x="29.337344" y="83.795412" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#mf6587d1e76" x="29.337344" y="83.795412" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_11">
-      <text style="font-size: 6px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: end" x="22.337344" y="86.193537" transform="rotate(-0 22.337344 86.193537)">0.6</text>
+      <text style="font: 6px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: end" x="22.337344" y="86.193537" transform="rotate(-0 22.337344 86.193537)">0.6</text>
      </g>
     </g>
     <g id="ytick_5">
      <g id="line2d_11">
       <g>
-       <use xlink:href="#m72ea700bc0" x="29.337344" y="55.09524" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#mf6587d1e76" x="29.337344" y="55.09524" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_12">
-      <text style="font-size: 6px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: end" x="22.337344" y="57.493365" transform="rotate(-0 22.337344 57.493365)">0.8</text>
+      <text style="font: 6px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: end" x="22.337344" y="57.493365" transform="rotate(-0 22.337344 57.493365)">0.8</text>
      </g>
     </g>
     <g id="ytick_6">
      <g id="line2d_12">
       <g>
-       <use xlink:href="#m72ea700bc0" x="29.337344" y="26.395069" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#mf6587d1e76" x="29.337344" y="26.395069" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_13">
-      <text style="font-size: 6px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: end" x="22.337344" y="28.793194" transform="rotate(-0 22.337344 28.793194)">1.0</text>
+      <text style="font: 6px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: end" x="22.337344" y="28.793194" transform="rotate(-0 22.337344 28.793194)">1.0</text>
      </g>
     </g>
     <g id="text_14">
-     <text style="font-size: 7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="8.115625" y="92.405463" transform="rotate(-90 8.115625 92.405463)">属性响应</text>
+     <text style="font: 7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="8.115625" y="92.405463" transform="rotate(-90 8.115625 92.405463)">属性响应</text>
     </g>
    </g>
    <g id="line2d_13">
@@ -411,17 +411,17 @@ L 176.927469 149.475881
 L 179.334483 150.906187 
 L 180.136822 151.317502 
 L 180.136822 151.317502 
-" clip-path="url(#p9181c78479)" style="fill: none; stroke: #20252a; stroke-linecap: square"/>
+" clip-path="url(#pd29b3d04f3)" style="fill: none; stroke: #20252a; stroke-linecap: square"/>
    </g>
    <g id="line2d_14">
     <path d="M 29.337344 66.575309 
 L 187.317749 66.575309 
-" clip-path="url(#p9181c78479)" style="fill: none; stroke-dasharray: 2.96,1.28; stroke-dashoffset: 0; stroke: #2d67a3; stroke-width: 0.8"/>
+" clip-path="url(#pd29b3d04f3)" style="fill: none; stroke-dasharray: 2.96,1.28; stroke-dashoffset: 0; stroke: #2d67a3; stroke-width: 0.8"/>
    </g>
    <g id="line2d_15">
     <path d="M 29.337344 101.015515 
 L 187.317749 101.015515 
-" clip-path="url(#p9181c78479)" style="fill: none; stroke-dasharray: 2.96,1.28; stroke-dashoffset: 0; stroke: #2f8f83; stroke-width: 0.8"/>
+" clip-path="url(#pd29b3d04f3)" style="fill: none; stroke-dasharray: 2.96,1.28; stroke-dashoffset: 0; stroke: #2f8f83; stroke-width: 0.8"/>
    </g>
    <g id="patch_3">
     <path d="M 29.337344 169.895926 
@@ -434,7 +434,7 @@ L 187.317749 169.895926
 " style="fill: none; stroke: #000000; stroke-width: 0.65; stroke-linejoin: miter; stroke-linecap: square"/>
    </g>
    <g id="text_15">
-    <text style="font-weight: 700; font-size: 8px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="29.337344" y="8.915" transform="rotate(-0 29.337344 8.915)">a  双阈值分离强种子与弱候选</text>
+    <text style="font: 700 8px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="29.337344" y="8.915" transform="rotate(-0 29.337344 8.915)">a  双阈值分离强种子与弱候选</text>
    </g>
    <g id="legend_1">
     <g id="line2d_16">
@@ -444,7 +444,7 @@ L 159.117749 23.01125
 " style="fill: none; stroke-dasharray: 2.96,1.28; stroke-dashoffset: 0; stroke: #2d67a3; stroke-width: 0.8"/>
     </g>
     <g id="text_16">
-     <text style="font-size: 6px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="163.917749" y="25.11125" transform="rotate(-0 163.917749 25.11125)">强阈值</text>
+     <text style="font: 6px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="163.917749" y="25.11125" transform="rotate(-0 163.917749 25.11125)">强阈值</text>
     </g>
     <g id="line2d_17">
      <path d="M 147.117749 32.299063 
@@ -453,7 +453,7 @@ L 159.117749 32.299063
 " style="fill: none; stroke-dasharray: 2.96,1.28; stroke-dashoffset: 0; stroke: #2f8f83; stroke-width: 0.8"/>
     </g>
     <g id="text_17">
-     <text style="font-size: 6px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="163.917749" y="34.399063" transform="rotate(-0 163.917749 34.399063)">弱阈值</text>
+     <text style="font: 6px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="163.917749" y="34.399063" transform="rotate(-0 163.917749 34.399063)">弱阈值</text>
     </g>
    </g>
   </g>
@@ -469,29 +469,29 @@ C 243.498202 79.543674 243.082057 80.529263 243.082057 81.556798
 C 243.082057 82.584334 243.498202 83.569923 244.238842 84.2965 
 C 244.979481 85.023077 245.984145 85.431321 247.031567 85.431321 
 z
-" clip-path="url(#p8c57402244)" style="fill: #ffffff; stroke: #2d67a3; stroke-width: 0.9; stroke-linejoin: miter"/>
+" clip-path="url(#pef8598a005)" style="fill: #ffffff; stroke: #2d67a3; stroke-width: 0.9; stroke-linejoin: miter"/>
    </g>
    <g id="line2d_18">
     <path d="M 205.956662 67.608515 
 L 247.031567 81.556798 
-" clip-path="url(#p8c57402244)" style="fill: none; stroke: #2d67a3; stroke-width: 7; stroke-linecap: round"/>
+" clip-path="url(#pef8598a005)" style="fill: none; stroke: #2d67a3; stroke-width: 7; stroke-linecap: round"/>
    </g>
    <g id="line2d_19">
     <path d="M 247.031567 81.556798 
 L 322.862162 114.102793 
-" clip-path="url(#p8c57402244)" style="fill: none; stroke: #2f8f83; stroke-width: 5; stroke-linecap: round"/>
+" clip-path="url(#pef8598a005)" style="fill: none; stroke: #2f8f83; stroke-width: 5; stroke-linecap: round"/>
    </g>
    <g id="text_18">
-    <text style="font-weight: 700; font-size: 6.2px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2d67a3" x="226.494114" y="52.110422" transform="rotate(-0 226.494114 52.110422)">强种子</text>
+    <text style="fill: #2d67a3; font: 700 6.2px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="226.494114" y="52.110422" transform="rotate(-0 226.494114 52.110422)">强种子</text>
    </g>
    <g id="text_19">
-    <text style="font-weight: 700; font-size: 6.2px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2f8f83" x="291.266081" y="84.656417" transform="rotate(-0 291.266081 84.656417)">弱候选分量</text>
+    <text style="fill: #2f8f83; font: 700 6.2px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="291.266081" y="84.656417" transform="rotate(-0 291.266081 84.656417)">弱候选分量</text>
    </g>
    <g id="text_20">
-    <text style="font-size: 5.8px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="272.308432" y="141.99936" transform="rotate(-0 272.308432 141.99936)">接触强种子邻域</text>
+    <text style="font: 5.8px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="272.308432" y="141.99936" transform="rotate(-0 272.308432 141.99936)">接触强种子邻域</text>
    </g>
    <g id="text_21">
-    <text style="font-weight: 700; font-size: 8px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="193.318229" y="8.915" transform="rotate(-0 193.318229 8.915)">b  邻域接触建立延拓起点</text>
+    <text style="font: 700 8px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="193.318229" y="8.915" transform="rotate(-0 193.318229 8.915)">b  邻域接触建立延拓起点</text>
    </g>
   </g>
   <g id="axes_3">
@@ -506,7 +506,7 @@ C 379.30016 54.243741 379.100411 54.716824 379.100411 55.210041
 C 379.100411 55.703258 379.30016 56.17634 379.655667 56.525098 
 C 380.011174 56.873855 380.493413 57.069812 380.996175 57.069812 
 z
-" clip-path="url(#pf9f1ea5c98)" style="fill: #2f8f83"/>
+" clip-path="url(#p0a305e0642)" style="fill: #2f8f83"/>
    </g>
    <g id="patch_7">
     <path d="M 380.996175 84.966379 
@@ -519,7 +519,7 @@ C 379.30016 82.140308 379.100411 82.61339 379.100411 83.106608
 C 379.100411 83.599825 379.30016 84.072907 379.655667 84.421664 
 C 380.011174 84.770421 380.493413 84.966379 380.996175 84.966379 
 z
-" clip-path="url(#pf9f1ea5c98)" style="fill: #2f8f83"/>
+" clip-path="url(#p0a305e0642)" style="fill: #2f8f83"/>
    </g>
    <g id="patch_8">
     <path d="M 380.996175 112.862945 
@@ -532,34 +532,34 @@ C 379.30016 110.036875 379.100411 110.509957 379.100411 111.003174
 C 379.100411 111.496391 379.30016 111.969474 379.655667 112.318231 
 C 380.011174 112.666988 380.493413 112.862945 380.996175 112.862945 
 z
-" clip-path="url(#pf9f1ea5c98)" style="fill: #2f8f83"/>
+" clip-path="url(#p0a305e0642)" style="fill: #2f8f83"/>
    </g>
    <g id="line2d_20">
     <path d="M 380.996175 55.210041 
 L 380.996175 111.003174 
-" clip-path="url(#pf9f1ea5c98)" style="fill: none; stroke: #2f8f83; stroke-width: 0.8"/>
+" clip-path="url(#p0a305e0642)" style="fill: none; stroke: #2f8f83; stroke-width: 0.8"/>
    </g>
    <g id="patch_9">
     <path d="M 406.67127 82.808073 
 Q 414.960932 81.556954 422.255632 80.456 
-" clip-path="url(#pf9f1ea5c98)" style="fill: none; stroke: #2f8f83; stroke-width: 0.9; stroke-linecap: round"/>
+" clip-path="url(#p0a305e0642)" style="fill: none; stroke: #2f8f83; stroke-width: 0.9; stroke-linecap: round"/>
     <path d="M 418.85269 79.351469 
 L 422.255632 80.456 
 L 419.330243 82.515635 
 z
-" clip-path="url(#pf9f1ea5c98)" style="fill: #2f8f83; stroke: #2f8f83; stroke-width: 0.9; stroke-linecap: round"/>
+" clip-path="url(#p0a305e0642)" style="fill: #2f8f83; stroke: #2f8f83; stroke-width: 0.9; stroke-linecap: round"/>
    </g>
    <g id="text_22">
-    <text style="font-size: 6px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="388.895196" y="56.862385" transform="rotate(-0 388.895196 56.862385)">分量规模</text>
+    <text style="font: 6px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="388.895196" y="56.862385" transform="rotate(-0 388.895196 56.862385)">分量规模</text>
    </g>
    <g id="text_23">
-    <text style="font-size: 6px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="388.895196" y="84.758951" transform="rotate(-0 388.895196 84.758951)">长宽比</text>
+    <text style="font: 6px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="388.895196" y="84.758951" transform="rotate(-0 388.895196 84.758951)">长宽比</text>
    </g>
    <g id="text_24">
-    <text style="font-size: 6px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="388.895196" y="112.655518" transform="rotate(-0 388.895196 112.655518)">与强种子接触</text>
+    <text style="font: 6px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="388.895196" y="112.655518" transform="rotate(-0 388.895196 112.655518)">与强种子接触</text>
    </g>
    <g id="text_25">
-    <text style="font-weight: 700; font-size: 8px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="357.299115" y="8.915" transform="rotate(-0 357.299115 8.915)">c  分量级形态门控</text>
+    <text style="font: 700 8px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="357.299115" y="8.915" transform="rotate(-0 357.299115 8.915)">c  分量级形态门控</text>
    </g>
    <g id="text_26">
     <g id="patch_10">
@@ -570,8 +570,8 @@ L 426.116534 71.898067
 z
 " style="fill: #ddedea; stroke: #2f8f83; stroke-width: 0.6; stroke-linejoin: miter"/>
     </g>
-    <text style="font-weight: 700; font-size: 6.2px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; fill: #2f8f83" transform="translate(430.208534 77.846192)">条件满足</text>
-    <text style="font-weight: 700; font-size: 6.2px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; fill: #2f8f83" transform="translate(427.108534 85.58263)">接纳弱分量</text>
+    <text style="fill: #2f8f83; font: 700 6.2px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(430.208534 77.846192)">条件满足</text>
+    <text style="fill: #2f8f83; font: 700 6.2px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(427.108534 85.58263)">接纳弱分量</text>
    </g>
    <g id="text_27">
     <g id="patch_11">
@@ -582,19 +582,19 @@ L 429.648534 121.753542
 z
 " style="fill: #ffffff; stroke: #a94a52; stroke-width: 0.6; stroke-linejoin: miter"/>
     </g>
-    <text style="font-size: 6px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; fill: #a94a52" transform="translate(430.608534 127.509792)">条件不足</text>
-    <text style="font-size: 6px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; fill: #a94a52" transform="translate(430.608534 134.996667)">保持背景</text>
+    <text style="fill: #a94a52; font: 6px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(430.608534 127.509792)">条件不足</text>
+    <text style="fill: #a94a52; font: 6px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(430.608534 134.996667)">保持背景</text>
    </g>
   </g>
  </g>
  <defs>
-  <clipPath id="p9181c78479">
+  <clipPath id="pd29b3d04f3">
    <rect x="29.337344" y="14.915" width="157.980405" height="154.980926"/>
   </clipPath>
-  <clipPath id="p8c57402244">
+  <clipPath id="pef8598a005">
    <rect x="193.318229" y="14.915" width="157.980405" height="154.980926"/>
   </clipPath>
-  <clipPath id="pf9f1ea5c98">
+  <clipPath id="p0a305e0642">
    <rect x="357.299115" y="14.915" width="157.980405" height="154.980926"/>
   </clipPath>
  </defs>

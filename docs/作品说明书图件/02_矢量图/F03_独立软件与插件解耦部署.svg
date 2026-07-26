@@ -6,11 +6,11 @@
   <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:date>2026-07-26T12:49:47.075117</dc:date>
+    <dc:date>2026-07-26T15:27:46.708760</dc:date>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
-      <dc:title>Matplotlib v3.10.9, https://matplotlib.org/</dc:title>
+      <dc:title>Matplotlib v3.9.4, https://matplotlib.org/</dc:title>
      </cc:Agent>
     </dc:creator>
    </cc:Work>
@@ -32,17 +32,17 @@ z
    <g id="line2d_1">
     <path d="M 23.030381 29.519957 
 L 238.389379 29.519957 
-" clip-path="url(#p32d69b879b)" style="fill: none; stroke: #2d67a3; stroke-width: 1.6"/>
+" clip-path="url(#pf547e316d7)" style="fill: none; stroke: #2d67a3; stroke-width: 1.6"/>
    </g>
    <g id="line2d_2">
     <path d="M 279.410141 29.519957 
 L 494.769139 29.519957 
-" clip-path="url(#p32d69b879b)" style="fill: none; stroke: #2f8f83; stroke-width: 1.6"/>
+" clip-path="url(#pf547e316d7)" style="fill: none; stroke: #2f8f83; stroke-width: 1.6"/>
    </g>
    <g id="line2d_3">
     <path d="M 48.668357 71.51989 
 L 48.668357 218.519654 
-" clip-path="url(#p32d69b879b)" style="fill: none; stroke: #2d67a3; stroke-width: 1.2"/>
+" clip-path="url(#pf547e316d7)" style="fill: none; stroke: #2d67a3; stroke-width: 1.2"/>
    </g>
    <g id="patch_2">
     <path d="M 48.668357 86.819865 
@@ -55,7 +55,7 @@ C 43.622305 81.80526 43.028002 82.644702 43.028002 83.51987
 C 43.028002 84.395039 43.622305 85.234481 44.680024 85.853319 
 C 45.737742 86.472157 47.172517 86.819865 48.668357 86.819865 
 z
-" clip-path="url(#p32d69b879b)" style="fill: #2d67a3"/>
+" clip-path="url(#pf547e316d7)" style="fill: #2d67a3"/>
    </g>
    <g id="patch_3">
     <path d="M 48.668357 140.819779 
@@ -68,7 +68,7 @@ C 43.622305 135.805173 43.028002 136.644615 43.028002 137.519784
 C 43.028002 138.394953 43.622305 139.234395 44.680024 139.853233 
 C 45.737742 140.47207 47.172517 140.819779 48.668357 140.819779 
 z
-" clip-path="url(#p32d69b879b)" style="fill: #2d67a3"/>
+" clip-path="url(#pf547e316d7)" style="fill: #2d67a3"/>
    </g>
    <g id="patch_4">
     <path d="M 48.668357 194.819692 
@@ -81,12 +81,12 @@ C 43.622305 189.805087 43.028002 190.644529 43.028002 191.519698
 C 43.028002 192.394866 43.622305 193.234308 44.680024 193.853146 
 C 45.737742 194.471984 47.172517 194.819692 48.668357 194.819692 
 z
-" clip-path="url(#p32d69b879b)" style="fill: #2d67a3"/>
+" clip-path="url(#pf547e316d7)" style="fill: #2d67a3"/>
    </g>
    <g id="line2d_4">
     <path d="M 305.048117 71.51989 
 L 305.048117 218.519654 
-" clip-path="url(#p32d69b879b)" style="fill: none; stroke: #2f8f83; stroke-width: 1.2"/>
+" clip-path="url(#pf547e316d7)" style="fill: none; stroke: #2f8f83; stroke-width: 1.2"/>
    </g>
    <g id="patch_5">
     <path d="M 305.048117 86.819865 
@@ -99,7 +99,7 @@ C 300.002065 81.80526 299.407762 82.644702 299.407762 83.51987
 C 299.407762 84.395039 300.002065 85.234481 301.059784 85.853319 
 C 302.117502 86.472157 303.552277 86.819865 305.048117 86.819865 
 z
-" clip-path="url(#p32d69b879b)" style="fill: #2f8f83"/>
+" clip-path="url(#pf547e316d7)" style="fill: #2f8f83"/>
    </g>
    <g id="patch_6">
     <path d="M 305.048117 140.819779 
@@ -112,7 +112,7 @@ C 300.002065 135.805173 299.407762 136.644615 299.407762 137.519784
 C 299.407762 138.394953 300.002065 139.234395 301.059784 139.853233 
 C 302.117502 140.47207 303.552277 140.819779 305.048117 140.819779 
 z
-" clip-path="url(#p32d69b879b)" style="fill: #2f8f83"/>
+" clip-path="url(#pf547e316d7)" style="fill: #2f8f83"/>
    </g>
    <g id="patch_7">
     <path d="M 305.048117 194.819692 
@@ -125,7 +125,7 @@ C 300.002065 189.805087 299.407762 190.644529 299.407762 191.519698
 C 299.407762 192.394866 300.002065 193.234308 301.059784 193.853146 
 C 302.117502 194.471984 303.552277 194.819692 305.048117 194.819692 
 z
-" clip-path="url(#p32d69b879b)" style="fill: #2f8f83"/>
+" clip-path="url(#pf547e316d7)" style="fill: #2f8f83"/>
    </g>
    <g id="patch_8">
     <path d="M 135.837475 278.519558 
@@ -133,83 +133,83 @@ L 381.962045 278.519558
 L 381.962045 242.519616 
 L 135.837475 242.519616 
 z
-" clip-path="url(#p32d69b879b)" style="fill: #f5f6f6; stroke: #20252a; stroke-width: 0.8; stroke-linejoin: miter"/>
+" clip-path="url(#pf547e316d7)" style="fill: #f5f6f6; stroke: #20252a; stroke-width: 0.8; stroke-linejoin: miter"/>
    </g>
    <g id="patch_9">
     <path d="M 158.159915 219.367798 
 Q 181.98766 230.520491 204.904061 241.246625 
-" clip-path="url(#p32d69b879b)" style="fill: none; stroke: #2d67a3; stroke-width: 0.9; stroke-linecap: round"/>
+" clip-path="url(#pf547e316d7)" style="fill: none; stroke: #2d67a3; stroke-width: 0.9; stroke-linecap: round"/>
     <path d="M 202.684087 238.440967 
 L 204.904061 241.246625 
 L 201.327551 241.33921 
 z
-" clip-path="url(#p32d69b879b)" style="fill: #2d67a3; stroke: #2d67a3; stroke-width: 0.9; stroke-linecap: round"/>
+" clip-path="url(#pf547e316d7)" style="fill: #2d67a3; stroke: #2d67a3; stroke-width: 0.9; stroke-linecap: round"/>
    </g>
    <g id="patch_10">
     <path d="M 359.639605 219.367798 
 Q 335.81186 230.520491 312.895459 241.246625 
-" clip-path="url(#p32d69b879b)" style="fill: none; stroke: #2f8f83; stroke-width: 0.9; stroke-linecap: round"/>
+" clip-path="url(#pf547e316d7)" style="fill: none; stroke: #2f8f83; stroke-width: 0.9; stroke-linecap: round"/>
     <path d="M 316.471969 241.33921 
 L 312.895459 241.246625 
 L 315.115433 238.440967 
 z
-" clip-path="url(#p32d69b879b)" style="fill: #2f8f83; stroke: #2f8f83; stroke-width: 0.9; stroke-linecap: round"/>
+" clip-path="url(#pf547e316d7)" style="fill: #2f8f83; stroke: #2f8f83; stroke-width: 0.9; stroke-linecap: round"/>
    </g>
    <g id="text_1">
-    <text style="font-weight: 700; font-size: 6.4px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #2d67a3" x="23.030381" y="20.728968" transform="rotate(-0 23.030381 20.728968)">独立软件产品边界</text>
+    <text style="fill: #2d67a3; font: 700 6.4px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="23.030381" y="20.728968" transform="rotate(-0 23.030381 20.728968)">独立软件产品边界</text>
    </g>
    <g id="text_2">
-    <text style="font-weight: 700; font-size: 6.4px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #2f8f83" x="279.410141" y="20.728968" transform="rotate(-0 279.410141 20.728968)">GeoEast 集成产品边界</text>
+    <text style="fill: #2f8f83; font: 700 6.4px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="279.410141" y="20.728968" transform="rotate(-0 279.410141 20.728968)">GeoEast 集成产品边界</text>
    </g>
    <g id="text_3">
-    <text style="font-weight: 700; font-size: 6.8px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #2d67a3" x="66.61494" y="77.51988" transform="rotate(-0 66.61494 77.51988)">FaultPolyTrace.exe</text>
+    <text style="fill: #2d67a3; font: 700 6.8px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="66.61494" y="77.51988" transform="rotate(-0 66.61494 77.51988)">FaultPolyTrace.exe</text>
    </g>
    <g id="text_4">
-    <text style="font-size: 5.7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #5f6870" x="66.61494" y="91.019858" transform="rotate(-0 66.61494 91.019858)">独立窗口与本地任务服务</text>
+    <text style="fill: #5f6870; font: 5.7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="66.61494" y="91.019858" transform="rotate(-0 66.61494 91.019858)">独立窗口与本地任务服务</text>
    </g>
    <g id="text_5">
-    <text style="font-weight: 700; font-size: 6.8px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #2d67a3" x="66.61494" y="131.519794" transform="rotate(-0 66.61494 131.519794)">客户机运行资源</text>
+    <text style="fill: #2d67a3; font: 700 6.8px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="66.61494" y="131.519794" transform="rotate(-0 66.61494 131.519794)">客户机运行资源</text>
    </g>
    <g id="text_6">
-    <text style="font-size: 5.7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #5f6870" x="66.61494" y="145.019772" transform="rotate(-0 66.61494 145.019772)">Qt/VC、平台插件、帮助与示例</text>
+    <text style="fill: #5f6870; font: 5.7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="66.61494" y="145.019772" transform="rotate(-0 66.61494 145.019772)">Qt/VC、平台插件、帮助与示例</text>
    </g>
    <g id="text_7">
-    <text style="font-weight: 700; font-size: 6.8px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #2d67a3" x="66.61494" y="185.519707" transform="rotate(-0 66.61494 185.519707)">安装器与便携包</text>
+    <text style="fill: #2d67a3; font: 700 6.8px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="66.61494" y="185.519707" transform="rotate(-0 66.61494 185.519707)">安装器与便携包</text>
    </g>
    <g id="text_8">
-    <text style="font-size: 5.7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #5f6870" x="66.61494" y="199.019686" transform="rotate(-0 66.61494 199.019686)">配置写入用户目录，不依赖开发机路径</text>
+    <text style="fill: #5f6870; font: 5.7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="66.61494" y="199.019686" transform="rotate(-0 66.61494 199.019686)">配置写入用户目录，不依赖开发机路径</text>
    </g>
    <g id="text_9">
-    <text style="font-weight: 700; font-size: 6.8px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #2f8f83" x="322.9947" y="77.51988" transform="rotate(-0 322.9947 77.51988)">GeoEast Ribbon 入口</text>
+    <text style="fill: #2f8f83; font: 700 6.8px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="322.9947" y="77.51988" transform="rotate(-0 322.9947 77.51988)">GeoEast Ribbon 入口</text>
    </g>
    <g id="text_10">
-    <text style="font-size: 5.7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #5f6870" x="322.9947" y="91.019858" transform="rotate(-0 322.9947 91.019858)">由宿主加载并传递当前工区上下文</text>
+    <text style="fill: #5f6870; font: 5.7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="322.9947" y="91.019858" transform="rotate(-0 322.9947 91.019858)">由宿主加载并传递当前工区上下文</text>
    </g>
    <g id="text_11">
-    <text style="font-weight: 700; font-size: 6.8px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #2f8f83" x="322.9947" y="131.519794" transform="rotate(-0 322.9947 131.519794)">Launcher 与 BO Runner</text>
+    <text style="fill: #2f8f83; font: 700 6.8px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="322.9947" y="131.519794" transform="rotate(-0 322.9947 131.519794)">Launcher 与 BO Runner</text>
    </g>
    <g id="text_12">
-    <text style="font-size: 5.7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #5f6870" x="322.9947" y="145.019772" transform="rotate(-0 322.9947 145.019772)">数据库选择、任务调度与状态反馈</text>
+    <text style="fill: #5f6870; font: 5.7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="322.9947" y="145.019772" transform="rotate(-0 322.9947 145.019772)">数据库选择、任务调度与状态反馈</text>
    </g>
    <g id="text_13">
-    <text style="font-weight: 700; font-size: 6.8px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #2f8f83" x="322.9947" y="185.519707" transform="rotate(-0 322.9947 185.519707)">GeoEast SDK 适配</text>
+    <text style="fill: #2f8f83; font: 700 6.8px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="322.9947" y="185.519707" transform="rotate(-0 322.9947 185.519707)">GeoEast SDK 适配</text>
    </g>
    <g id="text_14">
-    <text style="font-size: 5.7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #5f6870" x="322.9947" y="199.019686" transform="rotate(-0 322.9947 199.019686)">BOMapGrid 读取与 BOFaultPolygon 写入</text>
+    <text style="fill: #5f6870; font: 5.7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="322.9947" y="199.019686" transform="rotate(-0 322.9947 199.019686)">BOMapGrid 读取与 BOFaultPolygon 写入</text>
    </g>
    <g id="text_15">
-    <text style="font-size: 6.4px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #5f6870" x="258.89976" y="256.019594" transform="rotate(-0 258.89976 256.019594)">共享计算资产</text>
+    <text style="fill: #5f6870; font: 6.4px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="258.89976" y="256.019594" transform="rotate(-0 258.89976 256.019594)">共享计算资产</text>
    </g>
    <g id="text_16">
-    <text style="font-weight: 700; font-size: 6.8px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #20252a" x="258.89976" y="268.019575" transform="rotate(-0 258.89976 268.019575)">C++ 核心  ·  参数模型  ·  多边形输出语义  ·  自动化验证</text>
+    <text style="fill: #20252a; font: 700 6.8px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="258.89976" y="268.019575" transform="rotate(-0 258.89976 268.019575)">C++ 核心  ·  参数模型  ·  多边形输出语义  ·  自动化验证</text>
    </g>
    <g id="text_17">
-    <text style="font-weight: 700; font-size: 7.3px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="258.89976" y="17.519976" transform="rotate(-0 258.89976 17.519976)">部署单元彼此独立，计算能力保持单一来源</text>
+    <text style="font: 700 7.3px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="258.89976" y="17.519976" transform="rotate(-0 258.89976 17.519976)">部署单元彼此独立，计算能力保持单一来源</text>
    </g>
   </g>
  </g>
  <defs>
-  <clipPath id="p32d69b879b">
+  <clipPath id="pf547e316d7">
    <rect x="2.52" y="2.52" width="512.75952" height="299.99952"/>
   </clipPath>
  </defs>

@@ -1,0 +1,302 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="517.79952pt" height="308.63952pt" viewBox="0 0 517.79952 308.63952" xmlns="http://www.w3.org/2000/svg" version="1.1">
+ <metadata>
+  <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+   <cc:Work>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+    <dc:date>2026-07-26T15:27:47.976180</dc:date>
+    <dc:format>image/svg+xml</dc:format>
+    <dc:creator>
+     <cc:Agent>
+      <dc:title>Matplotlib v3.9.4, https://matplotlib.org/</dc:title>
+     </cc:Agent>
+    </dc:creator>
+   </cc:Work>
+  </rdf:RDF>
+ </metadata>
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="figure_1">
+  <g id="patch_1">
+   <path d="M 0 308.63952 
+L 517.79952 308.63952 
+L 517.79952 0 
+L 0 0 
+z
+" style="fill: #ffffff"/>
+  </g>
+  <g id="axes_1">
+   <g clip-path="url(#pb1a56f1554)">
+    <image xlink:href="data:image/png;base64,
+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" id="image321b0178b6" transform="scale(1 -1) translate(0 -66.96)" x="207.623808" y="-120.755707" width="97.92" height="66.96"/>
+   </g>
+   <g id="patch_2">
+    <path d="M 23.030381 126.995803 
+L 125.582285 126.995803 
+L 125.582285 110.29783 
+L 23.030381 110.29783 
+z
+" clip-path="url(#pb1a56f1554)" style="fill: #ffffff; stroke: #a5adb3; stroke-width: 0.55; stroke-linejoin: miter"/>
+   </g>
+   <g id="patch_3">
+    <path d="M 23.030381 143.693777 
+L 125.582285 143.693777 
+L 125.582285 126.995803 
+L 23.030381 126.995803 
+z
+" clip-path="url(#pb1a56f1554)" style="fill: #ffffff; stroke: #a5adb3; stroke-width: 0.55; stroke-linejoin: miter"/>
+   </g>
+   <g id="patch_4">
+    <path d="M 23.030381 160.39175 
+L 125.582285 160.39175 
+L 125.582285 143.693777 
+L 23.030381 143.693777 
+z
+" clip-path="url(#pb1a56f1554)" style="fill: #ffffff; stroke: #a5adb3; stroke-width: 0.55; stroke-linejoin: miter"/>
+   </g>
+   <g id="patch_5">
+    <path d="M 23.030381 224.14765 
+L 125.582285 224.14765 
+L 125.582285 207.449676 
+L 23.030381 207.449676 
+z
+" clip-path="url(#pb1a56f1554)" style="fill: #ffffff; stroke: #a5adb3; stroke-width: 0.55; stroke-linejoin: miter"/>
+   </g>
+   <g id="patch_6">
+    <path d="M 23.030381 240.845623 
+L 125.582285 240.845623 
+L 125.582285 224.14765 
+L 23.030381 224.14765 
+z
+" clip-path="url(#pb1a56f1554)" style="fill: #ffffff; stroke: #a5adb3; stroke-width: 0.55; stroke-linejoin: miter"/>
+   </g>
+   <g id="patch_7">
+    <path d="M 23.030381 257.543597 
+L 125.582285 257.543597 
+L 125.582285 240.845623 
+L 23.030381 240.845623 
+z
+" clip-path="url(#pb1a56f1554)" style="fill: #ffffff; stroke: #a5adb3; stroke-width: 0.55; stroke-linejoin: miter"/>
+   </g>
+   <g id="patch_8">
+    <path d="M 192.241022 230.21964 
+L 320.430902 230.21964 
+L 320.430902 84.49187 
+L 192.241022 84.49187 
+z
+" clip-path="url(#pb1a56f1554)" style="fill: #f5f6f6; stroke: #20252a; stroke-width: 0.8; stroke-linejoin: miter"/>
+   </g>
+   <g id="patch_9">
+    <path d="M 392.217235 126.995803 
+L 494.769139 126.995803 
+L 494.769139 110.29783 
+L 392.217235 110.29783 
+z
+" clip-path="url(#pb1a56f1554)" style="fill: #ffffff; stroke: #a5adb3; stroke-width: 0.55; stroke-linejoin: miter"/>
+   </g>
+   <g id="patch_10">
+    <path d="M 392.217235 143.693777 
+L 494.769139 143.693777 
+L 494.769139 126.995803 
+L 392.217235 126.995803 
+z
+" clip-path="url(#pb1a56f1554)" style="fill: #ffffff; stroke: #a5adb3; stroke-width: 0.55; stroke-linejoin: miter"/>
+   </g>
+   <g id="patch_11">
+    <path d="M 392.217235 160.39175 
+L 494.769139 160.39175 
+L 494.769139 143.693777 
+L 392.217235 143.693777 
+z
+" clip-path="url(#pb1a56f1554)" style="fill: #ffffff; stroke: #a5adb3; stroke-width: 0.55; stroke-linejoin: miter"/>
+   </g>
+   <g id="patch_12">
+    <path d="M 392.217235 224.14765 
+L 494.769139 224.14765 
+L 494.769139 207.449676 
+L 392.217235 207.449676 
+z
+" clip-path="url(#pb1a56f1554)" style="fill: #ffffff; stroke: #a5adb3; stroke-width: 0.55; stroke-linejoin: miter"/>
+   </g>
+   <g id="patch_13">
+    <path d="M 392.217235 240.845623 
+L 494.769139 240.845623 
+L 494.769139 224.14765 
+L 392.217235 224.14765 
+z
+" clip-path="url(#pb1a56f1554)" style="fill: #ffffff; stroke: #a5adb3; stroke-width: 0.55; stroke-linejoin: miter"/>
+   </g>
+   <g id="patch_14">
+    <path d="M 392.217235 257.543597 
+L 494.769139 257.543597 
+L 494.769139 240.845623 
+L 392.217235 240.845623 
+z
+" clip-path="url(#pb1a56f1554)" style="fill: #ffffff; stroke: #a5adb3; stroke-width: 0.55; stroke-linejoin: miter"/>
+   </g>
+   <g id="patch_15">
+    <path d="M 132.651506 121.40282 
+Q 161.476989 128.51418 189.325532 135.384526 
+" clip-path="url(#pb1a56f1554)" style="fill: none; stroke: #2d67a3; stroke-width: 0.9; stroke-linecap: round"/>
+    <path d="M 186.601917 133.064628 
+L 189.325532 135.384526 
+L 185.835445 136.171479 
+z
+" clip-path="url(#pb1a56f1554)" style="fill: #2d67a3; stroke: #2d67a3; stroke-width: 0.9; stroke-linecap: round"/>
+   </g>
+   <g id="patch_16">
+    <path d="M 132.396128 216.994049 
+Q 161.476641 198.340927 189.710185 180.231077 
+" clip-path="url(#pb1a56f1554)" style="fill: none; stroke: #2f8f83; stroke-width: 0.9; stroke-linecap: round"/>
+    <path d="M 186.152815 180.612022 
+L 189.710185 180.231077 
+L 187.880519 183.30554 
+z
+" clip-path="url(#pb1a56f1554)" style="fill: #2f8f83; stroke: #2f8f83; stroke-width: 0.9; stroke-linecap: round"/>
+   </g>
+   <g id="patch_17">
+    <path d="M 322.389428 135.689638 
+Q 356.325214 128.513559 389.276539 121.545654 
+" clip-path="url(#pb1a56f1554)" style="fill: none; stroke: #2d67a3; stroke-width: 0.9; stroke-linecap: round"/>
+    <path d="M 385.814753 120.642304 
+L 389.276539 121.545654 
+L 386.476787 123.773072 
+z
+" clip-path="url(#pb1a56f1554)" style="fill: #2d67a3; stroke: #2d67a3; stroke-width: 0.9; stroke-linecap: round"/>
+   </g>
+   <g id="patch_18">
+    <path d="M 322.181308 179.57009 
+Q 356.325105 198.34226 389.587151 216.629646 
+" clip-path="url(#pb1a56f1554)" style="fill: none; stroke: #2f8f83; stroke-width: 0.9; stroke-linecap: round"/>
+    <path d="M 387.553872 213.685877 
+L 389.587151 216.629646 
+L 386.012168 216.490008 
+z
+" clip-path="url(#pb1a56f1554)" style="fill: #2f8f83; stroke: #2f8f83; stroke-width: 0.9; stroke-linecap: round"/>
+   </g>
+   <g id="text_1">
+    <text style="fill: #2d67a3; font: 700 6.8px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="23.030381" y="86.444627" transform="rotate(-0 23.030381 86.444627)">外部文件输入</text>
+   </g>
+   <g id="text_2">
+    <text style="fill: #20252a; font: 5.9px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="29.183495" y="120.237512" transform="rotate(-0 29.183495 120.237512)">nx, ny</text>
+   </g>
+   <g id="text_3">
+    <text style="fill: #20252a; font: 5.9px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="29.183495" y="137.03597" transform="rotate(-0 29.183495 137.03597)">x/y 坐标</text>
+   </g>
+   <g id="text_4">
+    <text style="fill: #20252a; font: 5.9px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="29.183495" y="153.667568" transform="rotate(-0 29.183495 153.667568)">attribute[]</text>
+   </g>
+   <g id="text_5">
+    <text style="fill: #2f8f83; font: 700 6.8px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="23.030381" y="183.596474" transform="rotate(-0 23.030381 183.596474)">GeoEast 输入</text>
+   </g>
+   <g id="text_6">
+    <text style="fill: #20252a; font: 5.9px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="29.183495" y="217.423467" transform="rotate(-0 29.183495 217.423467)">BOMapGrid</text>
+   </g>
+   <g id="text_7">
+    <text style="fill: #20252a; font: 5.9px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="29.183495" y="234.121441" transform="rotate(-0 29.183495 234.121441)">工区/对象名</text>
+   </g>
+   <g id="text_8">
+    <text style="fill: #20252a; font: 5.9px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="29.183495" y="250.819415" transform="rotate(-0 29.183495 250.819415)">数据库上下文</text>
+   </g>
+   <g id="text_9">
+    <text style="font: 700 7.2px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="256.335962" y="101.189844" transform="rotate(-0 256.335962 101.189844)">内部数据约定</text>
+   </g>
+   <g id="text_10">
+    <text style="fill: #234e78; font: 700 7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="256.335962" y="201.377686" transform="rotate(-0 256.335962 201.377686)">Grid2D</text>
+   </g>
+   <g id="text_11">
+    <text style="fill: #5f6870; font: 5.8px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="256.335962" y="213.521666" transform="rotate(-0 256.335962 213.521666)">统一坐标、尺寸与连续属性</text>
+   </g>
+   <g id="text_12">
+    <text style="fill: #2d67a3; font: 700 6.8px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="392.217235" y="86.444627" transform="rotate(-0 392.217235 86.444627)">文件输出</text>
+   </g>
+   <g id="text_13">
+    <text style="fill: #20252a; font: 5.9px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="398.370349" y="120.254566" transform="rotate(-0 398.370349 120.254566)">Polygon/WKT</text>
+   </g>
+   <g id="text_14">
+    <text style="fill: #20252a; font: 5.9px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="398.370349" y="136.969595" transform="rotate(-0 398.370349 136.969595)">面积与属性统计</text>
+   </g>
+   <g id="text_15">
+    <text style="fill: #20252a; font: 5.9px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="398.370349" y="153.667568" transform="rotate(-0 398.370349 153.667568)">诊断/拓扑/图件</text>
+   </g>
+   <g id="text_16">
+    <text style="fill: #2f8f83; font: 700 6.8px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="392.217235" y="183.596474" transform="rotate(-0 392.217235 183.596474)">GeoEast 输出</text>
+   </g>
+   <g id="text_17">
+    <text style="fill: #20252a; font: 5.9px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="398.370349" y="217.406413" transform="rotate(-0 398.370349 217.406413)">BOFaultPolygon</text>
+   </g>
+   <g id="text_18">
+    <text style="fill: #20252a; font: 5.9px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="398.370349" y="234.121441" transform="rotate(-0 398.370349 234.121441)">边界段坐标</text>
+   </g>
+   <g id="text_19">
+    <text style="fill: #20252a; font: 5.9px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="398.370349" y="250.819415" transform="rotate(-0 398.370349 250.819415)">工区对象索引</text>
+   </g>
+   <g id="text_20">
+    <g id="patch_19">
+     <path d="M 151.455451 125.051724 
+L 171.495451 125.051724 
+L 171.495451 110.723911 
+L 151.455451 110.723911 
+z
+" style="fill: #ffffff; stroke: #ffffff; stroke-width: 0.7; stroke-linejoin: miter"/>
+    </g>
+    <text style="fill: #5f6870; font: 6px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="161.475451" y="119.540161" transform="rotate(-0 161.475451 119.540161)">解析</text>
+   </g>
+   <g id="text_21">
+    <g id="patch_20">
+     <path d="M 151.455451 216.13158 
+L 171.495451 216.13158 
+L 171.495451 201.803767 
+L 151.455451 201.803767 
+z
+" style="fill: #ffffff; stroke: #ffffff; stroke-width: 0.7; stroke-linejoin: miter"/>
+    </g>
+    <text style="fill: #5f6870; font: 6px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="161.475451" y="210.620017" transform="rotate(-0 161.475451 210.620017)">适配</text>
+   </g>
+   <g id="text_22">
+    <g id="patch_21">
+     <path d="M 343.304069 125.051724 
+L 369.344069 125.051724 
+L 369.344069 110.723911 
+L 343.304069 110.723911 
+z
+" style="fill: #ffffff; stroke: #ffffff; stroke-width: 0.7; stroke-linejoin: miter"/>
+    </g>
+    <text style="fill: #5f6870; font: 6px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="356.324069" y="119.540161" transform="rotate(-0 356.324069 119.540161)">序列化</text>
+   </g>
+   <g id="text_23">
+    <g id="patch_22">
+     <path d="M 346.304069 216.13158 
+L 366.344069 216.13158 
+L 366.344069 201.803767 
+L 346.304069 201.803767 
+z
+" style="fill: #ffffff; stroke: #ffffff; stroke-width: 0.7; stroke-linejoin: miter"/>
+    </g>
+    <text style="fill: #5f6870; font: 6px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="356.324069" y="210.620017" transform="rotate(-0 356.324069 210.620017)">写入</text>
+   </g>
+   <g id="text_24">
+    <text style="font: 700 7.2px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="258.89976" y="26.807962" transform="rotate(-0 258.89976 26.807962)">不同数据源在 Grid2D 处汇合，不同输出由同一几何结果派生</text>
+   </g>
+   <g id="text_25">
+    <g id="patch_23">
+     <path d="M 214.50776 276.964276 
+L 303.29176 276.964276 
+L 303.29176 268.48287 
+L 214.50776 268.48287 
+z
+" style="fill: #ffffff; stroke: #c9872b; stroke-width: 0.6; stroke-linejoin: miter"/>
+    </g>
+    <text style="fill: #c9872b; font: 6.2px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="258.89976" y="274.430995" transform="rotate(-0 258.89976 274.430995)">同一参数模型与同一多边形几何</text>
+   </g>
+  </g>
+ </g>
+ <defs>
+  <clipPath id="pb1a56f1554">
+   <rect x="2.52" y="2.52" width="512.75952" height="303.59952"/>
+  </clipPath>
+ </defs>
+</svg>

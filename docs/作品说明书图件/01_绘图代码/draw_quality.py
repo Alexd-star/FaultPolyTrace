@@ -61,7 +61,7 @@ def performance_breakdown() -> None:
 
 def verification_matrix() -> None:
     setup_style()
-    rows = ["Python 回归", "独立软件 UI 契约", "GeoEast UI 契约", "参数一致性", "C++ 核心验证", "安装器运行检查", "插件部署检查"]
+    rows = ["算法一致性检验", "独立软件界面检查", "GeoEast 界面检查", "参数一致性核对", "C++ 核心验证", "安装器运行检查", "插件部署检查"]
     columns = ["算法", "输入输出", "界面", "GeoEast", "发布"]
     matrix = np.array([
         [1,1,1,1,1], [0,1,1,0,1], [0,1,1,1,1], [1,1,1,1,1], [1,0,0,0,0], [1,1,1,0,1], [0,1,1,1,1]

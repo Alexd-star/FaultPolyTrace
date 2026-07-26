@@ -15,7 +15,7 @@ def packaging_flow() -> None:
     xs=[0.08,0.23,0.40,0.55,0.72,0.89]
     labels=[
         ("Git 提交","源码唯一来源"),("版本清单","Build ID / 时间"),("编译","CLI · GUI · 插件"),
-        ("自动验证","回归 · 哈希 · 运行检查"),("打包","安装器 · ZIP · 插件包"),("异机复核","中文路径与依赖")]
+        ("自动验证","一致性检验 · 哈希 · 运行检查"),("打包","安装器 · ZIP · 插件包"),("异机复核","中文路径与依赖")]
     rule(ax,(xs[0],0.61),(xs[-1],0.61),color="gray_dark",lw=0.9)
     for i,(x,(title,note)) in enumerate(zip(xs,labels),1):
         color="teal" if i in (3,4) else "blue"
@@ -44,7 +44,7 @@ def geoeast_roundtrip() -> None:
     ax.text(center[0],center[1]+0.025,"GeoEast 工区",ha="center",fontsize=7.0,weight="bold")
     ax.text(center[0],center[1]-0.028,"数据库上下文",ha="center",fontsize=5.8,color=COLORS["muted"])
     nodes=[
-        (0.18,0.70,"读取 BOMapGrid","网格与坐标"),(0.49,0.82,"转换 Grid2D","统一内部契约"),
+        (0.18,0.70,"读取 BOMapGrid","网格与坐标"),(0.49,0.82,"转换 Grid2D","统一内部格式"),
         (0.80,0.69,"执行追踪核心","闭合多边形"),(0.82,0.34,"写入 BOFaultPolygon","对象名与边界段"),
         (0.50,0.20,"重新读取列表","确认对象存在"),(0.18,0.34,"显示与管理","叠加、导出、删除")]
     for i,(x,y,title,note) in enumerate(nodes):

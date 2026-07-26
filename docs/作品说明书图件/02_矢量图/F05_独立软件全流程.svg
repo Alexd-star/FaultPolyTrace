@@ -6,11 +6,11 @@
   <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:date>2026-07-26T12:49:49.712453</dc:date>
+    <dc:date>2026-07-26T15:27:49.342376</dc:date>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
-      <dc:title>Matplotlib v3.10.9, https://matplotlib.org/</dc:title>
+      <dc:title>Matplotlib v3.9.4, https://matplotlib.org/</dc:title>
      </cc:Agent>
     </dc:creator>
    </cc:Work>
@@ -32,22 +32,22 @@ z
    <g id="line2d_1">
     <path d="M 23.030381 28.223957 
 L 151.220261 28.223957 
-" clip-path="url(#p9dcc70bdcb)" style="fill: none; stroke: #2d67a3; stroke-width: 1.6"/>
+" clip-path="url(#pbc78f25dd6)" style="fill: none; stroke: #2d67a3; stroke-width: 1.6"/>
    </g>
    <g id="line2d_2">
     <path d="M 171.730642 28.223957 
 L 299.920522 28.223957 
-" clip-path="url(#p9dcc70bdcb)" style="fill: none; stroke: #2f8f83; stroke-width: 1.6"/>
+" clip-path="url(#pbc78f25dd6)" style="fill: none; stroke: #2f8f83; stroke-width: 1.6"/>
    </g>
    <g id="line2d_3">
     <path d="M 320.430902 28.223957 
 L 494.769139 28.223957 
-" clip-path="url(#p9dcc70bdcb)" style="fill: none; stroke: #2d67a3; stroke-width: 1.6"/>
+" clip-path="url(#pbc78f25dd6)" style="fill: none; stroke: #2d67a3; stroke-width: 1.6"/>
    </g>
    <g id="line2d_4">
     <path d="M 48.668357 122.471798 
 L 469.131163 122.471798 
-" clip-path="url(#p9dcc70bdcb)" style="fill: none; stroke: #737d85; stroke-width: 0.8"/>
+" clip-path="url(#pbc78f25dd6)" style="fill: none; stroke: #737d85; stroke-width: 0.8"/>
    </g>
    <g id="patch_2">
     <path d="M 23.030381 250.991582 
@@ -55,7 +55,7 @@ L 494.769139 250.991582
 L 494.769139 199.583669 
 L 23.030381 199.583669 
 z
-" clip-path="url(#p9dcc70bdcb)" style="fill: #f5f6f6; stroke: #a5adb3; stroke-width: 0.6; stroke-linejoin: miter"/>
+" clip-path="url(#pbc78f25dd6)" style="fill: #f5f6f6; stroke: #a5adb3; stroke-width: 0.6; stroke-linejoin: miter"/>
    </g>
    <g id="patch_3">
     <path d="M 43.540762 238.139604 
@@ -68,7 +68,7 @@ C 38.953442 233.799691 38.413166 234.52619 38.413166 235.283609
 C 38.413166 236.041028 38.953442 236.767526 39.915004 237.303102 
 C 40.876566 237.838678 42.180907 238.139604 43.540762 238.139604 
 z
-" clip-path="url(#p9dcc70bdcb)" style="fill: #c9872b"/>
+" clip-path="url(#pbc78f25dd6)" style="fill: #c9872b"/>
    </g>
    <g id="patch_4">
     <path d="M 181.985832 238.139604 
@@ -81,7 +81,7 @@ C 177.398513 233.799691 176.858237 234.52619 176.858237 235.283609
 C 176.858237 236.041028 177.398513 236.767526 178.360075 237.303102 
 C 179.321637 237.838678 180.625978 238.139604 181.985832 238.139604 
 z
-" clip-path="url(#p9dcc70bdcb)" style="fill: #2d67a3"/>
+" clip-path="url(#pbc78f25dd6)" style="fill: #2d67a3"/>
    </g>
    <g id="patch_5">
     <path d="M 330.686093 238.139604 
@@ -94,16 +94,16 @@ C 326.098773 233.799691 325.558498 234.52619 325.558498 235.283609
 C 325.558498 236.041028 326.098773 236.767526 327.060335 237.303102 
 C 328.021898 237.838678 329.326239 238.139604 330.686093 238.139604 
 z
-" clip-path="url(#p9dcc70bdcb)" style="fill: #2f8f83"/>
+" clip-path="url(#pbc78f25dd6)" style="fill: #2f8f83"/>
    </g>
    <g id="text_1">
-    <text style="font-weight: 700; font-size: 6.4px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #2d67a3" x="23.030381" y="19.778568" transform="rotate(-0 23.030381 19.778568)">准备</text>
+    <text style="fill: #2d67a3; font: 700 6.4px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="23.030381" y="19.778568" transform="rotate(-0 23.030381 19.778568)">准备</text>
    </g>
    <g id="text_2">
-    <text style="font-weight: 700; font-size: 6.4px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #2f8f83" x="171.730642" y="19.778568" transform="rotate(-0 171.730642 19.778568)">计算</text>
+    <text style="fill: #2f8f83; font: 700 6.4px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="171.730642" y="19.778568" transform="rotate(-0 171.730642 19.778568)">计算</text>
    </g>
    <g id="text_3">
-    <text style="font-weight: 700; font-size: 6.4px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #2d67a3" x="320.430902" y="19.778568" transform="rotate(-0 320.430902 19.778568)">复核与交付</text>
+    <text style="fill: #2d67a3; font: 700 6.4px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="320.430902" y="19.778568" transform="rotate(-0 320.430902 19.778568)">复核与交付</text>
    </g>
    <g id="patch_6">
     <path d="M 48.668357 128.183789 
@@ -116,17 +116,17 @@ C 39.493718 119.503963 38.413166 120.956961 38.413166 122.471798
 C 38.413166 123.986636 39.493718 125.439634 41.416842 126.510786 
 C 43.339966 127.581937 45.948649 128.183789 48.668357 128.183789 
 z
-" clip-path="url(#p9dcc70bdcb)" style="fill: #ffffff; stroke: #2d67a3; stroke-width: 1.2; stroke-linejoin: miter"/>
+" clip-path="url(#pbc78f25dd6)" style="fill: #ffffff; stroke: #2d67a3; stroke-width: 1.2; stroke-linejoin: miter"/>
    </g>
    <g id="text_4">
-    <text style="font-weight: 700; font-size: 5.8px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2d67a3" x="48.668357" y="124.069064" transform="rotate(-0 48.668357 124.069064)">1</text>
+    <text style="fill: #2d67a3; font: 700 5.8px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="48.668357" y="124.069064" transform="rotate(-0 48.668357 124.069064)">1</text>
    </g>
    <g id="text_5">
-    <text style="font-weight: 700; font-size: 6.4px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2d67a3" x="48.668357" y="99.460834" transform="rotate(-0 48.668357 99.460834)">选择数据</text>
+    <text style="fill: #2d67a3; font: 700 6.4px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="48.668357" y="99.460834" transform="rotate(-0 48.668357 99.460834)">选择数据</text>
    </g>
    <g id="text_6">
-    <text style="font-size: 5.5px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; fill: #5f6870" transform="translate(36.648708 148.288325)">DAT/文本</text>
-    <text style="font-size: 5.5px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; fill: #5f6870" transform="translate(34.421208 155.151294)">或 GeoEast</text>
+    <text style="fill: #5f6870; font: 5.5px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(36.648708 148.288325)">DAT/文本</text>
+    <text style="fill: #5f6870; font: 5.5px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(34.421208 155.151294)">或 GeoEast</text>
    </g>
    <g id="patch_7">
     <path d="M 130.70988 128.183789 
@@ -139,17 +139,17 @@ C 121.535241 119.503963 120.45469 120.956961 120.45469 122.471798
 C 120.45469 123.986636 121.535241 125.439634 123.458365 126.510786 
 C 125.381489 127.581937 127.990172 128.183789 130.70988 128.183789 
 z
-" clip-path="url(#p9dcc70bdcb)" style="fill: #ffffff; stroke: #2d67a3; stroke-width: 1.2; stroke-linejoin: miter"/>
+" clip-path="url(#pbc78f25dd6)" style="fill: #ffffff; stroke: #2d67a3; stroke-width: 1.2; stroke-linejoin: miter"/>
    </g>
    <g id="text_7">
-    <text style="font-weight: 700; font-size: 5.8px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2d67a3" x="130.70988" y="124.069064" transform="rotate(-0 130.70988 124.069064)">2</text>
+    <text style="fill: #2d67a3; font: 700 5.8px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="130.70988" y="124.069064" transform="rotate(-0 130.70988 124.069064)">2</text>
    </g>
    <g id="text_8">
-    <text style="font-weight: 700; font-size: 6.4px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2d67a3" x="130.70988" y="99.460834" transform="rotate(-0 130.70988 99.460834)">检查网格</text>
+    <text style="fill: #2d67a3; font: 700 6.4px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="130.70988" y="99.460834" transform="rotate(-0 130.70988 99.460834)">检查网格</text>
    </g>
    <g id="text_9">
-    <text style="font-size: 5.5px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; fill: #5f6870" transform="translate(116.95988 148.288325)">坐标、范围</text>
-    <text style="font-size: 5.5px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; fill: #5f6870" transform="translate(122.45988 155.151294)">与属性</text>
+    <text style="fill: #5f6870; font: 5.5px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(116.95988 148.288325)">坐标、范围</text>
+    <text style="fill: #5f6870; font: 5.5px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(122.45988 155.151294)">与属性</text>
    </g>
    <g id="patch_8">
     <path d="M 212.751403 128.183789 
@@ -162,17 +162,17 @@ C 203.576764 119.503963 202.496213 120.956961 202.496213 122.471798
 C 202.496213 123.986636 203.576764 125.439634 205.499889 126.510786 
 C 207.423013 127.581937 210.031695 128.183789 212.751403 128.183789 
 z
-" clip-path="url(#p9dcc70bdcb)" style="fill: #ffffff; stroke: #2f8f83; stroke-width: 1.2; stroke-linejoin: miter"/>
+" clip-path="url(#pbc78f25dd6)" style="fill: #ffffff; stroke: #2f8f83; stroke-width: 1.2; stroke-linejoin: miter"/>
    </g>
    <g id="text_10">
-    <text style="font-weight: 700; font-size: 5.8px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2f8f83" x="212.751403" y="124.069064" transform="rotate(-0 212.751403 124.069064)">3</text>
+    <text style="fill: #2f8f83; font: 700 5.8px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="212.751403" y="124.069064" transform="rotate(-0 212.751403 124.069064)">3</text>
    </g>
    <g id="text_11">
-    <text style="font-weight: 700; font-size: 6.4px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2f8f83" x="212.751403" y="99.460834" transform="rotate(-0 212.751403 99.460834)">确认参数</text>
+    <text style="fill: #2f8f83; font: 700 6.4px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="212.751403" y="99.460834" transform="rotate(-0 212.751403 99.460834)">确认参数</text>
    </g>
    <g id="text_12">
-    <text style="font-size: 5.5px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; fill: #5f6870" transform="translate(201.751403 148.288325)">预设模板</text>
-    <text style="font-size: 5.5px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; fill: #5f6870" transform="translate(199.001403 155.151294)">或必要调整</text>
+    <text style="fill: #5f6870; font: 5.5px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(201.751403 148.288325)">预设模板</text>
+    <text style="fill: #5f6870; font: 5.5px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(199.001403 155.151294)">或必要调整</text>
    </g>
    <g id="patch_9">
     <path d="M 294.792926 128.183789 
@@ -185,17 +185,17 @@ C 285.618288 119.503963 284.537736 120.956961 284.537736 122.471798
 C 284.537736 123.986636 285.618288 125.439634 287.541412 126.510786 
 C 289.464536 127.581937 292.073218 128.183789 294.792926 128.183789 
 z
-" clip-path="url(#p9dcc70bdcb)" style="fill: #ffffff; stroke: #2f8f83; stroke-width: 1.2; stroke-linejoin: miter"/>
+" clip-path="url(#pbc78f25dd6)" style="fill: #ffffff; stroke: #2f8f83; stroke-width: 1.2; stroke-linejoin: miter"/>
    </g>
    <g id="text_13">
-    <text style="font-weight: 700; font-size: 5.8px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2f8f83" x="294.792926" y="124.069064" transform="rotate(-0 294.792926 124.069064)">4</text>
+    <text style="fill: #2f8f83; font: 700 5.8px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="294.792926" y="124.069064" transform="rotate(-0 294.792926 124.069064)">4</text>
    </g>
    <g id="text_14">
-    <text style="font-weight: 700; font-size: 6.4px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2f8f83" x="294.792926" y="99.460834" transform="rotate(-0 294.792926 99.460834)">开始追踪</text>
+    <text style="fill: #2f8f83; font: 700 6.4px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="294.792926" y="99.460834" transform="rotate(-0 294.792926 99.460834)">开始追踪</text>
    </g>
    <g id="text_15">
-    <text style="font-size: 5.5px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; fill: #5f6870" transform="translate(283.792926 148.288325)">后台执行</text>
-    <text style="font-size: 5.5px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; fill: #5f6870" transform="translate(283.792926 155.151294)">显示进度</text>
+    <text style="fill: #5f6870; font: 5.5px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(283.792926 148.288325)">后台执行</text>
+    <text style="fill: #5f6870; font: 5.5px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(283.792926 155.151294)">显示进度</text>
    </g>
    <g id="patch_10">
     <path d="M 376.83445 128.183789 
@@ -208,17 +208,17 @@ C 367.659811 119.503963 366.579259 120.956961 366.579259 122.471798
 C 366.579259 123.986636 367.659811 125.439634 369.582935 126.510786 
 C 371.506059 127.581937 374.114741 128.183789 376.83445 128.183789 
 z
-" clip-path="url(#p9dcc70bdcb)" style="fill: #ffffff; stroke: #2d67a3; stroke-width: 1.2; stroke-linejoin: miter"/>
+" clip-path="url(#pbc78f25dd6)" style="fill: #ffffff; stroke: #2d67a3; stroke-width: 1.2; stroke-linejoin: miter"/>
    </g>
    <g id="text_16">
-    <text style="font-weight: 700; font-size: 5.8px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2d67a3" x="376.83445" y="124.069064" transform="rotate(-0 376.83445 124.069064)">5</text>
+    <text style="fill: #2d67a3; font: 700 5.8px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="376.83445" y="124.069064" transform="rotate(-0 376.83445 124.069064)">5</text>
    </g>
    <g id="text_17">
-    <text style="font-weight: 700; font-size: 6.4px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2d67a3" x="376.83445" y="99.460834" transform="rotate(-0 376.83445 99.460834)">查看图层</text>
+    <text style="fill: #2d67a3; font: 700 6.4px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="376.83445" y="99.460834" transform="rotate(-0 376.83445 99.460834)">查看图层</text>
    </g>
    <g id="text_18">
-    <text style="font-size: 5.5px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; fill: #5f6870" transform="translate(364.659684 148.288325)">原始/结果</text>
-    <text style="font-size: 5.5px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; fill: #5f6870" transform="translate(365.83445 155.151294)">自由叠加</text>
+    <text style="fill: #5f6870; font: 5.5px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(364.659684 148.288325)">原始/结果</text>
+    <text style="fill: #5f6870; font: 5.5px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(365.83445 155.151294)">自由叠加</text>
    </g>
    <g id="patch_11">
     <path d="M 469.131163 128.183789 
@@ -231,43 +231,43 @@ C 459.956524 119.503963 458.875973 120.956961 458.875973 122.471798
 C 458.875973 123.986636 459.956524 125.439634 461.879649 126.510786 
 C 463.802773 127.581937 466.411455 128.183789 469.131163 128.183789 
 z
-" clip-path="url(#p9dcc70bdcb)" style="fill: #ffffff; stroke: #2d67a3; stroke-width: 1.2; stroke-linejoin: miter"/>
+" clip-path="url(#pbc78f25dd6)" style="fill: #ffffff; stroke: #2d67a3; stroke-width: 1.2; stroke-linejoin: miter"/>
    </g>
    <g id="text_19">
-    <text style="font-weight: 700; font-size: 5.8px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2d67a3" x="469.131163" y="124.069064" transform="rotate(-0 469.131163 124.069064)">6</text>
+    <text style="fill: #2d67a3; font: 700 5.8px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="469.131163" y="124.069064" transform="rotate(-0 469.131163 124.069064)">6</text>
    </g>
    <g id="text_20">
-    <text style="font-weight: 700; font-size: 6.4px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2d67a3" x="469.131163" y="99.460834" transform="rotate(-0 469.131163 99.460834)">保存结果</text>
+    <text style="fill: #2d67a3; font: 700 6.4px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="469.131163" y="99.460834" transform="rotate(-0 469.131163 99.460834)">保存结果</text>
    </g>
    <g id="text_21">
-    <text style="font-size: 5.5px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; fill: #5f6870" transform="translate(455.381163 148.288325)">文件、历史</text>
-    <text style="font-size: 5.5px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; fill: #5f6870" transform="translate(460.881163 155.151294)">与图件</text>
+    <text style="fill: #5f6870; font: 5.5px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(455.381163 148.288325)">文件、历史</text>
+    <text style="fill: #5f6870; font: 5.5px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(460.881163 155.151294)">与图件</text>
    </g>
    <g id="text_22">
-    <text style="font-weight: 700; font-size: 6.3px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #20252a" x="33.285571" y="212.435647" transform="rotate(-0 33.285571 212.435647)">状态反馈贯穿全流程</text>
+    <text style="fill: #20252a; font: 700 6.3px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="33.285571" y="212.435647" transform="rotate(-0 33.285571 212.435647)">状态反馈贯穿全流程</text>
    </g>
    <g id="text_23">
-    <text style="font-weight: 700; font-size: 6.1px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #c9872b" x="56.35975" y="229.571618" transform="rotate(-0 56.35975 229.571618)">未就绪</text>
+    <text style="fill: #c9872b; font: 700 6.1px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="56.35975" y="229.571618" transform="rotate(-0 56.35975 229.571618)">未就绪</text>
    </g>
    <g id="text_24">
-    <text style="font-size: 5.5px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #5f6870" x="56.35975" y="240.995599" transform="rotate(-0 56.35975 240.995599)">指出缺少的输入或配置</text>
+    <text style="fill: #5f6870; font: 5.5px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="56.35975" y="240.995599" transform="rotate(-0 56.35975 240.995599)">指出缺少的输入或配置</text>
    </g>
    <g id="text_25">
-    <text style="font-weight: 700; font-size: 6.1px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #2d67a3" x="194.80482" y="229.571618" transform="rotate(-0 194.80482 229.571618)">执行中</text>
+    <text style="fill: #2d67a3; font: 700 6.1px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="194.80482" y="229.571618" transform="rotate(-0 194.80482 229.571618)">执行中</text>
    </g>
    <g id="text_26">
-    <text style="font-size: 5.5px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #5f6870" x="194.80482" y="240.995599" transform="rotate(-0 194.80482 240.995599)">进度、阶段与耗时持续更新</text>
+    <text style="fill: #5f6870; font: 5.5px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="194.80482" y="240.995599" transform="rotate(-0 194.80482 240.995599)">进度、阶段与耗时持续更新</text>
    </g>
    <g id="text_27">
-    <text style="font-weight: 700; font-size: 6.1px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #2f8f83" x="343.505081" y="229.571618" transform="rotate(-0 343.505081 229.571618)">已完成</text>
+    <text style="fill: #2f8f83; font: 700 6.1px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="343.505081" y="229.571618" transform="rotate(-0 343.505081 229.571618)">已完成</text>
    </g>
    <g id="text_28">
-    <text style="font-size: 5.5px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #5f6870" x="343.505081" y="240.995599" transform="rotate(-0 343.505081 240.995599)">对象数量、输出位置与图层可用</text>
+    <text style="fill: #5f6870; font: 5.5px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="343.505081" y="240.995599" transform="rotate(-0 343.505081 240.995599)">对象数量、输出位置与图层可用</text>
    </g>
   </g>
  </g>
  <defs>
-  <clipPath id="p9dcc70bdcb">
+  <clipPath id="pbc78f25dd6">
    <rect x="2.52" y="2.52" width="512.75952" height="285.59952"/>
   </clipPath>
  </defs>

@@ -6,11 +6,11 @@
   <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:date>2026-07-26T13:11:29.615891</dc:date>
+    <dc:date>2026-07-26T15:27:54.998721</dc:date>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
-      <dc:title>Matplotlib v3.10.9, https://matplotlib.org/</dc:title>
+      <dc:title>Matplotlib v3.9.4, https://matplotlib.org/</dc:title>
      </cc:Agent>
     </dc:creator>
    </cc:Work>
@@ -32,22 +32,22 @@ z
    <g id="line2d_1">
     <path d="M 20.466583 30.167957 
 L 156.347856 30.167957 
-" clip-path="url(#p4a1742dc84)" style="fill: none; stroke: #2d67a3; stroke-width: 1.6"/>
+" clip-path="url(#pbe0e263ade)" style="fill: none; stroke: #2d67a3; stroke-width: 1.6"/>
    </g>
    <g id="line2d_2">
     <path d="M 176.858237 30.167957 
 L 325.558498 30.167957 
-" clip-path="url(#p4a1742dc84)" style="fill: none; stroke: #2f8f83; stroke-width: 1.6"/>
+" clip-path="url(#pbe0e263ade)" style="fill: none; stroke: #2f8f83; stroke-width: 1.6"/>
    </g>
    <g id="line2d_3">
     <path d="M 346.068878 30.167957 
 L 497.332937 30.167957 
-" clip-path="url(#p4a1742dc84)" style="fill: none; stroke: #2d67a3; stroke-width: 1.6"/>
+" clip-path="url(#pbe0e263ade)" style="fill: none; stroke: #2d67a3; stroke-width: 1.6"/>
    </g>
    <g id="line2d_4">
     <path d="M 38.413166 128.471803 
 L 484.513949 128.471803 
-" clip-path="url(#p4a1742dc84)" style="fill: none; stroke: #737d85; stroke-width: 0.9"/>
+" clip-path="url(#pbe0e263ade)" style="fill: none; stroke: #737d85; stroke-width: 0.9"/>
    </g>
    <g id="patch_2">
     <path d="M 20.466583 272.855578 
@@ -55,31 +55,31 @@ L 497.332937 272.855578
 L 497.332937 211.415674 
 L 20.466583 211.415674 
 z
-" clip-path="url(#p4a1742dc84)" style="fill: #f5f6f6; stroke: #a5adb3; stroke-width: 0.55; stroke-linejoin: miter"/>
+" clip-path="url(#pbe0e263ade)" style="fill: #f5f6f6; stroke: #a5adb3; stroke-width: 0.55; stroke-linejoin: miter"/>
    </g>
    <g id="line2d_5">
     <path d="M 76.87013 228.311647 
 L 94.816714 228.311647 
-" clip-path="url(#p4a1742dc84)" style="fill: none; stroke: #2d67a3; stroke-width: 1.2"/>
+" clip-path="url(#pbe0e263ade)" style="fill: none; stroke: #2d67a3; stroke-width: 1.2"/>
    </g>
    <g id="line2d_6">
     <path d="M 76.87013 246.743618 
 L 94.816714 246.743618 
-" clip-path="url(#p4a1742dc84)" style="fill: none; stroke: #2f8f83; stroke-width: 1.2"/>
+" clip-path="url(#pbe0e263ade)" style="fill: none; stroke: #2f8f83; stroke-width: 1.2"/>
    </g>
    <g id="line2d_7">
     <path d="M 76.87013 265.17559 
 L 94.816714 265.17559 
-" clip-path="url(#p4a1742dc84)" style="fill: none; stroke: #20252a; stroke-width: 1.2"/>
+" clip-path="url(#pbe0e263ade)" style="fill: none; stroke: #20252a; stroke-width: 1.2"/>
    </g>
    <g id="text_1">
-    <text style="font-weight: 700; font-size: 6.4px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #2d67a3" x="20.466583" y="21.204168" transform="rotate(-0 20.466583 21.204168)">I  响应提取</text>
+    <text style="fill: #2d67a3; font: 700 6.4px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="20.466583" y="21.204168" transform="rotate(-0 20.466583 21.204168)">I  响应提取</text>
    </g>
    <g id="text_2">
-    <text style="font-weight: 700; font-size: 6.4px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #2f8f83" x="176.858237" y="21.204168" transform="rotate(-0 176.858237 21.204168)">II  结构追踪</text>
+    <text style="fill: #2f8f83; font: 700 6.4px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="176.858237" y="21.204168" transform="rotate(-0 176.858237 21.204168)">II  结构追踪</text>
    </g>
    <g id="text_3">
-    <text style="font-weight: 700; font-size: 6.4px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #2d67a3" x="346.068878" y="21.204168" transform="rotate(-0 346.068878 21.204168)">III  几何生成与检查</text>
+    <text style="fill: #2d67a3; font: 700 6.4px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="346.068878" y="21.204168" transform="rotate(-0 346.068878 21.204168)">III  几何生成与检查</text>
    </g>
    <g id="patch_3">
     <path d="M 38.413166 134.615794 
@@ -92,17 +92,17 @@ C 29.238528 125.279509 28.157976 126.842398 28.157976 128.471803
 C 28.157976 130.101209 29.238528 131.664097 31.161652 132.81626 
 C 33.084776 133.968424 35.693458 134.615794 38.413166 134.615794 
 z
-" clip-path="url(#p4a1742dc84)" style="fill: #ffffff; stroke: #2d67a3; stroke-width: 1.1; stroke-linejoin: miter"/>
+" clip-path="url(#pbe0e263ade)" style="fill: #ffffff; stroke: #2d67a3; stroke-width: 1.1; stroke-linejoin: miter"/>
    </g>
    <g id="text_4">
-    <text style="font-weight: 700; font-size: 5.7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2d67a3" x="38.413166" y="130.04153" transform="rotate(-0 38.413166 130.04153)">1</text>
+    <text style="fill: #2d67a3; font: 700 5.7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="38.413166" y="130.04153" transform="rotate(-0 38.413166 130.04153)">1</text>
    </g>
    <g id="text_5">
-    <text style="font-weight: 700; font-size: 6.2px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2d67a3" x="38.413166" y="105.431839" transform="rotate(-0 38.413166 105.431839)">网格解析</text>
+    <text style="fill: #2d67a3; font: 700 6.2px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="38.413166" y="105.431839" transform="rotate(-0 38.413166 105.431839)">网格解析</text>
    </g>
    <g id="text_6">
-    <text style="font-size: 5.3px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; fill: #5f6870" transform="translate(25.163166 155.748455)">坐标、尺寸</text>
-    <text style="font-size: 5.3px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; fill: #5f6870" transform="translate(27.813166 162.361861)">属性统计</text>
+    <text style="fill: #5f6870; font: 5.3px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(25.163166 155.748455)">坐标、尺寸</text>
+    <text style="fill: #5f6870; font: 5.3px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(27.813166 162.361861)">属性统计</text>
    </g>
    <g id="patch_4">
     <path d="M 105.071904 134.615794 
@@ -115,17 +115,17 @@ C 95.897265 125.279509 94.816714 126.842398 94.816714 128.471803
 C 94.816714 130.101209 95.897265 131.664097 97.820389 132.81626 
 C 99.743513 133.968424 102.352196 134.615794 105.071904 134.615794 
 z
-" clip-path="url(#p4a1742dc84)" style="fill: #ffffff; stroke: #2d67a3; stroke-width: 1.1; stroke-linejoin: miter"/>
+" clip-path="url(#pbe0e263ade)" style="fill: #ffffff; stroke: #2d67a3; stroke-width: 1.1; stroke-linejoin: miter"/>
    </g>
    <g id="text_7">
-    <text style="font-weight: 700; font-size: 5.7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2d67a3" x="105.071904" y="130.04153" transform="rotate(-0 105.071904 130.04153)">2</text>
+    <text style="fill: #2d67a3; font: 700 5.7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="105.071904" y="130.04153" transform="rotate(-0 105.071904 130.04153)">2</text>
    </g>
    <g id="text_8">
-    <text style="font-weight: 700; font-size: 6.2px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2d67a3" x="105.071904" y="105.431839" transform="rotate(-0 105.071904 105.431839)">强弱响应</text>
+    <text style="fill: #2d67a3; font: 700 6.2px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="105.071904" y="105.431839" transform="rotate(-0 105.071904 105.431839)">强弱响应</text>
    </g>
    <g id="text_9">
-    <text style="font-size: 5.3px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; fill: #5f6870" transform="translate(91.821904 155.748455)">分位数种子</text>
-    <text style="font-size: 5.3px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; fill: #5f6870" transform="translate(91.821904 162.361861)">受控弱分量</text>
+    <text style="fill: #5f6870; font: 5.3px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(91.821904 155.748455)">分位数种子</text>
+    <text style="fill: #5f6870; font: 5.3px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(91.821904 162.361861)">受控弱分量</text>
    </g>
    <g id="patch_5">
     <path d="M 192.241022 134.615794 
@@ -138,17 +138,17 @@ C 183.066384 125.279509 181.985832 126.842398 181.985832 128.471803
 C 181.985832 130.101209 183.066384 131.664097 184.989508 132.81626 
 C 186.912632 133.968424 189.521314 134.615794 192.241022 134.615794 
 z
-" clip-path="url(#p4a1742dc84)" style="fill: #ffffff; stroke: #2f8f83; stroke-width: 1.1; stroke-linejoin: miter"/>
+" clip-path="url(#pbe0e263ade)" style="fill: #ffffff; stroke: #2f8f83; stroke-width: 1.1; stroke-linejoin: miter"/>
    </g>
    <g id="text_10">
-    <text style="font-weight: 700; font-size: 5.7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2f8f83" x="192.241022" y="130.04153" transform="rotate(-0 192.241022 130.04153)">3</text>
+    <text style="fill: #2f8f83; font: 700 5.7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="192.241022" y="130.04153" transform="rotate(-0 192.241022 130.04153)">3</text>
    </g>
    <g id="text_11">
-    <text style="font-weight: 700; font-size: 6.2px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2f8f83" x="192.241022" y="105.431839" transform="rotate(-0 192.241022 105.431839)">骨架化</text>
+    <text style="fill: #2f8f83; font: 700 6.2px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="192.241022" y="105.431839" transform="rotate(-0 192.241022 105.431839)">骨架化</text>
    </g>
    <g id="text_12">
-    <text style="font-size: 5.3px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; fill: #5f6870" transform="translate(181.641022 155.748455)">中心结构</text>
-    <text style="font-size: 5.3px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; fill: #5f6870" transform="translate(178.991022 162.361861)">端点与交点</text>
+    <text style="fill: #5f6870; font: 5.3px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(181.641022 155.748455)">中心结构</text>
+    <text style="fill: #5f6870; font: 5.3px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(178.991022 162.361861)">端点与交点</text>
    </g>
    <g id="patch_6">
     <path d="M 258.89976 134.615794 
@@ -161,17 +161,17 @@ C 249.725121 125.279509 248.64457 126.842398 248.64457 128.471803
 C 248.64457 130.101209 249.725121 131.664097 251.648245 132.81626 
 C 253.571369 133.968424 256.180052 134.615794 258.89976 134.615794 
 z
-" clip-path="url(#p4a1742dc84)" style="fill: #ffffff; stroke: #2f8f83; stroke-width: 1.1; stroke-linejoin: miter"/>
+" clip-path="url(#pbe0e263ade)" style="fill: #ffffff; stroke: #2f8f83; stroke-width: 1.1; stroke-linejoin: miter"/>
    </g>
    <g id="text_13">
-    <text style="font-weight: 700; font-size: 5.7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2f8f83" x="258.89976" y="130.04153" transform="rotate(-0 258.89976 130.04153)">4</text>
+    <text style="fill: #2f8f83; font: 700 5.7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="258.89976" y="130.04153" transform="rotate(-0 258.89976 130.04153)">4</text>
    </g>
    <g id="text_14">
-    <text style="font-weight: 700; font-size: 6.2px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2f8f83" x="258.89976" y="105.431839" transform="rotate(-0 258.89976 105.431839)">分支与补连</text>
+    <text style="fill: #2f8f83; font: 700 6.2px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="258.89976" y="105.431839" transform="rotate(-0 258.89976 105.431839)">分支与补连</text>
    </g>
    <g id="text_15">
-    <text style="font-size: 5.3px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; fill: #5f6870" transform="translate(241.867713 155.748455)">长度/属性筛选</text>
-    <text style="font-size: 5.3px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; fill: #5f6870" transform="translate(240.735666 162.361861)">距离/方向/支撑</text>
+    <text style="fill: #5f6870; font: 5.3px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(241.867713 155.748455)">长度/属性筛选</text>
+    <text style="fill: #5f6870; font: 5.3px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(240.735666 162.361861)">距离/方向/支撑</text>
    </g>
    <g id="patch_7">
     <path d="M 356.324069 134.615794 
@@ -184,17 +184,17 @@ C 347.14943 125.279509 346.068878 126.842398 346.068878 128.471803
 C 346.068878 130.101209 347.14943 131.664097 349.072554 132.81626 
 C 350.995678 133.968424 353.604361 134.615794 356.324069 134.615794 
 z
-" clip-path="url(#p4a1742dc84)" style="fill: #ffffff; stroke: #2f8f83; stroke-width: 1.1; stroke-linejoin: miter"/>
+" clip-path="url(#pbe0e263ade)" style="fill: #ffffff; stroke: #2f8f83; stroke-width: 1.1; stroke-linejoin: miter"/>
    </g>
    <g id="text_16">
-    <text style="font-weight: 700; font-size: 5.7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2f8f83" x="356.324069" y="130.04153" transform="rotate(-0 356.324069 130.04153)">5</text>
+    <text style="fill: #2f8f83; font: 700 5.7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="356.324069" y="130.04153" transform="rotate(-0 356.324069 130.04153)">5</text>
    </g>
    <g id="text_17">
-    <text style="font-weight: 700; font-size: 6.2px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2f8f83" x="356.324069" y="105.431839" transform="rotate(-0 356.324069 105.431839)">断层带重建</text>
+    <text style="fill: #2f8f83; font: 700 6.2px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="356.324069" y="105.431839" transform="rotate(-0 356.324069 105.431839)">断层带重建</text>
    </g>
    <g id="text_18">
-    <text style="font-size: 5.3px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; fill: #5f6870" transform="translate(345.724069 155.748455)">骨架扩展</text>
-    <text style="font-size: 5.3px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; fill: #5f6870" transform="translate(345.724069 162.361861)">属性包络</text>
+    <text style="fill: #5f6870; font: 5.3px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(345.724069 155.748455)">骨架扩展</text>
+    <text style="fill: #5f6870; font: 5.3px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(345.724069 162.361861)">属性包络</text>
    </g>
    <g id="patch_8">
     <path d="M 422.982806 134.615794 
@@ -207,17 +207,17 @@ C 413.808168 125.279509 412.727616 126.842398 412.727616 128.471803
 C 412.727616 130.101209 413.808168 131.664097 415.731292 132.81626 
 C 417.654416 133.968424 420.263098 134.615794 422.982806 134.615794 
 z
-" clip-path="url(#p4a1742dc84)" style="fill: #ffffff; stroke: #2d67a3; stroke-width: 1.1; stroke-linejoin: miter"/>
+" clip-path="url(#pbe0e263ade)" style="fill: #ffffff; stroke: #2d67a3; stroke-width: 1.1; stroke-linejoin: miter"/>
    </g>
    <g id="text_19">
-    <text style="font-weight: 700; font-size: 5.7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2d67a3" x="422.982806" y="130.04153" transform="rotate(-0 422.982806 130.04153)">6</text>
+    <text style="fill: #2d67a3; font: 700 5.7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="422.982806" y="130.04153" transform="rotate(-0 422.982806 130.04153)">6</text>
    </g>
    <g id="text_20">
-    <text style="font-weight: 700; font-size: 6.2px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2d67a3" x="422.982806" y="105.431839" transform="rotate(-0 422.982806 105.431839)">闭合多边形</text>
+    <text style="fill: #2d67a3; font: 700 6.2px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="422.982806" y="105.431839" transform="rotate(-0 422.982806 105.431839)">闭合多边形</text>
    </g>
    <g id="text_21">
-    <text style="font-size: 5.3px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; fill: #5f6870" transform="translate(415.032806 155.748455)">防黏连</text>
-    <text style="font-size: 5.3px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; fill: #5f6870" transform="translate(409.732806 162.361861)">边界矢量化</text>
+    <text style="fill: #5f6870; font: 5.3px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(415.032806 155.748455)">防黏连</text>
+    <text style="fill: #5f6870; font: 5.3px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(409.732806 162.361861)">边界矢量化</text>
    </g>
    <g id="patch_9">
     <path d="M 484.513949 134.615794 
@@ -230,40 +230,40 @@ C 475.33931 125.279509 474.258758 126.842398 474.258758 128.471803
 C 474.258758 130.101209 475.33931 131.664097 477.262434 132.81626 
 C 479.185558 133.968424 481.794241 134.615794 484.513949 134.615794 
 z
-" clip-path="url(#p4a1742dc84)" style="fill: #ffffff; stroke: #2d67a3; stroke-width: 1.1; stroke-linejoin: miter"/>
+" clip-path="url(#pbe0e263ade)" style="fill: #ffffff; stroke: #2d67a3; stroke-width: 1.1; stroke-linejoin: miter"/>
    </g>
    <g id="text_22">
-    <text style="font-weight: 700; font-size: 5.7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2d67a3" x="484.513949" y="130.04153" transform="rotate(-0 484.513949 130.04153)">7</text>
+    <text style="fill: #2d67a3; font: 700 5.7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="484.513949" y="130.04153" transform="rotate(-0 484.513949 130.04153)">7</text>
    </g>
    <g id="text_23">
-    <text style="font-weight: 700; font-size: 6.2px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2d67a3" x="484.513949" y="105.431839" transform="rotate(-0 484.513949 105.431839)">保留结果</text>
+    <text style="fill: #2d67a3; font: 700 6.2px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="484.513949" y="105.431839" transform="rotate(-0 484.513949 105.431839)">保留结果</text>
    </g>
    <g id="text_24">
-    <text style="font-size: 5.3px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; fill: #5f6870" transform="translate(473.913949 155.748455)">面积过滤</text>
-    <text style="font-size: 5.3px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; fill: #5f6870" transform="translate(472.781902 162.361861)">平滑/拓扑</text>
+    <text style="fill: #5f6870; font: 5.3px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(473.913949 155.748455)">面积过滤</text>
+    <text style="fill: #5f6870; font: 5.3px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(472.781902 162.361861)">平滑/拓扑</text>
    </g>
    <g id="text_25">
-    <text style="font-weight: 700; font-size: 6.1px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #2d67a3" x="33.285571" y="229.99153" transform="rotate(-0 33.285571 229.99153)">覆盖保护</text>
+    <text style="fill: #2d67a3; font: 700 6.1px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="33.285571" y="229.99153" transform="rotate(-0 33.285571 229.99153)">覆盖保护</text>
    </g>
    <g id="text_26">
-    <text style="font-size: 5.8px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #20252a" x="99.944309" y="229.908913" transform="rotate(-0 99.944309 229.908913)">强响应种子 · 受控弱响应 · 属性包络 · 平滑覆盖回退</text>
+    <text style="fill: #20252a; font: 5.8px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="99.944309" y="229.908913" transform="rotate(-0 99.944309 229.908913)">强响应种子 · 受控弱响应 · 属性包络 · 平滑覆盖回退</text>
    </g>
    <g id="text_27">
-    <text style="font-weight: 700; font-size: 6.1px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #2f8f83" x="33.285571" y="248.423501" transform="rotate(-0 33.285571 248.423501)">误合并抑制</text>
+    <text style="fill: #2f8f83; font: 700 6.1px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="33.285571" y="248.423501" transform="rotate(-0 33.285571 248.423501)">误合并抑制</text>
    </g>
    <g id="text_28">
-    <text style="font-size: 5.8px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #20252a" x="99.944309" y="248.340884" transform="rotate(-0 99.944309 248.340884)">方向与路径支撑 · 根系归属 · 低值桥模拟切分 · 条件不足回退</text>
+    <text style="fill: #20252a; font: 5.8px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="99.944309" y="248.340884" transform="rotate(-0 99.944309 248.340884)">方向与路径支撑 · 根系归属 · 低值桥模拟切分 · 条件不足回退</text>
    </g>
    <g id="text_29">
-    <text style="font-weight: 700; font-size: 6.1px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #20252a" x="33.285571" y="266.855472" transform="rotate(-0 33.285571 266.855472)">输出硬门槛</text>
+    <text style="fill: #20252a; font: 700 6.1px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="33.285571" y="266.855472" transform="rotate(-0 33.285571 266.855472)">输出硬门槛</text>
    </g>
    <g id="text_30">
-    <text style="font-size: 5.8px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #20252a" x="99.944309" y="266.772855" transform="rotate(-0 99.944309 266.772855)">闭合 · 无自交 · 无异常相交 · 面积与形态规则通过</text>
+    <text style="fill: #20252a; font: 5.8px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="99.944309" y="266.772855" transform="rotate(-0 99.944309 266.772855)">闭合 · 无自交 · 无异常相交 · 面积与形态规则通过</text>
    </g>
   </g>
  </g>
  <defs>
-  <clipPath id="p4a1742dc84">
+  <clipPath id="pbe0e263ade">
    <rect x="2.52" y="2.52" width="512.75952" height="307.19952"/>
   </clipPath>
  </defs>

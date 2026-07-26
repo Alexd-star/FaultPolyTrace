@@ -154,7 +154,7 @@ def data_contracts() -> None:
 
     ax.add_patch(Rectangle((0.37, 0.25), 0.25, 0.48, facecolor=COLORS["panel"],
                            edgecolor=COLORS["ink"], linewidth=0.8))
-    ax.text(0.495, 0.675, "内部数据契约", fontsize=7.2, weight="bold", ha="center")
+    ax.text(0.495, 0.675, "内部数据约定", fontsize=7.2, weight="bold", ha="center")
     field = _fault_field(120, 70)
     ax.imshow(field, extent=(0.40, 0.59, 0.39, 0.61), origin="lower", cmap="Greys", aspect="auto")
     ax.text(0.495, 0.345, "Grid2D", fontsize=7.0, weight="bold", ha="center", color=COLORS["blue_dark"])
@@ -169,7 +169,7 @@ def data_contracts() -> None:
     label_box(ax, (0.50, 0.11), "同一参数模型与同一多边形几何", color="amber", fill="paper", fontsize=6.2)
     ax.text(0.50, 0.92, "不同数据源在 Grid2D 处汇合，不同输出由同一几何结果派生", ha="center",
             fontsize=7.2, weight="bold")
-    save_all(fig, "F04_双数据源与输出契约")
+    save_all(fig, "F04_双数据源与输出约定")
 
 
 if __name__ == "__main__":

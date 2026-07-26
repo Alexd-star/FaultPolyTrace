@@ -6,11 +6,11 @@
   <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:date>2026-07-26T13:11:36.234202</dc:date>
+    <dc:date>2026-07-26T15:28:05.127322</dc:date>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
-      <dc:title>Matplotlib v3.10.9, https://matplotlib.org/</dc:title>
+      <dc:title>Matplotlib v3.9.4, https://matplotlib.org/</dc:title>
      </cc:Agent>
     </dc:creator>
    </cc:Work>
@@ -112,19 +112,19 @@ L 115.540325 80.904686
 L 115.861825 78.144283 
 L 115.90206 76.75976 
 L 115.90206 76.75976 
-" clip-path="url(#p13004edc09)" style="fill: none; stroke: #2f8f83; stroke-width: 1.4; stroke-linecap: square"/>
+" clip-path="url(#pc56e53d4e4)" style="fill: none; stroke: #2f8f83; stroke-width: 1.4; stroke-linecap: square"/>
    </g>
    <g id="text_1">
-    <text style="font-weight: 700; font-size: 6px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2f8f83" x="64.36476" y="129.327806" transform="rotate(-0 64.36476 129.327806)">通过</text>
+    <text style="fill: #2f8f83; font: 700 6px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="64.36476" y="129.327806" transform="rotate(-0 64.36476 129.327806)">通过</text>
    </g>
    <g id="text_2">
-    <text style="font-weight: 700; font-size: 8px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="2.52" y="8.915" transform="rotate(-0 2.52 8.915)">闭合</text>
+    <text style="font: 700 8px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="2.52" y="8.915" transform="rotate(-0 2.52 8.915)">闭合</text>
    </g>
   </g>
   <g id="axes_2">
    <g id="PathCollection_1">
     <defs>
-     <path id="m2eea666d4f" d="M 0 1.581139 
+     <path id="m439b6b064d" d="M 0 1.581139 
 C 0.419323 1.581139 0.821528 1.41454 1.118034 1.118034 
 C 1.41454 0.821528 1.581139 0.419323 1.581139 0 
 C 1.581139 -0.419323 1.41454 -0.821528 1.118034 -1.118034 
@@ -136,9 +136,9 @@ C -0.821528 1.41454 -0.419323 1.581139 0 1.581139
 z
 " style="stroke: #a94a52; stroke-width: 0.7"/>
     </defs>
-    <g clip-path="url(#pd34f4ba897)">
-     <use xlink:href="#m2eea666d4f" x="243.290223" y="66.403147" style="fill: #a94a52; stroke: #a94a52; stroke-width: 0.7"/>
-     <use xlink:href="#m2eea666d4f" x="240.461372" y="92.003285" style="fill: #a94a52; stroke: #a94a52; stroke-width: 0.7"/>
+    <g clip-path="url(#pea65360261)">
+     <use xlink:href="#m439b6b064d" x="243.290223" y="66.403147" style="fill: #a94a52; stroke: #a94a52; stroke-width: 0.7"/>
+     <use xlink:href="#m439b6b064d" x="240.461372" y="92.003285" style="fill: #a94a52; stroke: #a94a52; stroke-width: 0.7"/>
     </g>
    </g>
    <g id="line2d_2">
@@ -214,13 +214,13 @@ L 237.460151 95.654283
 L 239.532491 93.24705 
 L 240.461372 92.003285 
 L 240.461372 92.003285 
-" clip-path="url(#pd34f4ba897)" style="fill: none; stroke: #a94a52; stroke-width: 1.4; stroke-linecap: square"/>
+" clip-path="url(#pea65360261)" style="fill: none; stroke: #a94a52; stroke-width: 1.4; stroke-linecap: square"/>
    </g>
    <g id="text_3">
-    <text style="font-size: 5.7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #a94a52" x="194.05476" y="129.327806" transform="rotate(-0 194.05476 129.327806)">拒绝或回退</text>
+    <text style="fill: #a94a52; font: 5.7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="194.05476" y="129.327806" transform="rotate(-0 194.05476 129.327806)">拒绝或回退</text>
    </g>
    <g id="text_4">
-    <text style="font-weight: 700; font-size: 8px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="132.21" y="8.915" transform="rotate(-0 132.21 8.915)">开放环</text>
+    <text style="font: 700 8px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="132.21" y="8.915" transform="rotate(-0 132.21 8.915)">开放环</text>
    </g>
   </g>
   <g id="axes_3">
@@ -332,13 +332,13 @@ L 314.745918 85.620361
 L 321.93609 78.567316 
 L 323.74476 76.75976 
 L 323.74476 76.75976 
-" clip-path="url(#p2335713ed4)" style="fill: none; stroke: #a94a52; stroke-width: 1.4; stroke-linecap: square"/>
+" clip-path="url(#p496acbaf3d)" style="fill: none; stroke: #a94a52; stroke-width: 1.4; stroke-linecap: square"/>
    </g>
    <g id="text_5">
-    <text style="font-size: 5.7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #a94a52" x="323.74476" y="129.327806" transform="rotate(-0 323.74476 129.327806)">拒绝或回退</text>
+    <text style="fill: #a94a52; font: 5.7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="323.74476" y="129.327806" transform="rotate(-0 323.74476 129.327806)">拒绝或回退</text>
    </g>
    <g id="text_6">
-    <text style="font-weight: 700; font-size: 8px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="261.9" y="8.915" transform="rotate(-0 261.9 8.915)">自相交</text>
+    <text style="font: 700 8px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="261.9" y="8.915" transform="rotate(-0 261.9 8.915)">自相交</text>
    </g>
   </g>
   <g id="axes_4">
@@ -425,7 +425,7 @@ L 490.179881 80.295138
 L 490.501381 77.940677 
 L 490.541616 76.75976 
 L 490.541616 76.75976 
-" clip-path="url(#p7c3c82b431)" style="fill: none; stroke: #a94a52; stroke-width: 1.1; stroke-linecap: square"/>
+" clip-path="url(#p78263926db)" style="fill: none; stroke: #a94a52; stroke-width: 1.1; stroke-linecap: square"/>
    </g>
    <g id="line2d_5">
     <path d="M 518.79952 72.219163 
@@ -506,30 +506,30 @@ L 516.848526 86.052935
 L 517.960641 83.780888 
 L 518.79952 81.300357 
 L 518.79952 81.300357 
-" clip-path="url(#p7c3c82b431)" style="fill: none; stroke: #c9872b; stroke-width: 1.1; stroke-linecap: square"/>
+" clip-path="url(#p78263926db)" style="fill: none; stroke: #c9872b; stroke-width: 1.1; stroke-linecap: square"/>
    </g>
    <g id="text_7">
-    <text style="font-size: 5.7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #a94a52" x="453.43476" y="129.327806" transform="rotate(-0 453.43476 129.327806)">拒绝或回退</text>
+    <text style="fill: #a94a52; font: 5.7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="453.43476" y="129.327806" transform="rotate(-0 453.43476 129.327806)">拒绝或回退</text>
    </g>
    <g id="text_8">
-    <text style="font-weight: 700; font-size: 8px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="391.59" y="8.915" transform="rotate(-0 391.59 8.915)">异常相交</text>
+    <text style="font: 700 8px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="391.59" y="8.915" transform="rotate(-0 391.59 8.915)">异常相交</text>
    </g>
   </g>
   <g id="text_9">
-   <text style="font-size: 6.1px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #5f6870" x="258.89976" y="159.32936" transform="rotate(-0 258.89976 159.32936)">简化和平滑后重新检查；保留层只接收闭合、无自交且无异常相交的边界</text>
+   <text style="fill: #5f6870; font: 6.1px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="258.89976" y="159.32936" transform="rotate(-0 258.89976 159.32936)">简化和平滑后重新检查；保留层只接收闭合、无自交且无异常相交的边界</text>
   </g>
  </g>
  <defs>
-  <clipPath id="p13004edc09">
+  <clipPath id="pc56e53d4e4">
    <rect x="2.52" y="14.915" width="123.68952" height="123.68952"/>
   </clipPath>
-  <clipPath id="pd34f4ba897">
+  <clipPath id="pea65360261">
    <rect x="132.21" y="14.915" width="123.68952" height="123.68952"/>
   </clipPath>
-  <clipPath id="p2335713ed4">
+  <clipPath id="p496acbaf3d">
    <rect x="261.9" y="14.915" width="123.68952" height="123.68952"/>
   </clipPath>
-  <clipPath id="p7c3c82b431">
+  <clipPath id="p78263926db">
    <rect x="391.59" y="14.915" width="123.68952" height="123.68952"/>
   </clipPath>
  </defs>

@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-8" standalone="no"?>
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
   "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="517.418557pt" height="251.03952pt" viewBox="0 0 517.418557 251.03952" xmlns="http://www.w3.org/2000/svg" version="1.1">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="517.421518pt" height="251.03952pt" viewBox="0 0 517.421518 251.03952" xmlns="http://www.w3.org/2000/svg" version="1.1">
  <metadata>
   <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:date>2026-07-26T13:11:41.856852</dc:date>
+    <dc:date>2026-07-26T15:28:10.593388</dc:date>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
-      <dc:title>Matplotlib v3.10.9, https://matplotlib.org/</dc:title>
+      <dc:title>Matplotlib v3.9.4, https://matplotlib.org/</dc:title>
      </cc:Agent>
     </dc:creator>
    </cc:Work>
@@ -22,54 +22,54 @@
  <g id="figure_1">
   <g id="patch_1">
    <path d="M 0 251.03952 
-L 517.418557 251.03952 
-L 517.418557 0 
+L 517.421518 251.03952 
+L 517.421518 0 
 L 0 0 
 z
 " style="fill: #ffffff"/>
   </g>
   <g id="axes_1">
    <g id="patch_2">
-    <path d="M 51.814062 248.51952 
-L 476.16794 248.51952 
-L 476.16794 26.702812 
-L 51.814062 26.702812 
+    <path d="M 55.104688 248.51952 
+L 476.266659 248.51952 
+L 476.266659 26.702812 
+L 55.104688 26.702812 
 z
 " style="fill: #ffffff"/>
    </g>
-   <g clip-path="url(#p23ea8d6d02)">
+   <g clip-path="url(#pfd7b61655b)">
     <image xlink:href="data:image/png;base64,
-iVBORw0KGgoAAAANSUhEUgAAAk4AAAE1CAYAAAARVG9qAAAFxUlEQVR4nO3YQY3CABBA0e1m7VRCPeCiCqoCGTVQDxgiIKBr4R8gDeW98xwmc/qZ4f547j+czrRsR68AAKfze/QCAACfQjgBAETCCQAgEk4AAJFwAgCIhBMAQCScAAAi4QQAEAknAIBIOAEARMIJACASTgAAkXACAIiEEwBAJJwAACLhBAAQCScAgEg4AQBEwgkAIBJOAACRcAIAiIQTAEAknAAAIuEEABAJJwCASDgBAETCCQAgEk4AAJFwAgCIhBMAQCScAAAi4QQAEAknAIBIOAEARMIJACASTgAAkXACAIiEEwBAJJwAACLhBAAQCScAgEg4AQBEwgkAIBrGed3rMACvd7tenPWEpmU7egXewMcJACASTgAAkXACAIiEEwBAJJwAACLhBAAQCScAgEg4AQBEwgkAIBJOAACRcAIAiIQTAEAknAAAIuEEABAJJwCASDgBAETCCQAgEk4AAJFwAgCIhBMAQCScAAAi4QQAEAknAIBIOAEARMIJACASTgAAkXACAIiEEwBAJJwAACLhBAAQCScAgEg4AQBEwgkAIBJOAACRcAIAiIQTAEAknAAAIuEEABAJJwCASDgBAETCCQAgEk4AAJFwAgCIhnFe9zrM57hdL0evAACn4+MEABAJJwCASDgBAETCCQAgEk4AAJFwAgCIhBMAQCScAAAi4QQAEAknAIBIOAEARMIJACASTgAAkXACAIiEEwBAJJwAACLhBAAQCScAgEg4AQBEwgkAIBJOAACRcAIAEE4AAK/l4wQAEAknAIBIOAEARMIJACASTgAAkXACAIiEEwBAJJwAACLhBAAQCScAgEg4AQBEwgkAIBJOAACRcAIAiIQTAEAknAAAIuEEABAJJwCASDgBAETCCQAgEk4AANEwzutehwEAvpmPEwBAJJwAACLhBAAQCScAgEg4AQBEwgkAIBJOAACRcAIAiIQTAEAknAAAIuEEABAJJwCASDgBAETCCQAgEk4AAJFwAgCIhBMAQCScAAAi4QQAEAknAIBIOAEARMIJACASTgAAkXACAIiEEwBAJJwAACLhBAAQCScAgEg4AQBEwgkAIBJOAACRcAIAiIQTAEAknAAAIuEEABAJJwCASDgBAETCCQAgEk4AAJFwAgCIhBMAQCScAAAi4QQAEA33x3Ovw3yOadmOXgEATsfHCQAgEk4AAJFwAgCIhBMAQCScAAAi4QQAEAknAIBIOAEARMIJACASTgAAkXACAIiEEwBAJJwAACLhBAAQCScAgEg4AQBEwgkAIBJOAACRcAIAiIQTAEAknAAAIuEEABAJJwCASDgBAETCCQAgEk4AAJFwAgCIhBMAQCScAAAi4QQAEAknAIBIOAEARMIJACASTgAAkXACAIiEEwBAJJwAACLhBAAQCScAgEg4AQBEwgkAIBJOAACRcAIAiP7qIADvcbtenPaEpmU7egXewMcJACASTgAAkXACAIiEEwBAJJwAACLhBAAQCScAgEg4AQBEwgkAIBJOAACRcAIAiIQTAEAknAAAIuEEABAJJwCASDgBAETCCQAgEk4AAJFwAgCIhBMAQCScAAAi4QQAEAknAIBIOAEARMIJACASTgAAkXACAIiEEwBAJJwAACLhBAAQCScAgEg4AQBEwgkAIBJOAACRcAIAiIQTAEAknAAAIuEEABAJJwCASDgBAETCCQAgEk4AAJFwAgCIhnFe9zoMAPDNfJwAACLhBAAQCScAgEg4AQBEwgkAIBJOAACRcAIAiIQTAEAknAAAIuEEABAJJwCASDgBAETCCQAgEk4AAJFwAgCIhBMAQCScAAAi4QQAEAknAIBIOAEARMIJACASTgAAkXACAIiEEwBAJJwAACLhBAAQCScAgEg4AQBEwgkAIBJOAACRcAIAiIQTAEAknAAAIuEEABAJJwCASDgBAETCCQAgEk4AAJFwAgCIhBMAQCScAAAi4QQAEAknAICf5h8K2h1JqxmGfgAAAABJRU5ErkJggg==" id="imagee69c1dce5b" transform="scale(1 -1) translate(0 -222.48)" x="51.814063" y="-26.03952" width="424.8" height="222.48"/>
+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" id="imagebd455402d4" transform="scale(1 -1) translate(0 -222.48)" x="55.104688" y="-26.03952" width="421.2" height="222.48"/>
    </g>
    <g id="matplotlib.axis_1">
     <g id="xtick_1">
      <g id="line2d_1"/>
      <g id="text_1">
-      <text style="font-size: 6px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="94.24945" y="21.71125" transform="rotate(-0 94.24945 21.71125)">算法</text>
+      <text style="font: 6px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="97.220885" y="21.71125" transform="rotate(-0 97.220885 21.71125)">算法</text>
      </g>
     </g>
     <g id="xtick_2">
      <g id="line2d_2"/>
      <g id="text_2">
-      <text style="font-size: 6px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="179.120226" y="21.71125" transform="rotate(-0 179.120226 21.71125)">输入输出</text>
+      <text style="font: 6px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="181.453279" y="21.71125" transform="rotate(-0 181.453279 21.71125)">输入输出</text>
      </g>
     </g>
     <g id="xtick_3">
      <g id="line2d_3"/>
      <g id="text_3">
-      <text style="font-size: 6px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="263.991001" y="21.71125" transform="rotate(-0 263.991001 21.71125)">界面</text>
+      <text style="font: 6px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="265.685673" y="21.71125" transform="rotate(-0 265.685673 21.71125)">界面</text>
      </g>
     </g>
     <g id="xtick_4">
      <g id="line2d_4"/>
      <g id="text_4">
-      <text style="font-size: 6px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="348.861777" y="21.71125" transform="rotate(-0 348.861777 21.71125)">GeoEast</text>
+      <text style="font: 6px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="349.918068" y="21.71125" transform="rotate(-0 349.918068 21.71125)">GeoEast</text>
      </g>
     </g>
     <g id="xtick_5">
      <g id="line2d_5"/>
      <g id="text_5">
-      <text style="font-size: 6px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="433.732552" y="21.71125" transform="rotate(-0 433.732552 21.71125)">发布</text>
+      <text style="font: 6px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="434.150462" y="21.71125" transform="rotate(-0 434.150462 21.71125)">发布</text>
      </g>
     </g>
    </g>
@@ -77,180 +77,180 @@ iVBORw0KGgoAAAANSUhEUgAAAk4AAAE1CAYAAAARVG9qAAAFxUlEQVR4nO3YQY3CABBA0e1m7VRCPeCi
     <g id="ytick_1">
      <g id="line2d_6"/>
      <g id="text_6">
-      <text style="font-size: 6px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: end" x="48.314062" y="45.023738" transform="rotate(-0 48.314062 45.023738)">Python 回归</text>
+      <text style="font: 6px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: end" x="51.604688" y="44.944988" transform="rotate(-0 51.604688 44.944988)">算法一致性检验</text>
      </g>
     </g>
     <g id="ytick_2">
      <g id="line2d_7"/>
      <g id="text_7">
-      <text style="font-size: 6px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: end" x="48.314062" y="76.633089" transform="rotate(-0 48.314062 76.633089)">独立软件 UI 契约</text>
+      <text style="font: 6px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: end" x="51.604688" y="76.633089" transform="rotate(-0 51.604688 76.633089)">独立软件界面检查</text>
      </g>
     </g>
     <g id="ytick_3">
      <g id="line2d_8"/>
      <g id="text_8">
-      <text style="font-size: 6px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: end" x="48.314062" y="108.32119" transform="rotate(-0 48.314062 108.32119)">GeoEast UI 契约</text>
+      <text style="font: 6px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: end" x="51.604688" y="108.32119" transform="rotate(-0 51.604688 108.32119)">GeoEast 界面检查</text>
      </g>
     </g>
     <g id="ytick_4">
      <g id="line2d_9"/>
      <g id="text_9">
-      <text style="font-size: 6px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: end" x="48.314062" y="140.009291" transform="rotate(-0 48.314062 140.009291)">参数一致性</text>
+      <text style="font: 6px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: end" x="51.604688" y="140.009291" transform="rotate(-0 51.604688 140.009291)">参数一致性核对</text>
      </g>
     </g>
     <g id="ytick_5">
      <g id="line2d_10"/>
      <g id="text_10">
-      <text style="font-size: 6px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: end" x="48.314062" y="171.697392" transform="rotate(-0 48.314062 171.697392)">C++ 核心验证</text>
+      <text style="font: 6px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: end" x="51.604688" y="171.697392" transform="rotate(-0 51.604688 171.697392)">C++ 核心验证</text>
      </g>
     </g>
     <g id="ytick_6">
      <g id="line2d_11"/>
      <g id="text_11">
-      <text style="font-size: 6px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: end" x="48.314062" y="203.385493" transform="rotate(-0 48.314062 203.385493)">安装器运行检查</text>
+      <text style="font: 6px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: end" x="51.604688" y="203.385493" transform="rotate(-0 51.604688 203.385493)">安装器运行检查</text>
      </g>
     </g>
     <g id="ytick_7">
      <g id="line2d_12"/>
      <g id="text_12">
-      <text style="font-size: 6px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: end" x="48.314062" y="235.073594" transform="rotate(-0 48.314062 235.073594)">插件部署检查</text>
+      <text style="font: 6px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: end" x="51.604688" y="235.073594" transform="rotate(-0 51.604688 235.073594)">插件部署检查</text>
      </g>
     </g>
    </g>
    <g id="text_13">
-    <text style="font-size: 7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #ffffff" x="94.24945" y="44.474597" transform="rotate(-0 94.24945 44.474597)">●</text>
+    <text style="fill: #ffffff; font: 7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="97.220885" y="44.474597" transform="rotate(-0 97.220885 44.474597)">●</text>
    </g>
    <g id="text_14">
-    <text style="font-size: 7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #ffffff" x="179.120226" y="44.474597" transform="rotate(-0 179.120226 44.474597)">●</text>
+    <text style="fill: #ffffff; font: 7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="181.453279" y="44.474597" transform="rotate(-0 181.453279 44.474597)">●</text>
    </g>
    <g id="text_15">
-    <text style="font-size: 7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #ffffff" x="263.991001" y="44.474597" transform="rotate(-0 263.991001 44.474597)">●</text>
+    <text style="fill: #ffffff; font: 7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="265.685673" y="44.474597" transform="rotate(-0 265.685673 44.474597)">●</text>
    </g>
    <g id="text_16">
-    <text style="font-size: 7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #ffffff" x="348.861777" y="44.474597" transform="rotate(-0 348.861777 44.474597)">●</text>
+    <text style="fill: #ffffff; font: 7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="349.918068" y="44.474597" transform="rotate(-0 349.918068 44.474597)">●</text>
    </g>
    <g id="text_17">
-    <text style="font-size: 7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #ffffff" x="433.732552" y="44.474597" transform="rotate(-0 433.732552 44.474597)">●</text>
+    <text style="fill: #ffffff; font: 7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="434.150462" y="44.474597" transform="rotate(-0 434.150462 44.474597)">●</text>
    </g>
    <g id="text_18">
-    <text style="font-size: 6.5px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #20252a" x="488.898557" y="44.336902" transform="rotate(-0 488.898557 44.336902)">180 项</text>
+    <text style="fill: #20252a; font: 6.5px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="488.901518" y="44.336902" transform="rotate(-0 488.901518 44.336902)">180 项</text>
    </g>
    <g id="text_19">
-    <text style="font-size: 7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #5f6870" x="94.24945" y="76.162698" transform="rotate(-0 94.24945 76.162698)">—</text>
+    <text style="fill: #5f6870; font: 7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="97.220885" y="76.162698" transform="rotate(-0 97.220885 76.162698)">—</text>
    </g>
    <g id="text_20">
-    <text style="font-size: 7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #ffffff" x="179.120226" y="76.162698" transform="rotate(-0 179.120226 76.162698)">●</text>
+    <text style="fill: #ffffff; font: 7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="181.453279" y="76.162698" transform="rotate(-0 181.453279 76.162698)">●</text>
    </g>
    <g id="text_21">
-    <text style="font-size: 7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #ffffff" x="263.991001" y="76.162698" transform="rotate(-0 263.991001 76.162698)">●</text>
+    <text style="fill: #ffffff; font: 7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="265.685673" y="76.162698" transform="rotate(-0 265.685673 76.162698)">●</text>
    </g>
    <g id="text_22">
-    <text style="font-size: 7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #5f6870" x="348.861777" y="76.162698" transform="rotate(-0 348.861777 76.162698)">—</text>
+    <text style="fill: #5f6870; font: 7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="349.918068" y="76.162698" transform="rotate(-0 349.918068 76.162698)">—</text>
    </g>
    <g id="text_23">
-    <text style="font-size: 7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #ffffff" x="433.732552" y="76.162698" transform="rotate(-0 433.732552 76.162698)">●</text>
+    <text style="fill: #ffffff; font: 7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="434.150462" y="76.162698" transform="rotate(-0 434.150462 76.162698)">●</text>
    </g>
    <g id="text_24">
-    <text style="font-size: 6.5px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #20252a" x="488.898557" y="76.025003" transform="rotate(-0 488.898557 76.025003)">209/209</text>
+    <text style="fill: #20252a; font: 6.5px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="488.901518" y="76.025003" transform="rotate(-0 488.901518 76.025003)">209/209</text>
    </g>
    <g id="text_25">
-    <text style="font-size: 7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #5f6870" x="94.24945" y="107.8508" transform="rotate(-0 94.24945 107.8508)">—</text>
+    <text style="fill: #5f6870; font: 7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="97.220885" y="107.8508" transform="rotate(-0 97.220885 107.8508)">—</text>
    </g>
    <g id="text_26">
-    <text style="font-size: 7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #ffffff" x="179.120226" y="107.8508" transform="rotate(-0 179.120226 107.8508)">●</text>
+    <text style="fill: #ffffff; font: 7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="181.453279" y="107.8508" transform="rotate(-0 181.453279 107.8508)">●</text>
    </g>
    <g id="text_27">
-    <text style="font-size: 7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #ffffff" x="263.991001" y="107.8508" transform="rotate(-0 263.991001 107.8508)">●</text>
+    <text style="fill: #ffffff; font: 7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="265.685673" y="107.8508" transform="rotate(-0 265.685673 107.8508)">●</text>
    </g>
    <g id="text_28">
-    <text style="font-size: 7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #ffffff" x="348.861777" y="107.8508" transform="rotate(-0 348.861777 107.8508)">●</text>
+    <text style="fill: #ffffff; font: 7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="349.918068" y="107.8508" transform="rotate(-0 349.918068 107.8508)">●</text>
    </g>
    <g id="text_29">
-    <text style="font-size: 7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #ffffff" x="433.732552" y="107.8508" transform="rotate(-0 433.732552 107.8508)">●</text>
+    <text style="fill: #ffffff; font: 7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="434.150462" y="107.8508" transform="rotate(-0 434.150462 107.8508)">●</text>
    </g>
    <g id="text_30">
-    <text style="font-size: 6.5px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #20252a" x="488.898557" y="107.713104" transform="rotate(-0 488.898557 107.713104)">135/135</text>
+    <text style="fill: #20252a; font: 6.5px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="488.901518" y="107.713104" transform="rotate(-0 488.901518 107.713104)">135/135</text>
    </g>
    <g id="text_31">
-    <text style="font-size: 7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #ffffff" x="94.24945" y="139.538901" transform="rotate(-0 94.24945 139.538901)">●</text>
+    <text style="fill: #ffffff; font: 7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="97.220885" y="139.538901" transform="rotate(-0 97.220885 139.538901)">●</text>
    </g>
    <g id="text_32">
-    <text style="font-size: 7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #ffffff" x="179.120226" y="139.538901" transform="rotate(-0 179.120226 139.538901)">●</text>
+    <text style="fill: #ffffff; font: 7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="181.453279" y="139.538901" transform="rotate(-0 181.453279 139.538901)">●</text>
    </g>
    <g id="text_33">
-    <text style="font-size: 7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #ffffff" x="263.991001" y="139.538901" transform="rotate(-0 263.991001 139.538901)">●</text>
+    <text style="fill: #ffffff; font: 7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="265.685673" y="139.538901" transform="rotate(-0 265.685673 139.538901)">●</text>
    </g>
    <g id="text_34">
-    <text style="font-size: 7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #ffffff" x="348.861777" y="139.538901" transform="rotate(-0 348.861777 139.538901)">●</text>
+    <text style="fill: #ffffff; font: 7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="349.918068" y="139.538901" transform="rotate(-0 349.918068 139.538901)">●</text>
    </g>
    <g id="text_35">
-    <text style="font-size: 7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #ffffff" x="433.732552" y="139.538901" transform="rotate(-0 433.732552 139.538901)">●</text>
+    <text style="fill: #ffffff; font: 7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="434.150462" y="139.538901" transform="rotate(-0 434.150462 139.538901)">●</text>
    </g>
    <g id="text_36">
-    <text style="font-size: 6.5px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #20252a" x="488.898557" y="139.401205" transform="rotate(-0 488.898557 139.401205)">465/465</text>
+    <text style="fill: #20252a; font: 6.5px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="488.901518" y="139.401205" transform="rotate(-0 488.901518 139.401205)">465/465</text>
    </g>
    <g id="text_37">
-    <text style="font-size: 7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #ffffff" x="94.24945" y="171.227002" transform="rotate(-0 94.24945 171.227002)">●</text>
+    <text style="fill: #ffffff; font: 7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="97.220885" y="171.227002" transform="rotate(-0 97.220885 171.227002)">●</text>
    </g>
    <g id="text_38">
-    <text style="font-size: 7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #5f6870" x="179.120226" y="171.227002" transform="rotate(-0 179.120226 171.227002)">—</text>
+    <text style="fill: #5f6870; font: 7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="181.453279" y="171.227002" transform="rotate(-0 181.453279 171.227002)">—</text>
    </g>
    <g id="text_39">
-    <text style="font-size: 7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #5f6870" x="263.991001" y="171.227002" transform="rotate(-0 263.991001 171.227002)">—</text>
+    <text style="fill: #5f6870; font: 7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="265.685673" y="171.227002" transform="rotate(-0 265.685673 171.227002)">—</text>
    </g>
    <g id="text_40">
-    <text style="font-size: 7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #5f6870" x="348.861777" y="171.227002" transform="rotate(-0 348.861777 171.227002)">—</text>
+    <text style="fill: #5f6870; font: 7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="349.918068" y="171.227002" transform="rotate(-0 349.918068 171.227002)">—</text>
    </g>
    <g id="text_41">
-    <text style="font-size: 7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #5f6870" x="433.732552" y="171.227002" transform="rotate(-0 433.732552 171.227002)">—</text>
+    <text style="fill: #5f6870; font: 7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="434.150462" y="171.227002" transform="rotate(-0 434.150462 171.227002)">—</text>
    </g>
    <g id="text_42">
-    <text style="font-size: 6.5px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #20252a" x="488.898557" y="171.089306" transform="rotate(-0 488.898557 171.089306)">5 项</text>
+    <text style="fill: #20252a; font: 6.5px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="488.901518" y="171.089306" transform="rotate(-0 488.901518 171.089306)">5 项</text>
    </g>
    <g id="text_43">
-    <text style="font-size: 7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #ffffff" x="94.24945" y="202.915103" transform="rotate(-0 94.24945 202.915103)">●</text>
+    <text style="fill: #ffffff; font: 7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="97.220885" y="202.915103" transform="rotate(-0 97.220885 202.915103)">●</text>
    </g>
    <g id="text_44">
-    <text style="font-size: 7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #ffffff" x="179.120226" y="202.915103" transform="rotate(-0 179.120226 202.915103)">●</text>
+    <text style="fill: #ffffff; font: 7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="181.453279" y="202.915103" transform="rotate(-0 181.453279 202.915103)">●</text>
    </g>
    <g id="text_45">
-    <text style="font-size: 7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #ffffff" x="263.991001" y="202.915103" transform="rotate(-0 263.991001 202.915103)">●</text>
+    <text style="fill: #ffffff; font: 7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="265.685673" y="202.915103" transform="rotate(-0 265.685673 202.915103)">●</text>
    </g>
    <g id="text_46">
-    <text style="font-size: 7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #5f6870" x="348.861777" y="202.915103" transform="rotate(-0 348.861777 202.915103)">—</text>
+    <text style="fill: #5f6870; font: 7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="349.918068" y="202.915103" transform="rotate(-0 349.918068 202.915103)">—</text>
    </g>
    <g id="text_47">
-    <text style="font-size: 7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #ffffff" x="433.732552" y="202.915103" transform="rotate(-0 433.732552 202.915103)">●</text>
+    <text style="fill: #ffffff; font: 7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="434.150462" y="202.915103" transform="rotate(-0 434.150462 202.915103)">●</text>
    </g>
    <g id="text_48">
-    <text style="font-size: 6.5px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #20252a" x="488.898557" y="202.777407" transform="rotate(-0 488.898557 202.777407)">正常完成</text>
+    <text style="fill: #20252a; font: 6.5px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="488.901518" y="202.777407" transform="rotate(-0 488.901518 202.777407)">正常完成</text>
    </g>
    <g id="text_49">
-    <text style="font-size: 7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #5f6870" x="94.24945" y="234.603204" transform="rotate(-0 94.24945 234.603204)">—</text>
+    <text style="fill: #5f6870; font: 7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="97.220885" y="234.603204" transform="rotate(-0 97.220885 234.603204)">—</text>
    </g>
    <g id="text_50">
-    <text style="font-size: 7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #ffffff" x="179.120226" y="234.603204" transform="rotate(-0 179.120226 234.603204)">●</text>
+    <text style="fill: #ffffff; font: 7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="181.453279" y="234.603204" transform="rotate(-0 181.453279 234.603204)">●</text>
    </g>
    <g id="text_51">
-    <text style="font-size: 7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #ffffff" x="263.991001" y="234.603204" transform="rotate(-0 263.991001 234.603204)">●</text>
+    <text style="fill: #ffffff; font: 7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="265.685673" y="234.603204" transform="rotate(-0 265.685673 234.603204)">●</text>
    </g>
    <g id="text_52">
-    <text style="font-size: 7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #ffffff" x="348.861777" y="234.603204" transform="rotate(-0 348.861777 234.603204)">●</text>
+    <text style="fill: #ffffff; font: 7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="349.918068" y="234.603204" transform="rotate(-0 349.918068 234.603204)">●</text>
    </g>
    <g id="text_53">
-    <text style="font-size: 7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #ffffff" x="433.732552" y="234.603204" transform="rotate(-0 433.732552 234.603204)">●</text>
+    <text style="fill: #ffffff; font: 7px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="434.150462" y="234.603204" transform="rotate(-0 434.150462 234.603204)">●</text>
    </g>
    <g id="text_54">
-    <text style="font-size: 6.5px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #20252a" x="488.898557" y="234.465509" transform="rotate(-0 488.898557 234.465509)">组件完整</text>
+    <text style="fill: #20252a; font: 6.5px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="488.901518" y="234.465509" transform="rotate(-0 488.901518 234.465509)">组件完整</text>
    </g>
    <g id="text_55">
-    <text style="font-weight: 700; font-size: 8px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="51.814062" y="8.915" transform="rotate(-0 51.814062 8.915)">自动化验证覆盖范围与运行结果</text>
+    <text style="font: 700 8px 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="55.104688" y="8.915" transform="rotate(-0 55.104688 8.915)">自动化验证覆盖范围与运行结果</text>
    </g>
   </g>
  </g>
  <defs>
-  <clipPath id="p23ea8d6d02">
-   <rect x="51.814062" y="26.702812" width="424.353878" height="221.816708"/>
+  <clipPath id="pfd7b61655b">
+   <rect x="55.104688" y="26.702812" width="421.161972" height="221.816708"/>
   </clipPath>
  </defs>
 </svg>
