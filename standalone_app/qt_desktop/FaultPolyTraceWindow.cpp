@@ -1866,13 +1866,14 @@ void FaultPolyTraceWindow::buildUi() {
     connect(loadHistoryButton, &QPushButton::clicked, this, &FaultPolyTraceWindow::loadHistory);
     historyLayout->addWidget(loadHistoryButton, 1, 0, 1, 2);
 
-    // V1.1：按任务流排序侧栏分区——数据 → 参数 → 高级 → 显示 → 结果 → 历史。
+    // 侧栏分区顺序与 GeoEast 插件保持一致：数据与显示样式常驻首屏，
+    // 其后是追踪参数与默认折叠的高级参数，最后是结果查看与历史记录。
     sidebarLayout->addWidget(dataBox);
+    sidebarLayout->addWidget(styleBox);
     sidebarLayout->addWidget(basicBox);
     sidebarLayout->addWidget(topologyBox);
     sidebarLayout->addWidget(branchBox);
     sidebarLayout->addWidget(antiMergeBox);
-    sidebarLayout->addWidget(styleBox);
     sidebarLayout->addWidget(resultBox);
     sidebarLayout->addWidget(historyBox);
     sidebarLayout->addStretch(1);
