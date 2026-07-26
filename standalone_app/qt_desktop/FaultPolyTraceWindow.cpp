@@ -1,5 +1,6 @@
 #include "FaultPolyTraceWindow.h"
 #include "FptIcons.h"
+#include "FptLog.h"
 #include "FptTheme.h"
 #include "UiLocalization.h"
 #include "TraceParameterModel.h"
@@ -1216,6 +1217,23 @@ void FaultPolyTraceWindow::buildUi() {
     editMenu->addSeparator();
     QAction* copySummaryAction = editMenu->addAction(QString::fromUtf8("复制当前结果摘要"));
     connect(copySummaryAction, &QAction::triggered, this, &FaultPolyTraceWindow::copyResultSummary);
+    editMenu->addSeparator();
+    QAction* copyLogAction = editMenu->addAction(QString::fromUtf8("复制运行日志"));
+    connect(copyLogAction, &QAction::triggered, this, [this]() {
+        QString logText = logEdit_->toPlainText();
+        if (!pendingDebugLines_.isEmpty()) {
+            logText += QString::fromUtf8("\n---- 详细日志（界面已折叠）----\n") +
+                       pendingDebugLines_.join('\n');
+        }
+        QApplication::clipboard()->setText(logText);
+        updateStatus(QString::fromUtf8("运行日志已复制到剪贴板"));
+    });
+    QAction* clearLogAction = editMenu->addAction(QString::fromUtf8("清空运行日志"));
+    connect(clearLogAction, &QAction::triggered, this, [this]() {
+        logEdit_->clear();
+        pendingDebugLines_.clear();
+        updateStatus(QString::fromUtf8("运行日志已清空"));
+    });
 
     QMenu* viewMenu = menuBar()->addMenu(QString::fromUtf8("视图(&V)"));
     QAction* taskViewAction = viewMenu->addAction(QString::fromUtf8("任务预览"));
@@ -1890,7 +1908,7 @@ void FaultPolyTraceWindow::buildUi() {
                 child->setVisible(on);
             }
             // 收起时压到标题高度，避免留下空白分组框。
-            box->setMaximumHeight(on ? QWIDGETSIZE_MAX : 26);
+            box->setMaximumHeight(on ? QWIDGETSIZE_MAX : box->fontMetrics().height() + 9);
         };
         applyVisibility(expanded);
         connect(box, &QGroupBox::toggled, this, [this, applyVisibility](bool on) {
@@ -1959,13 +1977,35 @@ void FaultPolyTraceWindow::buildUi() {
     QVBoxLayout* logLayout = new QVBoxLayout(logPanel);
     logLayout->setContentsMargins(0, 0, 0, 0);
     logLayout->setSpacing(0);
-    QLabel* logHeader = new QLabel(QString::fromUtf8("运行日志与输出信息"), logPanel);
+    QWidget* logHeaderRow = new QWidget(logPanel);
+    QHBoxLayout* logHeaderLayout = new QHBoxLayout(logHeaderRow);
+    logHeaderLayout->setContentsMargins(0, 0, 8, 0);
+    logHeaderLayout->setSpacing(8);
+    QLabel* logHeader = new QLabel(QString::fromUtf8("运行日志与输出信息"), logHeaderRow);
     logHeader->setObjectName("logHeader");
     logHeader->setFixedHeight(24);
+    verboseLogCheck_ = new QCheckBox(QString::fromUtf8("详细日志"), logHeaderRow);
+    verboseLogCheck_->setChecked(false);
+    verboseLogCheck_->setToolTip(QString::fromUtf8("勾选后显示后台程序的原始英文输出，便于排查问题"));
+    connect(verboseLogCheck_, &QCheckBox::toggled, this, [this](bool on) {
+        if (on && !pendingDebugLines_.isEmpty()) {
+            QString html;
+            for (const QString& line : pendingDebugLines_) {
+                html += fpt_ui::logLineStyle(line).html;
+            }
+            pendingDebugLines_.clear();
+            logEdit_->moveCursor(QTextCursor::End);
+            logEdit_->insertHtml(html);
+            logEdit_->moveCursor(QTextCursor::End);
+        }
+    });
+    logHeaderLayout->addWidget(logHeader, 1);
+    logHeaderLayout->addWidget(verboseLogCheck_);
     logEdit_ = new QTextEdit(logPanel);
+    logEdit_->document()->setMaximumBlockCount(3000);
     logEdit_->setReadOnly(true);
     logEdit_->setFixedHeight(86);
-    logLayout->addWidget(logHeader);
+    logLayout->addWidget(logHeaderRow);
     logLayout->addWidget(logEdit_);
     rightLayout->addWidget(viewStrip, 1);
     rightLayout->addWidget(logPanel);
@@ -2062,19 +2102,32 @@ void FaultPolyTraceWindow::buildUi() {
     connect(presetCombo_, &QComboBox::currentTextChanged, this, &FaultPolyTraceWindow::applyPreset);
     // V1.1：任何参数被手动改动后，模板下拉自动显示“自定义”状态。
     const auto markCustomized = [this]() {
-        QTimer::singleShot(0, this, [this]() { syncPresetIndicator(); });
+        if (presetSyncPending_) {
+            return;
+        }
+        presetSyncPending_ = true;
+        QTimer::singleShot(0, this, [this]() {
+            presetSyncPending_ = false;
+            syncPresetIndicator();
+        });
     };
-    for (QDoubleSpinBox* spin : {percentileSpin_, thresholdSpin_, minAreaSpin_, maxGapAngleSpin_,
-                                 simplifyToleranceSpin_, weakPercentileSpin_, minJunctionBranchMeanSpin_}) {
-        if (spin) {
-            connect(spin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, markCustomized);
+    // 覆盖全部参数控件，含默认折叠的高级分组。
+    for (QAbstractSpinBox* box : findChildren<QAbstractSpinBox*>()) {
+        if (auto* dbl = qobject_cast<QDoubleSpinBox*>(box)) {
+            connect(dbl, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, markCustomized);
+        } else if (auto* integer = qobject_cast<QSpinBox*>(box)) {
+            connect(integer, QOverload<int>::of(&QSpinBox::valueChanged), this, markCustomized);
         }
     }
-    for (QSpinBox* spin : {closeRadiusSpin_, beltRadiusSpin_, postBeltCloseRadiusSpin_,
-                           attributeEnvelopeRadiusSpin_, maxGapDistanceSpin_, smoothIterationsSpin_,
-                           weakConnectRadiusSpin_, minBranchLengthSpin_, minJunctionBranchLengthSpin_}) {
-        if (spin) {
-            connect(spin, QOverload<int>::of(&QSpinBox::valueChanged), this, markCustomized);
+    for (QComboBox* combo : {traceModeCombo_, thresholdModeCombo_}) {
+        if (combo) {
+            connect(combo, &QComboBox::currentTextChanged, this, markCustomized);
+        }
+    }
+    for (QCheckBox* check : {attributeConstrainedBeltCheck_, rootAntiMergeCheck_,
+                             localAntiMergeCheck_, residualTraceCheck_}) {
+        if (check) {
+            connect(check, &QCheckBox::toggled, this, markCustomized);
         }
     }
     connect(inputEdit_, &QLineEdit::textChanged, this, &FaultPolyTraceWindow::updateTaskPreview);
@@ -3182,16 +3235,35 @@ bool FaultPolyTraceWindow::ensureGeoEastConfigReady(const QString& operation, bo
     appendLog(QString::fromUtf8("无法执行【%1】：GeoEast 配置不完整。缺失或无效项：%2")
                   .arg(operation, missing.join(QString::fromUtf8("；"))));
 
+    // 按缺失项路由：主面板字段直接定位聚焦，数据库项才进配置窗口。
+    const bool missingOutputName = requireOutput && outputNameEdit_ &&
+                                   outputNameEdit_->text().trimmed().isEmpty();
+    const bool missingGridChoice = requireGrid && geoEastGridCombo_ &&
+                                   geoEastGridCombo_->currentText().trimmed().isEmpty();
+    const bool mainPanelFixable = missingOutputName || missingGridChoice;
+
     QMessageBox message(this);
     message.setIcon(QMessageBox::Warning);
     message.setWindowTitle(QString::fromUtf8("GeoEast 配置不完整"));
     message.setText(QString::fromUtf8("执行【%1】前需要先补齐 GeoEast 配置。").arg(operation));
     message.setInformativeText(QString::fromUtf8("缺失或无效项：\n\n- %1\n\n请点击【打开数据库配置】补齐后再执行。保存一次后，下次打开会自动记住。")
                                    .arg(missing.join(QString::fromUtf8("\n- "))));
+    QPushButton* fixButton = nullptr;
+    if (mainPanelFixable) {
+        fixButton = message.addButton(uiText(QString::fromUtf8("去填写")), QMessageBox::AcceptRole);
+    }
     QPushButton* configButton = message.addButton(QString::fromUtf8("打开数据库配置"), QMessageBox::AcceptRole);
-    message.addButton(QString::fromUtf8("稍后处理"), QMessageBox::RejectRole);
+    message.addButton(uiText(QString::fromUtf8("取消")), QMessageBox::RejectRole);
     message.exec();
-    if (message.clickedButton() == configButton) {
+    if (fixButton && message.clickedButton() == fixButton) {
+        QWidget* target = missingOutputName ? static_cast<QWidget*>(outputNameEdit_)
+                                            : static_cast<QWidget*>(geoEastGridCombo_);
+        if (target) {
+            target->setFocus(Qt::OtherFocusReason);
+            target->setStyleSheet(QStringLiteral("border: 1px solid #D93025;"));
+            QTimer::singleShot(2600, target, [target]() { target->setStyleSheet(QString()); });
+        }
+    } else if (message.clickedButton() == configButton) {
         showGeoEastConfigDialog();
     }
     updateStatus(QString::fromUtf8("GeoEast 配置不完整，已停止操作"));
@@ -3367,13 +3439,17 @@ void FaultPolyTraceWindow::deleteGeoEastResult() {
         return;
     }
     const QString outputName = geoEastOutputName();
-    const int choice = QMessageBox::warning(
-        this,
-        QString::fromUtf8("确认删除 GeoEast 结果"),
-        QString::fromUtf8("将删除当前项目中的结果多边形对象：\n\n%1\n\n该操作不会删除输入网格，也不会删除本地输出文件。是否继续？").arg(outputName),
-        QMessageBox::Yes | QMessageBox::No,
-        QMessageBox::No);
-    if (choice != QMessageBox::Yes) {
+    // 中文按钮 + 红色“删除”，默认焦点在取消，防误触回车（与插件一致）。
+    QMessageBox confirmBox(QMessageBox::Warning,
+        uiText(QString::fromUtf8("确认删除 GeoEast 结果")),
+        uiText(QString::fromUtf8("将删除当前项目中的结果多边形对象：\n\n%1\n\n该操作不会删除输入网格，也不会删除本地输出文件。是否继续？")).arg(outputName),
+        QMessageBox::NoButton, this);
+    QPushButton* deleteButton = confirmBox.addButton(uiText(QString::fromUtf8("删除")), QMessageBox::DestructiveRole);
+    deleteButton->setStyleSheet("background:#D93025; color:#FFFFFF; border:1px solid #B42318; font-weight:bold;");
+    QPushButton* cancelButton = confirmBox.addButton(uiText(QString::fromUtf8("取消")), QMessageBox::RejectRole);
+    confirmBox.setDefaultButton(cancelButton);
+    confirmBox.exec();
+    if (confirmBox.clickedButton() != deleteButton) {
         return;
     }
     const QString runner = geoEastRunnerEdit_->text().trimmed();
@@ -3730,9 +3806,24 @@ void FaultPolyTraceWindow::setRunning(bool running) {
 }
 
 void FaultPolyTraceWindow::appendLog(const QString& text) {
-    logEdit_->moveCursor(QTextCursor::End);
-    logEdit_->insertPlainText(text.endsWith('\n') ? text : text + "\n");
-    logEdit_->moveCursor(QTextCursor::End);
+    // 与 GeoEast 插件共用行级着色规则：错误红、完成绿、后台输出灰。
+    QString html;
+    for (const QString& line : text.split('\n', Qt::SkipEmptyParts)) {
+        const fpt_ui::LogLineStyle style = fpt_ui::logLineStyle(line);
+        if (style.isDebug && verboseLogCheck_ && !verboseLogCheck_->isChecked()) {
+            pendingDebugLines_ << line;
+            if (pendingDebugLines_.size() > 2000) {
+                pendingDebugLines_.removeFirst();
+            }
+            continue;
+        }
+        html += style.html;
+    }
+    if (!html.isEmpty()) {
+        logEdit_->moveCursor(QTextCursor::End);
+        logEdit_->insertHtml(html);
+        logEdit_->moveCursor(QTextCursor::End);
+    }
 }
 
 void FaultPolyTraceWindow::setPolygonColor(const QColor& color) {
@@ -3845,9 +3936,11 @@ void FaultPolyTraceWindow::syncPresetIndicator() {
     if (key.isEmpty() || key == QString::fromUtf8("自定义参数")) {
         return;
     }
-    const QStringList current = fpt_ui::traceArguments(currentTraceParameters());
-    const QStringList preset = fpt_ui::traceArguments(fpt_ui::presetParameters(fpt_ui::canonical(key)));
-    const bool matches = current == preset;
+    // 质量模式属于运行方式而非预设内容，比对前对齐，避免切换诊断模式被误判为改参数。
+    fpt_ui::TraceParameters current = currentTraceParameters();
+    fpt_ui::TraceParameters preset = fpt_ui::presetParameters(fpt_ui::canonical(key));
+    preset.qualityMode = current.qualityMode;
+    const bool matches = fpt_ui::traceArguments(current) == fpt_ui::traceArguments(preset);
     const int customIndex = presetCombo_->findData(QString::fromUtf8("自定义参数"));
     presetSyncGuard_ = true;
     if (!matches) {
@@ -4061,7 +4154,12 @@ void FaultPolyTraceWindow::loadTemplate() {
 }
 
 void FaultPolyTraceWindow::saveRunLog() {
-    const QString logText = logEdit_ ? logEdit_->toPlainText().trimmed() : QString();
+    // 保存时带上界面折叠的后台输出，排障不缺原文。
+    QString logText = logEdit_ ? logEdit_->toPlainText().trimmed() : QString();
+    if (!pendingDebugLines_.isEmpty()) {
+        logText += QString::fromUtf8("\n---- 详细日志（界面已折叠）----\n") +
+                   pendingDebugLines_.join('\n');
+    }
     if (logText.isEmpty()) {
         QMessageBox::information(this, uiText(QString::fromUtf8("日志为空")),
                                  uiText(QString::fromUtf8("当前没有可保存的运行日志。")));

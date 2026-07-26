@@ -1,5 +1,6 @@
 #include "FaultTraceDialog.h"
 #include "FptIcons.h"
+#include "FptLog.h"
 #include "FptTheme.h"
 #include "UiLocalization.h"
 #include "TraceParameterModel.h"
@@ -1378,8 +1379,15 @@ void FaultTraceDialog::buildUi() {
     // V1.1：任何参数手动改动后，模板下拉自动显示“自定义”状态。
     {
         const auto markCustomized = [this]() {
-        QTimer::singleShot(0, this, [this]() { syncPresetIndicator(); });
-    };
+            if (presetSyncPending_) {
+                return;
+            }
+            presetSyncPending_ = true;
+            QTimer::singleShot(0, this, [this]() {
+                presetSyncPending_ = false;
+                syncPresetIndicator();
+            });
+        };
         const QList<QDoubleSpinBox*> doubleSpins = findChildren<QDoubleSpinBox*>();
         for (QDoubleSpinBox* spin : doubleSpins) {
             connect(spin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, markCustomized);
@@ -1387,6 +1395,17 @@ void FaultTraceDialog::buildUi() {
         const QList<QSpinBox*> intSpins = findChildren<QSpinBox*>();
         for (QSpinBox* spin : intSpins) {
             connect(spin, QOverload<int>::of(&QSpinBox::valueChanged), this, markCustomized);
+        }
+        for (QComboBox* combo : {traceModeCombo_, thresholdModeCombo_}) {
+            if (combo) {
+                connect(combo, &QComboBox::currentTextChanged, this, markCustomized);
+            }
+        }
+        for (QCheckBox* check : {attributeConstrainedBeltCheck_, rootAntiMergeCheck_,
+                                 localAntiMergeCheck_, residualTraceCheck_}) {
+            if (check) {
+                connect(check, &QCheckBox::toggled, this, markCustomized);
+            }
         }
     }
 
@@ -1479,7 +1498,12 @@ void FaultTraceDialog::buildUi() {
         QMenu* editMenu = menuBar->addMenu(QString::fromUtf8("编辑(E)"));
         QAction* copyLogAction = editMenu->addAction(QString::fromUtf8("复制日志"));
         connect(copyLogAction, &QAction::triggered, this, [this]() {
-            QApplication::clipboard()->setText(logEdit_ ? logEdit_->toPlainText() : QString());
+            QString logText = logEdit_ ? logEdit_->toPlainText() : QString();
+            if (!pendingDebugLines_.isEmpty()) {
+                logText += QString::fromUtf8("\n---- 详细日志（界面已折叠）----\n") +
+                           pendingDebugLines_.join('\n');
+            }
+            QApplication::clipboard()->setText(logText);
             appendLog(QString::fromUtf8("日志已复制到剪贴板。"));
         });
         QAction* clearLogAction = editMenu->addAction(QString::fromUtf8("清空日志"));
@@ -1890,13 +1914,13 @@ void FaultTraceDialog::buildUi() {
         addFormRow(traceLayoutNew, 3, QString::fromUtf8("阈值模式"), thresholdModeCombo_, traceGroup);
         addFormRow(traceLayoutNew, 4, QString::fromUtf8("分位数"), percentileSpin_, traceGroup);
         addFormRow(traceLayoutNew, 5, QString::fromUtf8("固定阈值"), thresholdSpin_, traceGroup);
-        addFormRow(traceLayoutNew, 6, QString::fromUtf8("平滑次数"), smoothIterationsSpin_, traceGroup);
+        addFormRow(traceLayoutNew, 6, QString::fromUtf8("最小面积"), minAreaSpin_, traceGroup);
 
         QGroupBox* morphologyGroup = new QGroupBox(QString::fromUtf8("形态与拓扑约束"), sidebarContent);
         QGridLayout* morphologyLayoutNew = makeGroupLayout(morphologyGroup);
         addFormRow(morphologyLayoutNew, 0, QString::fromUtf8("闭运算半径"), closeRadiusSpin_, morphologyGroup);
         addFormRow(morphologyLayoutNew, 1, QString::fromUtf8("最大断距"), maxGapDistanceSpin_, morphologyGroup);
-        addFormRow(morphologyLayoutNew, 2, QString::fromUtf8("最小面积"), minAreaSpin_, morphologyGroup);
+        addFormRow(morphologyLayoutNew, 2, QString::fromUtf8("平滑次数"), smoothIterationsSpin_, morphologyGroup);
         addFormRow(morphologyLayoutNew, 3, QString::fromUtf8("最大夹角"), maxGapAngleSpin_, morphologyGroup);
         addFormRow(morphologyLayoutNew, 4, QString::fromUtf8("防黏连支撑"), rootAntiMergeSupportRatioSpin_, morphologyGroup);
         addFormRow(morphologyLayoutNew, 5, QString::fromUtf8("简化容差"), simplifyToleranceSpin_, morphologyGroup);
@@ -1952,7 +1976,7 @@ void FaultTraceDialog::buildUi() {
                     child->setVisible(on);
                 }
                 // 收起时压到标题高度，避免留下空白分组框。
-                box->setMaximumHeight(on ? QWIDGETSIZE_MAX : 26);
+                box->setMaximumHeight(on ? QWIDGETSIZE_MAX : box->fontMetrics().height() + 9);
             };
             applyVisibility(expanded);
             connect(box, &QGroupBox::toggled, this, [this, applyVisibility](bool on) {
@@ -1973,9 +1997,9 @@ void FaultTraceDialog::buildUi() {
         QHBoxLayout* actionLayout = new QHBoxLayout(actionDock);
         actionLayout->setContentsMargins(12, 10, 12, 10);
         actionLayout->setSpacing(10);
-        runButton_ = new QPushButton(QString::fromUtf8("▶ 开始追踪"), actionDock);
+        runButton_ = new QPushButton(QString::fromUtf8("开始追踪"), actionDock);
         runButton_->setObjectName("runButton");
-        stopButton_ = new QPushButton(QString::fromUtf8("■ 停止"), actionDock);
+        stopButton_ = new QPushButton(QString::fromUtf8("停止"), actionDock);
         stopButton_->setObjectName("stopButton");
         stopButton_->setEnabled(false);
         actionLayout->addWidget(runButton_, 2);
@@ -2088,6 +2112,7 @@ void FaultTraceDialog::buildUi() {
         logEdit_->setObjectName("logEdit");
         logEdit_->setReadOnly(true);
         logEdit_->setLineWrapMode(QTextEdit::NoWrap);
+        logEdit_->document()->setMaximumBlockCount(3000);
         logLayout->addWidget(logHeaderRow);
         logLayout->addWidget(logEdit_, 1);
         workspaceLayout->addWidget(logDock);
@@ -2148,6 +2173,10 @@ void FaultTraceDialog::buildUi() {
         rootLayout->addWidget(mainSplitter_, 1);
         rootLayout->addWidget(statusBar);
 
+        if (attributeConstrainedBeltCheck_) {
+            connect(attributeConstrainedBeltCheck_, &QCheckBox::toggled,
+                    this, &FaultTraceDialog::updateOptionControls);
+        }
         connect(projectEdit_, &QLineEdit::textChanged, this, &FaultTraceDialog::updateStatusContext);
         connect(databaseEdit_, &QLineEdit::textChanged, this, &FaultTraceDialog::updateStatusContext);
         connect(gridCombo_, &QComboBox::currentTextChanged, this, &FaultTraceDialog::updateStatusContext);
@@ -2551,7 +2580,12 @@ void FaultTraceDialog::loadParameterTemplate() {
 }
 
 void FaultTraceDialog::saveRunLog() {
-    const QString logText = logEdit_ ? logEdit_->toPlainText().trimmed() : QString();
+    // 保存时带上界面折叠的后台输出，排障不缺原文。
+    QString logText = logEdit_ ? logEdit_->toPlainText().trimmed() : QString();
+    if (!pendingDebugLines_.isEmpty()) {
+        logText += QString::fromUtf8("\n---- 详细日志（界面已折叠）----\n") +
+                   pendingDebugLines_.join('\n');
+    }
     if (logText.isEmpty()) {
         QMessageBox::information(this, uiText(QString::fromUtf8("日志为空")),
                                  uiText(QString::fromUtf8("当前没有可保存的运行日志。")));
@@ -2732,14 +2766,7 @@ void FaultTraceDialog::retranslateUi() {
     if (colorBarWidget_) {
         static_cast<ColorBarWidget*>(colorBarWidget_)->setLanguage(currentLanguage_);
     }
-    if (logEdit_ && !logEdit_->toPlainText().isEmpty()) {
-        QStringList translatedLines;
-        for (const QString& line : logEdit_->toPlainText().split('\n')) {
-            translatedLines << uiText(line);
-        }
-        logEdit_->setPlainText(translatedLines.join('\n'));
-        logEdit_->moveCursor(QTextCursor::End);
-    }
+    // 运行日志是进程输出，切换界面语言时不重排，避免抹掉分级着色。
     updateStatusContext();
 }
 
@@ -3015,6 +3042,12 @@ void FaultTraceDialog::updateOptionControls() {
         percentileSpin_->setEnabled(!fixedThreshold);
     }
 
+    const bool attributeEnabled = attributeConstrainedBeltCheck_ &&
+                                  attributeConstrainedBeltCheck_->isChecked();
+    if (attributeEnvelopeRadiusSpin_) {
+        attributeEnvelopeRadiusSpin_->setEnabled(attributeEnabled);
+    }
+
     const bool importDat = importDatCheck_ && importDatCheck_->isChecked();
     if (datFileEdit_) {
         datFileEdit_->setEnabled(importDat);
@@ -3241,9 +3274,11 @@ void FaultTraceDialog::syncPresetIndicator() {
     if (key.isEmpty() || key == QString::fromUtf8("自定义参数")) {
         return;
     }
-    const QStringList current = fpt_ui::traceArguments(currentTraceParameters());
-    const QStringList preset = fpt_ui::traceArguments(fpt_ui::presetParameters(fpt_ui::canonical(key)));
-    const bool matches = current == preset;
+    // 质量模式属于运行方式而非预设内容，比对前对齐。
+    fpt_ui::TraceParameters current = currentTraceParameters();
+    fpt_ui::TraceParameters preset = fpt_ui::presetParameters(fpt_ui::canonical(key));
+    preset.qualityMode = current.qualityMode;
+    const bool matches = fpt_ui::traceArguments(current) == fpt_ui::traceArguments(preset);
     const int customIndex = presetCombo_->findData(QString::fromUtf8("自定义参数"));
     presetSyncGuard_ = true;
     if (!matches) {
@@ -3476,6 +3511,9 @@ void FaultTraceDialog::loadSelectedOutputInternal(bool userInitiated) {
 }
 
 void FaultTraceDialog::runTrace() {
+    if (doneBanner_) {
+        doneBanner_->hide();
+    }
     if (process_->state() != QProcess::NotRunning) {
         return;
     }
@@ -3506,6 +3544,9 @@ void FaultTraceDialog::runTrace() {
 }
 
 void FaultTraceDialog::deleteOutput() {
+    if (doneBanner_) {
+        doneBanner_->hide();
+    }
     if (process_->state() != QProcess::NotRunning) {
         return;
     }
@@ -3800,6 +3841,20 @@ void FaultTraceDialog::onProcessFinished(int exitCode, QProcess::ExitStatus stat
         if (renderViewWidget_) {
             static_cast<RenderViewWidget*>(renderViewWidget_)->setActivity(QString::fromUtf8("追踪完成，结果已写入 GeoEast 数据库"));
         }
+        // 完成后自动打开两个图层，避免画布仍停在“图层显示已关闭”。
+        if (showInputLayerCheck_ && showResultLayerCheck_) {
+            QSignalBlocker blockInput(showInputLayerCheck_);
+            QSignalBlocker blockResult(showResultLayerCheck_);
+            showInputLayerCheck_->setChecked(true);
+            showResultLayerCheck_->setChecked(true);
+        }
+        if (showInputLayerAction_) {
+            showInputLayerAction_->setChecked(true);
+        }
+        if (showResultLayerAction_) {
+            showResultLayerAction_->setChecked(true);
+        }
+        updateLayerVisibility();
         if (doneBanner_ && doneBannerLabel_) {
             doneBannerLabel_->setText(uiText(QString::fromUtf8("追踪完成：结果已写入 BOFaultPolygon/%1，可叠加检查或到工区底图复核"))
                                           .arg(outputEdit_ ? outputEdit_->text().trimmed() : QString()));
@@ -3893,30 +3948,18 @@ void FaultTraceDialog::setRunning(bool running) {
 }
 
 void FaultTraceDialog::appendLog(const QString& text) {
-    // V1.1：按行分级着色；后台英文调试输出默认折叠到“详细日志”。
-    const QStringList lines = text.split('\n', Qt::SkipEmptyParts);
+    // 与独立软件共用行级着色规则；后台英文输出默认折叠到“详细日志”。
     QString html;
-    for (const QString& line : lines) {
-        const bool looksDebug =
-            !line.startsWith('>') &&
-            !line.contains(QRegularExpression(QString::fromUtf8("[\\x{4e00}-\\x{9fff}]")));
-        if (looksDebug && verboseLogCheck_ && !verboseLogCheck_->isChecked()) {
+    for (const QString& line : text.split('\n', Qt::SkipEmptyParts)) {
+        const fpt_ui::LogLineStyle style = fpt_ui::logLineStyle(line);
+        if (style.isDebug && verboseLogCheck_ && !verboseLogCheck_->isChecked()) {
             pendingDebugLines_ << line;
+            if (pendingDebugLines_.size() > 2000) {
+                pendingDebugLines_.removeFirst();
+            }
             continue;
         }
-        QString color = "#374151";
-        if (line.contains(QString::fromUtf8("错误")) || line.contains(QString::fromUtf8("失败")) ||
-            line.contains(QLatin1String("error"), Qt::CaseInsensitive) ||
-            line.contains(QLatin1String("failed"), Qt::CaseInsensitive)) {
-            color = "#B42318";
-        } else if (line.contains(QString::fromUtf8("完成")) || line.contains(QString::fromUtf8("成功")) ||
-                   line.contains(QString::fromUtf8("就绪"))) {
-            color = "#1A7F37";
-        } else if (looksDebug) {
-            color = "#9CA3AF";
-        }
-        html += QString("<span style=\"color:%1;\">%2</span><br>")
-                    .arg(color, line.toHtmlEscaped());
+        html += style.html;
     }
     if (!html.isEmpty()) {
         logEdit_->moveCursor(QTextCursor::End);

@@ -120,6 +120,7 @@ private:
     QCheckBox* verboseLogCheck_ = nullptr;
     QStringList pendingDebugLines_;
     bool presetSyncGuard_ = false;
+    bool presetSyncPending_ = false;
     QProgressBar* busyBar_ = nullptr;
     QFrame* doneBanner_ = nullptr;
     QLabel* doneBannerLabel_ = nullptr;

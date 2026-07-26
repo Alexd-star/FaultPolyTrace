@@ -1,6 +1,5 @@
 #include "FptIcons.h"
 
-#include <QApplication>
 #include <QColor>
 #include <QFont>
 #include <QPainter>
@@ -60,15 +59,13 @@ void paintCircularArrow(QPainter& p, const QColor& color) {
     p.drawLine(QPointF(6, 8), QPointF(10, 7));
 }
 
-}  // namespace
-
-QIcon toolIcon(IconKind kind) {
-    const qreal dpr = qApp ? qApp->devicePixelRatio() : 1.0;
-    QPixmap pixmap(qRound(24 * dpr), qRound(24 * dpr));
-    pixmap.setDevicePixelRatio(dpr);
+// 以 24×24 逻辑坐标绘制，按目标像素尺寸整体缩放，供多分辨率图标复用。
+QPixmap renderPixmap(IconKind kind, int px) {
+    QPixmap pixmap(px, px);
     pixmap.fill(Qt::transparent);
     QPainter painter(&pixmap);
     painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.scale(px / 24.0, px / 24.0);
     painter.setPen(QPen(kOutline, 1.4));
 
     switch (kind) {
@@ -195,7 +192,20 @@ QIcon toolIcon(IconKind kind) {
         break;
     }
 
-    return QIcon(pixmap);
+    painter.end();
+    return pixmap;
+}
+
+}  // namespace
+
+QIcon toolIcon(IconKind kind) {
+    // 装入多档位图，窗口在不同缩放比的显示器之间移动时由 QIcon 自行挑选，
+    // 不把某一块屏幕的设备像素比固化进图标。
+    QIcon icon;
+    for (int px : {16, 24, 32, 48, 64}) {
+        icon.addPixmap(renderPixmap(kind, px));
+    }
+    return icon;
 }
 
 }  // namespace fpt_ui

@@ -20,6 +20,7 @@ SOURCES += \
     ../../src/ui/UiLocalization.cpp \
     ../../src/ui/FptTheme.cpp \
     ../../src/ui/FptIcons.cpp \
+    ../../src/ui/FptLog.cpp \
     ../../src/ui/TraceParameterModel.cpp \
     FaultPolyTraceWindow.cpp
 
@@ -27,6 +28,7 @@ HEADERS += \
     ../../src/ui/UiLocalization.h \
     ../../src/ui/FptTheme.h \
     ../../src/ui/FptIcons.h \
+    ../../src/ui/FptLog.h \
     ../../src/ui/TraceParameterModel.h \
     FaultPolyTraceWindow.h
 

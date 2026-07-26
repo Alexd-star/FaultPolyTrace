@@ -224,6 +224,9 @@ private:
     QLabel* doneBannerLabel_ = nullptr;
     bool presetCustomized_ = false;
     bool presetSyncGuard_ = false;
+    bool presetSyncPending_ = false;
+    QCheckBox* verboseLogCheck_ = nullptr;
+    QStringList pendingDebugLines_;
     QPushButton* exportPngButton_ = nullptr;
     QAction* runAction_ = nullptr;
     QAction* stopAction_ = nullptr;
