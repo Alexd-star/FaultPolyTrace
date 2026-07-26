@@ -1,6 +1,9 @@
 #include "FaultTraceDialog.h"
 
 #include <QApplication>
+#include <QGuiApplication>
+#include <QLibraryInfo>
+#include <QTranslator>
 #include <QCoreApplication>
 #include <QDir>
 #include <QFileInfo>
@@ -38,10 +41,31 @@ QIcon locateApplicationIcon() {
 } // namespace
 
 int main(int argc, char* argv[]) {
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+    QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+    QApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
+#endif
+#if QT_VERSION >= QT_VERSION_CHECK(5, 14, 0)
+    QGuiApplication::setHighDpiScaleFactorRoundingPolicy(
+        Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
+#endif
     QApplication app(argc, argv);
     app.setApplicationName("FaultPolyTrace");
     app.setOrganizationName("BGPCup2026");
     app.setWindowIcon(locateApplicationIcon());
+
+    // 加载 Qt 中文翻译，使系统对话框（颜色/文件选择）随界面显示中文。
+    QTranslator qtTranslator;
+    const QStringList translationDirs = {
+        QCoreApplication::applicationDirPath() + "/translations",
+        QLibraryInfo::location(QLibraryInfo::TranslationsPath),
+    };
+    for (const QString& dir : translationDirs) {
+        if (qtTranslator.load(QStringLiteral("qt_zh_CN"), dir)) {
+            app.installTranslator(&qtTranslator);
+            break;
+        }
+    }
 
     FaultTraceDialog dialog;
     dialog.show();

@@ -4,9 +4,12 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QFileInfo>
+#include <QGuiApplication>
 #include <QIcon>
+#include <QLibraryInfo>
 #include <QProcess>
 #include <QStringList>
+#include <QTranslator>
 
 #include <cstdio>
 
@@ -118,11 +121,32 @@ int forwardToCoreRunner(const QStringList& args) {
 }
 
 int main(int argc, char* argv[]) {
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+    QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+    QApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
+#endif
+#if QT_VERSION >= QT_VERSION_CHECK(5, 14, 0)
+    QGuiApplication::setHighDpiScaleFactorRoundingPolicy(
+        Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
+#endif
     QApplication app(argc, argv);
     app.setApplicationName("FaultPolyTrace");
     app.setOrganizationName("BGPCup2026");
     app.setApplicationDisplayName(QString::fromUtf8("FaultPolyTrace 断层多边形自动追踪"));
     app.setWindowIcon(locateApplicationIcon());
+
+    // 加载 Qt 中文翻译，使系统对话框（颜色/文件选择）随界面显示中文。
+    QTranslator qtTranslator;
+    const QStringList translationDirs = {
+        QCoreApplication::applicationDirPath() + "/translations",
+        QLibraryInfo::location(QLibraryInfo::TranslationsPath),
+    };
+    for (const QString& dir : translationDirs) {
+        if (qtTranslator.load(QStringLiteral("qt_zh_CN"), dir)) {
+            app.installTranslator(&qtTranslator);
+            break;
+        }
+    }
 
     if (hasCliArguments(app.arguments())) {
         return forwardToCoreRunner(app.arguments());

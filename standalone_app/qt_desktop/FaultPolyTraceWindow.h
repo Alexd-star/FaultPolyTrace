@@ -22,6 +22,8 @@ class QSplitter;
 class QStackedWidget;
 class QTextEdit;
 class QToolButton;
+class QFrame;
+class QProgressBar;
 
 enum class UiLanguage {
     SimplifiedChinese,
@@ -100,6 +102,7 @@ private:
     void appendLog(const QString& text);
     void updateStatus(const QString& text);
     void setPolygonColor(const QColor& color);
+    void syncPresetIndicator();
     void applyPreset(const QString& preset);
     void applyTraceParameters(const fpt_ui::TraceParameters& parameters);
     void refreshHistory();
@@ -204,6 +207,8 @@ private:
     QSpinBox* residualTraceMinLengthSpin_ = nullptr;
     QSpinBox* residualTraceMaxCellsSpin_ = nullptr;
     QLineEdit* colorEdit_ = nullptr;
+    QToolButton* colorSwatch_ = nullptr;
+    QProgressBar* busyBar_ = nullptr;
     QDoubleSpinBox* lineWidthSpin_ = nullptr;
     QDoubleSpinBox* alphaSpin_ = nullptr;
     QCheckBox* showGridLayerCheck_ = nullptr;
@@ -211,11 +216,15 @@ private:
     QPushButton* showOverlayLayerButton_ = nullptr;
     QPushButton* runButton_ = nullptr;
     QPushButton* stopButton_ = nullptr;
-    QPushButton* showOverlayButton_ = nullptr;
-    QPushButton* openCsvButton_ = nullptr;
-    QPushButton* openGeoJsonButton_ = nullptr;
-    QPushButton* openDiagnosticsButton_ = nullptr;
-    QPushButton* openOutputDirButton_ = nullptr;
+    QToolButton* openFilesButton_ = nullptr;
+    QAction* openCsvMenuAction_ = nullptr;
+    QAction* openGeoJsonMenuAction_ = nullptr;
+    QAction* openDiagnosticsMenuAction_ = nullptr;
+    QAction* openOutputDirMenuAction_ = nullptr;
+    QFrame* doneBanner_ = nullptr;
+    QLabel* doneBannerLabel_ = nullptr;
+    bool presetCustomized_ = false;
+    bool presetSyncGuard_ = false;
     QPushButton* exportPngButton_ = nullptr;
     QAction* runAction_ = nullptr;
     QAction* stopAction_ = nullptr;

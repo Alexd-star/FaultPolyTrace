@@ -108,7 +108,10 @@ Add-Check -Rows $rows -Group "窗口与布局" -Name "侧栏不再固定宽度" 
 Add-Check -Rows $rows -Group "窗口与布局" -Name "不强制放大用户侧栏" -Requirement "启动恢复分割栏时只纠正低于最小美观宽度的异常侧栏，不得强行改回 520/540 像素" -Passed ($cpp.Contains("sizes.at(0) < 420") -and $cpp.Contains("mainSplitter_->setSizes({420") -and -not $cpp.Contains("sizes.at(0) < 520") -and -not $cpp.Contains("setSizes({540")) -Detail "$cppPath 仅纠正低于 420 的异常宽度"
 Add-ContainsCheck -Rows $rows -Group "窗口与布局" -Name "表单标签宽度" -Requirement "表单标签列采用 v0.9.26 验证过的宽度，保留参数面板有效空间" -Text $cpp -Needle "label->setFixedWidth(100)" -Detail "$cppPath 设置表单标签宽度"
 Add-ContainsCheck -Rows $rows -Group "窗口与布局" -Name "首个分组留白" -Requirement "滚动区顶部必须留出标题绘制空间，避免首个分组标题被裁剪" -Text $cpp -Needle "sidebarLayout->setContentsMargins(0, 8, 4, 0)" -Detail "$cppPath 设置侧栏顶部留白"
-Add-ContainsCheck -Rows $rows -Group "窗口与布局" -Name "分组标题背景" -Requirement "分组标题应使用稳定背景，避免浮动标题与边框或子控件混叠" -Text $cpp -Needle "QGroupBox::title { subcontrol-origin: margin; left: 8px; padding: 0 5px; background: #F0F0F0;" -Detail "$cppPath 设置 QGroupBox 标题背景"
+$themePath = "src\ui\FptTheme.cpp"
+$theme = Read-TextFile $themePath
+Add-ContainsCheck -Rows $rows -Group "窗口与布局" -Name "统一主题接入" -Requirement "主窗口使用共享主题 fpt_ui::appStyle()，换肤只改一处" -Text $cpp -Needle "setStyleSheet(fpt_ui::appStyle());" -Detail "$cppPath 接入 FptTheme"
+Add-ContainsCheck -Rows $rows -Group "窗口与布局" -Name "分组卡片标题" -Requirement "分组标题移出边框上方且背景透明，避免标题骑线与子控件混叠" -Text $theme -Needle "subcontrol-origin: margin; left: 2px; top: 0; padding: 0;" -Detail "$themePath 卡片式 QGroupBox 标题"
 Add-ContainsCheck -Rows $rows -Group "窗口与布局" -Name "首组内嵌标题" -Requirement "第一个分组不使用容易被滚动区裁剪的浮动标题，应使用组内稳定标题行" -Text $cpp -Needle 'dataTitle->setObjectName("sectionTitle")' -Detail "$cppPath 数据与输出使用组内标题"
 Add-ContainsCheck -Rows $rows -Group "窗口与布局" -Name "首组非浮动标题容器" -Requirement "第一个分组应使用 QFrame 容器，避免空 QGroupBox 标题槽形成白框" -Text $cpp -Needle 'dataBox->setObjectName("sectionBox")' -Detail "$cppPath 数据与输出使用 sectionBox"
 Add-ContainsCheck -Rows $rows -Group "窗口与布局" -Name "输入文件占位提示" -Requirement "独立软件默认不选择样例文件，输入框必须提示用户主动选择" -Text $cpp -Needle "请选择平面断层属性文件" -Detail "$cppPath 设置输入文件占位提示"
@@ -182,10 +185,10 @@ Add-ContainsCheck -Rows $rows -Group "运行状态联动" -Name "动作成员" -
 
 $resultChecks = @(
     @{ Name="结果查看分组"; Needle="QGroupBox* resultBox = new QGroupBox(QString::fromUtf8(`"结果查看`")"; Requirement="左侧结果查看入口存在" },
-    @{ Name="叠加查看按钮"; Needle="showOverlayButton_ = new QPushButton(QString::fromUtf8(`"叠加查看`")"; Requirement="可直接切换到叠加结果" },
-    @{ Name="打开 CSV 按钮"; Needle="openCsvButton_ = new QPushButton(QString::fromUtf8(`"打开CSV`")"; Requirement="可直接打开结果 CSV" },
-    @{ Name="打开 GeoJSON 按钮"; Needle="openGeoJsonButton_ = new QPushButton(QString::fromUtf8(`"GeoJSON`")"; Requirement="可直接打开 GeoJSON" },
-    @{ Name="打开诊断按钮"; Needle="openDiagnosticsButton_ = new QPushButton(QString::fromUtf8(`"诊断JSON`")"; Requirement="可直接打开诊断 JSON" },
+    @{ Name="叠加查看按钮"; Needle="showOverlayLayerButton_->setText(QString::fromUtf8(`"叠加查看`"))"; Requirement="可直接切换到叠加结果" },
+    @{ Name="打开文件菜单·结果CSV"; Needle="openCsvMenuAction_ = openFilesMenu->addAction(QString::fromUtf8(`"结果 CSV`"))"; Requirement="「打开文件」菜单可打开结果 CSV" },
+    @{ Name="打开文件菜单·GeoJSON"; Needle="openGeoJsonMenuAction_ = openFilesMenu->addAction(QString::fromUtf8(`"GeoJSON`"))"; Requirement="「打开文件」菜单可打开 GeoJSON" },
+    @{ Name="打开文件菜单·诊断JSON"; Needle="openDiagnosticsMenuAction_ = openFilesMenu->addAction(QString::fromUtf8(`"诊断 JSON`"))"; Requirement="「打开文件」菜单可打开诊断 JSON" },
     @{ Name="结果区刷新"; Needle="void FaultPolyTraceWindow::updateResultPanel()"; Requirement="结果文件状态有统一刷新函数" },
     @{ Name="完成后自动叠加"; Needle="setComboByKey(viewModeCombo_, QString::fromUtf8(`"叠加结果`"))"; Requirement="运行完成或历史载入后自动显示叠加结果" },
     @{ Name="帮助说明结果入口"; Needle="在左侧【结果查看】中打开 CSV、GeoJSON、诊断 JSON 或输出目录"; Requirement="帮助提示说明结果查看方式" }
