@@ -227,6 +227,7 @@ private:
     QPushButton* exportPngButton_ = nullptr;
     QAction* runAction_ = nullptr;
     QAction* stopAction_ = nullptr;
+    QAction* refreshResultsAction_ = nullptr;
     QAction* languageChineseAction_ = nullptr;
     QAction* languageEnglishAction_ = nullptr;
     QTextEdit* logEdit_ = nullptr;

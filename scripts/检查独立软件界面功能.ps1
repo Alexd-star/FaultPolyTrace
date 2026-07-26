@@ -91,7 +91,7 @@ $rows = [System.Collections.Generic.List[object]]::new()
 
 Add-ContainsCheck -Rows $rows -Group "窗口与布局" -Name "默认窗口" -Requirement "最小窗口不低于规划值" -Text $cpp -Needle "setMinimumSize(1100, 700)" -Detail "$cppPath 设置最小窗口"
 Add-ContainsCheck -Rows $rows -Group "窗口与布局" -Name "默认窗口" -Requirement "默认窗口接近 1280 x 760 以上" -Text $cpp -Needle "resize(1280, 780)" -Detail "$cppPath 设置默认窗口"
-Add-ContainsCheck -Rows $rows -Group "窗口与布局" -Name "工具栏图标" -Requirement "图标清晰且不使用过小尺寸" -Text $cpp -Needle "toolbar->setIconSize(QSize(20, 20))" -Detail "$cppPath 设置工具栏图标尺寸"
+Add-ContainsCheck -Rows $rows -Group "窗口与布局" -Name "工具栏图标" -Requirement "图标清晰且不使用过小尺寸" -Text $cpp -Needle "toolbar->setIconSize(QSize(22, 22))" -Detail "$cppPath 设置工具栏图标尺寸"
 Add-ContainsCheck -Rows $rows -Group "窗口与布局" -Name "工具栏文字" -Requirement "图标配合文字或工具提示" -Text $cpp -Needle "toolbar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon)" -Detail "$cppPath 设置工具栏图标文字样式"
 Add-ContainsCheck -Rows $rows -Group "窗口与布局" -Name "侧栏滚动" -Requirement "窗口缩小时参数区可滚动" -Text $cpp -Needle "sidebarScroll->setWidgetResizable(true)" -Detail "$cppPath 侧栏使用 QScrollArea"
 Add-ContainsCheck -Rows $rows -Group "窗口与布局" -Name "运行时图标" -Requirement "窗口和任务栏使用产品图标" -Text $main -Needle "app.setWindowIcon(locateApplicationIcon())" -Detail "$mainPath 设置运行时图标"

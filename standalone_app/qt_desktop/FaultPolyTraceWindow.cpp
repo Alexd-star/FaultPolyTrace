@@ -1,4 +1,5 @@
 #include "FaultPolyTraceWindow.h"
+#include "FptIcons.h"
 #include "FptTheme.h"
 #include "UiLocalization.h"
 #include "TraceParameterModel.h"
@@ -464,54 +465,7 @@ void configurePathLineEdit(QLineEdit* edit) {
     edit->setCursorPosition(0);
 }
 
-enum class ToolIconKind {
-    Pan,
-    ZoomIn,
-    ZoomOut,
-    Reset
-};
 
-QIcon makeToolIcon(ToolIconKind kind) {
-    // 按设备像素比绘制，高分屏图标不发虚（视觉与 V1.0.1 一致）。
-    const qreal dpr = qApp ? qApp->devicePixelRatio() : 1.0;
-    QPixmap pixmap(qRound(24 * dpr), qRound(24 * dpr));
-    pixmap.setDevicePixelRatio(dpr);
-    pixmap.fill(Qt::transparent);
-    QPainter painter(&pixmap);
-    painter.setRenderHint(QPainter::Antialiasing, true);
-
-    const QColor blue("#1685D9");
-    const QColor darkBlue("#005A9E");
-    painter.setPen(QPen(darkBlue, 1.7, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-    painter.setBrush(QColor("#EAF6FF"));
-
-    if (kind == ToolIconKind::Pan) {
-        painter.drawRoundedRect(QRectF(5, 5, 14, 14), 2, 2);
-        painter.drawLine(QPointF(12, 3), QPointF(12, 21));
-        painter.drawLine(QPointF(3, 12), QPointF(21, 12));
-        painter.setBrush(blue);
-        painter.drawPolygon(QPolygonF({QPointF(12, 1), QPointF(9, 5), QPointF(15, 5)}));
-        painter.drawPolygon(QPolygonF({QPointF(12, 23), QPointF(9, 19), QPointF(15, 19)}));
-        painter.drawPolygon(QPolygonF({QPointF(1, 12), QPointF(5, 9), QPointF(5, 15)}));
-        painter.drawPolygon(QPolygonF({QPointF(23, 12), QPointF(19, 9), QPointF(19, 15)}));
-    } else if (kind == ToolIconKind::ZoomIn || kind == ToolIconKind::ZoomOut) {
-        painter.drawEllipse(QRectF(4, 4, 11, 11));
-        painter.drawLine(QPointF(13, 13), QPointF(20, 20));
-        painter.setPen(QPen(darkBlue, 1.8, Qt::SolidLine, Qt::RoundCap));
-        painter.drawLine(QPointF(7, 9.5), QPointF(12, 9.5));
-        if (kind == ToolIconKind::ZoomIn) {
-            painter.drawLine(QPointF(9.5, 7), QPointF(9.5, 12));
-        }
-    } else {
-        painter.setBrush(Qt::NoBrush);
-        painter.drawArc(QRectF(5, 5, 14, 14), 40 * 16, 280 * 16);
-        painter.setBrush(blue);
-        painter.drawPolygon(QPolygonF({QPointF(17, 5), QPointF(21, 5), QPointF(20, 9)}));
-        painter.drawLine(QPointF(8, 12), QPointF(16, 12));
-    }
-
-    return QIcon(pixmap);
-}
 
 } // namespace
 
@@ -1198,38 +1152,42 @@ void FaultPolyTraceWindow::buildUi() {
     resize(1280, 780);
     setStyleSheet(fpt_ui::appStyle());
 
-    QAction* openAction = new QAction(style()->standardIcon(QStyle::SP_DirOpenIcon), QString::fromUtf8("打开 DAT 文件"), this);
+    QAction* openAction = new QAction(fpt_ui::toolIcon(fpt_ui::IconKind::Open), QString::fromUtf8("打开 DAT 文件"), this);
     openAction->setToolTip(QString::fromUtf8("选择外部断层属性网格文件 (Ctrl+O)"));
     openAction->setShortcut(QKeySequence::Open);
     connect(openAction, &QAction::triggered, this, &FaultPolyTraceWindow::browseInput);
-    runAction_ = new QAction(style()->standardIcon(QStyle::SP_MediaPlay), QString::fromUtf8("开始追踪"), this);
+    runAction_ = new QAction(fpt_ui::toolIcon(fpt_ui::IconKind::Run), QString::fromUtf8("开始追踪"), this);
     runAction_->setToolTip(QString::fromUtf8("按当前参数运行断层多边形自动追踪 (F5)"));
     runAction_->setShortcut(QKeySequence(Qt::Key_F5));
     connect(runAction_, &QAction::triggered, this, &FaultPolyTraceWindow::runTrace);
-    stopAction_ = new QAction(style()->standardIcon(QStyle::SP_MediaStop), QString::fromUtf8("停止"), this);
+    stopAction_ = new QAction(fpt_ui::toolIcon(fpt_ui::IconKind::Stop), QString::fromUtf8("停止"), this);
     stopAction_->setToolTip(QString::fromUtf8("终止当前正在运行的追踪任务 (Shift+F5)"));
     stopAction_->setEnabled(false);
     stopAction_->setShortcut(QKeySequence("Shift+F5"));
     connect(stopAction_, &QAction::triggered, this, &FaultPolyTraceWindow::stopTrace);
-    QAction* pngAction = new QAction(style()->standardIcon(QStyle::SP_DialogSaveButton), QString::fromUtf8("导出PNG"), this);
+    QAction* pngAction = new QAction(fpt_ui::toolIcon(fpt_ui::IconKind::Image), QString::fromUtf8("导出PNG"), this);
     pngAction->setToolTip(QString::fromUtf8("导出当前视图区图像 (Ctrl+Shift+P)"));
     pngAction->setShortcut(QKeySequence("Ctrl+Shift+P"));
     connect(pngAction, &QAction::triggered, this, &FaultPolyTraceWindow::exportPng);
-    QAction* saveTplAction = new QAction(style()->standardIcon(QStyle::SP_DialogSaveButton), QString::fromUtf8("保存参数模板"), this);
+    QAction* saveTplAction = new QAction(fpt_ui::toolIcon(fpt_ui::IconKind::Preset), QString::fromUtf8("保存参数模板"), this);
     saveTplAction->setToolTip(QString::fromUtf8("保存当前算法参数模板 (Ctrl+S)"));
     saveTplAction->setShortcut(QKeySequence::Save);
     connect(saveTplAction, &QAction::triggered, this, &FaultPolyTraceWindow::saveTemplate);
-    QAction* loadTplAction = new QAction(style()->standardIcon(QStyle::SP_DialogOpenButton), QString::fromUtf8("打开参数模板"), this);
+    QAction* loadTplAction = new QAction(fpt_ui::toolIcon(fpt_ui::IconKind::Load), QString::fromUtf8("打开参数模板"), this);
     loadTplAction->setToolTip(QString::fromUtf8("读取已保存的参数模板 (Ctrl+Shift+O)"));
     loadTplAction->setShortcut(QKeySequence("Ctrl+Shift+O"));
     connect(loadTplAction, &QAction::triggered, this, &FaultPolyTraceWindow::loadTemplate);
-    QAction* resetAction = new QAction(style()->standardIcon(QStyle::SP_BrowserReload), QString::fromUtf8("恢复默认参数"), this);
+    QAction* resetAction = new QAction(fpt_ui::toolIcon(fpt_ui::IconKind::Restore), QString::fromUtf8("恢复默认参数"), this);
     resetAction->setToolTip(QString::fromUtf8("恢复推荐默认参数"));
     connect(resetAction, &QAction::triggered, this, &FaultPolyTraceWindow::restoreDefaults);
-    QAction* outputDirAction = new QAction(style()->standardIcon(QStyle::SP_DirIcon), QString::fromUtf8("打开输出目录"), this);
+    QAction* outputDirAction = new QAction(fpt_ui::toolIcon(fpt_ui::IconKind::Folder), QString::fromUtf8("打开输出目录"), this);
     outputDirAction->setToolTip(QString::fromUtf8("打开当前结果输出目录"));
     connect(outputDirAction, &QAction::triggered, this, &FaultPolyTraceWindow::openOutputDir);
-    QAction* helpAction = new QAction(style()->standardIcon(QStyle::SP_MessageBoxQuestion), QString::fromUtf8("帮助提示"), this);
+    refreshResultsAction_ = new QAction(fpt_ui::toolIcon(fpt_ui::IconKind::Refresh), QString::fromUtf8("刷新结果列表"), this);
+    refreshResultsAction_->setToolTip(QString::fromUtf8("重新读取输出目录或数据库中的已有结果 (F6)"));
+    refreshResultsAction_->setShortcut(QKeySequence(Qt::Key_F6));
+    connect(refreshResultsAction_, &QAction::triggered, this, &FaultPolyTraceWindow::refreshAvailableResults);
+    QAction* helpAction = new QAction(fpt_ui::toolIcon(fpt_ui::IconKind::Help), QString::fromUtf8("帮助提示"), this);
     helpAction->setToolTip(QString::fromUtf8("查看独立软件使用说明"));
     connect(helpAction, &QAction::triggered, this, &FaultPolyTraceWindow::openHelp);
     QAction* userManualAction = new QAction(QString::fromUtf8("用户操作手册"), this);
@@ -1269,7 +1227,7 @@ void FaultPolyTraceWindow::buildUi() {
     QAction* overlayViewAction = viewMenu->addAction(QString::fromUtf8("叠加结果"));
     connect(overlayViewAction, &QAction::triggered, this, [this]() { setComboByKey(viewModeCombo_, QString::fromUtf8("叠加结果")); });
     viewMenu->addSeparator();
-    QAction* panAction = viewMenu->addAction(makeToolIcon(ToolIconKind::Pan), QString::fromUtf8("平移模式"));
+    QAction* panAction = viewMenu->addAction(fpt_ui::toolIcon(fpt_ui::IconKind::Pan), QString::fromUtf8("平移模式"));
     panAction->setCheckable(true);
     connect(panAction, &QAction::toggled, this, [this](bool checked) {
         if (view_) {
@@ -1277,21 +1235,21 @@ void FaultPolyTraceWindow::buildUi() {
         }
         updateStatus(checked ? QString::fromUtf8("视图区已切换为平移模式") : QString::fromUtf8("视图区已切换为选择模式"));
     });
-    QAction* zoomInAction = viewMenu->addAction(makeToolIcon(ToolIconKind::ZoomIn), QString::fromUtf8("放大"));
+    QAction* zoomInAction = viewMenu->addAction(fpt_ui::toolIcon(fpt_ui::IconKind::ZoomIn), QString::fromUtf8("放大"));
     connect(zoomInAction, &QAction::triggered, this, [this]() {
         if (view_) {
             view_->zoomIn();
         }
         updateStatus(QString::fromUtf8("视图区已放大"));
     });
-    QAction* zoomOutAction = viewMenu->addAction(makeToolIcon(ToolIconKind::ZoomOut), QString::fromUtf8("缩小"));
+    QAction* zoomOutAction = viewMenu->addAction(fpt_ui::toolIcon(fpt_ui::IconKind::ZoomOut), QString::fromUtf8("缩小"));
     connect(zoomOutAction, &QAction::triggered, this, [this]() {
         if (view_) {
             view_->zoomOut();
         }
         updateStatus(QString::fromUtf8("视图区已缩小"));
     });
-    QAction* resetViewAction = viewMenu->addAction(makeToolIcon(ToolIconKind::Reset), QString::fromUtf8("重置视图"));
+    QAction* resetViewAction = viewMenu->addAction(fpt_ui::toolIcon(fpt_ui::IconKind::Reset), QString::fromUtf8("重置视图"));
     resetViewAction->setShortcut(QKeySequence(Qt::Key_Home));
     connect(resetViewAction, &QAction::triggered, this, [this, panAction]() {
         if (view_) {
@@ -1330,13 +1288,35 @@ void FaultPolyTraceWindow::buildUi() {
     helpMenu->addAction(productManualAction);
     helpMenu->addAction(projectStructureAction);
 
+    // 工具栏使用简短文案，菜单中仍保留完整名称。
+    const auto setBarText = [](QAction* action, const QString& shortText) {
+        if (action) {
+            action->setIconText(shortText);
+        }
+    };
+    setBarText(openAction, QString::fromUtf8("打开"));
+    setBarText(saveTplAction, QString::fromUtf8("保存模板"));
+    setBarText(loadTplAction, QString::fromUtf8("载入模板"));
+    setBarText(panAction, QString::fromUtf8("平移"));
+    setBarText(zoomInAction, QString::fromUtf8("放大"));
+    setBarText(zoomOutAction, QString::fromUtf8("缩小"));
+    setBarText(resetViewAction, QString::fromUtf8("重置"));
+    setBarText(runAction_, QString::fromUtf8("开始追踪"));
+    setBarText(stopAction_, QString::fromUtf8("停止"));
+    setBarText(resetAction, QString::fromUtf8("恢复默认"));
+    setBarText(pngAction, QString::fromUtf8("导出PNG"));
+    setBarText(outputDirAction, QString::fromUtf8("输出目录"));
+    setBarText(refreshResultsAction_, QString::fromUtf8("刷新结果"));
+    setBarText(helpAction, QString::fromUtf8("帮助"));
+
     QToolBar* toolbar = addToolBar(QString::fromUtf8("工具栏"));
     toolbar->setMovable(false);
     toolbar->setFloatable(false);
-    toolbar->setIconSize(QSize(20, 20));
+    toolbar->setIconSize(QSize(22, 22));
     toolbar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
     toolbar->addAction(openAction);
     toolbar->addAction(saveTplAction);
+    toolbar->addAction(loadTplAction);
     toolbar->addSeparator();
     toolbar->addAction(panAction);
     toolbar->addAction(zoomInAction);
@@ -1350,6 +1330,8 @@ void FaultPolyTraceWindow::buildUi() {
     toolbar->addAction(pngAction);
     toolbar->addSeparator();
     toolbar->addAction(outputDirAction);
+    toolbar->addSeparator();
+    toolbar->addAction(refreshResultsAction_);
     toolbar->addSeparator();
     toolbar->addAction(helpAction);
 

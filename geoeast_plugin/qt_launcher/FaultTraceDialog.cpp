@@ -1,4 +1,5 @@
 #include "FaultTraceDialog.h"
+#include "FptIcons.h"
 #include "FptTheme.h"
 #include "UiLocalization.h"
 #include "TraceParameterModel.h"
@@ -413,122 +414,7 @@ QString sanitizeFileComponent(const QString& text, const QString& fallback) {
     return value.isEmpty() ? fallback : value;
 }
 
-enum class ToolIconKind {
-    Open,
-    Save,
-    Pan,
-    ZoomIn,
-    ZoomOut,
-    Database,
-    Preset,
-    Help,
-    Reset,
-    Run,
-    Stop
-};
 
-QIcon makeToolIcon(ToolIconKind kind) {
-    // 按设备像素比绘制，高分屏图标不发虚（视觉与 V1.0.1 一致）。
-    const qreal dpr = qApp ? qApp->devicePixelRatio() : 1.0;
-    QPixmap pixmap(qRound(24 * dpr), qRound(24 * dpr));
-    pixmap.setDevicePixelRatio(dpr);
-    pixmap.fill(Qt::transparent);
-    QPainter painter(&pixmap);
-    painter.setRenderHint(QPainter::Antialiasing, true);
-    painter.setPen(QPen(QColor("#4A4A4A"), 1.4));
-
-    const QColor blue("#1D7FC1");
-    const QColor darkBlue("#005A9E");
-    const QColor green("#2E8B57");
-    const QColor yellow("#F4B844");
-    const QColor red("#C94040");
-    const QColor purple("#6A5ACD");
-
-    switch (kind) {
-    case ToolIconKind::Open:
-        painter.setPen(QPen(QColor("#C58A1D"), 1.2));
-        painter.setBrush(yellow);
-        painter.drawRoundedRect(QRectF(3, 8, 18, 11), 2, 2);
-        painter.setBrush(QColor("#FFD36A"));
-        painter.drawRoundedRect(QRectF(3, 6, 8, 5), 1.5, 1.5);
-        break;
-    case ToolIconKind::Save:
-        painter.setPen(QPen(darkBlue, 1.2));
-        painter.setBrush(QColor("#3F8ED0"));
-        painter.drawRoundedRect(QRectF(5, 4, 14, 16), 1.5, 1.5);
-        painter.setBrush(QColor("#EAF4FF"));
-        painter.drawRect(QRectF(8, 5.5, 7, 4.5));
-        painter.drawRect(QRectF(8, 14, 8, 5));
-        break;
-    case ToolIconKind::Pan:
-        painter.setPen(QPen(green, 1.8, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-        painter.drawLine(QPointF(8, 12), QPointF(8, 7));
-        painter.drawLine(QPointF(11, 12), QPointF(11, 5));
-        painter.drawLine(QPointF(14, 13), QPointF(14, 7));
-        painter.drawLine(QPointF(17, 14), QPointF(17, 9));
-        painter.drawLine(QPointF(7, 13), QPointF(11, 19));
-        painter.drawLine(QPointF(11, 19), QPointF(18, 18));
-        painter.drawLine(QPointF(18, 18), QPointF(19, 13));
-        break;
-    case ToolIconKind::ZoomIn:
-    case ToolIconKind::ZoomOut:
-        painter.setPen(QPen(blue, 2.0));
-        painter.setBrush(QColor("#EAF6FF"));
-        painter.drawEllipse(QRectF(4, 4, 11, 11));
-        painter.drawLine(QPointF(13, 13), QPointF(20, 20));
-        painter.setPen(QPen(darkBlue, 1.7, Qt::SolidLine, Qt::RoundCap));
-        painter.drawLine(QPointF(7, 9.5), QPointF(12, 9.5));
-        if (kind == ToolIconKind::ZoomIn) {
-            painter.drawLine(QPointF(9.5, 7), QPointF(9.5, 12));
-        }
-        break;
-    case ToolIconKind::Database:
-        painter.setPen(QPen(darkBlue, 1.3));
-        painter.setBrush(QColor("#DFF0FF"));
-        painter.drawEllipse(QRectF(5, 4, 14, 5));
-        painter.drawRect(QRectF(5, 6.5, 14, 11));
-        painter.drawEllipse(QRectF(5, 15, 14, 5));
-        painter.drawLine(QPointF(5, 9.5), QPointF(19, 9.5));
-        painter.drawLine(QPointF(5, 13), QPointF(19, 13));
-        break;
-    case ToolIconKind::Preset:
-        painter.setPen(QPen(purple, 1.4));
-        painter.setBrush(QColor("#EEEAFE"));
-        painter.drawRoundedRect(QRectF(5, 4, 14, 16), 2, 2);
-        painter.setPen(QPen(purple, 1.6, Qt::SolidLine, Qt::RoundCap));
-        painter.drawLine(QPointF(8, 9), QPointF(16, 9));
-        painter.drawLine(QPointF(8, 13), QPointF(16, 13));
-        painter.setPen(QPen(green, 2.1, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-        painter.drawLine(QPointF(8, 17), QPointF(10.5, 19));
-        painter.drawLine(QPointF(10.5, 19), QPointF(17, 12));
-        break;
-    case ToolIconKind::Help:
-        painter.setPen(QPen(QColor("#DC143C"), 1.5));
-        painter.setBrush(QColor("#FFF5F7"));
-        painter.drawEllipse(QRectF(4, 4, 16, 16));
-        painter.setPen(QPen(QColor("#DC143C"), 2.0, Qt::SolidLine, Qt::RoundCap));
-        painter.drawText(QRect(4, 4, 16, 16), Qt::AlignCenter, "?");
-        break;
-    case ToolIconKind::Reset:
-        painter.setPen(QPen(blue, 1.8, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-        painter.drawArc(QRectF(5, 5, 14, 14), 35 * 16, 285 * 16);
-        painter.drawLine(QPointF(6, 8), QPointF(5, 4));
-        painter.drawLine(QPointF(6, 8), QPointF(10, 7));
-        break;
-    case ToolIconKind::Run:
-        painter.setPen(Qt::NoPen);
-        painter.setBrush(blue);
-        painter.drawPolygon(QPolygonF() << QPointF(7, 5) << QPointF(19, 12) << QPointF(7, 19));
-        break;
-    case ToolIconKind::Stop:
-        painter.setPen(Qt::NoPen);
-        painter.setBrush(red);
-        painter.drawRect(QRectF(7, 7, 10, 10));
-        break;
-    }
-
-    return QIcon(pixmap);
-}
 
 class RenderViewWidget : public QWidget {
 public:
@@ -1524,7 +1410,7 @@ void FaultTraceDialog::buildUi() {
         browseDatButton->setFixedWidth(52);
         refreshButton_->setText(QString::fromUtf8("刷新网格列表"));
         refreshButton_->setToolTip(QString::fromUtf8("从 GeoEast 数据库读取可用输入网格列表"));
-        refreshButton_->setIcon(makeToolIcon(ToolIconKind::Reset));
+        refreshButton_->setIcon(fpt_ui::toolIcon(fpt_ui::IconKind::Reset));
         refreshButton_->setIconSize(QSize(18, 18));
 
         setStyleSheet(fpt_ui::appStyle());
@@ -1555,16 +1441,16 @@ void FaultTraceDialog::buildUi() {
         QMenuBar* menuBar = new QMenuBar(this);
         menuBar->setNativeMenuBar(false);
         QMenu* geoEastMenu = menuBar->addMenu(QString::fromUtf8("GeoEast(G)"));
-        QAction* configAction = geoEastMenu->addAction(makeToolIcon(ToolIconKind::Database), QString::fromUtf8("数据库配置"));
+        QAction* configAction = geoEastMenu->addAction(fpt_ui::toolIcon(fpt_ui::IconKind::Database), QString::fromUtf8("数据库配置"));
         configAction->setToolTip(QString::fromUtf8("配置 GeoEast 根目录、数据根目录、数据库、项目、用户和执行程序"));
         connect(configAction, &QAction::triggered, this, &FaultTraceDialog::showDatabaseConfigDialog);
-        refreshGridAction_ = geoEastMenu->addAction(makeToolIcon(ToolIconKind::Database), QString::fromUtf8("刷新网格"));
+        refreshGridAction_ = geoEastMenu->addAction(fpt_ui::toolIcon(fpt_ui::IconKind::Refresh), QString::fromUtf8("刷新网格"));
         refreshGridAction_->setToolTip(QString::fromUtf8("刷新 GeoEast 当前项目下的输入网格列表"));
         connect(refreshGridAction_, &QAction::triggered, this, &FaultTraceDialog::refreshGrids);
         deleteOutputAction_ = geoEastMenu->addAction(QString::fromUtf8("删除当前结果"));
         connect(deleteOutputAction_, &QAction::triggered, this, &FaultTraceDialog::deleteOutput);
         geoEastMenu->addSeparator();
-        openBasemapAction_ = geoEastMenu->addAction(QString::fromUtf8("打开工区底图"));
+        openBasemapAction_ = geoEastMenu->addAction(fpt_ui::toolIcon(fpt_ui::IconKind::Basemap), QString::fromUtf8("打开工区底图"));
         connect(openBasemapAction_, &QAction::triggered, this, &FaultTraceDialog::openGeoEastBasemap);
         openMappingAction_ = geoEastMenu->addAction(QString::fromUtf8("打开平面成图"));
         connect(openMappingAction_, &QAction::triggered, this, &FaultTraceDialog::openGeoEastMapping);
@@ -1573,12 +1459,12 @@ void FaultTraceDialog::buildUi() {
         connect(exitAction, &QAction::triggered, this, &FaultTraceDialog::close);
 
         QMenu* fileMenu = menuBar->addMenu(QString::fromUtf8("文件(F)"));
-        QAction* openAction = fileMenu->addAction(makeToolIcon(ToolIconKind::Open), QString::fromUtf8("打开 DAT 文件..."));
+        QAction* openAction = fileMenu->addAction(fpt_ui::toolIcon(fpt_ui::IconKind::Open), QString::fromUtf8("打开 DAT 文件..."));
         openAction->setText(QString::fromUtf8("打开DAT"));
         openAction->setToolTip(QString::fromUtf8("打开或选择 DAT 文件"));
         openAction->setShortcut(QKeySequence::Open);
         connect(openAction, &QAction::triggered, this, &FaultTraceDialog::browseDatFile);
-        QAction* saveAction = fileMenu->addAction(makeToolIcon(ToolIconKind::Save), QString::fromUtf8("保存当前配置"));
+        QAction* saveAction = fileMenu->addAction(fpt_ui::toolIcon(fpt_ui::IconKind::Save), QString::fromUtf8("保存当前配置"));
         saveAction->setText(QString::fromUtf8("保存界面设置"));
         saveAction->setToolTip(QString::fromUtf8("保存当前界面配置和参数"));
         saveAction->setShortcut(QKeySequence("Ctrl+Alt+S"));
@@ -1612,7 +1498,7 @@ void FaultTraceDialog::buildUi() {
         connect(copySummaryAction, &QAction::triggered, this, &FaultTraceDialog::copyResultSummary);
 
         QMenu* viewMenu = menuBar->addMenu(QString::fromUtf8("视图(V)"));
-        QAction* panAction = viewMenu->addAction(makeToolIcon(ToolIconKind::Pan), QString::fromUtf8("平移模式"));
+        QAction* panAction = viewMenu->addAction(fpt_ui::toolIcon(fpt_ui::IconKind::Pan), QString::fromUtf8("平移模式"));
         panAction->setText(QString::fromUtf8("平移"));
         panAction->setCheckable(true);
         connect(panAction, &QAction::toggled, this, [this, renderView](bool checked) {
@@ -1621,21 +1507,21 @@ void FaultTraceDialog::buildUi() {
             }
             appendStatus(checked ? QString::fromUtf8("视图区已切换为平移模式") : QString::fromUtf8("视图区已切换为选择模式"));
         });
-        QAction* zoomInAction = viewMenu->addAction(makeToolIcon(ToolIconKind::ZoomIn), QString::fromUtf8("放大"));
+        QAction* zoomInAction = viewMenu->addAction(fpt_ui::toolIcon(fpt_ui::IconKind::ZoomIn), QString::fromUtf8("放大"));
         connect(zoomInAction, &QAction::triggered, this, [this, renderView]() {
             if (renderView()) {
                 renderView()->zoomIn();
             }
             appendStatus(QString::fromUtf8("视图区已放大"));
         });
-        QAction* zoomOutAction = viewMenu->addAction(makeToolIcon(ToolIconKind::ZoomOut), QString::fromUtf8("缩小"));
+        QAction* zoomOutAction = viewMenu->addAction(fpt_ui::toolIcon(fpt_ui::IconKind::ZoomOut), QString::fromUtf8("缩小"));
         connect(zoomOutAction, &QAction::triggered, this, [this, renderView]() {
             if (renderView()) {
                 renderView()->zoomOut();
             }
             appendStatus(QString::fromUtf8("视图区已缩小"));
         });
-        QAction* resetViewAction = viewMenu->addAction(makeToolIcon(ToolIconKind::Reset), QString::fromUtf8("重置视图"));
+        QAction* resetViewAction = viewMenu->addAction(fpt_ui::toolIcon(fpt_ui::IconKind::Reset), QString::fromUtf8("重置视图"));
         resetViewAction->setText(QString::fromUtf8("重置"));
         resetViewAction->setShortcut(QKeySequence(Qt::Key_Home));
         connect(resetViewAction, &QAction::triggered, this, [this, renderView, panAction]() {
@@ -1669,15 +1555,15 @@ void FaultTraceDialog::buildUi() {
         viewMenu->addSeparator();
         loadResultViewAction_ = viewMenu->addAction(QString::fromUtf8("重新载入结果视图"));
         connect(loadResultViewAction_, &QAction::triggered, this, &FaultTraceDialog::loadResultView);
-        exportViewAction_ = viewMenu->addAction(QString::fromUtf8("导出当前视图 PNG"));
+        exportViewAction_ = viewMenu->addAction(fpt_ui::toolIcon(fpt_ui::IconKind::Image), QString::fromUtf8("导出当前视图 PNG"));
         exportViewAction_->setShortcut(QKeySequence("Ctrl+Shift+P"));
         connect(exportViewAction_, &QAction::triggered, this, &FaultTraceDialog::exportResultViewPng);
 
         QMenu* faultMenu = menuBar->addMenu(QString::fromUtf8("断层(L)"));
-        runTraceAction_ = faultMenu->addAction(makeToolIcon(ToolIconKind::Run), QString::fromUtf8("开始追踪"));
+        runTraceAction_ = faultMenu->addAction(fpt_ui::toolIcon(fpt_ui::IconKind::Run), QString::fromUtf8("开始追踪"));
         runTraceAction_->setShortcut(QKeySequence(Qt::Key_F5));
         connect(runTraceAction_, &QAction::triggered, this, &FaultTraceDialog::runTrace);
-        stopTraceAction_ = faultMenu->addAction(makeToolIcon(ToolIconKind::Stop), QString::fromUtf8("停止追踪"));
+        stopTraceAction_ = faultMenu->addAction(fpt_ui::toolIcon(fpt_ui::IconKind::Stop), QString::fromUtf8("停止追踪"));
         stopTraceAction_->setEnabled(false);
         stopTraceAction_->setShortcut(QKeySequence("Shift+F5"));
         connect(stopTraceAction_, &QAction::triggered, this, &FaultTraceDialog::stopProcess);
@@ -1693,13 +1579,13 @@ void FaultTraceDialog::buildUi() {
         });
 
         QMenu* toolMenu = menuBar->addMenu(QString::fromUtf8("工具(T)"));
-        QAction* savePresetAction = toolMenu->addAction(makeToolIcon(ToolIconKind::Preset), QString::fromUtf8("保存参数模板..."));
+        QAction* savePresetAction = toolMenu->addAction(fpt_ui::toolIcon(fpt_ui::IconKind::Preset), QString::fromUtf8("保存参数模板..."));
         savePresetAction->setShortcut(QKeySequence::Save);
         connect(savePresetAction, &QAction::triggered, this, &FaultTraceDialog::saveParameterTemplate);
-        QAction* loadPresetAction = toolMenu->addAction(makeToolIcon(ToolIconKind::Open), QString::fromUtf8("打开参数模板..."));
+        QAction* loadPresetAction = toolMenu->addAction(fpt_ui::toolIcon(fpt_ui::IconKind::Open), QString::fromUtf8("打开参数模板..."));
         loadPresetAction->setShortcut(QKeySequence("Ctrl+Shift+O"));
         connect(loadPresetAction, &QAction::triggered, this, &FaultTraceDialog::loadParameterTemplate);
-        restoreDefaultsAction_ = toolMenu->addAction(makeToolIcon(ToolIconKind::Reset), QString::fromUtf8("恢复默认配置"));
+        restoreDefaultsAction_ = toolMenu->addAction(fpt_ui::toolIcon(fpt_ui::IconKind::Restore), QString::fromUtf8("恢复默认配置"));
         restoreDefaultsAction_->setText(QString::fromUtf8("恢复默认"));
         restoreDefaultsAction_->setToolTip(QString::fromUtf8("恢复推荐算法参数、显示样式和默认输出名，不清空数据库连接信息"));
         connect(restoreDefaultsAction_, &QAction::triggered, this, &FaultTraceDialog::restoreDefaults);
@@ -1721,7 +1607,7 @@ void FaultTraceDialog::buildUi() {
         connect(languageEnglishAction_, &QAction::triggered, this, [this]() { setLanguage(UiLanguage::English); });
 
         QMenu* helpMenu = menuBar->addMenu(QString::fromUtf8("帮助(H)"));
-        QAction* helpAction = helpMenu->addAction(makeToolIcon(ToolIconKind::Help), QString::fromUtf8("帮助提示"));
+        QAction* helpAction = helpMenu->addAction(fpt_ui::toolIcon(fpt_ui::IconKind::Help), QString::fromUtf8("帮助提示"));
         connect(helpAction, &QAction::triggered, this, &FaultTraceDialog::showHelpHint);
         QAction* manualAction = helpMenu->addAction(QString::fromUtf8("用户操作手册"));
         connect(manualAction, &QAction::triggered, this, [openLocalFile]() { openLocalFile("docs/用户操作手册.md"); });
@@ -1734,6 +1620,27 @@ void FaultTraceDialog::buildUi() {
                                                        "定位：平面断层属性到闭合断层多边形的自动追踪工具。\n"
                                                        "入口：可独立运行，也可通过 GeoEast 菜单调用执行程序。"));
         });
+
+        // 工具栏使用简短文案，菜单中仍保留完整名称。
+        const auto setBarText = [](QAction* action, const QString& shortText) {
+            if (action) {
+                action->setIconText(shortText);
+            }
+        };
+        setBarText(openAction, QString::fromUtf8("打开"));
+        setBarText(saveAction, QString::fromUtf8("保存设置"));
+        setBarText(panAction, QString::fromUtf8("平移"));
+        setBarText(zoomInAction, QString::fromUtf8("放大"));
+        setBarText(zoomOutAction, QString::fromUtf8("缩小"));
+        setBarText(resetViewAction, QString::fromUtf8("重置"));
+        setBarText(runTraceAction_, QString::fromUtf8("开始追踪"));
+        setBarText(stopTraceAction_, QString::fromUtf8("停止"));
+        setBarText(configAction, QString::fromUtf8("数据库"));
+        setBarText(refreshGridAction_, QString::fromUtf8("刷新网格"));
+        setBarText(restoreDefaultsAction_, QString::fromUtf8("恢复默认"));
+        setBarText(exportViewAction_, QString::fromUtf8("导出PNG"));
+        setBarText(openBasemapAction_, QString::fromUtf8("工区底图"));
+        setBarText(helpAction, QString::fromUtf8("帮助"));
 
         QToolBar* toolbar = new QToolBar(this);
         toolbar->setMovable(false);
@@ -1748,10 +1655,17 @@ void FaultTraceDialog::buildUi() {
         toolbar->addAction(zoomOutAction);
         toolbar->addAction(resetViewAction);
         toolbar->addSeparator();
+        toolbar->addAction(runTraceAction_);
+        toolbar->addAction(stopTraceAction_);
+        toolbar->addSeparator();
         toolbar->addAction(configAction);
         toolbar->addAction(refreshGridAction_);
         toolbar->addAction(restoreDefaultsAction_);
         toolbar->addSeparator();
+        toolbar->addAction(exportViewAction_);
+        toolbar->addAction(openBasemapAction_);
+        toolbar->addSeparator();
+        toolbar->addAction(helpAction);
         QWidget* toolbarSpacer = new QWidget(this);
         toolbarSpacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
         toolbar->addWidget(toolbarSpacer);
