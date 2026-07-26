@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-8" standalone="no"?>
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
   "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="517.43952pt" height="287.03952pt" viewBox="0 0 517.43952 287.03952" xmlns="http://www.w3.org/2000/svg" version="1.1">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="517.79952pt" height="301.43952pt" viewBox="0 0 517.79952 301.43952" xmlns="http://www.w3.org/2000/svg" version="1.1">
  <metadata>
   <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:date>2026-07-26T06:24:08.761216</dc:date>
+    <dc:date>2026-07-26T12:49:51.078961</dc:date>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
-      <dc:title>Matplotlib v3.9.4, https://matplotlib.org/</dc:title>
+      <dc:title>Matplotlib v3.10.9, https://matplotlib.org/</dc:title>
      </cc:Agent>
     </dc:creator>
    </cc:Work>
@@ -21,207 +21,241 @@
  </defs>
  <g id="figure_1">
   <g id="patch_1">
-   <path d="M 0 287.03952 
-L 517.43952 287.03952 
-L 517.43952 0 
+   <path d="M 0 301.43952 
+L 517.79952 301.43952 
+L 517.79952 0 
 L 0 0 
 z
 " style="fill: #ffffff"/>
   </g>
   <g id="axes_1">
    <g id="patch_2">
-    <path d="M 91.627978 120.959798 
-Q 96.802256 120.959798 100.970304 120.959798 
-" clip-path="url(#paf095f6541)" style="fill: none; stroke: #0f4d92; stroke-width: 0.9; stroke-linecap: round"/>
-    <path d="M 97.770304 119.359798 
-L 100.970304 120.959798 
-L 97.770304 122.559798 
+    <path d="M 96.753176 93.911329 
+Q 158.910868 78.102077 220.201731 62.513296 
+" clip-path="url(#pf8daf098f5)" style="fill: none; stroke: #2d67a3; stroke-width: 0.8; stroke-linecap: round"/>
+    <path d="M 216.70608 61.751443 
+L 220.201731 62.513296 
+L 217.494858 64.852705 
 z
-" clip-path="url(#paf095f6541)" style="fill: #0f4d92; stroke: #0f4d92; stroke-width: 0.9; stroke-linecap: round"/>
+" clip-path="url(#pf8daf098f5)" style="fill: #2d67a3; stroke: #2d67a3; stroke-width: 0.8; stroke-linecap: round"/>
    </g>
    <g id="patch_3">
-    <path d="M 172.587102 120.959798 
-Q 177.76138 120.959798 181.929428 120.959798 
-" clip-path="url(#paf095f6541)" style="fill: none; stroke: #0f4d92; stroke-width: 0.9; stroke-linecap: round"/>
-    <path d="M 178.729428 119.359798 
-L 181.929428 120.959798 
-L 178.729428 122.559798 
+    <path d="M 224.982959 62.104553 
+Q 299.919315 73.655699 373.971685 85.070582 
+" clip-path="url(#pf8daf098f5)" style="fill: none; stroke: #2d67a3; stroke-width: 0.8; stroke-linecap: round"/>
+    <path d="M 371.052793 83.001749 
+L 373.971685 85.070582 
+L 370.565284 86.164395 
 z
-" clip-path="url(#paf095f6541)" style="fill: #0f4d92; stroke: #0f4d92; stroke-width: 0.9; stroke-linecap: round"/>
+" clip-path="url(#pf8daf098f5)" style="fill: #2d67a3; stroke: #2d67a3; stroke-width: 0.8; stroke-linecap: round"/>
    </g>
    <g id="patch_4">
-    <path d="M 253.546226 120.959798 
-Q 258.720504 120.959798 262.888552 120.959798 
-" clip-path="url(#paf095f6541)" style="fill: none; stroke: #0f4d92; stroke-width: 0.9; stroke-linecap: round"/>
-    <path d="M 259.688552 119.359798 
-L 262.888552 120.959798 
-L 259.688552 122.559798 
+    <path d="M 377.488856 87.403258 
+Q 392.217763 129.973318 406.654214 171.698115 
+" clip-path="url(#pf8daf098f5)" style="fill: none; stroke: #2d67a3; stroke-width: 0.8; stroke-linecap: round"/>
+    <path d="M 407.11995 168.15085 
+L 406.654214 171.698115 
+L 404.095844 169.197167 
 z
-" clip-path="url(#paf095f6541)" style="fill: #0f4d92; stroke: #0f4d92; stroke-width: 0.9; stroke-linecap: round"/>
+" clip-path="url(#pf8daf098f5)" style="fill: #2d67a3; stroke: #2d67a3; stroke-width: 0.8; stroke-linecap: round"/>
    </g>
    <g id="patch_5">
-    <path d="M 334.50535 120.959798 
-Q 339.679629 120.959798 343.847676 120.959798 
-" clip-path="url(#paf095f6541)" style="fill: none; stroke: #0f4d92; stroke-width: 0.9; stroke-linecap: round"/>
-    <path d="M 340.647676 119.359798 
-L 343.847676 120.959798 
-L 340.647676 122.559798 
+    <path d="M 405.736792 175.149745 
+Q 338.377452 201.107691 271.852712 226.744012 
+" clip-path="url(#pf8daf098f5)" style="fill: none; stroke: #2f8f83; stroke-width: 0.8; stroke-linecap: round"/>
+    <path d="M 275.414009 227.086306 
+L 271.852712 226.744012 
+L 274.263325 224.100351 
 z
-" clip-path="url(#paf095f6541)" style="fill: #0f4d92; stroke: #0f4d92; stroke-width: 0.9; stroke-linecap: round"/>
+" clip-path="url(#pf8daf098f5)" style="fill: #2f8f83; stroke: #2f8f83; stroke-width: 0.8; stroke-linecap: round"/>
    </g>
    <g id="patch_6">
-    <path d="M 415.464474 120.959798 
-Q 420.638753 120.959798 424.8068 120.959798 
-" clip-path="url(#paf095f6541)" style="fill: none; stroke: #0f4d92; stroke-width: 0.9; stroke-linecap: round"/>
-    <path d="M 421.6068 119.359798 
-L 424.8068 120.959798 
-L 421.6068 122.559798 
+    <path d="M 267.184532 227.427699 
+Q 187.111491 212.963309 107.918632 198.657916 
+" clip-path="url(#pf8daf098f5)" style="fill: none; stroke: #2d67a3; stroke-width: 0.8; stroke-linecap: round"/>
+    <path d="M 110.783246 200.801275 
+L 107.918632 198.657916 
+L 111.352087 197.65224 
 z
-" clip-path="url(#paf095f6541)" style="fill: #0f4d92; stroke: #0f4d92; stroke-width: 0.9; stroke-linecap: round"/>
+" clip-path="url(#pf8daf098f5)" style="fill: #2d67a3; stroke: #2d67a3; stroke-width: 0.8; stroke-linecap: round"/>
    </g>
    <g id="patch_7">
-    <path d="M 17.891986 250.679578 
-L 248.47177 250.679578 
-L 248.47177 194.279674 
-L 17.891986 194.279674 
-L 17.891986 250.679578 
+    <path d="M 104.87505 196.152339 
+Q 99.944261 146.273285 95.101462 97.28432 
+" clip-path="url(#pf8daf098f5)" style="fill: none; stroke: #2d67a3; stroke-width: 0.8; stroke-linecap: round"/>
+    <path d="M 93.824024 100.626199 
+L 95.101462 97.28432 
+L 97.008502 100.311398 
 z
-" clip-path="url(#paf095f6541)" style="fill: none; stroke-dasharray: 2.59,1.12; stroke-dashoffset: 0; stroke: #cbd1d6; stroke-width: 0.7; stroke-linejoin: miter"/>
+" clip-path="url(#pf8daf098f5)" style="fill: #2d67a3; stroke: #2d67a3; stroke-width: 0.8; stroke-linecap: round"/>
    </g>
    <g id="patch_8">
-    <path d="M 268.96775 250.679578 
-L 499.547534 250.679578 
-L 499.547534 194.279674 
-L 268.96775 194.279674 
-L 268.96775 250.679578 
+    <path d="M 264.027355 175.913719 
+C 278.305824 175.913719 292.001405 172.634514 302.097807 166.798311 
+C 312.194209 160.962108 317.867105 153.045407 317.867105 144.79177 
+C 317.867105 136.538132 312.194209 128.621431 302.097807 122.785228 
+C 292.001405 116.949025 278.305824 113.66982 264.027355 113.66982 
+C 249.748887 113.66982 236.053305 116.949025 225.956903 122.785228 
+C 215.860501 128.621431 210.187606 136.538132 210.187606 144.79177 
+C 210.187606 153.045407 215.860501 160.962108 225.956903 166.798311 
+C 236.053305 172.634514 249.748887 175.913719 264.027355 175.913719 
 z
-" clip-path="url(#paf095f6541)" style="fill: none; stroke-dasharray: 2.59,1.12; stroke-dashoffset: 0; stroke: #cbd1d6; stroke-width: 0.7; stroke-linejoin: miter"/>
+" clip-path="url(#pf8daf098f5)" style="fill: #f5f6f6; stroke: #20252a; stroke-width: 0.7; stroke-linejoin: miter"/>
    </g>
    <g id="patch_9">
-    <path d="M 26.090378 150.851748 
-L 86.553521 150.851748 
-Q 92.702316 150.851748 92.702316 147.467753 
-L 92.702316 94.451844 
-Q 92.702316 91.067849 86.553521 91.067849 
-L 26.090378 91.067849 
-Q 19.941584 91.067849 19.941584 94.451844 
-L 19.941584 147.467753 
-Q 19.941584 150.851748 26.090378 150.851748 
+    <path d="M 94.816714 103.888636 
+C 99.168247 103.888636 103.342138 102.889259 106.419137 101.110607 
+C 109.496136 99.331954 111.225018 96.919245 111.225018 94.403851 
+C 111.225018 91.888457 109.496136 89.475748 106.419137 87.697096 
+C 103.342138 85.918443 99.168247 84.919067 94.816714 84.919067 
+C 90.46518 84.919067 86.291289 85.918443 83.21429 87.697096 
+C 80.137291 89.475748 78.408409 91.888457 78.408409 94.403851 
+C 78.408409 96.919245 80.137291 99.331954 83.21429 101.110607 
+C 86.291289 102.889259 90.46518 103.888636 94.816714 103.888636 
 z
-" clip-path="url(#paf095f6541)" style="fill: #f4f6f7; stroke: #8c969e; stroke-width: 0.8; stroke-linejoin: miter"/>
-   </g>
-   <g id="patch_10">
-    <path d="M 107.049502 150.851748 
-L 167.512645 150.851748 
-Q 173.66144 150.851748 173.66144 147.467753 
-L 173.66144 94.451844 
-Q 173.66144 91.067849 167.512645 91.067849 
-L 107.049502 91.067849 
-Q 100.900708 91.067849 100.900708 94.451844 
-L 100.900708 147.467753 
-Q 100.900708 150.851748 107.049502 150.851748 
-z
-" clip-path="url(#paf095f6541)" style="fill: #d9e7f5; stroke: #8c969e; stroke-width: 0.8; stroke-linejoin: miter"/>
-   </g>
-   <g id="patch_11">
-    <path d="M 188.008626 150.851748 
-L 248.47177 150.851748 
-Q 254.620564 150.851748 254.620564 147.467753 
-L 254.620564 94.451844 
-Q 254.620564 91.067849 248.47177 91.067849 
-L 188.008626 91.067849 
-Q 181.859832 91.067849 181.859832 94.451844 
-L 181.859832 147.467753 
-Q 181.859832 150.851748 188.008626 150.851748 
-z
-" clip-path="url(#paf095f6541)" style="fill: #ffffff; stroke: #8c969e; stroke-width: 0.8; stroke-linejoin: miter"/>
-   </g>
-   <g id="patch_12">
-    <path d="M 268.96775 150.851748 
-L 329.430894 150.851748 
-Q 335.579688 150.851748 335.579688 147.467753 
-L 335.579688 94.451844 
-Q 335.579688 91.067849 329.430894 91.067849 
-L 268.96775 91.067849 
-Q 262.818956 91.067849 262.818956 94.451844 
-L 262.818956 147.467753 
-Q 262.818956 150.851748 268.96775 150.851748 
-z
-" clip-path="url(#paf095f6541)" style="fill: #ffffff; stroke: #8c969e; stroke-width: 0.8; stroke-linejoin: miter"/>
-   </g>
-   <g id="patch_13">
-    <path d="M 349.926875 150.851748 
-L 410.390018 150.851748 
-Q 416.538812 150.851748 416.538812 147.467753 
-L 416.538812 94.451844 
-Q 416.538812 91.067849 410.390018 91.067849 
-L 349.926875 91.067849 
-Q 343.77808 91.067849 343.77808 94.451844 
-L 343.77808 147.467753 
-Q 343.77808 150.851748 349.926875 150.851748 
-z
-" clip-path="url(#paf095f6541)" style="fill: #d8efeb; stroke: #8c969e; stroke-width: 0.8; stroke-linejoin: miter"/>
-   </g>
-   <g id="patch_14">
-    <path d="M 430.885999 150.851748 
-L 491.349142 150.851748 
-Q 497.497936 150.851748 497.497936 147.467753 
-L 497.497936 94.451844 
-Q 497.497936 91.067849 491.349142 91.067849 
-L 430.885999 91.067849 
-Q 424.737204 91.067849 424.737204 94.451844 
-L 424.737204 147.467753 
-Q 424.737204 150.851748 430.885999 150.851748 
-z
-" clip-path="url(#paf095f6541)" style="fill: #f4f6f7; stroke: #8c969e; stroke-width: 0.8; stroke-linejoin: miter"/>
+" clip-path="url(#pf8daf098f5)" style="fill: #ffffff; stroke: #2d67a3; stroke-width: 1.2; stroke-linejoin: miter"/>
    </g>
    <g id="text_1">
-    <text style="fill: #20272e; font: 7px 'Microsoft YaHei', 'SimHei', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(38.189215 118.240408)">从 GeoEast</text>
-    <text style="fill: #20272e; font: 7px 'Microsoft YaHei', 'SimHei', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(42.32195 127.534658)">打开插件</text>
+    <text style="font-weight: 700; font-size: 6.2px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2d67a3" x="94.816714" y="97.000472" transform="rotate(-0 94.816714 97.000472)">1</text>
    </g>
    <g id="text_2">
-    <text style="fill: #20272e; font: 7px 'Microsoft YaHei', 'SimHei', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(112.781074 118.240408)">自动识别根目录</text>
-    <text style="fill: #20272e; font: 7px 'Microsoft YaHei', 'SimHei', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(112.781074 127.534658)">用户与当前工区</text>
+    <text style="font-weight: 700; font-size: 6.4px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2d67a3" x="94.816714" y="74.545083" transform="rotate(-0 94.816714 74.545083)">打开插件</text>
    </g>
    <g id="text_3">
-    <text style="fill: #20272e; font: 7px 'Microsoft YaHei', 'SimHei', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(200.740198 118.065435)">检测连接并</text>
-    <text style="fill: #20272e; font: 7px 'Microsoft YaHei', 'SimHei', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(190.456214 127.70963)">刷新 BOMapGrid</text>
+    <text style="font-size: 5.4px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #5f6870" x="94.816714" y="116.633815" transform="rotate(-0 94.816714 116.633815)">宿主传入当前工区</text>
+   </g>
+   <g id="patch_10">
+    <path d="M 223.006594 71.284689 
+C 227.358127 71.284689 231.532018 70.285312 234.609017 68.50666 
+C 237.686016 66.728007 239.414898 64.315298 239.414898 61.799904 
+C 239.414898 59.28451 237.686016 56.871801 234.609017 55.093148 
+C 231.532018 53.314496 227.358127 52.315119 223.006594 52.315119 
+C 218.65506 52.315119 214.481169 53.314496 211.40417 55.093148 
+C 208.327171 56.871801 206.598289 59.28451 206.598289 61.799904 
+C 206.598289 64.315298 208.327171 66.728007 211.40417 68.50666 
+C 214.481169 70.285312 218.65506 71.284689 223.006594 71.284689 
+z
+" clip-path="url(#pf8daf098f5)" style="fill: #ffffff; stroke: #2d67a3; stroke-width: 1.2; stroke-linejoin: miter"/>
    </g>
    <g id="text_4">
-    <text style="fill: #20272e; font: 7px 'Microsoft YaHei', 'SimHei', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(278.199322 118.240408)">选择输入网格</text>
-    <text style="fill: #20272e; font: 7px 'Microsoft YaHei', 'SimHei', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(278.199322 127.534658)">命名输出对象</text>
+    <text style="font-weight: 700; font-size: 6.2px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2d67a3" x="223.006594" y="64.396524" transform="rotate(-0 223.006594 64.396524)">2</text>
    </g>
    <g id="text_5">
-    <text style="fill: #20272e; font: 7px 'Microsoft YaHei', 'SimHei', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(359.158446 118.127888)">执行统一核心</text>
-    <text style="fill: #20272e; font: 7px 'Microsoft YaHei', 'SimHei', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(345.41329 127.606709)">写入 BOFaultPolygon</text>
+    <text style="font-weight: 700; font-size: 6.4px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2d67a3" x="223.006594" y="41.941136" transform="rotate(-0 223.006594 41.941136)">自动检测</text>
    </g>
    <g id="text_6">
-    <text style="fill: #20272e; font: 7px 'Microsoft YaHei', 'SimHei', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(440.11757 118.240408)">刷新结果列表</text>
-    <text style="fill: #20272e; font: 7px 'Microsoft YaHei', 'SimHei', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(436.61757 127.534658)">显示或删除对象</text>
+    <text style="font-size: 5.4px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #5f6870" x="223.006594" y="84.029868" transform="rotate(-0 223.006594 84.029868)">根目录、用户、执行程序</text>
+   </g>
+   <g id="patch_11">
+    <path d="M 376.83445 94.99665 
+C 381.185983 94.99665 385.359874 93.997273 388.436873 92.218621 
+C 391.513872 90.439969 393.242754 88.02726 393.242754 85.511866 
+C 393.242754 82.996471 391.513872 80.583762 388.436873 78.80511 
+C 385.359874 77.026458 381.185983 76.027081 376.83445 76.027081 
+C 372.482916 76.027081 368.309025 77.026458 365.232026 78.80511 
+C 362.155027 80.583762 360.426145 82.996471 360.426145 85.511866 
+C 360.426145 88.02726 362.155027 90.439969 365.232026 92.218621 
+C 368.309025 93.997273 372.482916 94.99665 376.83445 94.99665 
+z
+" clip-path="url(#pf8daf098f5)" style="fill: #ffffff; stroke: #2d67a3; stroke-width: 1.2; stroke-linejoin: miter"/>
    </g>
    <g id="text_7">
-    <text style="fill: #5c6873; font: 700 6.5px 'Microsoft YaHei', 'SimHei', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="24.04078" y="206.525599" transform="rotate(-0 24.04078 206.525599)">自动化范围</text>
+    <text style="font-weight: 700; font-size: 6.2px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2d67a3" x="376.83445" y="88.108486" transform="rotate(-0 376.83445 88.108486)">3</text>
    </g>
    <g id="text_8">
-    <text style="fill: #20272e; font: 6.5px 'Microsoft YaHei', 'SimHei', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="28.139976" y="225.299621" transform="rotate(-0 28.139976 225.299621)">可检测：GeoEast 路径、执行程序、用户、当前工区、对象列表</text>
+    <text style="font-weight: 700; font-size: 6.4px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2d67a3" x="376.83445" y="65.653098" transform="rotate(-0 376.83445 65.653098)">刷新对象</text>
    </g>
    <g id="text_9">
-    <text style="fill: #20272e; font: 6.5px 'Microsoft YaHei', 'SimHei', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="28.139976" y="240.809594" transform="rotate(-0 28.139976 240.809594)">需确认：目标工区、输入对象、输出名称与数据库权限</text>
+    <text style="font-size: 5.4px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #5f6870" x="376.83445" y="107.74183" transform="rotate(-0 376.83445 107.74183)">列出 BOMapGrid</text>
+   </g>
+   <g id="patch_12">
+    <path d="M 407.600021 183.916506 
+C 411.951554 183.916506 416.125446 182.917129 419.202444 181.138477 
+C 422.279443 179.359825 424.008325 176.947116 424.008325 174.431722 
+C 424.008325 171.916327 422.279443 169.503618 419.202444 167.724966 
+C 416.125446 165.946314 411.951554 164.946937 407.600021 164.946937 
+C 403.248488 164.946937 399.074596 165.946314 395.997597 167.724966 
+C 392.920599 169.503618 391.191716 171.916327 391.191716 174.431722 
+C 391.191716 176.947116 392.920599 179.359825 395.997597 181.138477 
+C 399.074596 182.917129 403.248488 183.916506 407.600021 183.916506 
+z
+" clip-path="url(#pf8daf098f5)" style="fill: #ffffff; stroke: #2f8f83; stroke-width: 1.2; stroke-linejoin: miter"/>
    </g>
    <g id="text_10">
-    <text style="fill: #5c6873; font: 700 6.5px 'Microsoft YaHei', 'SimHei', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="275.116545" y="206.525599" transform="rotate(-0 275.116545 206.525599)">闭环证据</text>
+    <text style="font-weight: 700; font-size: 6.2px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2f8f83" x="407.600021" y="177.028342" transform="rotate(-0 407.600021 177.028342)">4</text>
    </g>
    <g id="text_11">
-    <text style="fill: #20272e; font: 6.5px 'Microsoft YaHei', 'SimHei', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="279.215741" y="225.299621" transform="rotate(-0 279.215741 225.299621)">读取 BOMapGrid → 运行 → 写入 → 重新读取 → 图层叠加</text>
+    <text style="font-weight: 700; font-size: 6.4px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2f8f83" x="407.600021" y="154.572954" transform="rotate(-0 407.600021 154.572954)">执行追踪</text>
    </g>
    <g id="text_12">
-    <text style="fill: #20272e; font: 6.5px 'Microsoft YaHei', 'SimHei', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="279.215741" y="240.809594" transform="rotate(-0 279.215741 240.809594)">日志同步记录核心耗时、总耗时、对象名称和失败原因</text>
+    <text style="font-size: 5.4px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #5f6870" x="407.600021" y="196.661686" transform="rotate(-0 407.600021 196.661686)">读取、计算、写入</text>
+   </g>
+   <g id="patch_13">
+    <path d="M 269.15495 237.26842 
+C 273.506484 237.26842 277.680375 236.269043 280.757374 234.490391 
+C 283.834373 232.711738 285.563255 230.299029 285.563255 227.783635 
+C 285.563255 225.268241 283.834373 222.855532 280.757374 221.07688 
+C 277.680375 219.298227 273.506484 218.298851 269.15495 218.298851 
+C 264.803417 218.298851 260.629526 219.298227 257.552527 221.07688 
+C 254.475528 222.855532 252.746646 225.268241 252.746646 227.783635 
+C 252.746646 230.299029 254.475528 232.711738 257.552527 234.490391 
+C 260.629526 236.269043 264.803417 237.26842 269.15495 237.26842 
+z
+" clip-path="url(#pf8daf098f5)" style="fill: #ffffff; stroke: #2f8f83; stroke-width: 1.2; stroke-linejoin: miter"/>
+   </g>
+   <g id="text_13">
+    <text style="font-weight: 700; font-size: 6.2px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2f8f83" x="269.15495" y="230.380256" transform="rotate(-0 269.15495 230.380256)">5</text>
+   </g>
+   <g id="text_14">
+    <text style="font-weight: 700; font-size: 6.4px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2f8f83" x="269.15495" y="207.924867" transform="rotate(-0 269.15495 207.924867)">重新读取</text>
+   </g>
+   <g id="text_15">
+    <text style="font-size: 5.4px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #5f6870" x="269.15495" y="250.013599" transform="rotate(-0 269.15495 250.013599)">刷新 BOFaultPolygon</text>
+   </g>
+   <g id="patch_14">
+    <path d="M 105.071904 207.628468 
+C 109.423437 207.628468 113.597329 206.629091 116.674327 204.850439 
+C 119.751326 203.071786 121.480209 200.659077 121.480209 198.143683 
+C 121.480209 195.628289 119.751326 193.21558 116.674327 191.436928 
+C 113.597329 189.658275 109.423437 188.658899 105.071904 188.658899 
+C 100.720371 188.658899 96.546479 189.658275 93.469481 191.436928 
+C 90.392482 193.21558 88.663599 195.628289 88.663599 198.143683 
+C 88.663599 200.659077 90.392482 203.071786 93.469481 204.850439 
+C 96.546479 206.629091 100.720371 207.628468 105.071904 207.628468 
+z
+" clip-path="url(#pf8daf098f5)" style="fill: #ffffff; stroke: #2d67a3; stroke-width: 1.2; stroke-linejoin: miter"/>
+   </g>
+   <g id="text_16">
+    <text style="font-weight: 700; font-size: 6.2px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2d67a3" x="105.071904" y="200.740304" transform="rotate(-0 105.071904 200.740304)">6</text>
+   </g>
+   <g id="text_17">
+    <text style="font-weight: 700; font-size: 6.4px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2d67a3" x="105.071904" y="178.284915" transform="rotate(-0 105.071904 178.284915)">显示或管理</text>
+   </g>
+   <g id="text_18">
+    <text style="font-size: 5.4px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #5f6870" x="105.071904" y="220.373647" transform="rotate(-0 105.071904 220.373647)">叠加、导出、删除</text>
+   </g>
+   <g id="text_19">
+    <text style="font-weight: 700; font-size: 7.3px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="264.027355" y="137.381782" transform="rotate(-0 264.027355 137.381782)">GeoEast</text>
+   </g>
+   <g id="text_20">
+    <text style="font-size: 6px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #5f6870" x="264.027355" y="152.201758" transform="rotate(-0 264.027355 152.201758)">数据库作业闭环</text>
+   </g>
+   <g id="text_21">
+    <g id="patch_15">
+     <path d="M 177.30776 279.448262 
+L 340.49176 279.448262 
+L 340.49176 270.966855 
+L 177.30776 270.966855 
+z
+" style="fill: #ffffff; stroke: #2f8f83; stroke-width: 0.6; stroke-linejoin: miter"/>
+    </g>
+    <text style="font-size: 6.2px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2f8f83" x="258.89976" y="276.91498" transform="rotate(-0 258.89976 276.91498)">完成判据：写入后能够重新读取，并在工区中显示同一对象</text>
    </g>
   </g>
  </g>
  <defs>
-  <clipPath id="paf095f6541">
-   <rect x="2.52" y="2.52" width="512.39952" height="281.99952"/>
+  <clipPath id="pf8daf098f5">
+   <rect x="2.52" y="2.52" width="512.75952" height="296.39952"/>
   </clipPath>
  </defs>
 </svg>

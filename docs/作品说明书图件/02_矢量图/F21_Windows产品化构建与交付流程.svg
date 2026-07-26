@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-8" standalone="no"?>
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
   "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="517.43952pt" height="294.23952pt" viewBox="0 0 517.43952 294.23952" xmlns="http://www.w3.org/2000/svg" version="1.1">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="517.79952pt" height="297.83952pt" viewBox="0 0 517.79952 297.83952" xmlns="http://www.w3.org/2000/svg" version="1.1">
  <metadata>
   <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:date>2026-07-26T06:24:22.051310</dc:date>
+    <dc:date>2026-07-26T12:50:15.244345</dc:date>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
-      <dc:title>Matplotlib v3.9.4, https://matplotlib.org/</dc:title>
+      <dc:title>Matplotlib v3.10.9, https://matplotlib.org/</dc:title>
      </cc:Agent>
     </dc:creator>
    </cc:Work>
@@ -21,203 +21,268 @@
  </defs>
  <g id="figure_1">
   <g id="patch_1">
-   <path d="M 0 294.23952 
-L 517.43952 294.23952 
-L 517.43952 0 
+   <path d="M 0 297.83952 
+L 517.79952 297.83952 
+L 517.79952 0 
 L 0 0 
 z
 " style="fill: #ffffff"/>
   </g>
   <g id="axes_1">
+   <g id="line2d_1">
+    <path d="M 23.030381 28.871957 
+L 161.475451 28.871957 
+" clip-path="url(#p56e1141bbf)" style="fill: none; stroke: #2d67a3; stroke-width: 1.6"/>
+   </g>
+   <g id="line2d_2">
+    <path d="M 181.985832 28.871957 
+L 335.813688 28.871957 
+" clip-path="url(#p56e1141bbf)" style="fill: none; stroke: #2f8f83; stroke-width: 1.6"/>
+   </g>
+   <g id="line2d_3">
+    <path d="M 356.324069 28.871957 
+L 494.769139 28.871957 
+" clip-path="url(#p56e1141bbf)" style="fill: none; stroke: #2d67a3; stroke-width: 1.6"/>
+   </g>
+   <g id="line2d_4">
+    <path d="M 43.540762 116.711813 
+L 458.875973 116.711813 
+" clip-path="url(#p56e1141bbf)" style="fill: none; stroke: #737d85; stroke-width: 0.9"/>
+   </g>
    <g id="patch_2">
-    <path d="M 91.627978 118.199808 
-Q 96.802256 118.199808 100.970304 118.199808 
-" clip-path="url(#p414e5b3e1b)" style="fill: none; stroke: #0f4d92; stroke-width: 0.9; stroke-linecap: round"/>
-    <path d="M 97.770304 116.599808 
-L 100.970304 118.199808 
-L 97.770304 119.799808 
+    <path d="M 23.030381 257.255582 
+L 243.516974 257.255582 
+L 243.516974 198.695678 
+L 23.030381 198.695678 
 z
-" clip-path="url(#p414e5b3e1b)" style="fill: #0f4d92; stroke: #0f4d92; stroke-width: 0.9; stroke-linecap: round"/>
+" clip-path="url(#p56e1141bbf)" style="fill: #f5f6f6; stroke: #a5adb3; stroke-width: 0.55; stroke-linejoin: miter"/>
    </g>
    <g id="patch_3">
-    <path d="M 172.587102 118.199808 
-Q 177.76138 118.199808 181.929428 118.199808 
-" clip-path="url(#p414e5b3e1b)" style="fill: none; stroke: #0f4d92; stroke-width: 0.9; stroke-linecap: round"/>
-    <path d="M 178.729428 116.599808 
-L 181.929428 118.199808 
-L 178.729428 119.799808 
+    <path d="M 38.413166 225.926034 
+C 39.50105 225.926034 40.544523 225.679224 41.313772 225.239962 
+C 42.083022 224.800699 42.515243 224.204848 42.515243 223.583638 
+C 42.515243 222.962427 42.083022 222.366576 41.313772 221.927313 
+C 40.544523 221.488051 39.50105 221.241241 38.413166 221.241241 
+C 37.325283 221.241241 36.28181 221.488051 35.512561 221.927313 
+C 34.743311 222.366576 34.31109 222.962427 34.31109 223.583638 
+C 34.31109 224.204848 34.743311 224.800699 35.512561 225.239962 
+C 36.28181 225.679224 37.325283 225.926034 38.413166 225.926034 
 z
-" clip-path="url(#p414e5b3e1b)" style="fill: #0f4d92; stroke: #0f4d92; stroke-width: 0.9; stroke-linecap: round"/>
+" clip-path="url(#p56e1141bbf)" style="fill: #2f8f83"/>
    </g>
    <g id="patch_4">
-    <path d="M 253.546226 118.199808 
-Q 258.720504 118.199808 262.888552 118.199808 
-" clip-path="url(#p414e5b3e1b)" style="fill: none; stroke: #0f4d92; stroke-width: 0.9; stroke-linecap: round"/>
-    <path d="M 259.688552 116.599808 
-L 262.888552 118.199808 
-L 259.688552 119.799808 
+    <path d="M 38.413166 240.56601 
+C 39.50105 240.56601 40.544523 240.3192 41.313772 239.879938 
+C 42.083022 239.440675 42.515243 238.844824 42.515243 238.223614 
+C 42.515243 237.602403 42.083022 237.006552 41.313772 236.567289 
+C 40.544523 236.128027 39.50105 235.881217 38.413166 235.881217 
+C 37.325283 235.881217 36.28181 236.128027 35.512561 236.567289 
+C 34.743311 237.006552 34.31109 237.602403 34.31109 238.223614 
+C 34.31109 238.844824 34.743311 239.440675 35.512561 239.879938 
+C 36.28181 240.3192 37.325283 240.56601 38.413166 240.56601 
 z
-" clip-path="url(#p414e5b3e1b)" style="fill: #0f4d92; stroke: #0f4d92; stroke-width: 0.9; stroke-linecap: round"/>
+" clip-path="url(#p56e1141bbf)" style="fill: #2f8f83"/>
    </g>
    <g id="patch_5">
-    <path d="M 334.50535 118.199808 
-Q 339.679629 118.199808 343.847676 118.199808 
-" clip-path="url(#p414e5b3e1b)" style="fill: none; stroke: #0f4d92; stroke-width: 0.9; stroke-linecap: round"/>
-    <path d="M 340.647676 116.599808 
-L 343.847676 118.199808 
-L 340.647676 119.799808 
+    <path d="M 38.413166 255.205986 
+C 39.50105 255.205986 40.544523 254.959176 41.313772 254.519914 
+C 42.083022 254.080651 42.515243 253.4848 42.515243 252.86359 
+C 42.515243 252.242379 42.083022 251.646528 41.313772 251.207265 
+C 40.544523 250.768003 39.50105 250.521193 38.413166 250.521193 
+C 37.325283 250.521193 36.28181 250.768003 35.512561 251.207265 
+C 34.743311 251.646528 34.31109 252.242379 34.31109 252.86359 
+C 34.31109 253.4848 34.743311 254.080651 35.512561 254.519914 
+C 36.28181 254.959176 37.325283 255.205986 38.413166 255.205986 
 z
-" clip-path="url(#p414e5b3e1b)" style="fill: #0f4d92; stroke: #0f4d92; stroke-width: 0.9; stroke-linecap: round"/>
+" clip-path="url(#p56e1141bbf)" style="fill: #2f8f83"/>
    </g>
    <g id="patch_6">
-    <path d="M 415.464474 118.199808 
-Q 420.638753 118.199808 424.8068 118.199808 
-" clip-path="url(#p414e5b3e1b)" style="fill: none; stroke: #0f4d92; stroke-width: 0.9; stroke-linecap: round"/>
-    <path d="M 421.6068 116.599808 
-L 424.8068 118.199808 
-L 421.6068 119.799808 
+    <path d="M 274.282546 257.255582 
+L 494.769139 257.255582 
+L 494.769139 198.695678 
+L 274.282546 198.695678 
 z
-" clip-path="url(#p414e5b3e1b)" style="fill: #0f4d92; stroke: #0f4d92; stroke-width: 0.9; stroke-linecap: round"/>
-   </g>
-   <g id="patch_7">
-    <path d="M 23.015981 254.123582 
-L 238.223779 254.123582 
-L 238.223779 196.283678 
-L 23.015981 196.283678 
-L 23.015981 254.123582 
-z
-" clip-path="url(#p414e5b3e1b)" style="fill: none; stroke-dasharray: 2.59,1.12; stroke-dashoffset: 0; stroke: #cbd1d6; stroke-width: 0.7; stroke-linejoin: miter"/>
-   </g>
-   <g id="patch_8">
-    <path d="M 279.215741 254.123582 
-L 494.423539 254.123582 
-L 494.423539 196.283678 
-L 279.215741 196.283678 
-L 279.215741 254.123582 
-z
-" clip-path="url(#p414e5b3e1b)" style="fill: none; stroke-dasharray: 2.59,1.12; stroke-dashoffset: 0; stroke: #cbd1d6; stroke-width: 0.7; stroke-linejoin: miter"/>
-   </g>
-   <g id="patch_9">
-    <path d="M 26.090378 148.854957 
-L 86.553521 148.854957 
-Q 92.702316 148.854957 92.702316 145.384563 
-L 92.702316 91.015053 
-Q 92.702316 87.544659 86.553521 87.544659 
-L 26.090378 87.544659 
-Q 19.941584 87.544659 19.941584 91.015053 
-L 19.941584 145.384563 
-Q 19.941584 148.854957 26.090378 148.854957 
-z
-" clip-path="url(#p414e5b3e1b)" style="fill: #f4f6f7; stroke: #8c969e; stroke-width: 0.8; stroke-linejoin: miter"/>
-   </g>
-   <g id="patch_10">
-    <path d="M 107.049502 148.854957 
-L 167.512645 148.854957 
-Q 173.66144 148.854957 173.66144 145.384563 
-L 173.66144 91.015053 
-Q 173.66144 87.544659 167.512645 87.544659 
-L 107.049502 87.544659 
-Q 100.900708 87.544659 100.900708 91.015053 
-L 100.900708 145.384563 
-Q 100.900708 148.854957 107.049502 148.854957 
-z
-" clip-path="url(#p414e5b3e1b)" style="fill: #d9e7f5; stroke: #8c969e; stroke-width: 0.8; stroke-linejoin: miter"/>
-   </g>
-   <g id="patch_11">
-    <path d="M 188.008626 148.854957 
-L 248.47177 148.854957 
-Q 254.620564 148.854957 254.620564 145.384563 
-L 254.620564 91.015053 
-Q 254.620564 87.544659 248.47177 87.544659 
-L 188.008626 87.544659 
-Q 181.859832 87.544659 181.859832 91.015053 
-L 181.859832 145.384563 
-Q 181.859832 148.854957 188.008626 148.854957 
-z
-" clip-path="url(#p414e5b3e1b)" style="fill: #ffffff; stroke: #8c969e; stroke-width: 0.8; stroke-linejoin: miter"/>
-   </g>
-   <g id="patch_12">
-    <path d="M 268.96775 148.854957 
-L 329.430894 148.854957 
-Q 335.579688 148.854957 335.579688 145.384563 
-L 335.579688 91.015053 
-Q 335.579688 87.544659 329.430894 87.544659 
-L 268.96775 87.544659 
-Q 262.818956 87.544659 262.818956 91.015053 
-L 262.818956 145.384563 
-Q 262.818956 148.854957 268.96775 148.854957 
-z
-" clip-path="url(#p414e5b3e1b)" style="fill: #d8efeb; stroke: #8c969e; stroke-width: 0.8; stroke-linejoin: miter"/>
-   </g>
-   <g id="patch_13">
-    <path d="M 349.926875 148.854957 
-L 410.390018 148.854957 
-Q 416.538812 148.854957 416.538812 145.384563 
-L 416.538812 91.015053 
-Q 416.538812 87.544659 410.390018 87.544659 
-L 349.926875 87.544659 
-Q 343.77808 87.544659 343.77808 91.015053 
-L 343.77808 145.384563 
-Q 343.77808 148.854957 349.926875 148.854957 
-z
-" clip-path="url(#p414e5b3e1b)" style="fill: #ffffff; stroke: #8c969e; stroke-width: 0.8; stroke-linejoin: miter"/>
-   </g>
-   <g id="patch_14">
-    <path d="M 430.885999 148.854957 
-L 491.349142 148.854957 
-Q 497.497936 148.854957 497.497936 145.384563 
-L 497.497936 91.015053 
-Q 497.497936 87.544659 491.349142 87.544659 
-L 430.885999 87.544659 
-Q 424.737204 87.544659 424.737204 91.015053 
-L 424.737204 145.384563 
-Q 424.737204 148.854957 430.885999 148.854957 
-z
-" clip-path="url(#p414e5b3e1b)" style="fill: #f4f6f7; stroke: #8c969e; stroke-width: 0.8; stroke-linejoin: miter"/>
+" clip-path="url(#p56e1141bbf)" style="fill: #f5f6f6; stroke: #a5adb3; stroke-width: 0.55; stroke-linejoin: miter"/>
    </g>
    <g id="text_1">
-    <text style="fill: #20272e; font: 7px 'Microsoft YaHei', 'SimHei', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="56.32195" y="120.127542" transform="rotate(-0 56.32195 120.127542)">同一 Git 提交</text>
+    <text style="font-weight: 700; font-size: 6.4px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #2d67a3" x="23.030381" y="20.253768" transform="rotate(-0 23.030381 20.253768)">来源可追溯</text>
    </g>
    <g id="text_2">
-    <text style="fill: #20272e; font: 7px 'Microsoft YaHei', 'SimHei', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(106.512793 115.480417)">构建 CLI / 桌面软件</text>
-    <text style="fill: #20272e; font: 7px 'Microsoft YaHei', 'SimHei', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(95.792949 124.774667)">Launcher / Runner / 插件</text>
+    <text style="font-weight: 700; font-size: 6.4px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #2f8f83" x="181.985832" y="20.253768" transform="rotate(-0 181.985832 20.253768)">统一构建与验证</text>
    </g>
    <g id="text_3">
-    <text style="fill: #20272e; font: 7px 'Microsoft YaHei', 'SimHei', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="218.240198" y="120.127542" transform="rotate(-0 218.240198 120.127542)">自动测试与哈希核对</text>
+    <text style="font-weight: 700; font-size: 6.4px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #2d67a3" x="356.324069" y="20.253768" transform="rotate(-0 356.324069 20.253768)">客户机交付</text>
+   </g>
+   <g id="patch_7">
+    <path d="M 43.540762 122.275004 
+C 46.124484 122.275004 48.602733 121.688831 50.429701 120.645583 
+C 52.256669 119.602335 53.283192 118.187188 53.283192 116.711813 
+C 53.283192 115.236437 52.256669 113.821291 50.429701 112.778043 
+C 48.602733 111.734795 46.124484 111.148622 43.540762 111.148622 
+C 40.957039 111.148622 38.478791 111.734795 36.651823 112.778043 
+C 34.824855 113.821291 33.798331 115.236437 33.798331 116.711813 
+C 33.798331 118.187188 34.824855 119.602335 36.651823 120.645583 
+C 38.478791 121.688831 40.957039 122.275004 43.540762 122.275004 
+z
+" clip-path="url(#p56e1141bbf)" style="fill: #ffffff; stroke: #2d67a3; stroke-width: 1.1; stroke-linejoin: miter"/>
    </g>
    <g id="text_4">
-    <text style="fill: #20272e; font: 7px 'Microsoft YaHei', 'SimHei', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(281.699322 115.480417)">生成安装器</text>
-    <text style="fill: #20272e; font: 7px 'Microsoft YaHei', 'SimHei', 'Arial', 'DejaVu Sans', sans-serif" transform="translate(271.756041 124.774667)">便携 ZIP / 插件包</text>
+    <text style="font-weight: 700; font-size: 5.6px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2d67a3" x="43.540762" y="118.254" transform="rotate(-0 43.540762 118.254)">1</text>
    </g>
    <g id="text_5">
-    <text style="fill: #20272e; font: 7px 'Microsoft YaHei', 'SimHei', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="380.158446" y="120.127542" transform="rotate(-0 380.158446 120.127542)">异机与中文路径烟测</text>
+    <text style="font-weight: 700; font-size: 6.2px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2d67a3" x="43.540762" y="93.287851" transform="rotate(-0 43.540762 93.287851)">Git 提交</text>
    </g>
    <g id="text_6">
-    <text style="fill: #20272e; font: 7px 'Microsoft YaHei', 'SimHei', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle" x="461.11757" y="120.127542" transform="rotate(-0 461.11757 120.127542)">形成唯一交付清单</text>
+    <text style="font-size: 5.4px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #5f6870" x="43.540762" y="145.991765" transform="rotate(-0 43.540762 145.991765)">源码唯一来源</text>
+   </g>
+   <g id="patch_8">
+    <path d="M 120.45469 122.275004 
+C 123.038412 122.275004 125.516661 121.688831 127.343629 120.645583 
+C 129.170597 119.602335 130.19712 118.187188 130.19712 116.711813 
+C 130.19712 115.236437 129.170597 113.821291 127.343629 112.778043 
+C 125.516661 111.734795 123.038412 111.148622 120.45469 111.148622 
+C 117.870967 111.148622 115.392719 111.734795 113.565751 112.778043 
+C 111.738783 113.821291 110.712259 115.236437 110.712259 116.711813 
+C 110.712259 118.187188 111.738783 119.602335 113.565751 120.645583 
+C 115.392719 121.688831 117.870967 122.275004 120.45469 122.275004 
+z
+" clip-path="url(#p56e1141bbf)" style="fill: #ffffff; stroke: #2d67a3; stroke-width: 1.1; stroke-linejoin: miter"/>
    </g>
    <g id="text_7">
-    <text style="fill: #5c6873; font: 700 6.5px 'Microsoft YaHei', 'SimHei', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="29.164775" y="208.709604" transform="rotate(-0 29.164775 208.709604)">一致性约束</text>
+    <text style="font-weight: 700; font-size: 5.6px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2d67a3" x="120.45469" y="118.254" transform="rotate(-0 120.45469 118.254)">2</text>
    </g>
    <g id="text_8">
-    <text style="font: 6.5px 'Microsoft YaHei', 'SimHei', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="33.263971" y="228.095626" transform="rotate(-0 33.263971 228.095626)">源码提交、编译时间、Build ID、EXE 哈希和包哈希可追溯</text>
+    <text style="font-weight: 700; font-size: 6.2px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2d67a3" x="120.45469" y="93.287851" transform="rotate(-0 120.45469 93.287851)">版本清单</text>
    </g>
    <g id="text_9">
-    <text style="font: 6.5px 'Microsoft YaHei', 'SimHei', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="33.263971" y="245.447597" transform="rotate(-0 33.263971 245.447597)">禁止混入旧版 EXE、个人配置、开发缓存和历史发布目录</text>
+    <text style="font-size: 5.4px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #5f6870" x="120.45469" y="145.991765" transform="rotate(-0 120.45469 145.991765)">Build ID / 时间</text>
+   </g>
+   <g id="patch_9">
+    <path d="M 207.623808 122.275004 
+C 210.207531 122.275004 212.685779 121.688831 214.512747 120.645583 
+C 216.339715 119.602335 217.366239 118.187188 217.366239 116.711813 
+C 217.366239 115.236437 216.339715 113.821291 214.512747 112.778043 
+C 212.685779 111.734795 210.207531 111.148622 207.623808 111.148622 
+C 205.040085 111.148622 202.561837 111.734795 200.734869 112.778043 
+C 198.907901 113.821291 197.881377 115.236437 197.881377 116.711813 
+C 197.881377 118.187188 198.907901 119.602335 200.734869 120.645583 
+C 202.561837 121.688831 205.040085 122.275004 207.623808 122.275004 
+z
+" clip-path="url(#p56e1141bbf)" style="fill: #ffffff; stroke: #2f8f83; stroke-width: 1.1; stroke-linejoin: miter"/>
    </g>
    <g id="text_10">
-    <text style="fill: #5c6873; font: 700 6.5px 'Microsoft YaHei', 'SimHei', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="285.364535" y="208.709604" transform="rotate(-0 285.364535 208.709604)">客户机约束</text>
+    <text style="font-weight: 700; font-size: 5.6px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2f8f83" x="207.623808" y="118.254" transform="rotate(-0 207.623808 118.254)">3</text>
    </g>
    <g id="text_11">
-    <text style="font: 6.5px 'Microsoft YaHei', 'SimHei', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="289.463731" y="228.095626" transform="rotate(-0 289.463731 228.095626)">安装目录不写配置；用户数据进入 LocalAppData / 文档目录</text>
+    <text style="font-weight: 700; font-size: 6.2px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2f8f83" x="207.623808" y="93.287851" transform="rotate(-0 207.623808 93.287851)">编译</text>
    </g>
    <g id="text_12">
-    <text style="font: 6.5px 'Microsoft YaHei', 'SimHei', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="289.463731" y="245.447597" transform="rotate(-0 289.463731 245.447597)">Qt、VC、平台插件、示例、模板和帮助文档完整随包</text>
+    <text style="font-size: 5.4px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #5f6870" x="207.623808" y="145.991765" transform="rotate(-0 207.623808 145.991765)">CLI · GUI · 插件</text>
+   </g>
+   <g id="patch_10">
+    <path d="M 284.537736 122.275004 
+C 287.121459 122.275004 289.599707 121.688831 291.426675 120.645583 
+C 293.253643 119.602335 294.280167 118.187188 294.280167 116.711813 
+C 294.280167 115.236437 293.253643 113.821291 291.426675 112.778043 
+C 289.599707 111.734795 287.121459 111.148622 284.537736 111.148622 
+C 281.954013 111.148622 279.475765 111.734795 277.648797 112.778043 
+C 275.821829 113.821291 274.795305 115.236437 274.795305 116.711813 
+C 274.795305 118.187188 275.821829 119.602335 277.648797 120.645583 
+C 279.475765 121.688831 281.954013 122.275004 284.537736 122.275004 
+z
+" clip-path="url(#p56e1141bbf)" style="fill: #ffffff; stroke: #2f8f83; stroke-width: 1.1; stroke-linejoin: miter"/>
+   </g>
+   <g id="text_13">
+    <text style="font-weight: 700; font-size: 5.6px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2f8f83" x="284.537736" y="118.254" transform="rotate(-0 284.537736 118.254)">4</text>
+   </g>
+   <g id="text_14">
+    <text style="font-weight: 700; font-size: 6.2px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2f8f83" x="284.537736" y="93.287851" transform="rotate(-0 284.537736 93.287851)">自动验证</text>
+   </g>
+   <g id="text_15">
+    <text style="font-size: 5.4px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #5f6870" x="284.537736" y="145.991765" transform="rotate(-0 284.537736 145.991765)">回归 · 哈希 · 运行检查</text>
+   </g>
+   <g id="patch_11">
+    <path d="M 371.706854 122.275004 
+C 374.290577 122.275004 376.768825 121.688831 378.595793 120.645583 
+C 380.422761 119.602335 381.449285 118.187188 381.449285 116.711813 
+C 381.449285 115.236437 380.422761 113.821291 378.595793 112.778043 
+C 376.768825 111.734795 374.290577 111.148622 371.706854 111.148622 
+C 369.123132 111.148622 366.644883 111.734795 364.817915 112.778043 
+C 362.990947 113.821291 361.964424 115.236437 361.964424 116.711813 
+C 361.964424 118.187188 362.990947 119.602335 364.817915 120.645583 
+C 366.644883 121.688831 369.123132 122.275004 371.706854 122.275004 
+z
+" clip-path="url(#p56e1141bbf)" style="fill: #ffffff; stroke: #2d67a3; stroke-width: 1.1; stroke-linejoin: miter"/>
+   </g>
+   <g id="text_16">
+    <text style="font-weight: 700; font-size: 5.6px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2d67a3" x="371.706854" y="118.254" transform="rotate(-0 371.706854 118.254)">5</text>
+   </g>
+   <g id="text_17">
+    <text style="font-weight: 700; font-size: 6.2px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2d67a3" x="371.706854" y="93.287851" transform="rotate(-0 371.706854 93.287851)">打包</text>
+   </g>
+   <g id="text_18">
+    <text style="font-size: 5.4px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #5f6870" x="371.706854" y="145.991765" transform="rotate(-0 371.706854 145.991765)">安装器 · ZIP · 插件包</text>
+   </g>
+   <g id="patch_12">
+    <path d="M 458.875973 122.275004 
+C 461.459696 122.275004 463.937944 121.688831 465.764912 120.645583 
+C 467.59188 119.602335 468.618404 118.187188 468.618404 116.711813 
+C 468.618404 115.236437 467.59188 113.821291 465.764912 112.778043 
+C 463.937944 111.734795 461.459696 111.148622 458.875973 111.148622 
+C 456.29225 111.148622 453.814002 111.734795 451.987034 112.778043 
+C 450.160066 113.821291 449.133542 115.236437 449.133542 116.711813 
+C 449.133542 118.187188 450.160066 119.602335 451.987034 120.645583 
+C 453.814002 121.688831 456.29225 122.275004 458.875973 122.275004 
+z
+" clip-path="url(#p56e1141bbf)" style="fill: #ffffff; stroke: #2d67a3; stroke-width: 1.1; stroke-linejoin: miter"/>
+   </g>
+   <g id="text_19">
+    <text style="font-weight: 700; font-size: 5.6px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2d67a3" x="458.875973" y="118.254" transform="rotate(-0 458.875973 118.254)">6</text>
+   </g>
+   <g id="text_20">
+    <text style="font-weight: 700; font-size: 6.2px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #2d67a3" x="458.875973" y="93.287851" transform="rotate(-0 458.875973 93.287851)">异机复核</text>
+   </g>
+   <g id="text_21">
+    <text style="font-size: 5.4px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #5f6870" x="458.875973" y="145.991765" transform="rotate(-0 458.875973 145.991765)">中文路径与依赖</text>
+   </g>
+   <g id="text_22">
+    <text style="font-weight: 700; font-size: 6.2px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="33.285571" y="211.871657" transform="rotate(-0 33.285571 211.871657)">纳入交付包</text>
+   </g>
+   <g id="text_23">
+    <text style="font-size: 5.7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="48.668357" y="225.153364" transform="rotate(-0 48.668357 225.153364)">可执行程序与运行库</text>
+   </g>
+   <g id="text_24">
+    <text style="font-size: 5.7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="48.668357" y="239.79334" transform="rotate(-0 48.668357 239.79334)">帮助、模板与许可</text>
+   </g>
+   <g id="text_25">
+    <text style="font-size: 5.7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="48.668357" y="254.433316" transform="rotate(-0 48.668357 254.433316)">唯一构建清单与 SHA256</text>
+   </g>
+   <g id="text_26">
+    <text style="font-weight: 700; font-size: 6.2px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="284.537736" y="211.871657" transform="rotate(-0 284.537736 211.871657)">交付包排除内容</text>
+   </g>
+   <g id="text_27">
+    <text style="font-weight: 700; font-size: 7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #a94a52" x="289.665331" y="225.511372" transform="rotate(-0 289.665331 225.511372)">×</text>
+   </g>
+   <g id="text_28">
+    <text style="font-size: 5.7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="305.048117" y="225.153364" transform="rotate(-0 305.048117 225.153364)">个人路径与本机配置</text>
+   </g>
+   <g id="text_29">
+    <text style="font-weight: 700; font-size: 7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #a94a52" x="289.665331" y="240.151348" transform="rotate(-0 289.665331 240.151348)">×</text>
+   </g>
+   <g id="text_30">
+    <text style="font-size: 5.7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="305.048117" y="239.79334" transform="rotate(-0 305.048117 239.79334)">缓存、临时文件与旧版 EXE</text>
+   </g>
+   <g id="text_31">
+    <text style="font-weight: 700; font-size: 7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #a94a52" x="289.665331" y="254.791324" transform="rotate(-0 289.665331 254.791324)">×</text>
+   </g>
+   <g id="text_32">
+    <text style="font-size: 5.7px; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start" x="305.048117" y="254.433316" transform="rotate(-0 305.048117 254.433316)">无法追溯的混合构建产物</text>
    </g>
   </g>
  </g>
  <defs>
-  <clipPath id="p414e5b3e1b">
-   <rect x="2.52" y="2.52" width="512.39952" height="289.19952"/>
+  <clipPath id="p56e1141bbf">
+   <rect x="2.52" y="2.52" width="512.75952" height="292.79952"/>
   </clipPath>
  </defs>
 </svg>

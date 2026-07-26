@@ -1,69 +1,128 @@
 from __future__ import annotations
 
-from figure_style import COLORS, arrow, box, canvas, horizontal_chain, save_all, stage_band
+import numpy as np
+from matplotlib.patches import Circle, Rectangle
+
+from figure_style import COLORS, arrow, canvas, label_box, phase_header, rule, save_all
+
+
+def _field(nx: int = 180, ny: int = 90) -> np.ndarray:
+    x = np.linspace(-1, 1, nx)
+    y = np.linspace(-0.55, 0.55, ny)
+    xx, yy = np.meshgrid(x, y)
+    c = 0.15 * np.sin(3.6 * xx)
+    branch = -0.34 * xx + 0.16
+    return np.clip(np.exp(-((yy - c) ** 2) / 0.005) + 0.7 * np.exp(-((yy - branch) ** 2) / 0.009), 0, 1)
+
+
+def _timeline(ax, xs: list[float], y: float, labels: list[str], notes: list[str], colors: list[str]) -> None:
+    rule(ax, (xs[0], y), (xs[-1], y), color="gray_dark", lw=0.8)
+    for i, (x, label, note, color) in enumerate(zip(xs, labels, notes, colors), 1):
+        ax.add_patch(Circle((x, y), 0.020, facecolor=COLORS["paper"], edgecolor=COLORS[color], lw=1.2, zorder=3))
+        ax.text(x, y, str(i), ha="center", va="center", fontsize=5.8, weight="bold", color=COLORS[color])
+        ax.text(x, y + 0.075, label, ha="center", va="bottom", fontsize=6.4, weight="bold", color=COLORS[color])
+        ax.text(x, y - 0.075, note, ha="center", va="top", fontsize=5.5, color=COLORS["muted"], linespacing=1.25)
 
 
 def standalone_workflow() -> None:
-    fig, ax = canvas(7.2, 3.7)
-    labels = ["选择数据源\n打开 DAT/文本", "检查原始网格\n确认坐标与响应", "选择预设或\n调整必要参数", "开始追踪\n后台执行", "查看原始/结果/叠加", "保存结果\n历史与图件"]
-    fills = ["panel", "blue_light", "paper", "teal_light", "blue_light", "panel"]
-    horizontal_chain(ax, labels, y=0.43, box_height=0.20, fills=fills)
-    ax.text(0.04, 0.78, "前置条件", fontsize=7, weight="bold", color=COLORS["muted"])
-    ax.text(0.04, 0.73, "输入可读、输出目录可写；未完成时界面给出下一步提示", fontsize=6.5, color=COLORS["ink"])
-    ax.text(0.04, 0.22, "结果状态", fontsize=7, weight="bold", color=COLORS["muted"])
-    ax.text(0.04, 0.17, "未运行：不显示处理后多边形  |  完成：显示对象数量、耗时与输出位置  |  失败：保留原因和修复入口", fontsize=6.5, color=COLORS["ink"])
+    fig, ax = canvas(7.205, 4.05)
+    phase_header(ax, 0.04, 0.29, 0.91, "准备", color="blue")
+    phase_header(ax, 0.33, 0.58, 0.91, "计算", color="teal")
+    phase_header(ax, 0.62, 0.96, 0.91, "复核与交付", color="blue")
+    xs = [0.09, 0.25, 0.41, 0.57, 0.73, 0.91]
+    _timeline(
+        ax, xs, 0.58,
+        ["选择数据", "检查网格", "确认参数", "开始追踪", "查看图层", "保存结果"],
+        ["DAT/文本\n或 GeoEast", "坐标、范围\n与属性", "预设模板\n或必要调整", "后台执行\n显示进度", "原始/结果\n自由叠加", "文件、历史\n与图件"],
+        ["blue", "blue", "teal", "teal", "blue", "blue"],
+    )
+    ax.add_patch(Rectangle((0.04, 0.13), 0.92, 0.18, facecolor=COLORS["panel"], edgecolor=COLORS["line"], lw=0.6))
+    ax.text(0.06, 0.265, "状态反馈贯穿全流程", fontsize=6.3, weight="bold", color=COLORS["ink"])
+    states = [
+        (0.08, "未就绪", "指出缺少的输入或配置", "amber"),
+        (0.35, "执行中", "进度、阶段与耗时持续更新", "blue"),
+        (0.64, "已完成", "对象数量、输出位置与图层可用", "teal"),
+    ]
+    for x, title, note, color in states:
+        ax.add_patch(Circle((x, 0.185), 0.010, facecolor=COLORS[color], edgecolor="none"))
+        ax.text(x + 0.025, 0.205, title, fontsize=6.1, weight="bold", color=COLORS[color], ha="left")
+        ax.text(x + 0.025, 0.165, note, fontsize=5.5, color=COLORS["muted"], ha="left")
     save_all(fig, "F05_独立软件全流程")
 
 
 def geoeast_workflow() -> None:
-    fig, ax = canvas(7.2, 4.0)
-    labels = ["从 GeoEast\n打开插件", "自动识别根目录\n用户与当前工区", "检测连接并\n刷新 BOMapGrid", "选择输入网格\n命名输出对象", "执行统一核心\n写入 BOFaultPolygon", "刷新结果列表\n显示或删除对象"]
-    fills = ["panel", "blue_light", "paper", "paper", "teal_light", "panel"]
-    horizontal_chain(ax, labels, y=0.48, box_height=0.20, fills=fills)
-    stage_band(ax, 0.03, 0.12, 0.45, 0.20, "自动化范围")
-    ax.text(0.05, 0.21, "可检测：GeoEast 路径、执行程序、用户、当前工区、对象列表", fontsize=6.5, color=COLORS["ink"])
-    ax.text(0.05, 0.155, "需确认：目标工区、输入对象、输出名称与数据库权限", fontsize=6.5, color=COLORS["ink"])
-    stage_band(ax, 0.52, 0.12, 0.45, 0.20, "闭环证据")
-    ax.text(0.54, 0.21, "读取 BOMapGrid → 运行 → 写入 → 重新读取 → 图层叠加", fontsize=6.5, color=COLORS["ink"])
-    ax.text(0.54, 0.155, "日志同步记录核心耗时、总耗时、对象名称和失败原因", fontsize=6.5, color=COLORS["ink"])
+    fig, ax = canvas(7.205, 4.2)
+    center = (0.51, 0.52)
+    nodes = [
+        (0.18, 0.69, "1  打开插件", "宿主传入当前工区"),
+        (0.43, 0.80, "2  自动检测", "根目录、用户、执行程序"),
+        (0.73, 0.72, "3  刷新对象", "列出 BOMapGrid"),
+        (0.79, 0.42, "4  执行追踪", "读取、计算、写入"),
+        (0.52, 0.24, "5  重新读取", "刷新 BOFaultPolygon"),
+        (0.20, 0.34, "6  显示或管理", "叠加、导出、删除"),
+    ]
+    for i, (x, y, title, note) in enumerate(nodes):
+        color = "teal" if i in (3, 4) else "blue"
+        ax.add_patch(Circle((x, y), 0.032, facecolor=COLORS["paper"], edgecolor=COLORS[color], lw=1.2, zorder=3))
+        ax.text(x, y - 0.003, str(i + 1), ha="center", va="center", fontsize=6.2, weight="bold", color=COLORS[color])
+        ax.text(x, y + 0.067, title[3:], ha="center", fontsize=6.4, weight="bold", color=COLORS[color])
+        ax.text(x, y - 0.075, note, ha="center", fontsize=5.4, color=COLORS["muted"])
+    for a, b in zip(nodes, nodes[1:] + nodes[:1]):
+        arrow(ax, (a[0], a[1]), (b[0], b[1]), color="teal" if a == nodes[3] else "blue", lw=0.8)
+    ax.add_patch(Circle(center, 0.105, facecolor=COLORS["panel"], edgecolor=COLORS["ink"], lw=0.7))
+    ax.text(center[0], center[1] + 0.025, "GeoEast", ha="center", fontsize=7.3, weight="bold")
+    ax.text(center[0], center[1] - 0.025, "数据库作业闭环", ha="center", fontsize=6.0, color=COLORS["muted"])
+    label_box(ax, (0.50, 0.08), "完成判据：写入后能够重新读取，并在工区中显示同一对象", color="teal", fontsize=6.2)
     save_all(fig, "F06_GeoEast插件标准流程")
 
 
 def layer_view_workflow() -> None:
-    fig, ax = canvas(7.2, 4.1)
-    box(ax, (0.05, 0.61), (0.20, 0.12), "输入网格选择", fill="paper", edge="blue")
-    box(ax, (0.05, 0.29), (0.20, 0.12), "结果对象选择", fill="paper", edge="teal")
-    box(ax, (0.35, 0.61), (0.20, 0.12), "原始网格图层：开启", fill="blue_light", edge="blue", weight="bold")
-    box(ax, (0.35, 0.29), (0.20, 0.12), "结果多边形图层：开启", fill="teal_light", edge="teal", weight="bold")
-    box(ax, (0.67, 0.44), (0.26, 0.16), "真实图层查看器\n平移、缩放、重置、导出", fill="panel", edge="ink", weight="bold")
-    arrow(ax, (0.25, 0.67), (0.35, 0.67), color="blue")
-    arrow(ax, (0.25, 0.35), (0.35, 0.35), color="teal")
-    arrow(ax, (0.55, 0.67), (0.67, 0.55), color="blue")
-    arrow(ax, (0.55, 0.35), (0.67, 0.49), color="teal")
-    box(ax, (0.18, 0.08), (0.64, 0.09), "图层开关只控制显示；颜色、线宽和透明度不改变多边形坐标与面积", fill="paper", edge="amber")
-    arrow(ax, (0.80, 0.44), (0.80, 0.17), color="amber", dashed=True)
-    ax.text(0.50, 0.88, "选择对象与显示开关相互独立，可单层查看，也可同时叠加", ha="center", fontsize=8, weight="bold")
+    fig, axes = __import__("matplotlib.pyplot").pyplot.subplots(1, 3, figsize=(7.205, 2.7), constrained_layout=True)
+    field = _field()
+    mask = field > 0.50
+    titles = ["a  原始网格层", "b  结果多边形层", "c  叠加查看"]
+    for ax, title in zip(axes, titles):
+        ax.set_title(title, loc="left", fontsize=7.2, weight="bold")
+        ax.set_xticks([]); ax.set_yticks([])
+        for spine in ax.spines.values():
+            spine.set_visible(True); spine.set_linewidth(0.6); spine.set_color(COLORS["line"])
+    axes[0].imshow(field, origin="lower", cmap="Greys", aspect="auto")
+    axes[0].text(0.02, 0.04, "开关：显示 / 隐藏", transform=axes[0].transAxes, fontsize=5.7,
+                 color=COLORS["blue"], bbox={"fc":"white","ec":"none","alpha":0.85,"pad":1.5})
+    axes[1].contour(mask.astype(float), levels=[0.5], colors=[COLORS["teal"]], linewidths=1.1, origin="lower")
+    axes[1].text(0.02, 0.04, "颜色、线宽、透明度可调", transform=axes[1].transAxes, fontsize=5.7,
+                 color=COLORS["teal_dark"], bbox={"fc":"white","ec":"none","alpha":0.85,"pad":1.5})
+    axes[2].imshow(field, origin="lower", cmap="Greys", aspect="auto")
+    axes[2].contour(mask.astype(float), levels=[0.5], colors=[COLORS["amber"]], linewidths=1.15, origin="lower")
+    axes[2].text(0.02, 0.04, "平移 · 缩放 · 重置 · 导出", transform=axes[2].transAxes, fontsize=5.7,
+                 color=COLORS["ink"], bbox={"fc":"white","ec":"none","alpha":0.85,"pad":1.5})
+    fig.text(0.5, 0.015, "对象选择决定显示内容；图层开关只控制可见性；显示样式不修改多边形坐标与面积",
+             ha="center", fontsize=6.2, color=COLORS["muted"])
     save_all(fig, "F07_结果查看与图层叠加逻辑")
 
 
 def guidance_states() -> None:
-    fig, ax = canvas(7.2, 4.4)
+    fig, ax = canvas(7.205, 4.3)
+    ax.text(0.04, 0.91, "用户动作", fontsize=6.2, weight="bold", color=COLORS["muted"])
+    ax.text(0.31, 0.91, "前置条件判断", fontsize=6.2, weight="bold", color=COLORS["muted"])
+    ax.text(0.66, 0.91, "界面反馈与下一步", fontsize=6.2, weight="bold", color=COLORS["muted"])
     rows = [
-        (0.73, "未选择输入", "禁用开始追踪", "提示选择外部文件或配置 GeoEast 数据源", "amber_light", "amber"),
-        (0.54, "数据库信息不完整", "网格/结果列表不执行", "定位缺失字段并提供数据库配置与帮助入口", "amber_light", "amber"),
-        (0.35, "已有输入但尚未计算", "结果图层保持空", "明确显示“尚未生成处理结果”，避免误解", "panel", "line"),
-        (0.16, "执行失败", "保留日志和当前配置", "按输入、执行程序、权限或对象名称给出修复顺序", "red_light", "red"),
+        (0.74, "开始追踪", "输入已选择且可读？", "执行计算 / 引导选择输入", "blue"),
+        (0.56, "刷新数据库对象", "数据库配置与权限完整？", "刷新列表 / 打开配置帮助", "teal"),
+        (0.38, "显示结果层", "已选择可用结果？", "立即重绘 / 说明尚无结果", "blue"),
+        (0.20, "删除结果", "对象明确且二次确认？", "执行删除 / 取消并保持现状", "red"),
     ]
-    ax.text(0.06, 0.92, "用户状态", fontsize=7, weight="bold", color=COLORS["muted"])
-    ax.text(0.35, 0.92, "界面行为", fontsize=7, weight="bold", color=COLORS["muted"])
-    ax.text(0.60, 0.92, "引导信息", fontsize=7, weight="bold", color=COLORS["muted"])
-    for y, state, action, message, fill, edge in rows:
-        box(ax, (0.04, y), (0.22, 0.11), state, fill=fill, edge=edge, weight="bold")
-        box(ax, (0.32, y), (0.22, 0.11), action, fill="paper", edge="line")
-        box(ax, (0.60, y), (0.35, 0.11), message, fill="paper", edge="line", fontsize=6.3)
-        arrow(ax, (0.26, y + 0.055), (0.32, y + 0.055), color="ink")
-        arrow(ax, (0.54, y + 0.055), (0.60, y + 0.055), color="ink")
-    ax.text(0.50, 0.055, "原则：前置条件在动作发生前检查，错误信息同时说明原因、影响与下一步", ha="center", fontsize=7, color=COLORS["ink"])
+    for y, action, condition, result, color in rows:
+        ax.text(0.05, y, action, fontsize=6.6, weight="bold", color=COLORS[color], va="center")
+        arrow(ax, (0.20, y), (0.30, y), color=color, lw=0.8)
+        diamond = np.array([[0.44, y + 0.065], [0.58, y], [0.44, y - 0.065], [0.30, y]])
+        ax.fill(diamond[:,0], diamond[:,1], facecolor=COLORS["paper"], edgecolor=COLORS[color], lw=0.8)
+        ax.text(0.44, y, condition, ha="center", va="center", fontsize=5.5, color=COLORS["ink"])
+        arrow(ax, (0.58, y), (0.65, y), color=color, lw=0.8)
+        ax.add_patch(Rectangle((0.66, y - 0.055), 0.30, 0.11, facecolor=COLORS["panel"],
+                               edgecolor=COLORS["line"], lw=0.55))
+        ax.text(0.81, y, result, ha="center", va="center", fontsize=5.8, color=COLORS["ink"])
+    label_box(ax, (0.50, 0.075), "提示内容包括缺失条件、操作影响和处理方法", color="amber", fontsize=6.3)
     save_all(fig, "F08_前置条件与错误引导状态")
 
 
