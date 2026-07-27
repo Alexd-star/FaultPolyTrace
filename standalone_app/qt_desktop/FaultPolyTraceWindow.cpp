@@ -4426,7 +4426,7 @@ void FaultPolyTraceWindow::updateLayerVisibility() {
         refreshResultPreview();
     }
     if (isGeoEastMode() && process_ && process_->state() == QProcess::NotRunning &&
-        (showGrid || showPolygons) && resultCatalogCombo_ &&
+        showPolygons && resultCatalogCombo_ &&
         !resultCatalogCombo_->currentData().toString().trimmed().isEmpty() &&
         (resultCatalogCombo_->currentData().toString().trimmed() != loadedGeoEastOutput_ ||
          !geoEastGridCombo_ || geoEastGridCombo_->currentText().trimmed() != loadedGeoEastGrid_)) {

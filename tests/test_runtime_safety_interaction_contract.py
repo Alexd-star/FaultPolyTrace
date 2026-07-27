@@ -62,6 +62,7 @@ def test_stop_is_a_cancellation_boundary_and_never_continues_task_chain():
 def test_catalog_and_layer_loading_are_cached_and_do_not_repeat_on_every_click():
     desktop = read("standalone_app/qt_desktop/FaultPolyTraceWindow.cpp")
     launcher = read("geoeast_plugin/qt_launcher/FaultTraceDialog.cpp")
+    controls = read("src/ui/FptControls.cpp")
 
     assert 'property("fptCatalogReady").toBool()' in desktop
     assert 'property("fptCatalogLoading").toBool()' in desktop
@@ -79,6 +80,10 @@ def test_catalog_and_layer_loading_are_cached_and_do_not_repeat_on_every_click()
     assert "const bool tracing = running && !refreshingGrids_" in launcher
     assert "const QString completedOutput" in desktop
     assert "currentTask_ == ProcessTask::ExternalTrace || currentTask_ == ProcessTask::GeoEastTrace" in desktop
+    assert "showPolygons && resultCatalogCombo_" in desktop
+    assert "(showGrid || showPolygons) && resultCatalogCombo_" not in desktop
+    assert "visualKnobPosition" in controls
+    assert "isChecked() ? 1.0 : 0.0" in controls
 
 
 def test_failed_layer_loads_roll_back_visible_toggles_and_catalog_tasks_are_serialized():

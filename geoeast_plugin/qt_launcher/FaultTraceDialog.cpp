@@ -1751,8 +1751,8 @@ void FaultTraceDialog::buildUi() {
         showInputLayerAction_->setChecked(false);
         connect(showInputLayerAction_, &QAction::toggled, this, [this](bool checked) {
             if (showInputLayerCheck_ && showInputLayerCheck_->isChecked() != checked) {
+                QSignalBlocker blocker(showInputLayerCheck_);
                 showInputLayerCheck_->setChecked(checked);
-                return;
             }
             updateLayerVisibility();
         });
@@ -1761,8 +1761,8 @@ void FaultTraceDialog::buildUi() {
         showResultLayerAction_->setChecked(false);
         connect(showResultLayerAction_, &QAction::toggled, this, [this](bool checked) {
             if (showResultLayerCheck_ && showResultLayerCheck_->isChecked() != checked) {
+                QSignalBlocker blocker(showResultLayerCheck_);
                 showResultLayerCheck_->setChecked(checked);
-                return;
             }
             updateLayerVisibility();
         });
@@ -2052,15 +2052,15 @@ void FaultTraceDialog::buildUi() {
         resultLayout->addWidget(displayHint, 6, 0, 1, 2);
         connect(showInputLayerCheck_, &QAbstractButton::toggled, this, [this](bool checked) {
             if (showInputLayerAction_ && showInputLayerAction_->isChecked() != checked) {
+                QSignalBlocker blocker(showInputLayerAction_);
                 showInputLayerAction_->setChecked(checked);
-                return;
             }
             updateLayerVisibility();
         });
         connect(showResultLayerCheck_, &QAbstractButton::toggled, this, [this](bool checked) {
             if (showResultLayerAction_ && showResultLayerAction_->isChecked() != checked) {
+                QSignalBlocker blocker(showResultLayerAction_);
                 showResultLayerAction_->setChecked(checked);
-                return;
             }
             updateLayerVisibility();
         });
@@ -4384,9 +4384,11 @@ void FaultTraceDialog::onProcessFinished(int exitCode, QProcess::ExitStatus stat
             showResultLayerCheck_->setChecked(true);
         }
         if (showInputLayerAction_) {
+            QSignalBlocker blocker(showInputLayerAction_);
             showInputLayerAction_->setChecked(true);
         }
         if (showResultLayerAction_) {
+            QSignalBlocker blocker(showResultLayerAction_);
             showResultLayerAction_->setChecked(true);
         }
         updateLayerVisibility();
@@ -4615,9 +4617,11 @@ void FaultTraceDialog::updateLayerVisibility() {
     }
 
     if (showInputLayerAction_ && showInputLayerAction_->isChecked() != showInput) {
+        QSignalBlocker blocker(showInputLayerAction_);
         showInputLayerAction_->setChecked(showInput);
     }
     if (showResultLayerAction_ && showResultLayerAction_->isChecked() != showResult) {
+        QSignalBlocker blocker(showResultLayerAction_);
         showResultLayerAction_->setChecked(showResult);
     }
     if (renderViewWidget_) {

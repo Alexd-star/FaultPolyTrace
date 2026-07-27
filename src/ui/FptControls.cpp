@@ -23,8 +23,11 @@ LayerToggle::LayerToggle(QWidget* parent) : QAbstractButton(parent) {
     animation_->setDuration(150);
     animation_->setEasingCurve(QEasingCurve::OutCubic);
     connect(this, &QAbstractButton::toggled, this, [this](bool checked) {
+        const bool wasAnimating = animation_->state() == QAbstractAnimation::Running;
         animation_->stop();
-        animation_->setStartValue(knobPosition_);
+        // A programmatic state change may use QSignalBlocker, which also blocks
+        // this internal slot. Start from the visible endpoint in that case.
+        animation_->setStartValue(wasAnimating ? knobPosition_ : (checked ? 0.0 : 1.0));
         animation_->setEndValue(checked ? 1.0 : 0.0);
         if (QApplication::isEffectEnabled(Qt::UI_AnimateCombo)) {
             animation_->start();
@@ -91,7 +94,10 @@ void LayerToggle::paintEvent(QPaintEvent*) {
     painter.drawRoundedRect(switchRect, switchHeight / 2.0, switchHeight / 2.0);
 
     const qreal knobSize = 14.0;
-    const qreal knobX = switchRect.left() + 2.0 + knobPosition_ * (switchWidth - knobSize - 4.0);
+    const qreal visualKnobPosition = animation_ && animation_->state() == QAbstractAnimation::Running
+        ? knobPosition_
+        : (isChecked() ? 1.0 : 0.0);
+    const qreal knobX = switchRect.left() + 2.0 + visualKnobPosition * (switchWidth - knobSize - 4.0);
     painter.setBrush(QColor(QStringLiteral("#FFFFFF")));
     painter.drawEllipse(QRectF(knobX, switchRect.top() + 2.0, knobSize, knobSize));
 
