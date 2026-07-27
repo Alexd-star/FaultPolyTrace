@@ -95,6 +95,7 @@ private:
     void syncPresetIndicator();
     void applyParameterPreset(const QString& presetName);
     void applyTraceParameters(const fpt_ui::TraceParameters& parameters);
+    bool confirmTraceParametersForRun();
     void setPolygonColor(const QColor& color);
     void updateStatusContext();
     void updateOptionControls();
@@ -214,6 +215,13 @@ private:
     bool exportingGridView_ = false;
     bool deletingOutput_ = false;
     bool startupDiscoveryScheduled_ = false;
+    bool cancelRequested_ = false;
+    bool suppressLayerAutoLoad_ = false;
+    bool userInitiatedLayerLoad_ = false;
+    QString loadedGridName_;
+    QString loadedOutputName_;
     QString pendingGridRestore_;
+    QString pendingOutputRestore_;
+    QStringList startupNotices_;
     UiLanguage currentLanguage_ = UiLanguage::SimplifiedChinese;
 };

@@ -239,6 +239,15 @@ QMap<QString, QString> buildEnglishTextMap() {
     add("弱保护半径", "Weak Guard Radius");
     add("启用局部桥防黏连", "Enable Local Bridge Anti-merge");
     add("局部桥防黏连", "Local Bridge Anti-merge");
+    add("根系防黏连（推荐）", "Root Anti-merge (Recommended)");
+    add("局部桥分裂（按需）", "Local Bridge Split (As Needed)");
+    add("弱响应补追（按需）", "Weak Response Recovery (As Needed)");
+    add("展开或收起参数区；此操作不会启用、停用或重新运行算法", "Expand or collapse this parameter section. This does not enable, disable, or rerun the algorithm.");
+    add("主阈值分位数，0.98 表示保留属性值最高约 2% 的像元。0 不是关闭阈值。", "Primary threshold percentile. 0.98 keeps roughly the highest 2% of attribute cells. Zero does not disable thresholding.");
+    add("过滤面积小于该值的碎片。必须大于 0；数值过小会保留大量微小对象。", "Filters fragments smaller than this area. The value must be above zero; very small values retain many tiny objects.");
+    add("依据断层根系归属切断缺少属性支撑的连接，降低邻近断层误合并风险。分裂后的小片仍受最小面积过滤。", "Cuts unsupported connections using fault-root ownership to reduce false merging. Small pieces produced by splitting are still subject to the minimum-area filter.");
+    add("检查局部低属性短桥并尝试分裂。仅适合明确存在局部黏连时使用，可能使小片因面积过滤而减少。", "Checks short low-attribute bridges and attempts a local split. Use only for clear local sticking; small pieces may then be removed by the area filter.");
+    add("在正式主结果之外补充细长弱响应候选。可能增加耗时和碎片，不建议与所有防黏连功能同时开启。", "Adds thin weak-response candidates beyond the primary result. It may increase runtime and fragments and should not normally be enabled with every anti-merge option.");
     add("低值阈值", "Low-value Threshold");
     add("桥半径", "Bridge Radius");
     add("局部主体", "Local Main Cells");
@@ -278,6 +287,49 @@ QMap<QString, QString> buildEnglishTextMap() {
     add("默认输出目录", "Default Output Folder");
     add("等待运行", "Waiting");
     add("任务运行中", "Task Running");
+    add("正在停止…", "Stopping...");
+    add("参数设置无效", "Invalid Parameters");
+    add("参数设置无效，未启动追踪", "Invalid parameters. Tracing was not started.");
+    add("请先修正以下设置，再开始追踪：\n\n- %1", "Correct the following settings before tracing:\n\n- %1");
+    add("确认高负载参数", "Confirm High-load Parameters");
+    add("当前参数可以运行，但存在以下影响：\n\n- %1\n\n建议先使用推荐预设。若这是有目的的对比实验，可继续运行。", "The parameters can run but have the following effects:\n\n- %1\n\nUse a recommended preset first. Continue only for an intentional comparison.");
+    add("返回调整", "Adjust Parameters");
+    add("继续运行", "Continue");
+    add("追踪模式无效，请重新选择预设或恢复默认参数。", "The trace mode is invalid. Select a preset again or restore defaults.");
+    add("阈值模式无效，请重新选择阈值模式。", "The threshold mode is invalid. Select a threshold mode again.");
+    add("分位数模式要求分位数大于 0 且小于 1。分位数 0 不是关闭阈值，而是无效设置。", "Percentile modes require a value greater than 0 and less than 1. Zero does not disable thresholding and is invalid.");
+    add("分位数低于 0.80 会让过多背景像元进入骨架追踪。请提高分位数，或改用固定阈值模式并依据属性范围设置阈值。", "A percentile below 0.80 admits too many background cells into skeleton tracing. Raise the percentile or use Fixed Threshold mode with a value based on the attribute range.");
+    add("固定阈值必须是有限数值。", "The fixed threshold must be a finite number.");
+    add("最小面积必须大于 0。设为 0 会保留全部微小碎片，可能造成结果数量和处理负载急剧增加。", "Minimum area must be greater than zero. Zero retains every tiny fragment and may sharply increase output size and processing load.");
+    add("带宽半径必须至少为 1 个像元。", "Belt radius must be at least one cell.");
+    add("最短分支必须至少为 1 个像元。", "Minimum branch length must be at least one cell.");
+    add("启用弱响应补追时，补追分位数必须大于 0 且小于 1。", "Weak-response recovery requires a recovery percentile greater than 0 and less than 1.");
+    add("当前分位数低于 0.90，活动像元和骨架分支可能显著增加。建议优先使用推荐预设，仅在明确了解数据分布时继续。", "The percentile is below 0.90, which may greatly increase active cells and skeleton branches. Prefer a recommended preset and continue only when the data distribution is understood.");
+    add("固定阈值小于或等于 0，可能把大面积背景纳入追踪。请确认该阈值符合输入属性的数值范围。", "A fixed threshold at or below zero may include large background areas. Confirm that it matches the input attribute range.");
+    add("弱响应分位不低于主分位数，补充层不会提供更弱的连续性信息，结果可能比预期更少。", "The weak-response percentile is not below the primary percentile, so it adds no weaker continuity information and may produce fewer results than expected.");
+    add("补追分位数不低于主分位数，二次追踪通常无法补充弱响应断层。", "The recovery percentile is not below the primary percentile, so secondary tracing will usually add no weak-response faults.");
+    add("补追上限为 0 表示不限制连通块大小，复杂网格上可能明显增加处理时间。", "A recovery limit of zero leaves component size unlimited and may substantially increase runtime on complex grids.");
+    add("局部桥分裂与弱响应补追同时启用时，会先增加弱响应候选再执行局部分裂，处理时间和结果敏感性都会提高。", "Using local bridge splitting with weak-response recovery adds weak candidates before local splitting, increasing runtime and result sensitivity.");
+    add("三个按需增强功能已同时启用。它们不是叠加后必然更优的质量开关，建议仅用于受控对比并逐项核验结果。", "All three optional enhancements are enabled. They are not cumulative quality switches and should be used only for controlled comparisons with item-by-item review.");
+    add("当前使用受控实验模式，运行时间和输出对象可能与正式处理模式不同。", "Controlled Experiment mode is active. Runtime and output objects may differ from Production mode.");
+    add("请等待当前任务完成或先点击【停止】，再加载其它图层。", "Wait for the current task to finish or click [Stop] before loading another layer.");
+    add("任务运行中，暂不能加载其它图层", "A task is running. Other layers cannot be loaded yet.");
+    add("请先选择输入文件", "Select an Input File First");
+    add("显示原始网格前，请先在数据源区域选择可读取的断层属性文件。", "Select a readable fault attribute file in Data Source before displaying the input grid.");
+    add("没有可显示的结果", "No Result to Display");
+    add("请先运行追踪，或点击【刷新结果列表】并选择一个已有结果。", "Run tracing first, or click [Refresh Result List] and select an existing result.");
+    add("网格列表尚未读取", "Grid List Not Loaded");
+    add("当前项目没有可用网格；需要重新查询时请点击【刷新网格列表】", "No grid is available in the current project. Click [Refresh Grid List] to query again.");
+    add("当前项目没有已有结果；需要重新查询时请点击【刷新结果列表】", "No existing result is available in the current project. Click [Refresh Result List] to query again.");
+    add("正在读取当前项目的输入网格。读取完成后，请选择网格并再次打开原始网格图层。", "The input grid list is being loaded. Select a grid and turn on the input grid layer after loading finishes.");
+    add("尚未生成本地视图文件", "Local View Files Not Available");
+    add("请先运行追踪，或在结果列表中选择对象后点击【显示所选结果】。", "Run tracing first, or select an object in the result list and click [Display Selected Result].");
+    add("原始网格载入失败", "Input Grid Load Failed");
+    add("未能从 GeoEast 导出或解析所选网格。请检查当前项目、网格选择、数据库连接和日志。", "The selected grid could not be exported from GeoEast or parsed. Check the current project, grid selection, database connection, and log.");
+    add("结果载入失败", "Result Load Failed");
+    add("未能导出或解析所选结果。请确认输入网格与结果属于当前项目，并检查数据库连接和日志。", "The selected result could not be exported or parsed. Confirm that the grid and result belong to the current project, then check the database connection and log.");
+    add("图层载入失败", "Layer Load Failed");
+    add("执行程序未能完成图层载入。请检查执行程序路径、数据库连接、当前项目和运行日志。", "The executable could not complete layer loading. Check its path, the database connection, the current project, and the run log.");
     add("数据库未配置", "Database Not Configured");
     add("正在操作项目: %1", "Project: %1");
     add("当前网格: %1", "Current Grid: %1");
@@ -902,6 +954,20 @@ QMap<QString, QString> buildEnglishTextMap() {
     add("项目: %1", "Project: %1");
     add("网格: %1", "Grid: %1");
     add("数据库: %1", "Database: %1");
+    add("请稍候；完成后视图区会自动更新，无需重复点击。",
+        "Please wait. The view updates automatically when loading finishes; no repeated click is needed.");
+    add("数据源已切换，请选择当前数据源中的输入网格",
+        "The data source changed. Select an input grid from the current source.");
+    add("检测到旧版分位数设置 %1，已调整到当前安全范围 %2～%3。",
+        "Legacy percentile setting %1 was adjusted to the current safe range %2-%3.");
+    add("检测到旧版最小面积设置 %1，已调整为 %2，避免保留全部微小碎片。",
+        "Legacy minimum-area setting %1 was adjusted to %2 to avoid retaining every tiny fragment.");
+    add("根系防黏连、局部桥分裂和弱响应补追不能同时启用。三者处理目标不同，叠加会显著放大计算量和结果敏感性；请保留推荐的根系防黏连，并只选择一项按需功能进行对比。",
+        "Root anti-merge, local bridge splitting, and weak-response retracing cannot be enabled together. Their goals differ, and stacking them greatly increases computation and result sensitivity. Keep the recommended root anti-merge and compare only one optional function at a time.");
+    add("局部桥分裂会把低属性短桥两侧重新分组，分裂后的小对象仍受最小面积过滤，因此结果数量可能减少。仅在确认存在局部黏连时使用。",
+        "Local bridge splitting regroups objects around low-attribute short bridges. Small split objects still pass through the minimum-area filter, so the result count may decrease. Use it only for confirmed local merging.");
+    add("弱响应补追会额外检查主结果之外的细长弱响应，可能增加候选数量和处理时间。仅在主结果确有弱响应漏失时使用。",
+        "Weak-response retracing examines slender weak responses outside the main result and may increase candidate count and processing time. Use it only when the main result misses weak responses.");
 
     return map;
 }

@@ -1,0 +1,122 @@
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def read(path: str) -> str:
+    return (ROOT / path).read_text(encoding="utf-8")
+
+
+def test_shared_parameter_safety_rejects_zero_and_warns_about_conflicting_enhancements():
+    model = read("src/ui/TraceParameterModel.cpp")
+
+    assert "TraceParameterValidation validateTraceParameters" in model
+    assert "分位数 0 不是关闭阈值" in model
+    assert "最小面积必须大于 0" in model
+    assert "p.percentile < 0.80" in model
+    assert "p.rootAntiMerge && p.localAntiMerge && p.residualTrace" in model
+    assert "根系防黏连、局部桥分裂和弱响应补追不能同时启用" in model
+    assert "局部桥分裂会把低属性短桥两侧重新分组" in model
+    assert "弱响应补追会额外检查主结果之外" in model
+
+
+def test_all_trace_entry_points_apply_parameter_safety_before_starting():
+    desktop = read("standalone_app/qt_desktop/FaultPolyTraceWindow.cpp")
+    launcher = read("geoeast_plugin/qt_launcher/FaultTraceDialog.cpp")
+    core = read("src/core/FaultTracer.cpp")
+
+    for source in (desktop, launcher):
+        assert "confirmTraceParametersForRun()" in source
+        assert "fpt_ui::validateTraceParameters" in source
+        assert "确认高负载参数" in source
+    assert "kNoAreaFilterMaxGridCells" in core
+    assert '"minArea=0 is disabled for large grids' in core
+    assert "kCombinedOptionalEnhancementsMaxGridCells" in core
+    assert '"rootAntiMerge, localAntiMerge, and residualTrace cannot all be enabled' in core
+
+
+def test_advanced_sections_use_disclosure_arrows_not_algorithm_checkboxes():
+    desktop = read("standalone_app/qt_desktop/FaultPolyTraceWindow.cpp")
+    launcher = read("geoeast_plugin/qt_launcher/FaultTraceDialog.cpp")
+
+    for source in (desktop, launcher):
+        assert 'setObjectName("advancedSectionToggle")' in source
+        assert "setArrowType(expanded ? Qt::DownArrow : Qt::RightArrow)" in source
+        assert "此操作不会启用、停用或重新运行算法" in source
+        assert "box->setCheckable(true)" not in source
+
+
+def test_stop_is_a_cancellation_boundary_and_never_continues_task_chain():
+    desktop = read("standalone_app/qt_desktop/FaultPolyTraceWindow.cpp")
+    launcher = read("geoeast_plugin/qt_launcher/FaultTraceDialog.cpp")
+
+    for source in (desktop, launcher):
+        assert "cancelRequested_ = true" in source
+        assert "process_->kill()" in source
+        assert "if (cancelRequested_)" in source
+        assert "未执行后续刷新、导出或结果载入" in source
+        assert "process_->terminate()" not in source
+
+
+def test_catalog_and_layer_loading_are_cached_and_do_not_repeat_on_every_click():
+    desktop = read("standalone_app/qt_desktop/FaultPolyTraceWindow.cpp")
+    launcher = read("geoeast_plugin/qt_launcher/FaultTraceDialog.cpp")
+
+    assert 'property("fptCatalogReady").toBool()' in desktop
+    assert 'property("fptCatalogLoading").toBool()' in desktop
+    assert "loadedGeoEastGrid_" in desktop
+    assert "loadedGeoEastOutput_" in desktop
+    assert "pendingGeoEastResultRestore_" in desktop
+
+    assert 'property("fptCatalogReady").toBool()' in launcher
+    assert 'property("fptCatalogLoading").toBool()' in launcher
+    assert "loadedGridName_" in launcher
+    assert "loadedOutputName_" in launcher
+    assert "pendingOutputRestore_" in launcher
+    assert "suppressLayerAutoLoad_" in launcher
+    assert "const QString completedOutput" in launcher
+    assert "const bool tracing = running && !refreshingGrids_" in launcher
+    assert "const QString completedOutput" in desktop
+    assert "currentTask_ == ProcessTask::ExternalTrace || currentTask_ == ProcessTask::GeoEastTrace" in desktop
+
+
+def test_failed_layer_loads_roll_back_visible_toggles_and_catalog_tasks_are_serialized():
+    desktop = read("standalone_app/qt_desktop/FaultPolyTraceWindow.cpp")
+    launcher = read("geoeast_plugin/qt_launcher/FaultTraceDialog.cpp")
+
+    assert "disableGridLayer" in desktop
+    assert "disablePolygonLayer" in desktop
+    assert "QSignalBlocker gridSignals(geoEastGridCombo_)" in desktop
+    assert "layerLoadScheduled" in desktop
+
+    assert "disableInputLayer" in launcher
+    assert "disableResultLayer" in launcher
+    assert "drawActivityState" in launcher
+    assert "if (refreshOutputsAfterGrids_)" in launcher
+    assert "else if (!names.isEmpty() && (!showInputLayerCheck_" in launcher
+    assert "layerLoadScheduled" in launcher
+
+
+def test_legacy_dangerous_settings_are_migrated_and_reported():
+    desktop = read("standalone_app/qt_desktop/FaultPolyTraceWindow.cpp")
+    launcher = read("geoeast_plugin/qt_launcher/FaultTraceDialog.cpp")
+
+    for source in (desktop, launcher):
+        assert "startupNotices_" in source
+        assert "检测到旧版分位数设置" in source
+        assert "检测到旧版最小面积设置" in source
+        assert 'settings.setValue("configSchemaVersion", 5)' in source
+
+
+def test_layer_actions_have_user_facing_precondition_guidance():
+    desktop = read("standalone_app/qt_desktop/FaultPolyTraceWindow.cpp")
+    launcher = read("geoeast_plugin/qt_launcher/FaultTraceDialog.cpp")
+
+    for source in (desktop, launcher):
+        assert "没有可显示的结果" in source
+        assert "任务正在运行" in source
+        assert "请等待当前任务完成或先点击【停止】" in source
+    assert "显示原始网格前，请先在数据源区域选择" in desktop
+    assert "网格列表尚未读取" in launcher
+    assert "尚未生成本地视图文件" in launcher

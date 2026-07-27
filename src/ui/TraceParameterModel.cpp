@@ -167,6 +167,76 @@ QStringList traceArguments(const TraceParameters& p) {
     return args;
 }
 
+TraceParameterValidation validateTraceParameters(const TraceParameters& p) {
+    TraceParameterValidation result;
+    const auto finite = [](double value) { return std::isfinite(value); };
+    const bool percentileMode = p.thresholdMode == "percentile" ||
+        p.thresholdMode == "positive-percentile";
+
+    if (p.traceMode != "ridge-belt" && p.traceMode != "region") {
+        result.errors << QString::fromUtf8("追踪模式无效，请重新选择预设或恢复默认参数。");
+    }
+    if (p.thresholdMode != "percentile" &&
+        p.thresholdMode != "positive-percentile" &&
+        p.thresholdMode != "fixed") {
+        result.errors << QString::fromUtf8("阈值模式无效，请重新选择阈值模式。");
+    }
+    if (percentileMode && (!finite(p.percentile) || p.percentile <= 0.0 || p.percentile >= 1.0)) {
+        result.errors << QString::fromUtf8("分位数模式要求分位数大于 0 且小于 1。分位数 0 不是关闭阈值，而是无效设置。");
+    } else if (percentileMode && p.percentile < 0.80) {
+        result.errors << QString::fromUtf8("分位数低于 0.80 会让过多背景像元进入骨架追踪。请提高分位数，或改用固定阈值模式并依据属性范围设置阈值。");
+    }
+    if (!finite(p.threshold)) {
+        result.errors << QString::fromUtf8("固定阈值必须是有限数值。");
+    }
+    if (!finite(p.minArea) || p.minArea <= 0.0) {
+        result.errors << QString::fromUtf8("最小面积必须大于 0。设为 0 会保留全部微小碎片，可能造成结果数量和处理负载急剧增加。");
+    }
+    if (p.beltRadius < 1) {
+        result.errors << QString::fromUtf8("带宽半径必须至少为 1 个像元。");
+    }
+    if (p.minBranchLength < 1) {
+        result.errors << QString::fromUtf8("最短分支必须至少为 1 个像元。");
+    }
+    if (p.residualTrace &&
+        (!finite(p.residualPercentile) || p.residualPercentile <= 0.0 || p.residualPercentile >= 1.0)) {
+        result.errors << QString::fromUtf8("启用弱响应补追时，补追分位数必须大于 0 且小于 1。");
+    }
+    if (p.rootAntiMerge && p.localAntiMerge && p.residualTrace) {
+        result.errors << QString::fromUtf8("根系防黏连、局部桥分裂和弱响应补追不能同时启用。三者处理目标不同，叠加会显著放大计算量和结果敏感性；请保留推荐的根系防黏连，并只选择一项按需功能进行对比。");
+    }
+
+    if (percentileMode && p.percentile > 0.0 && p.percentile < 0.90) {
+        result.warnings << QString::fromUtf8("当前分位数低于 0.90，活动像元和骨架分支可能显著增加。建议优先使用推荐预设，仅在明确了解数据分布时继续。");
+    }
+    if (p.thresholdMode == "fixed" && p.threshold <= 0.0) {
+        result.warnings << QString::fromUtf8("固定阈值小于或等于 0，可能把大面积背景纳入追踪。请确认该阈值符合输入属性的数值范围。");
+    }
+    if (percentileMode && p.weakPercentile > 0.0 && p.weakPercentile >= p.percentile) {
+        result.warnings << QString::fromUtf8("弱响应分位不低于主分位数，补充层不会提供更弱的连续性信息，结果可能比预期更少。");
+    }
+    if (p.residualTrace && percentileMode &&
+        p.residualPercentile > 0.0 && p.residualPercentile >= p.percentile) {
+        result.warnings << QString::fromUtf8("补追分位数不低于主分位数，二次追踪通常无法补充弱响应断层。");
+    }
+    if (p.residualTrace && p.residualTraceMaxCells == 0) {
+        result.warnings << QString::fromUtf8("补追上限为 0 表示不限制连通块大小，复杂网格上可能明显增加处理时间。");
+    }
+    if (p.localAntiMerge) {
+        result.warnings << QString::fromUtf8("局部桥分裂会把低属性短桥两侧重新分组，分裂后的小对象仍受最小面积过滤，因此结果数量可能减少。仅在确认存在局部黏连时使用。");
+    }
+    if (p.residualTrace) {
+        result.warnings << QString::fromUtf8("弱响应补追会额外检查主结果之外的细长弱响应，可能增加候选数量和处理时间。仅在主结果确有弱响应漏失时使用。");
+    }
+    if (p.localAntiMerge && p.residualTrace) {
+        result.warnings << QString::fromUtf8("局部桥分裂与弱响应补追同时启用时，会先增加弱响应候选再执行局部分裂，处理时间和结果敏感性都会提高。");
+    }
+    if (p.qualityMode == QualityMode::Experimental) {
+        result.warnings << QString::fromUtf8("当前使用受控实验模式，运行时间和输出对象可能与正式处理模式不同。");
+    }
+    return result;
+}
+
 QString qualityModeKey(QualityMode mode) {
     switch (mode) {
     case QualityMode::Diagnostics: return "diagnostics";
@@ -374,6 +444,10 @@ bool traceParametersFromJson(const QJsonObject& object,
     }
     if (presetKey) {
         *presetKey = object.value("preset").toString().trimmed();
+    }
+    const TraceParameterValidation validation = validateTraceParameters(parsed);
+    if (!validation.isValid()) {
+        return fail(validation.errors.join(QString::fromUtf8("\n")));
     }
     *parameters = parsed;
     if (errorMessage) {

@@ -84,6 +84,7 @@ private:
         GeoEastTrace,
         RefreshGeoEastGrids,
         RefreshGeoEastResults,
+        ExportGeoEastGrid,
         ExportGeoEastResult,
         DeleteGeoEastResult
     };
@@ -105,6 +106,7 @@ private:
     void syncPresetIndicator();
     void applyPreset(const QString& preset);
     void applyTraceParameters(const fpt_ui::TraceParameters& parameters);
+    bool confirmTraceParametersForRun();
     void refreshHistory();
     void appendHistory(qint64 elapsedMs);
     void updateResultPanel();
@@ -142,8 +144,14 @@ private:
     QString processOutput_;
     QString lastOutputCsv_;
     QString lastGeoEastOutput_;
+    QString loadedGeoEastGrid_;
+    QString loadedGeoEastOutput_;
     QString pendingGeoEastGridRestore_;
+    QString pendingGeoEastResultRestore_;
     bool refreshResultsAfterGrids_ = false;
+    bool cancelRequested_ = false;
+    bool userInitiatedLayerLoad_ = false;
+    QStringList startupNotices_;
 
     QComboBox* sourceModeCombo_ = nullptr;
     QStackedWidget* sourceStack_ = nullptr;

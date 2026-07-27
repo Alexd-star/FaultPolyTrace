@@ -30,6 +30,13 @@ QString appStyle() {
         QToolButton:pressed { background: #B3DCFF; border-color: #7FBFF2; }
         QToolButton:checked { background: #CCE8FF; border-color: #6AA9D8; }
         QToolButton:disabled { color: #999999; }
+        QToolButton#advancedSectionToggle {
+            background: #F0F0F0; border: 1px solid #B5B5B5; border-radius: 3px;
+            min-height: 24px; padding: 2px 7px; color: #005A9E; font-weight: bold;
+            text-align: left;
+        }
+        QToolButton#advancedSectionToggle:hover { background: #E5F1FB; border-color: #7FAFD1; }
+        QToolButton#advancedSectionToggle:checked { background: #F0F0F0; border-color: #B5B5B5; }
 
         /* ---- 分区与侧栏 ---- */
         QGroupBox {

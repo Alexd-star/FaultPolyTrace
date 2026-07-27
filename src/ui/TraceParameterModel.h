@@ -62,9 +62,18 @@ struct TraceParameters {
     QualityMode qualityMode = QualityMode::Production;
 };
 
+struct TraceParameterValidation {
+    QStringList errors;
+    QStringList warnings;
+
+    bool isValid() const { return errors.isEmpty(); }
+    bool requiresConfirmation() const { return !warnings.isEmpty(); }
+};
+
 QStringList presetKeys();
 TraceParameters presetParameters(const QString& canonicalPresetName);
 QStringList traceArguments(const TraceParameters& parameters);
+TraceParameterValidation validateTraceParameters(const TraceParameters& parameters);
 QString qualityModeKey(QualityMode mode);
 QualityMode qualityModeFromKey(const QString& key);
 QJsonObject traceParametersToJson(const TraceParameters& parameters,

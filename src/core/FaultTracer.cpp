@@ -2556,6 +2556,17 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
     if (grid.empty()) {
         throw std::runtime_error("Cannot trace an empty grid.");
     }
+    if ((options.thresholdMode == ThresholdMode::Percentile ||
+         options.thresholdMode == ThresholdMode::PositivePercentile) &&
+        (!std::isfinite(options.percentile) || options.percentile <= 0.0 || options.percentile >= 1.0)) {
+        throw std::runtime_error("percentile must be greater than 0 and less than 1 in percentile modes.");
+    }
+    if (!std::isfinite(options.threshold)) {
+        throw std::runtime_error("threshold must be finite.");
+    }
+    if (!std::isfinite(options.minArea) || options.minArea < 0.0) {
+        throw std::runtime_error("minArea must be finite and non-negative.");
+    }
     if (options.minCells < 1) {
         throw std::runtime_error("minCells must be at least 1.");
     }
@@ -2691,6 +2702,18 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
 
     const int nx = grid.nx();
     const int ny = grid.ny();
+    constexpr std::size_t kNoAreaFilterMaxGridCells = 250000;
+    const std::size_t gridCellCount = static_cast<std::size_t>(nx) * static_cast<std::size_t>(ny);
+    if (options.minArea == 0.0 && gridCellCount > kNoAreaFilterMaxGridCells) {
+        throw std::runtime_error(
+            "minArea=0 is disabled for large grids because retaining every fragment can exhaust processing and display resources. Use a small positive minimum area.");
+    }
+    constexpr std::size_t kCombinedOptionalEnhancementsMaxGridCells = 250000;
+    if (gridCellCount > kCombinedOptionalEnhancementsMaxGridCells &&
+        options.rootAntiMerge && options.localAntiMerge && options.residualTrace) {
+        throw std::runtime_error(
+            "rootAntiMerge, localAntiMerge, and residualTrace cannot all be enabled on a large grid. Run the recommended root anti-merge baseline first, then evaluate one optional enhancement at a time.");
+    }
 
     SegmentationOptions segmentationOptions;
     segmentationOptions.thresholdMode = options.thresholdMode;
