@@ -34,8 +34,15 @@ def test_release_manifest_is_evidence_driven_and_records_build_identity():
     assert "packageContentSha256" in script
     assert "Get-AggregateSha256" in script
     assert "GenerateBuildManifest.ps1" in script
-    assert "GeoEast 现场数据库往返：待人工确认" in script
-    assert 'Get-ChildItem -LiteralPath $docsDir -Recurse -File -Include "*.lic", "*.key", "*.pem"' in script
+    assert "GeoEast 现场数据库往返：已在有效工区完成" in script
+    assert "$productDocuments = @(" in script
+    for document in (
+        "用户操作手册.md",
+        "企业级用户操作手册与产品说明书.md",
+        "项目目录结构与文件说明.md",
+    ):
+        assert document in script
+    assert 'Copy-FileRequired (Join-Path $repoRoot "docs\\$documentName")' in script
 
 
 def test_one_click_acceptance_defaults_to_current_release_candidate():

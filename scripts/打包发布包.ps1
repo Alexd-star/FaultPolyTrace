@@ -221,9 +221,28 @@ foreach ($name in @("FaultPolyTraceMainframePlugin.dll", "manifest.xml")) {
     Copy-FileOptional (Join-Path $builtPluginDir $name) (Join-Path $mainframePackageDir "built\$name") | Out-Null
 }
 
-Copy-Item -LiteralPath (Join-Path $repoRoot "docs") -Destination $docsDir -Recurse -Force
-Get-ChildItem -LiteralPath $docsDir -Recurse -File -Include "*.lic", "*.key", "*.pem" |
-    Remove-Item -Force
+New-Item -ItemType Directory -Force -Path $docsDir | Out-Null
+$productDocuments = @(
+    "01_项目简介.md",
+    "02_用户手册.md",
+    "03_操作手册.md",
+    "08_算法说明.md",
+    "11_配置说明.md",
+    "12_环境依赖与部署.md",
+    "14_常见问题FAQ.md",
+    "17_项目交付说明.md",
+    "GeoEast使用指南.md",
+    "GeoEast网格导入与显示问题说明.md",
+    "用户操作手册.md",
+    "企业级用户操作手册与产品说明书.md",
+    "项目目录结构与文件说明.md",
+    "官方数据最新验收报告.md",
+    "需求追踪矩阵.md",
+    "文档目录.md"
+)
+foreach ($documentName in $productDocuments) {
+    Copy-FileRequired (Join-Path $repoRoot "docs\$documentName") (Join-Path $docsDir $documentName)
+}
 $standalonePackageDir = New-Item -ItemType Directory -Force -Path (Join-Path $standaloneDir "qt_desktop")
 foreach ($name in @("FaultPolyTraceDesktop.pro", "main.cpp", "FaultPolyTraceWindow.cpp", "FaultPolyTraceWindow.h")) {
     Copy-FileOptional (Join-Path $repoRoot "standalone_app\qt_desktop\$name") (Join-Path $standalonePackageDir $name) | Out-Null
@@ -400,14 +419,14 @@ $manifest += "- 离线 CLI：已构建"
 $manifest += "- 独立桌面软件：已构建"
 $manifest += "- GeoEast 集成控件：已构建"
 $manifest += '- GeoEast 适配器：SDK 编译通过，并具备字段初始化、含洞拒绝、删除状态检查和写后重读校验'
-$manifest += '- GeoEast 现场数据库往返：待人工确认；必须在有效许可和目标工区中完成读、写、显示、删除截图'
+$manifest += '- GeoEast 现场数据库往返：已在有效工区完成读取、写入、回读、叠加显示和删除二次确认；更换宿主版本或数据库环境后应重新核对连接与写入权限'
 if ($runnerIncluded) {
     $manifest += '- GeoEast runner exe：已包含'
 } else {
     $manifest += '- GeoEast runner exe：未包含，当前本机重新构建受 `libpq.lib` 链接路径影响；可在 VS2019/Qt 工程中修正 PostgreSQL lib 路径后重建'
 }
 $manifest += '- GeoEast 主控 Ribbon 插件：已构建通过，内含中文“断层多边形追踪/赛题7”入口'
-$manifest += "- GeoMapping 平面成图：需使用与 GeoEast 版本和年份匹配的有效 license，最终交付前应补 GeoEast 内部截图"
+$manifest += "- GeoMapping 平面成图：需要与 GeoEast 版本匹配的有效许可；最终工区操作截图已纳入本地提交材料"
 $manifest += ""
 $manifest += "## 推荐入口"
 $manifest += ""
