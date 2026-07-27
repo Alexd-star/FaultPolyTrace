@@ -120,3 +120,20 @@ def test_layer_actions_have_user_facing_precondition_guidance():
     assert "显示原始网格前，请先在数据源区域选择" in desktop
     assert "网格列表尚未读取" in launcher
     assert "尚未生成本地视图文件" in launcher
+
+
+def test_desktop_startup_is_fast_non_modal_centered_and_single_instance():
+    main = read("standalone_app/qt_desktop/main.cpp")
+    desktop = read("standalone_app/qt_desktop/FaultPolyTraceWindow.cpp")
+    localization = read("src/ui/UiLocalization.cpp")
+
+    assert "std::make_unique<QSplashScreen>" in main
+    assert 'qgetenv("FPT_DISABLE_SPLASH")' in main
+    assert "QLockFile guiLock" in main
+    assert "splash->finish(&window)" in main
+    assert main.index("centerSplash(splash.get())") < main.index("splash->show()")
+    assert "Sleep(" not in main
+    assert "msleep(" not in main
+    assert "QTimer::singleShot(0, this, [this]()" in desktop
+    assert "chineseTextByEnglish" in localization
+    assert "if (map.contains(text))" in localization

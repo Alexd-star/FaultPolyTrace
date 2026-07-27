@@ -6,6 +6,7 @@
 #include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QGroupBox>
+#include <QHash>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMap>
@@ -977,6 +978,22 @@ const QMap<QString, QString>& englishTextMap() {
     return map;
 }
 
+const QHash<QString, QString>& chineseTextByEnglish() {
+    static const QHash<QString, QString> reverse = []() {
+        QHash<QString, QString> result;
+        const QMap<QString, QString>& source = englishTextMap();
+        result.reserve(source.size());
+        for (auto it = source.constBegin(); it != source.constEnd(); ++it) {
+            // Keep the same first-match behavior as the former ordered linear scan.
+            if (!result.contains(it.value())) {
+                result.insert(it.value(), it.key());
+            }
+        }
+        return result;
+    }();
+    return reverse;
+}
+
 QString translateTemplate(const QString& text, bool reverse) {
     const QMap<QString, QString>& map = englishTextMap();
     const QRegularExpression placeholderExpression(QStringLiteral("%([1-9])"));
@@ -1058,10 +1075,14 @@ QString translate(const QString& zh, const QString& languageCode) {
 
 QString canonical(const QString& text) {
     const QMap<QString, QString>& map = englishTextMap();
-    for (auto it = map.constBegin(); it != map.constEnd(); ++it) {
-        if (it.value() == text) {
-            return it.key();
-        }
+    // Most UI strings are created in Chinese. Avoid scanning every English value
+    // for the overwhelmingly common case, then use a cached reverse index.
+    if (map.contains(text)) {
+        return text;
+    }
+    const auto reverseIt = chineseTextByEnglish().constFind(text);
+    if (reverseIt != chineseTextByEnglish().constEnd()) {
+        return reverseIt.value();
     }
     return translateTemplate(text, true);
 }

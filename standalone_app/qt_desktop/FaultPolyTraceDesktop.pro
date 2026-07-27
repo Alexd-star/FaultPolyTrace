@@ -9,6 +9,7 @@ INCLUDEPATH += ../../src/ui
 win32 {
     DEFINES += NOMINMAX
     DEFINES += _HAS_STD_BYTE=0
+    LIBS += user32.lib
     RC_ICONS = ../../assets/icons/faultpolytrace.ico
 }
 

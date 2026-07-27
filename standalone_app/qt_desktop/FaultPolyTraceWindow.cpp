@@ -21,6 +21,7 @@
 #include <QDialog>
 #include <QDir>
 #include <QDoubleSpinBox>
+#include <QElapsedTimer>
 #include <QEventLoop>
 #include <QFile>
 #include <QFileDialog>
@@ -78,6 +79,19 @@
 #include <limits>
 
 namespace {
+
+void appendStartupTrace(const QString& stage, qint64 elapsedMs) {
+    const QString tracePath = QString::fromLocal8Bit(qgetenv("FPT_STARTUP_TRACE")).trimmed();
+    if (tracePath.isEmpty()) {
+        return;
+    }
+    QFile file(tracePath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) {
+        return;
+    }
+    QTextStream stream(&file);
+    stream << stage << '\t' << elapsedMs << " ms\n";
+}
 
 class GuidedCatalogComboBox : public QComboBox {
 public:
@@ -1175,14 +1189,15 @@ private:
 
 FaultPolyTraceWindow::FaultPolyTraceWindow(QWidget* parent)
     : QMainWindow(parent), process_(new QProcess(this)) {
+    QElapsedTimer startupTimer;
+    startupTimer.start();
     buildUi();
+    appendStartupTrace(QStringLiteral("buildUi"), startupTimer.restart());
     loadSettings();
-    refreshHistory();
-    if (!isGeoEastMode()) {
-        refreshAvailableResults();
-    }
+    appendStartupTrace(QStringLiteral("loadSettings"), startupTimer.restart());
     updateTaskPreview();
     updateResultPanel();
+    appendStartupTrace(QStringLiteral("finalize"), startupTimer.restart());
     appendLog(QString::fromUtf8("[系统就绪] 等待参数输入及任务执行。"));
     for (const QString& notice : startupNotices_) {
         appendLog(notice);
@@ -1191,9 +1206,20 @@ FaultPolyTraceWindow::FaultPolyTraceWindow(QWidget* parent)
     connect(process_, &QProcess::readyReadStandardError, this, &FaultPolyTraceWindow::onReadyRead);
     connect(process_, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this, &FaultPolyTraceWindow::onFinished);
     connect(process_, &QProcess::errorOccurred, this, &FaultPolyTraceWindow::onProcessError);
+    QTimer::singleShot(0, this, [this]() {
+        refreshHistory();
+        if (!isGeoEastMode() && resultCatalogCombo_ &&
+            !resultCatalogCombo_->property("fptCatalogReady").toBool() &&
+            !resultCatalogCombo_->property("fptCatalogLoading").toBool()) {
+            refreshAvailableResults();
+        }
+        updateResultPanel();
+    });
 }
 
 void FaultPolyTraceWindow::buildUi() {
+    QElapsedTimer buildTimer;
+    buildTimer.start();
     setWindowTitle(QString::fromUtf8("FaultPolyTrace 断层多边形自动追踪"));
     setMinimumSize(1100, 700);
     resize(1280, 780);
@@ -1401,6 +1427,7 @@ void FaultPolyTraceWindow::buildUi() {
     toolbar->addAction(refreshResultsAction_);
     toolbar->addSeparator();
     toolbar->addAction(helpAction);
+    appendStartupTrace(QStringLiteral("buildUi.actionsAndToolbar"), buildTimer.restart());
 
     QWidget* root = new QWidget(this);
     QHBoxLayout* rootLayout = new QHBoxLayout(root);
@@ -1572,6 +1599,7 @@ void FaultPolyTraceWindow::buildUi() {
     viewModeCombo_->setMinimumWidth(0);
     viewModeCombo_->addItems({QString::fromUtf8("任务预览"), QString::fromUtf8("叠加结果"), QString::fromUtf8("原始网格"), QString::fromUtf8("结果多边形")});
     addRow(dataLayout, 5, QString::fromUtf8("视图内容"), viewModeCombo_, dataBox);
+    appendStartupTrace(QStringLiteral("buildUi.dataSource"), buildTimer.restart());
 
     QGroupBox* styleBox = new QGroupBox(QString::fromUtf8("显示样式"), sidebarContent);
     QGridLayout* styleLayout = new QGridLayout(styleBox);
@@ -1956,6 +1984,7 @@ void FaultPolyTraceWindow::buildUi() {
     QPushButton* loadHistoryButton = new QPushButton(QString::fromUtf8("载入历史"), historyBox);
     connect(loadHistoryButton, &QPushButton::clicked, this, &FaultPolyTraceWindow::loadHistory);
     historyLayout->addWidget(loadHistoryButton, 1, 0, 1, 2);
+    appendStartupTrace(QStringLiteral("buildUi.controls"), buildTimer.restart());
 
     // 侧栏分区顺序与 GeoEast 插件保持一致：数据与显示样式常驻首屏，
     // 其后是追踪参数与默认折叠的高级参数，最后是结果查看与历史记录。
@@ -2017,6 +2046,7 @@ void FaultPolyTraceWindow::buildUi() {
     actionLayout->addWidget(runButton_, 2);
     actionLayout->addWidget(stopButton_, 1);
     leftLayout->addLayout(actionLayout);
+    appendStartupTrace(QStringLiteral("buildUi.sidebar"), buildTimer.restart());
 
     QWidget* right = new QWidget(root);
     QVBoxLayout* rightLayout = new QVBoxLayout(right);
@@ -2114,6 +2144,7 @@ void FaultPolyTraceWindow::buildUi() {
     busyBar_->hide();
     statusBar()->addPermanentWidget(busyBar_);
     statusBar()->addPermanentWidget(elapsedLabel_);
+    appendStartupTrace(QStringLiteral("buildUi.centralView"), buildTimer.restart());
 
     connect(inputEdit_, &QLineEdit::editingFinished, this, [this]() {
         if (showGridLayerCheck_ && showGridLayerCheck_->isChecked()) {
@@ -2316,9 +2347,11 @@ void FaultPolyTraceWindow::buildUi() {
         combo->installEventFilter(noWheelFilter);
         combo->setFocusPolicy(Qt::StrongFocus);
     }
+    appendStartupTrace(QStringLiteral("buildUi.connections"), buildTimer.restart());
     prepareLanguageMetadata();
-    retranslateUi();
+    appendStartupTrace(QStringLiteral("buildUi.languageMetadata"), buildTimer.restart());
     updateOptionControls();
+    appendStartupTrace(QStringLiteral("buildUi.finalize"), buildTimer.restart());
 }
 
 QString FaultPolyTraceWindow::coreRunnerPath() const {
@@ -2711,9 +2744,6 @@ void FaultPolyTraceWindow::retranslateUi() {
     }
     updateTaskPreview();
     updateResultPanel();
-    if (!isGeoEastMode()) {
-        refreshAvailableResults();
-    }
 }
 
 void FaultPolyTraceWindow::loadSettings() {
