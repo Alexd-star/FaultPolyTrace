@@ -165,3 +165,33 @@ def test_preview_io_is_streamed_and_redundant_repaints_are_skipped():
     assert "cellCount > std::numeric_limits<int>::max()" in launcher_grid
     assert "showGridLayer_ == showGrid" in desktop
     assert "showInputLayer_ == showInputLayer" in launcher
+
+
+def test_preview_pan_zoom_reuses_parsed_samples_and_cached_polygon_paths():
+    desktop = read("standalone_app/qt_desktop/FaultPolyTraceWindow.cpp")
+    launcher = read("geoeast_plugin/qt_launcher/FaultTraceDialog.cpp")
+    packaging = read("scripts/打包发布包.ps1")
+
+    desktop_draw = desktop[desktop.index("void drawPolygons("):desktop.index("void drawTaskPreview(")]
+    launcher_draw = launcher[launcher.index("void drawPolygons("):launcher.index("QString uiText(", launcher.index("void drawPolygons("))]
+
+    assert "parseGeoEastPreviewSample" in desktop
+    assert "splitNumbers(file.readLine())" not in desktop[desktop.index("} else {"):desktop.index("min_ = std::numeric_limits<double>::max()")]
+    for source, draw in ((desktop, desktop_draw), (launcher, launcher_draw)):
+        assert "QPainterPath polygonPath_" in source
+        assert "polygonPath_.addPolygon" in source
+        assert "painter.drawPath(polygonPath_)" in draw
+        assert "pen.setCosmetic(true)" in draw
+        assert "QPolygonF mapped" not in draw
+
+    assert '"official_root_antimerge_benchmark.csv"' in packaging
+    assert 'Copy-Item -LiteralPath (Join-Path $repoRoot "examples\\outputs\\official")' not in packaging
+
+
+def test_customer_builds_ship_only_the_required_simplified_chinese_qt_translation():
+    for script_path in ("scripts/build_desktop_app.ps1", "scripts/build_qt_launcher.ps1"):
+        script = read(script_path)
+        assert "function Install-RequiredQtTranslations" in script
+        assert 'translations\\qt_zh_CN.qm' in script
+        assert 'Remove-Item -LiteralPath $destination -Recurse -Force' in script
+        assert "Install-RequiredQtTranslations" in script[script.index("if (Test-Path -LiteralPath $windeployQt)"):]

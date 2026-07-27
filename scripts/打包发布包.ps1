@@ -260,7 +260,22 @@ if (Test-Path -LiteralPath $releaseFigureDir) {
         }
     }
 }
-Copy-Item -LiteralPath (Join-Path $repoRoot "examples\outputs\official") -Destination (Join-Path $examplesDir "outputs\official") -Recurse -Force
+$officialSourceDir = Join-Path $repoRoot "examples\outputs\official"
+$officialPackageDir = New-Item -ItemType Directory -Force -Path (Join-Path $examplesDir "outputs\official")
+foreach ($name in @(
+    "official_root_antimerge_benchmark.csv",
+    "official_root_antimerge_benchmark.csv.branches.csv",
+    "official_root_antimerge_benchmark.csv.diagnostics.json",
+    "official_root_antimerge_benchmark.csv.topology.csv"
+)) {
+    Copy-FileRequired (Join-Path $officialSourceDir $name) (Join-Path $officialPackageDir $name)
+}
+foreach ($name in @("figures", "figures_compare", "figures_smoothed")) {
+    $source = Join-Path $officialSourceDir $name
+    if (Test-Path -LiteralPath $source) {
+        Copy-Item -LiteralPath $source -Destination (Join-Path $officialPackageDir $name) -Recurse -Force
+    }
+}
 Copy-Item -LiteralPath (Join-Path $repoRoot "examples\synthetic") -Destination (Join-Path $examplesDir "synthetic") -Recurse -Force
 
 $repoOutputsDir = Join-Path $repoRoot "examples\outputs"

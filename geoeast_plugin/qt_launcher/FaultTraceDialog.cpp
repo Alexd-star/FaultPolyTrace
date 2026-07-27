@@ -749,6 +749,7 @@ public:
             return true;
         }
         polygons_.clear();
+        polygonPath_ = QPainterPath();
         QFile file(path);
         if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
             if (error) {
@@ -783,6 +784,8 @@ public:
             }
             if (ring.size() >= 3) {
                 polygons_ << ring;
+                polygonPath_.addPolygon(ring);
+                polygonPath_.closeSubpath();
             }
         };
 
@@ -1115,19 +1118,27 @@ private:
     }
 
     void drawPolygons(QPainter& painter, const QRectF& available) const {
+        if (polygonPath_.isEmpty()) {
+            return;
+        }
         QColor color = polygonColor_;
         color.setAlphaF(polygonOpacity_);
         painter.setRenderHint(QPainter::Antialiasing, true);
-        painter.setPen(QPen(color, qMax(1.2, polygonLineWidth_ * 42.0), Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        QPen pen(color, qMax(1.2, polygonLineWidth_ * 42.0), Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+        pen.setCosmetic(true);
+        painter.setPen(pen);
         painter.setBrush(Qt::NoBrush);
         const QRectF target = fittedRect(available);
-        for (const QPolygonF& polygon : polygons_) {
-            QPolygonF mapped;
-            for (const QPointF& point : polygon) {
-                mapped << mapPoint(point, target);
-            }
-            painter.drawPolygon(mapped);
-        }
+        const double xRange = qMax(1e-9, xMax_ - xMin_);
+        const double yRange = qMax(1e-9, yMax_ - yMin_);
+        QTransform worldToView;
+        worldToView.translate(target.left(), target.bottom());
+        worldToView.scale(target.width() / xRange, -target.height() / yRange);
+        worldToView.translate(-xMin_, -yMin_);
+        painter.save();
+        painter.setWorldTransform(worldToView, true);
+        painter.drawPath(polygonPath_);
+        painter.restore();
     }
 
     QString uiText(const QString& zh) const {
@@ -1143,6 +1154,7 @@ private:
     QPointF lastDragPos_;
     QVector<double> grid_;
     QVector<QPolygonF> polygons_;
+    QPainterPath polygonPath_;
     QString gridCachePath_;
     qint64 gridCacheSize_ = -1;
     qint64 gridCacheMtime_ = -1;

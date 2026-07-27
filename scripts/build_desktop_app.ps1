@@ -62,6 +62,21 @@ function Write-QtConf {
     ) -Encoding ASCII
 }
 
+function Install-RequiredQtTranslations {
+    param([string]$DestinationDir)
+
+    $source = Join-Path (Split-Path -Parent $qtBin) "translations\qt_zh_CN.qm"
+    if (!(Test-Path -LiteralPath $source)) {
+        throw "Required Qt Simplified Chinese translation was not found: $source"
+    }
+    $destination = Join-Path $DestinationDir "translations"
+    if (Test-Path -LiteralPath $destination) {
+        Remove-Item -LiteralPath $destination -Recurse -Force
+    }
+    New-Item -ItemType Directory -Force -Path $destination | Out-Null
+    Copy-Item -LiteralPath $source -Destination (Join-Path $destination "qt_zh_CN.qm") -Force
+}
+
 function Invoke-WinDeployQtWithVcEnv {
     param(
         [string]$DeployTool,
@@ -90,6 +105,7 @@ if ($LASTEXITCODE -ne 0) {
 if (Test-Path -LiteralPath $windeployQt) {
     Invoke-WinDeployQtWithVcEnv -DeployTool $windeployQt -Executable $desktopExe
     Copy-VcRuntimeIfAvailable $desktopDir
+    Install-RequiredQtTranslations $desktopDir
     Write-QtConf $desktopDir
 } else {
     Write-Warning "windeployqt.exe was not found next to qmake.exe: $windeployQt"

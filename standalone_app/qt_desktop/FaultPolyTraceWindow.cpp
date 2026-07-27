@@ -46,6 +46,7 @@
 #include <QMessageBox>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QPainterPath>
 #include <QPolygonF>
 #include <QPixmap>
 #include <QProcessEnvironment>
@@ -417,6 +418,36 @@ QVector<double> splitNumbers(const QByteArray& line) {
     return numbers;
 }
 
+bool parseGeoEastPreviewSample(const QByteArray& textLine,
+                               int* line,
+                               int* cmp,
+                               double* x,
+                               double* y,
+                               double* value) {
+    const char* cursor = textLine.constData();
+    char* end = nullptr;
+    double fields[5] = {};
+    int fieldCount = 0;
+    while (*cursor != '\0' && fieldCount < 5) {
+        const double parsed = std::strtod(cursor, &end);
+        if (end == cursor) {
+            ++cursor;
+            continue;
+        }
+        fields[fieldCount++] = parsed;
+        cursor = end;
+    }
+    if (fieldCount < 5) {
+        return false;
+    }
+    *line = qRound(fields[0]);
+    *cmp = qRound(fields[1]);
+    *x = fields[2];
+    *y = fields[3];
+    *value = fields[4];
+    return true;
+}
+
 QVector<QPolygonF> parsePolygonRings(const QString& wkt, double* pxMin, double* pyMin, double* pxMax, double* pyMax) {
     QVector<QPolygonF> rings;
     static const QRegularExpression ringRe("\\(([^()]+)\\)");
@@ -715,21 +746,23 @@ public:
             QHash<int, double> cmpToY;
 
             while (!file.atEnd()) {
-                const QVector<double> values = splitNumbers(file.readLine());
-                if (values.size() < 5) {
+                int line = 0;
+                int cmp = 0;
+                double x = 0.0;
+                double y = 0.0;
+                double value = 0.0;
+                if (!parseGeoEastPreviewSample(file.readLine(), &line, &cmp, &x, &y, &value)) {
                     continue;
                 }
-                const int line = qRound(values[0]);
-                const int cmp = qRound(values[1]);
                 if (!lineToX.contains(line)) {
-                    lineToX.insert(line, values[2]);
+                    lineToX.insert(line, x);
                     lineKeys << line;
                 }
                 if (!cmpToY.contains(cmp)) {
-                    cmpToY.insert(cmp, values[3]);
+                    cmpToY.insert(cmp, y);
                     cmpKeys << cmp;
                 }
-                samples << GridSample{line, cmp, values[4]};
+                samples << GridSample{line, cmp, value};
             }
             if (samples.isEmpty() || lineKeys.isEmpty() || cmpKeys.isEmpty()) {
                 if (error) {
@@ -810,6 +843,7 @@ public:
             return true;
         }
         polygons_.clear();
+        polygonPath_ = QPainterPath();
         QFile file(path);
         if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
             if (error) {
@@ -831,6 +865,10 @@ public:
             const QVector<QPolygonF> rings = parsePolygonRings(wkt, &pxMin, &pyMin, &pxMax, &pyMax);
             if (!rings.isEmpty()) {
                 polygons_ << rings;
+                for (const QPolygonF& ring : rings) {
+                    polygonPath_.addPolygon(ring);
+                    polygonPath_.closeSubpath();
+                }
             }
         }
         if (grid_.isEmpty() && !polygons_.isEmpty()) {
@@ -851,6 +889,7 @@ public:
 
     void clearPolygons(const QString& status = QString()) {
         polygons_.clear();
+        polygonPath_ = QPainterPath();
         if (!status.isEmpty()) {
             status_ = status;
         } else if (!grid_.isEmpty()) {
@@ -864,6 +903,7 @@ public:
     void clearData(const QString& status = QString()) {
         grid_.clear();
         polygons_.clear();
+        polygonPath_ = QPainterPath();
         gridImage_ = QImage();
         gridImageDirty_ = true;
         nx_ = 0;
@@ -1091,21 +1131,27 @@ private:
     }
 
     void drawPolygons(QPainter& painter, const QRectF& available) const {
+        if (polygonPath_.isEmpty()) {
+            return;
+        }
         QColor color = color_;
         color.setAlphaF(alpha_);
         painter.setRenderHint(QPainter::Antialiasing, true);
-        painter.setPen(QPen(color, qMax(1.2, lineWidth_ * 42.0), Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        QPen pen(color, qMax(1.2, lineWidth_ * 42.0), Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+        pen.setCosmetic(true);
+        painter.setPen(pen);
         painter.setBrush(Qt::NoBrush);
         const QRectF target = fittedRect(available);
-        for (const QVector<QPolygonF>& polygon : polygons_) {
-            for (const QPolygonF& ring : polygon) {
-                QPolygonF mapped;
-                for (const QPointF& point : ring) {
-                    mapped << mapPoint(point, target);
-                }
-                painter.drawPolygon(mapped);
-            }
-        }
+        const double xRange = qMax(1e-9, xMax_ - xMin_);
+        const double yRange = qMax(1e-9, yMax_ - yMin_);
+        QTransform worldToView;
+        worldToView.translate(target.left(), target.bottom());
+        worldToView.scale(target.width() / xRange, -target.height() / yRange);
+        worldToView.translate(-xMin_, -yMin_);
+        painter.save();
+        painter.setWorldTransform(worldToView, true);
+        painter.drawPath(polygonPath_);
+        painter.restore();
     }
 
     void drawTaskPreview(QPainter& painter, const QRectF& canvas) const {
@@ -1153,6 +1199,7 @@ private:
     Mode mode_ = Mode::Task;
     QVector<double> grid_;
     QVector<QVector<QPolygonF>> polygons_;
+    QPainterPath polygonPath_;
     QString gridCachePath_;
     QString gridCacheFormat_;
     qint64 gridCacheSize_ = -1;
