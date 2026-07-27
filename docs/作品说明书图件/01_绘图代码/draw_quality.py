@@ -46,15 +46,15 @@ def performance_breakdown() -> None:
     setup_style()
     fig, ax = plt.subplots(figsize=(7.2, 2.75), constrained_layout=True)
     stages = ["输入读取", "核心追踪", "拓扑检查", "结果写出"]
-    values = np.array([2746, 811, 224, 424])
+    values = np.array([367, 627, 170, 350])
     y = np.arange(len(stages))
     ax.barh(y, values, color=[COLORS["gray"], COLORS["blue"], COLORS["teal"], COLORS["gray"]], edgecolor=COLORS["ink"], linewidth=0.6)
     for yi, value in zip(y, values):
         ax.text(value + 14, yi, f"{value} ms", va="center", fontsize=6.5)
-    ax.set_yticks(y, stages); ax.invert_yaxis(); ax.set_xlabel("耗时（ms）"); ax.set_xlim(0, 3000)
+    ax.set_yticks(y, stages); ax.invert_yaxis(); ax.set_xlabel("耗时（ms）"); ax.set_xlim(0, 700)
     ax.set_title("输入数据完整运行的分阶段耗时", loc="left", fontsize=8, weight="bold")
-    ax.text(0.99, 0.05, "总耗时 4207 ms（4.21 s）\n处理时限 60 s", transform=ax.transAxes, ha="right", va="bottom", fontsize=7, color=COLORS["muted"])
-    ax.axvline(811, color=COLORS["blue"], lw=0.7, ls="--")
+    ax.text(0.99, 0.05, "总耗时 1516 ms（1.52 s）\n处理时限 60 s", transform=ax.transAxes, ha="right", va="bottom", fontsize=7, color=COLORS["muted"])
+    ax.axvline(627, color=COLORS["blue"], lw=0.7, ls="--")
     ax.grid(False); ax.spines["left"].set_visible(False); ax.tick_params(axis="y", length=0)
     save_all(fig, "F17_官方数据耗时分解")
 

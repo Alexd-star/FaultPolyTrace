@@ -148,8 +148,8 @@
       "figure": "F17_官方数据耗时分解",
       "width": 4311,
       "height": 1641,
-      "contrast_std": 47.85,
-      "white_ratio": 0.7828,
+      "contrast_std": 65.41,
+      "white_ratio": 0.6735,
       "status": "PASS",
       "failed_checks": []
     },
