@@ -41,6 +41,13 @@ def test_submission_hash_verifier_parses_generated_format() -> None:
     assert "INVALID $line" in verifier
 
 
+def test_submission_token_expansion_cannot_rewrite_binary_files() -> None:
+    script = read("scripts/构建提交代码包.ps1")
+    assert 'Where-Object { $_.Extension.ToLowerInvariant() -in @(".md", ".ps1", ".json") }' in script
+    assert '-Include "*.md", "*.ps1", "*.json"' not in script
+    assert "压缩包完整性检查失败" in script
+
+
 def test_submission_templates_have_no_frozen_old_build_identity() -> None:
     template_root = ROOT / "packaging" / "submission"
     text = "\n".join(

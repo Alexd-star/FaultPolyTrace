@@ -59,6 +59,8 @@ function New-Zip {
     if (Test-Path -LiteralPath $sevenZip) {
         & $sevenZip a -tzip -mx=5 -bso0 -bsp0 $ZipPath (Join-Path $SourceDir "*") | Out-Null
         if ($LASTEXITCODE -ne 0) { throw "打包失败：$ZipPath" }
+        & $sevenZip t -bso0 -bsp0 $ZipPath | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "压缩包完整性检查失败：$ZipPath" }
     } else {
         Compress-Archive -Path (Join-Path $SourceDir "*") -DestinationPath $ZipPath -Force
     }
@@ -78,7 +80,9 @@ function Expand-SubmissionTokens {
     param([string]$Root)
     $installerHash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash
     $releaseZipHash = (Get-FileHash -LiteralPath $releaseZip -Algorithm SHA256).Hash
-    Get-ChildItem -LiteralPath $Root -Recurse -File -Include "*.md", "*.ps1", "*.json" | ForEach-Object {
+    Get-ChildItem -LiteralPath $Root -Recurse -File |
+        Where-Object { $_.Extension.ToLowerInvariant() -in @(".md", ".ps1", ".json") } |
+        ForEach-Object {
         $text = [System.IO.File]::ReadAllText($_.FullName, [System.Text.Encoding]::UTF8)
         $updated = $text.Replace("{{VERSION}}", $Version).
             Replace("{{PLAIN_VERSION}}", $plain).
@@ -88,7 +92,7 @@ function Expand-SubmissionTokens {
             Replace("{{RELEASE_ZIP_SHA256}}", $releaseZipHash)
         $withBom = $_.Extension.Equals(".ps1", [System.StringComparison]::OrdinalIgnoreCase)
         [System.IO.File]::WriteAllText($_.FullName, $updated, (New-Object System.Text.UTF8Encoding($withBom)))
-    }
+        }
 }
 
 Write-Host "[1/6] 导出 Git 跟踪源码"
