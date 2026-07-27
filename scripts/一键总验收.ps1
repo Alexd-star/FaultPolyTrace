@@ -1,7 +1,7 @@
 ﻿param(
     [string]$GeoEastRoot = $(if ($env:FPT_GEOEAST_ROOT) { $env:FPT_GEOEAST_ROOT } elseif ($env:USERPROFILE -and (Test-Path -LiteralPath (Join-Path $env:USERPROFILE "GeoEast"))) { Join-Path $env:USERPROFILE "GeoEast" } else { "C:\GeoEast" }),
     [string]$OfficialDat = "",
-    [string]$PackageVersion = "v1.0.1-contest-final",
+    [string]$PackageVersion = "v1.1.0",
     [int]$MaxElapsedMs = 5000,
     [double]$MinStrongCoverage = 0.990,
     [double]$MinWeakCoverage = 0.955,

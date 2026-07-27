@@ -28,10 +28,10 @@
       "failed_checks": []
     },
     {
-      "figure": "F04_双数据源与输出契约",
+      "figure": "F04_双数据源与输出约定",
       "width": 4314,
       "height": 2571,
-      "contrast_std": 28.28,
+      "contrast_std": 28.27,
       "white_ratio": 0.8573,
       "status": "PASS",
       "failed_checks": []
@@ -157,8 +157,8 @@
       "figure": "F18_自动化验证与交付核验矩阵",
       "width": 4311,
       "height": 2091,
-      "contrast_std": 81.98,
-      "white_ratio": 0.2642,
+      "contrast_std": 82.08,
+      "white_ratio": 0.2689,
       "status": "PASS",
       "failed_checks": []
     },
@@ -184,8 +184,8 @@
       "figure": "F21_Windows产品化构建与交付流程",
       "width": 4314,
       "height": 2481,
-      "contrast_std": 26.03,
-      "white_ratio": 0.8127,
+      "contrast_std": 26.08,
+      "white_ratio": 0.8126,
       "status": "PASS",
       "failed_checks": []
     },

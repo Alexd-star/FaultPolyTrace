@@ -25,14 +25,14 @@ if ([string]::IsNullOrWhiteSpace($OutputBase)) {
 
 $artifacts = @()
 foreach ($item in @(
-    @{ role = "release-directory-identity"; path = $identityPath },
-    @{ role = "release-zip"; path = $zip },
-    @{ role = "windows-installer"; path = $installer }
+    @{ role = "release-directory-identity"; path = $identityPath; portablePath = ((Split-Path $package -Leaf) + "/构建与依赖清单.json") },
+    @{ role = "release-zip"; path = $zip; portablePath = (Split-Path $zip -Leaf) },
+    @{ role = "windows-installer"; path = $installer; portablePath = ("installer/" + (Split-Path $installer -Leaf)) }
 )) {
     $file = Get-Item -LiteralPath $item.path
     $artifacts += [ordered]@{
         role = $item.role
-        path = $file.FullName
+        path = $item.portablePath
         sizeBytes = $file.Length
         sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $file.FullName).Hash
     }
