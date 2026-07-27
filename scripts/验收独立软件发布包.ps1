@@ -283,6 +283,11 @@ function Invoke-GuiClickAcceptance {
 
     $outputName = "GuiClick_Result"
     $csv = Join-Path $OutputDir "$outputName.csv"
+    $geojson = Join-Path $OutputDir "$outputName.geojson"
+    $diagnostics = Join-Path $OutputDir "$outputName.diagnostics.json"
+    $branches = Join-Path $OutputDir "$outputName.branches.csv"
+    $topology = Join-Path $OutputDir "$outputName.topology.csv"
+    $expectedOutputs = @($csv, $geojson, $diagnostics, $branches, $topology)
     $inputIni = $InputPath -replace "\\", "/"
     $outIni = $OutputDir -replace "\\", "/"
 
@@ -335,19 +340,20 @@ function Invoke-GuiClickAcceptance {
 
         $deadline = (Get-Date).AddSeconds($GuiTimeoutSeconds)
         while ((Get-Date) -lt $deadline) {
-            if (Test-Path -LiteralPath $csv) {
-                $item = Get-Item -LiteralPath $csv
-                if ($item.Length -gt 0) {
-                    break
-                }
+            $ready = @($expectedOutputs | Where-Object {
+                !(Test-Path -LiteralPath $_ -PathType Leaf) -or
+                (Get-Item -LiteralPath $_).Length -le 0
+            }).Count -eq 0
+            if ($ready) {
+                break
             }
             Start-Sleep -Milliseconds 250
         }
         Assert-OutputFile -Path $csv -Name "GUI 点击 CSV" | Out-Null
-        Assert-OutputFile -Path (Join-Path $OutputDir "$outputName.geojson") -Name "GUI 点击 GeoJSON" | Out-Null
-        Assert-OutputFile -Path (Join-Path $OutputDir "$outputName.diagnostics.json") -Name "GUI 点击诊断 JSON" | Out-Null
-        Assert-OutputFile -Path (Join-Path $OutputDir "$outputName.branches.csv") -Name "GUI 点击枝干 CSV" | Out-Null
-        Assert-OutputFile -Path (Join-Path $OutputDir "$outputName.topology.csv") -Name "GUI 点击拓扑 CSV" | Out-Null
+        Assert-OutputFile -Path $geojson -Name "GUI 点击 GeoJSON" | Out-Null
+        Assert-OutputFile -Path $diagnostics -Name "GUI 点击诊断 JSON" | Out-Null
+        Assert-OutputFile -Path $branches -Name "GUI 点击枝干 CSV" | Out-Null
+        Assert-OutputFile -Path $topology -Name "GUI 点击拓扑 CSV" | Out-Null
         Save-WindowScreenshot -Process $process -Path (Join-Path $figureRoot "02_GUI运行后.png")
     } finally {
         if (!$process.HasExited) {
@@ -364,10 +370,10 @@ function Invoke-GuiClickAcceptance {
 
     return @{
         csv = $csv
-        geojson = Join-Path $OutputDir "$outputName.geojson"
-        diagnostics = Join-Path $OutputDir "$outputName.diagnostics.json"
-        branches = Join-Path $OutputDir "$outputName.branches.csv"
-        topology = Join-Path $OutputDir "$outputName.topology.csv"
+        geojson = $geojson
+        diagnostics = $diagnostics
+        branches = $branches
+        topology = $topology
     }
 }
 

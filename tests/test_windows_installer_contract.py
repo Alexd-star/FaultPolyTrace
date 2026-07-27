@@ -43,3 +43,10 @@ def test_installer_smoke_test_covers_install_run_identity_and_uninstall():
         "unins000.exe",
     ):
         assert required in script
+
+
+def test_standalone_gui_acceptance_waits_for_the_complete_output_set():
+    script = (ROOT / "scripts/验收独立软件发布包.ps1").read_text(encoding="utf-8-sig")
+    assert "$expectedOutputs = @($csv, $geojson, $diagnostics, $branches, $topology)" in script
+    assert "$ready = @($expectedOutputs | Where-Object" in script
+    assert "Assert-OutputFile -Path $geojson" in script
