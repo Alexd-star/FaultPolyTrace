@@ -3,12 +3,17 @@
 #include <QAction>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QDoubleSpinBox>
 #include <QGroupBox>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMap>
 #include <QMenu>
 #include <QPushButton>
+#include <QRegularExpression>
+#include <QSpinBox>
+#include <QToolButton>
+#include <QVector>
 #include <QWidget>
 
 namespace {
@@ -39,6 +44,14 @@ QMap<QString, QString> buildEnglishTextMap() {
     add("语言(&I)", "Language(&I)");
     add("简体中文", "Simplified Chinese");
     add("English", "English");
+
+    add("打开", "Open");
+    add("保存模板", "Save Template");
+    add("载入模板", "Load Template");
+    add("保存设置", "Save Settings");
+    add("数据库", "Database");
+    add("工区底图", "Basemap");
+    add("帮助", "Help");
 
     add("数据库配置", "Database Configuration");
     add("刷新网格", "Refresh Grids");
@@ -75,6 +88,7 @@ QMap<QString, QString> buildEnglishTextMap() {
     add("显示原始网格层", "Show Input Grid Layer");
     add("显示结果多边形层", "Show Result Polygon Layer");
     add("显示图层", "Visible Layers");
+    add("图层", "Layers");
     add("同时勾选两层即为叠加查看。", "Check both layers to view the overlay.");
     add("叠加查看", "Overlay View");
     add("平台复核：在工区底图或平面成图中勾选网格与结果图层。",
@@ -227,6 +241,7 @@ QMap<QString, QString> buildEnglishTextMap() {
     add("▶ 开始追踪", "▶ Start Trace");
     add("■ 停止", "■ Stop");
     add("运行日志与输出信息", "Run Log and Output");
+    add("详细日志", "Verbose Log");
     add("视图 X: --   |   Y: --", "View X: --   |   Y: --");
     add("数据库连接待验证", "Database Connection Pending");
     add("就绪", "Ready");
@@ -324,6 +339,9 @@ QMap<QString, QString> buildEnglishTextMap() {
     add("原始网格：%1 x %2", "Input Grid: %1 x %2");
     add("结果多边形：%1 个，显示环：%2 条", "Result Polygons: %1, Rings: %2");
     add("结果多边形：%1 个", "Result Polygons: %1");
+    add("追踪完成：%1 个多边形，耗时 %2", "Trace completed: %1 polygons in %2");
+    add("追踪完成：结果已写入 BOFaultPolygon/%1，可叠加检查或到工区底图复核",
+        "Trace completed: result written to BOFaultPolygon/%1. Review it as an overlay or in Basemap.");
     add("未发现保留多边形", "No Kept Polygons Found");
 
     add("配置 GeoEast 根目录、数据根目录、数据库、项目、用户和执行程序", "Configure GeoEast root, data root, database, project, user, and execution program");
@@ -495,12 +513,426 @@ QMap<QString, QString> buildEnglishTextMap() {
     add("配置 GeoEast 根目录、数据根目录、数据库、项目和用户信息", "Configure GeoEast root, data root, database, project, and user information");
     add("删除当前输出名对应的 GeoEast 结果多边形对象", "Delete the GeoEast result polygon object matching the current output name");
 
+    // Shared validation and configuration text used by both product surfaces.
+    add("执行程序文件未填写", "Executable path is empty");
+    add("执行程序文件不存在：%1", "Executable does not exist: %1");
+    add("GeoEast 根目录未填写", "GeoEast root is empty");
+    add("GeoEast 根目录不存在：%1", "GeoEast root does not exist: %1");
+    add("GeoEast 根目录应包含 NGP 和 GeoEast-RC 子目录", "GeoEast root must contain the NGP and GeoEast-RC folders");
+    add("GeoEast 数据根目录未填写", "GeoEast data root is empty");
+    add("GeoEast 数据根目录不存在：%1", "GeoEast data root does not exist: %1");
+    add("PG 主机未填写", "PostgreSQL host is empty");
+    add("PG 端口应为 1 到 65535 之间的数字", "PostgreSQL port must be a number from 1 to 65535");
+    add("数据库名未填写", "Database name is empty");
+    add("项目名未填写。请在 GeoEast 主控标题、打开项目窗口或项目管理工具中确认",
+        "Project name is empty. Check the GeoEast main window title, Open Project dialog, or project manager.");
+    add("用户名未填写", "User name is empty");
+    add("<已隐藏>", "<hidden>");
+    add("执行程序", "Executable");
+    add("GeoEast根目录", "GeoEast Root");
+    add("数据根目录", "Data Root");
+    add("PG主机", "PG Host");
+    add("PG 主机/端口", "PG Host / Port");
+    add("端口", "Port");
+    add("数据库", "Database");
+    add("项目", "Project");
+    add("用户", "User");
+    add("密码", "Password");
+    add("浏览...", "Browse...");
+    add("执行程序文件:", "Executable:");
+    add("GeoEast 根目录:", "GeoEast Root:");
+    add("GeoEast 数据根目录:", "GeoEast Data Root:");
+    add("PG 主机:", "PG Host:");
+    add("端口:", "Port:");
+    add("数据库:", "Database:");
+    add("项目:", "Project:");
+    add("用户:", "User:");
+    add("密码:", "Password:");
+    add("选择 GeoEast 执行程序", "Select GeoEast Executable");
+    add("选择 GeoEast 安装根目录", "Select GeoEast Installation Root");
+    add("选择 GeoEastData 根目录", "Select GeoEastData Root");
+    add("可执行文件 (*.exe);;所有文件 (*.*)", "Executables (*.exe);;All Files (*.*)");
+    add("输入输出", "Input and Output");
+    add("选择颜色", "Choose Color");
+    add("GeoEast 数据库与环境配置", "GeoEast Database and Environment Configuration");
+    add("GeoEast 连接配置", "GeoEast Connection Configuration");
+    add("查看每个配置项从哪里获取", "Learn where to find each configuration value");
+    add("尚未检查配置。", "Configuration has not been checked.");
+    add("自动检测", "Auto Detect");
+    add("检查配置", "Check Configuration");
+    add("取消", "Cancel");
+    add("应用并保存配置", "Apply and Save");
+    add("已执行自动检测。项目名无法安全推断，请按当前 GeoEast 项目填写后再检查配置。",
+        "Automatic detection finished. Enter the current GeoEast project name, then check the configuration.");
+    add("配置检查通过。可以刷新网格列表。", "Configuration is valid. You can now refresh the grid list.");
+    add("配置检查通过", "Configuration Valid");
+    add("GeoEast 数据库配置项完整。保存后可返回主界面刷新网格列表。",
+        "The GeoEast database configuration is complete. Save it, then return to the main window and refresh the grid list.");
+    add("配置仍有 %1 项需要处理。", "%1 configuration item(s) still require attention.");
+    add("配置需要补充", "Configuration Incomplete");
+    add("请处理以下项目：\n\n- %1", "Resolve the following item(s):\n\n- %1");
+    add("GeoEast 配置帮助", "GeoEast Configuration Help");
+    add("GeoEast 数据库配置用于让 FaultPolyTrace 读取 BOMapGrid，并把追踪结果写入 BOFaultPolygon。\n\n"
+        "字段来源：\n"
+        "1. 执行程序文件：通常位于 GeoEast-RC\\bin\\faultpolytrace_geoeast_runner.exe，发布包或 GeoEast 插件部署后会自动检测。\n"
+        "2. GeoEast 根目录：包含 NGP 和 GeoEast-RC 两个子目录的安装根目录。\n"
+        "3. GeoEast 数据根目录：GeoEastData 根目录，通常包含 pgdata 和 DATA 等数据目录。\n"
+        "4. PG 主机和端口：本机 GeoEast 通常为 127.0.0.1 和 5433；如果连接远端数据库，请填写管理员提供的地址。\n"
+        "5. 数据库：通常为 ndp，也可从 GeoEast 项目管理或数据源配置中确认。\n"
+        "6. 项目：GeoEast 当前打开或需要处理的项目名，可在 GeoEast 主控标题、打开项目窗口或项目管理工具中查看。\n"
+        "7. 用户：GeoEast 登录用户，通常与 Windows 用户名一致。\n\n"
+        "建议流程：先点击【自动检测】，再点击【检查配置】。检查通过后点击【应用并保存配置】，然后返回主界面点击【刷新网格列表】。",
+        "GeoEast database configuration lets FaultPolyTrace read BOMapGrid objects and write tracing results to BOFaultPolygon.\n\n"
+        "Where to find each value:\n"
+        "1. Executable: normally GeoEast-RC\\bin\\faultpolytrace_geoeast_runner.exe; it is detected after package or plugin deployment.\n"
+        "2. GeoEast Root: the installation folder containing NGP and GeoEast-RC.\n"
+        "3. GeoEast Data Root: the GeoEastData folder, normally containing pgdata and DATA.\n"
+        "4. PG Host and Port: normally 127.0.0.1 and 5433 for local GeoEast; use administrator-provided values for a remote database.\n"
+        "5. Database: normally ndp; confirm it in GeoEast project management or data-source settings.\n"
+        "6. Project: the open or target GeoEast project, shown in the main title, Open Project dialog, or project manager.\n"
+        "7. User: the GeoEast login user, commonly the Windows user name.\n\n"
+        "Recommended sequence: click [Auto Detect], then [Check Configuration]. After validation, click [Apply and Save], return to the main window, and click [Refresh Grid List].");
+    add("GeoEast 数据库配置用于让 FaultPolyTrace 读取 BOMapGrid，并把追踪结果写入 BOFaultPolygon。\n\n"
+        "字段来源：\n"
+        "1. 执行程序文件：通常位于 GeoEast-RC\\bin\\faultpolytrace_geoeast_runner.exe，GeoEast 插件部署后会自动检测。\n"
+        "2. GeoEast 根目录：包含 NGP 和 GeoEast-RC 两个子目录的安装根目录。\n"
+        "3. GeoEast 数据根目录：GeoEastData 根目录，通常包含 pgdata 和 DATA 等数据目录。\n"
+        "4. PG 主机和端口：本机 GeoEast 通常为 127.0.0.1 和 5433；如果连接远端数据库，请填写管理员提供的地址。\n"
+        "5. 数据库：通常为 ndp，也可从 GeoEast 项目管理或数据源配置中确认。\n"
+        "6. 项目：GeoEast 当前打开或需要处理的项目名，可在 GeoEast 主控标题、打开项目窗口或项目管理工具中查看。\n"
+        "7. 用户：GeoEast 登录用户，通常与 Windows 用户名一致。\n\n"
+        "建议流程：先点击【自动检测】，再点击【检查配置】。检查通过后点击【应用并保存配置】，然后返回主界面点击【刷新网格列表】。",
+        "GeoEast database configuration lets FaultPolyTrace read BOMapGrid objects and write tracing results to BOFaultPolygon.\n\n"
+        "Where to find each value:\n"
+        "1. Executable: normally GeoEast-RC\\bin\\faultpolytrace_geoeast_runner.exe; it is detected after plugin deployment.\n"
+        "2. GeoEast Root: the installation folder containing NGP and GeoEast-RC.\n"
+        "3. GeoEast Data Root: the GeoEastData folder, normally containing pgdata and DATA.\n"
+        "4. PG Host and Port: normally 127.0.0.1 and 5433 for local GeoEast; use administrator-provided values for a remote database.\n"
+        "5. Database: normally ndp; confirm it in GeoEast project management or data-source settings.\n"
+        "6. Project: the open or target GeoEast project, shown in the main title, Open Project dialog, or project manager.\n"
+        "7. User: the GeoEast login user, commonly the Windows user name.\n\n"
+        "Recommended sequence: click [Auto Detect], then [Check Configuration]. After validation, click [Apply and Save], return to the main window, and click [Refresh Grid List].");
+    add("配置尚未完整", "Configuration Incomplete");
+    add("以下配置可能导致刷新网格或写库失败：\n\n- %1\n\n建议返回修改。是否仍然保存？",
+        "The following settings may prevent grid refresh or database writes:\n\n- %1\n\nReturn to correct them. Save anyway?");
+    add("配置未保存，请补齐后再应用。", "Configuration was not saved. Complete it before applying.");
+    add("打开数据库配置", "Open Database Configuration");
+    add("去填写", "Configure Now");
+    add("GeoEast 配置不完整", "GeoEast Configuration Incomplete");
+    add("执行【%1】前需要先补齐 GeoEast 配置。", "Complete the GeoEast configuration before %1.");
+    add("缺失或无效项：\n\n- %1", "Missing or invalid item(s):\n\n- %1");
+    add("缺失或无效项：\n\n- %1\n\n请点击【打开数据库配置】补齐后再执行。保存一次后，下次打开会自动记住。",
+        "Missing or invalid item(s):\n\n- %1\n\nClick [Open Database Configuration] to complete the settings. Saved settings are restored next time.");
+    add("无法执行【%1】：GeoEast 配置不完整。缺失或无效项：%2",
+        "Cannot perform %1 because the GeoEast configuration is incomplete. Missing or invalid item(s): %2");
+
+    // Runtime status, result paths, and user guidance.
+    add("运行日志已复制到剪贴板", "Run log copied to the clipboard");
+    add("运行日志已清空", "Run log cleared");
+    add("日志已复制到剪贴板。", "Log copied to the clipboard.");
+    add("日志已清空", "Log cleared");
+    add("视图区已切换为平移模式", "View switched to pan mode");
+    add("视图区已切换为选择模式", "View switched to selection mode");
+    add("已选择输入文件；勾选“显示原始网格层”后再载入图像",
+        "Input file selected. Enable Show Input Grid Layer to load the image.");
+    add("已选择输入文件，未自动载入图像以保持界面流畅",
+        "Input file selected. The image was not loaded automatically to keep the interface responsive.");
+    add("正在刷新 GeoEast 网格列表...", "Refreshing the GeoEast grid list...");
+    add("正在刷新 GeoEast 结果列表...", "Refreshing the GeoEast result list...");
+    add("任务运行中，暂不能刷新已有结果", "A task is running. Existing results cannot be refreshed yet.");
+    add("已刷新输出目录结果，共 %1 个", "Output result list refreshed: %1 item(s)");
+    add("暂无可载入结果，请先运行追踪或刷新已有结果列表",
+        "No result is available. Run tracing or refresh the existing result list first.");
+    add("没有可载入的结果", "No Result Available");
+    add("请先运行追踪，或点击【刷新结果列表】读取输出目录/GeoEast 数据库中的已有结果。",
+        "Run tracing or click [Refresh Result List] to read results from the output folder or GeoEast database.");
+    add("任务运行中，暂不能载入 GeoEast 历史结果", "A task is running. GeoEast results cannot be loaded yet.");
+    add("载入已有结果", "Load Existing Result");
+    add("正在导出 GeoEast 历史结果...", "Exporting the selected GeoEast result...");
+    add("结果文件不存在，请刷新结果列表", "The result file does not exist. Refresh the result list.");
+    add("已载入结果多边形；如需叠加，请再选择对应原始网格",
+        "Result polygons loaded. Select the corresponding input grid for an overlay.");
+    add("已载入已有结果：%1", "Existing result loaded: %1");
+    add("确认删除 GeoEast 结果", "Confirm GeoEast Result Deletion");
+    add("将删除当前项目中的结果多边形对象：\n\n%1\n\n该操作不会删除输入网格，也不会删除本地输出文件。是否继续？",
+        "The following result polygon object will be deleted from the current project:\n\n%1\n\nThe input grid and local output files will not be deleted. Continue?");
+    add("将删除当前项目中的结果多边形对象：\n\n%1\n\n该操作不会删除输入网格，也不会删除其它解释对象。是否继续？",
+        "The following result polygon object will be deleted from the current project:\n\n%1\n\nThe input grid and other interpretation objects will not be deleted. Continue?");
+    add("删除", "Delete");
+    add("正在删除 GeoEast 结果对象...", "Deleting the GeoEast result object...");
+    add("正在连接 GeoEast 并追踪断层多边形...", "Connecting to GeoEast and tracing fault polygons...");
+    add("正在追踪断层多边形...", "Tracing fault polygons...");
+    add("算法程序定位错误", "Algorithm Executable Location Error");
+    add("独立软件不能把自身作为核心算法程序启动。请确认发布包中存在 bin/faultpolytrace.exe。",
+        "The standalone application cannot use itself as the algorithm executable. Confirm that bin/faultpolytrace.exe exists in the package.");
+    add("GeoEast 结果刷新完成，共 %1 个", "GeoEast result refresh completed: %1 item(s)");
+    add("GeoEast 结果刷新失败，请查看日志", "GeoEast result refresh failed. Check the log.");
+    add("GeoEast 结果对象已删除或原本不存在", "The GeoEast result object was deleted or did not exist");
+    add("GeoEast 结果删除失败，请查看日志", "GeoEast result deletion failed. Check the log.");
+    add("运行结束，但未生成结果 CSV：%1", "Run finished without a result CSV: %1");
+    add("请检查输入格式、输出目录写入权限和上方算法日志。",
+        "Check the input format, output-folder write permission, and algorithm log above.");
+    add("GeoEast 数据库写入对象：BOFaultPolygon/%1", "GeoEast database object: BOFaultPolygon/%1");
+    add("原始网格视图文件：%1", "Input grid view file: %1");
+    add("GeoEast 历史结果已导出：BOFaultPolygon/%1", "GeoEast result exported: BOFaultPolygon/%1");
+    add("结果 CSV：%1", "Result CSV: %1");
+    add("GeoJSON 文件：%1", "GeoJSON file: %1");
+    add("诊断 JSON：%1", "Diagnostics JSON: %1");
+    add("拓扑 CSV：%1", "Topology CSV: %1");
+    add("枝干 CSV：%1", "Branch CSV: %1");
+    add("GeoEast 历史结果已导出并载入", "GeoEast result exported and loaded");
+    add("进程错误：%1", "Process error: %1");
+    add("追踪中…", "Tracing...");
+    add("自定义参数", "Custom Parameters");
+    add("参数已手动调整；重新选择任一预设可整体恢复",
+        "Parameters were adjusted manually. Select a preset to restore its full parameter set.");
+    add("参数模板已保存：%1", "Parameter template saved: %1");
+    add("参数模板已载入：%1", "Parameter template loaded: %1");
+    add("无法读取 CSV：%1", "Cannot read CSV: %1");
+    add("无法打开输入文件：%1", "Cannot open input file: %1");
+    add("输入文件为空。", "The input file is empty.");
+    add("矩阵网格头不足。", "The matrix-grid header is incomplete.");
+    add("矩阵网格头无效。", "The matrix-grid header is invalid.");
+    add("矩阵网格数值数量不足。", "The matrix grid does not contain enough values.");
+    add("未识别到 GeoEast DAT 五列采样数据。", "No five-column GeoEast DAT samples were detected.");
+    add("无法打开结果 CSV：%1", "Cannot open result CSV: %1");
+    add("等待数据", "Waiting for Data");
+    add("选择外部断层属性网格文件 (Ctrl+O)", "Select an external fault-attribute grid (Ctrl+O)");
+    add("按当前参数运行断层多边形自动追踪 (F5)", "Run fault polygon tracing with current parameters (F5)");
+    add("终止当前正在运行的追踪任务 (Shift+F5)", "Stop the running trace task (Shift+F5)");
+    add("导出当前视图区图像 (Ctrl+Shift+P)", "Export the current view image (Ctrl+Shift+P)");
+    add("保存当前算法参数模板 (Ctrl+S)", "Save the current parameter template (Ctrl+S)");
+    add("读取已保存的参数模板 (Ctrl+Shift+O)", "Load a saved parameter template (Ctrl+Shift+O)");
+    add("重新读取输出目录或数据库中的已有结果 (F6)", "Refresh results from the output folder or database (F6)");
+    add("复制运行日志", "Copy Run Log");
+    add("清空运行日志", "Clear Run Log");
+    add("\n---- 详细日志（界面已折叠）----\n", "\n---- Verbose Log (collapsed in the interface) ----\n");
+    add(" 像元", " cells");
+    add(" 次", " iterations");
+    add("删除结果", "Delete Result");
+    add("列出可用于查看或管理的已有结果。外部文件模式读取输出目录，GeoEast 模式读取当前项目中的结果多边形对象。",
+        "List results available for viewing or management. External-file mode reads the output folder; GeoEast mode reads result polygon objects in the current project.");
+    add("载入所选结果", "Load Selected Result");
+    add("形态学闭运算半径：调大可修复更宽的小断口，过大易把邻近断层连成一片",
+        "Morphological closing radius: larger values repair wider small gaps but may connect nearby faults.");
+    add("由骨架向两侧恢复断层带的半径：调大结果更宽，调小更贴中心线",
+        "Fault-belt radius restored from the skeleton: increase for wider results or decrease for closer centerline fit.");
+    add("断层带成形后的闭合半径：修补带间小缝隙，0 最保守",
+        "Post-belt closing radius: repairs small gaps between belt cells; 0 is the most conservative.");
+    add("原始属性包络半径：限制断层带向背景外扩，调大更宽松",
+        "Attribute-envelope radius: limits expansion into the background; larger values are more permissive.");
+    add("断点补连的最大端点距离：调大可跨越更长缺口，过大易误连邻近断层",
+        "Maximum endpoint gap: larger values bridge longer gaps but may connect nearby faults incorrectly.");
+    add("补连允许的最大方向差：调大能容纳更弯的断层，过大易跨脉络误连",
+        "Maximum connection-angle difference: larger values allow greater curvature but may connect unrelated trends.");
+    add("Chaikin 平滑次数：0 保留像元台阶，次数越多边界越圆滑",
+        "Chaikin smoothing iterations: 0 preserves pixel steps; more iterations produce smoother boundaries.");
+    add("Douglas-Peucker 简化容差：调大顶点更少，过大会损失形态细节",
+        "Douglas-Peucker tolerance: larger values reduce vertices but may remove shape detail.");
+    add("单击标题旁的勾选框展开或收起高级参数", "Use the title checkbox to expand or collapse advanced parameters");
+    add("GeoEast 执行程序文件", "GeoEast Executable");
+    add("GeoEast 执行程序文件不存在：%1", "GeoEast executable does not exist: %1");
+    add("GeoEast 根目录", "GeoEast Root");
+    add("GeoEast 数据根目录", "GeoEast Data Root");
+    add("数据库名", "Database Name");
+    add("项目名", "Project Name");
+    add("用户名", "User Name");
+    add("输出多边形名称", "Output Polygon Name");
+    add("执行程序文件", "Executable");
+    add("刷新已有结果", "Refresh Existing Results");
+    add("GeoEast数据库：%1 / %2 / BOMapGrid/%3", "GeoEast Database: %1 / %2 / BOMapGrid/%3");
+    add("外部文件：%1", "External File: %1");
+    add("结果已写入 GeoEast 数据库，并已生成本地视图文件。",
+        "Results were written to the GeoEast database and local view files were generated.");
+    add("已选择 GeoEast 数据库结果；当前没有同名本地视图缓存。",
+        "A GeoEast database result is selected, but no matching local view cache is available.");
+    add("GeoEast对象：BOFaultPolygon/%1\n本地CSV：%2", "GeoEast Object: BOFaultPolygon/%1\nLocal CSV: %2");
+    add("GeoEast对象：BOFaultPolygon/%1\n本地缓存：%2", "GeoEast Object: BOFaultPolygon/%1\nLocal Cache: %2");
+
+    add("无法打开原始网格导出文件：%1", "Cannot open exported input-grid file: %1");
+    add("原始网格导出文件格式不完整。", "The exported input-grid file is incomplete.");
+    add("原始网格导出文件头无效。", "The exported input-grid header is invalid.");
+    add("原始网格尺寸无效。", "The input-grid dimensions are invalid.");
+    add("原始网格数值数量不足。", "The input grid does not contain enough values.");
+    add("无法打开结果多边形导出文件：%1", "Cannot open exported result-polygon file: %1");
+    add("自动识别失败时请手动选择 GeoEast 安装根目录", "Select the GeoEast installation root if automatic detection fails");
+    add("自动识别失败时请手动选择 GeoEastData 根目录", "Select the GeoEastData root if automatic detection fails");
+    add("GeoEast 数据库", "GeoEast Database");
+    add("文件不存在：%1。请确认 docs 目录已随发布包或 GeoEast 便携启动器部署。",
+        "File not found: %1. Confirm that the docs folder was deployed with the package or GeoEast portable launcher.");
+    add("无法打开文件：%1", "Cannot open file: %1");
+    add("无法打开目录：%1", "Cannot open folder: %1");
+    add("本工具直接处理平面断层属性网格，不修改层位解释对象；正在打开 GeoEast 叠合查看指南。",
+        "This tool processes planar fault-attribute grids without modifying horizon interpretation objects. Opening the GeoEast overlay guide.");
+    add("正在打开 GeoEast 叠加查看步骤。官方图层显示和关闭请在 GeoEast 图层树中操作。",
+        "Opening the GeoEast overlay instructions. Show or hide official layers in the GeoEast layer tree.");
+    add("加载项目配置：%1 成功。", "Project configuration loaded: %1.");
+    add("选择官方 DAT 文件", "Select Official DAT File");
+    add("DAT 文件 (*.dat);;所有文件 (*.*)", "DAT Files (*.dat);;All Files (*.*)");
+    add("帮助文档：docs/用户操作手册.md；异机交付说明：docs/评审交付与异机运行说明.md。",
+        "Help: docs/User Manual; deployment details: docs/Deployment Guide.");
+    add("选择 GeoEast 结果多边形颜色", "Choose GeoEast Result Polygon Color");
+    add("已启动 %1：%2", "Started %1: %2");
+    add("官方窗口中请在图层树加载 Grids/%1 与 Fault Polygons/%2；本插件无法从外部进程强制勾选 GeoEast 内部图层。",
+        "In the GeoEast window, load Grids/%1 and Fault Polygons/%2 from the layer tree. This plugin cannot force layer selection in another process.");
+    add("已打开 %1，按官方图层树查看结果", "%1 opened. View the result through the GeoEast layer tree.");
+    add("正在刷新 GeoEast 网格列表", "Refreshing the GeoEast grid list");
+    add("正在刷新 GeoEast 结果列表", "Refreshing the GeoEast result list");
+    add("正在追踪断层多边形", "Tracing fault polygons");
+    add("正在删除 GeoEast 结果对象", "Deleting the GeoEast result object");
+    add("GeoBasemap 工区底图", "GeoBasemap");
+    add("GeoMapping 平面成图", "GeoMapping");
+    add("当前输出目录中没有可查看的结果 CSV。\n\n"
+        "请先选择输入数据并完成一次追踪，或检查“输出目录”后点击【刷新结果列表】。",
+        "There is no result CSV in the current output folder.\n\n"
+        "Select input data and complete a trace, or check the Output Folder and click [Refresh Result List].");
+    add("打开文件", "Open Files");
+    add("结果 CSV", "Result CSV");
+    add("诊断 JSON", "Diagnostics JSON");
+    add("三步完成断层多边形追踪", "Trace Fault Polygons in Three Steps");
+    add("打开 DAT 文件，或接入 GeoEast 数据库网格", "Open a DAT file or connect to a GeoEast database grid");
+    add("检查追踪参数（推荐预设已就绪）", "Review trace parameters; a recommended preset is ready");
+    add("单击左下角「开始追踪」，随后开启结果图层", "Click Start Trace, then enable the result layers");
+    add("三步完成工区断层多边形追踪", "Trace Fault Polygons in Three Steps");
+    add("确认数据库连接与当前工区（自动检测可一键填充）",
+        "Confirm the database and project settings.");
+    add("刷新并选择输入 BOMapGrid，填写输出多边形名称",
+        "Select a BOMapGrid and name the output.");
+    add("单击「开始追踪」，完成后开启结果图层查看",
+        "Click Start Trace, then enable result layers.");
+    add("当前 GeoEast 项目名，未识别时请填写", "Current GeoEast project name; enter it if detection fails");
+    add("GeoEast 登录用户名", "GeoEast login user name");
+    add("刷新已有结果列表", "Refresh the existing result list");
+    add("载入当前选择的已有结果；GeoEast 数据库对象会同步为当前输出名称",
+        "Load the selected result; a GeoEast database object is also used as the current output name");
+    add("勾选后显示后台程序的原始英文输出，便于排查问题",
+        "Show raw executable output for troubleshooting");
+    add("恢复推荐算法参数、显示样式和默认输出名，不清空数据库连接信息",
+        "Restore recommended parameters, display style, and output name while keeping database settings");
+    add("当前 GeoEast 项目中已有的结果多边形对象。选择后可同步为当前输出名称，便于查看、覆盖或删除。",
+        "Result polygon objects in the current GeoEast project. Select one to use its name for viewing, overwriting, or deletion.");
+    add("导出并显示当前选择的结果多边形，同时叠加当前输入网格。",
+        "Export and display the selected result polygons with the current input grid overlay.");
+
+    // GeoEast launcher runtime text.
+    add("GeoEast 连接配置已保存。", "GeoEast connection configuration saved.");
+    add("当前参数和界面配置已保存。", "Current parameters and interface settings saved.");
+    add("已恢复推荐默认配置：防黏连增强、青色结果线、默认输出名。数据库连接信息已保留。",
+        "Recommended defaults restored: anti-merge preset, cyan result line, and default output name. Database connection settings were kept.");
+    add("已恢复默认配置", "Default settings restored");
+    add("任务运行中，暂不能载入输入网格", "A task is running. The input grid cannot be loaded yet.");
+    add("显示输入网格", "Display Input Grid");
+    add("正在载入输入网格：%1", "Loading input grid: %1");
+    add("正在载入输入网格", "Loading input grid");
+    add("暂无可显示结果，请先运行追踪或刷新结果列表",
+        "No displayable result is available. Run tracing or refresh the result list first.");
+    add("没有可选择的结果", "No Selectable Result");
+    add("请先运行追踪，或点击【刷新结果列表】读取当前项目中的结果多边形对象。",
+        "Run tracing or click [Refresh Result List] to read result polygon objects in the current project.");
+    add("任务运行中，暂不能载入已有结果", "A task is running. Existing results cannot be loaded yet.");
+    add("正在载入已有结果对象：%1", "Loading existing result object: %1");
+    add("正在导出并载入已有结果对象", "Exporting and loading the existing result object");
+    add("已载入原始网格视图：%1", "Input grid view loaded: %1");
+    add("已载入结果多边形视图：%1", "Result polygon view loaded: %1");
+    add("结果视图已载入", "Result view loaded");
+    add("未找到结果视图文件，请先运行追踪", "Result view files were not found. Run tracing first.");
+    add("未找到结果视图文件", "Result View Files Not Found");
+    add("结果视图 PNG 已导出：%1", "Result view PNG exported: %1");
+    add("结果视图 PNG 已导出", "Result view PNG exported");
+    add("结果视图 PNG 导出失败：%1", "Failed to export result view PNG: %1");
+    add("结果视图 PNG 导出失败", "Failed to export result view PNG");
+    add("网格对象刷新完成", "Grid object refresh completed");
+    add("结果对象刷新完成，共 %1 个", "Result object refresh completed: %1 item(s)");
+    add("结果对象刷新完成", "Result object refresh completed");
+    add("结果对象刷新失败，请查看日志", "Result object refresh failed. Check the log.");
+    add("原始网格载入失败，请查看日志", "Input grid loading failed. Check the log.");
+    add("原始网格导出失败，请查看日志", "Input grid export failed. Check the log.");
+    add("已有结果已载入", "Existing result loaded");
+    add("已有结果载入失败，请查看日志", "Existing result loading failed. Check the log.");
+    add("已有结果载入失败", "Existing Result Loading Failed");
+    add("结果对象已删除或原本不存在", "The result object was deleted or did not exist");
+    add("删除失败，请查看日志", "Deletion failed. Check the log.");
+    add("追踪完成，结果已写入 GeoEast 数据库", "Tracing completed. Results were written to the GeoEast database.");
+    add("GeoEast 数据库配置", "GeoEast Database Configuration");
+    add("FaultPolyTrace 帮助提示", "FaultPolyTrace Help");
+    add("FaultPolyTrace 断层多边形自动追踪\n\n"
+        "定位：平面断层属性到闭合断层多边形的自动追踪工具。\n"
+        "入口：可独立运行，也可通过 GeoEast 菜单调用执行程序。",
+        "FaultPolyTrace Fault Polygon Auto Tracing\n\n"
+        "Purpose: automatically trace closed polygons from planar fault attributes.\n"
+        "Access: run as a standalone application or launch the executable from GeoEast.");
+    add("常用流程：\n"
+        "1. 在【数据库配置】中确认 GeoEast 根目录、数据根目录、项目、用户和执行程序。\n"
+        "2. 点击【刷新网格列表】读取 GeoEast 中的输入网格。\n"
+        "3. 设置输入网格、输出多边形、结果颜色和必要参数。\n"
+        "4. 点击【开始追踪】，完成后本窗口会显示原始网格和结果多边形。\n"
+        "5. 如需用 GeoEast 官方窗口查看，点击【打开工区底图】或【打开平面成图】，再在图层树中勾选 Grids 和 Fault Polygons。\n"
+        "6. 如需移除旧结果，在【结果查看】中点击【删除当前结果】。\n\n"
+        "详细说明见 docs/用户操作手册.md 和 docs/评审交付与异机运行说明.md。",
+        "Common workflow:\n"
+        "1. In [Database Configuration], confirm the GeoEast root, data root, project, user, and executable.\n"
+        "2. Click [Refresh Grid List] to read input grids from GeoEast.\n"
+        "3. Select the input grid, output polygon name, result color, and required parameters.\n"
+        "4. Click [Start Trace]. The input grid and result polygons are displayed when processing finishes.\n"
+        "5. For viewing in GeoEast, open Basemap or GeoMapping and enable Grids and Fault Polygons in the layer tree.\n"
+        "6. To remove an old result, use [Delete Current Result] under [Result View].\n\n"
+        "See docs/User Manual and the deployment guide for complete instructions.");
+    add("GeoEast 程序不存在", "GeoEast Application Not Found");
+    add("未找到 %1：\n%2", "%1 was not found:\n%2");
+    add("启动失败", "Launch Failed");
+    add("无法启动 %1。请确认 GeoEast 环境和 license 可用。",
+        "Cannot start %1. Confirm that the GeoEast environment and license are available.");
+    add("项目: %1", "Project: %1");
+    add("网格: %1", "Grid: %1");
+    add("数据库: %1", "Database: %1");
+
     return map;
 }
 
 const QMap<QString, QString>& englishTextMap() {
     static const QMap<QString, QString> map = buildEnglishTextMap();
     return map;
+}
+
+QString translateTemplate(const QString& text, bool reverse) {
+    const QMap<QString, QString>& map = englishTextMap();
+    const QRegularExpression placeholderExpression(QStringLiteral("%([1-9])"));
+    for (auto it = map.constBegin(); it != map.constEnd(); ++it) {
+        const QString source = reverse ? it.value() : it.key();
+        const QString target = reverse ? it.key() : it.value();
+        if (!source.contains(placeholderExpression)) {
+            continue;
+        }
+
+        QString pattern;
+        QVector<int> placeholderIndexes;
+        int previousEnd = 0;
+        QRegularExpressionMatchIterator matches = placeholderExpression.globalMatch(source);
+        while (matches.hasNext()) {
+            const QRegularExpressionMatch match = matches.next();
+            pattern += QRegularExpression::escape(source.mid(previousEnd, match.capturedStart() - previousEnd));
+            pattern += QStringLiteral("(.*?)");
+            placeholderIndexes.push_back(match.captured(1).toInt());
+            previousEnd = match.capturedEnd();
+        }
+        pattern += QRegularExpression::escape(source.mid(previousEnd));
+
+        const QRegularExpression expression(
+            QStringLiteral("^") + pattern + QStringLiteral("$"),
+            QRegularExpression::DotMatchesEverythingOption);
+        const QRegularExpressionMatch result = expression.match(text);
+        if (!result.hasMatch()) {
+            continue;
+        }
+
+        QString translated = target;
+        for (int capture = 0; capture < placeholderIndexes.size(); ++capture) {
+            translated.replace(QStringLiteral("%") + QString::number(placeholderIndexes.at(capture)),
+                               result.captured(capture + 1));
+        }
+        return translated;
+    }
+    return text;
 }
 
 bool isEnglish(const QString& languageCode) {
@@ -538,7 +970,7 @@ QString translate(const QString& zh, const QString& languageCode) {
         return key;
     }
     const auto it = englishTextMap().constFind(key);
-    return it == englishTextMap().constEnd() ? key : it.value();
+    return it == englishTextMap().constEnd() ? translateTemplate(key, false) : it.value();
 }
 
 QString canonical(const QString& text) {
@@ -548,17 +980,19 @@ QString canonical(const QString& text) {
             return it.key();
         }
     }
-    return text;
+    return translateTemplate(text, true);
 }
 
 void captureTranslatableText(QObject* root) {
     if (!root) {
         return;
     }
-    const QList<QObject*> objects = root->findChildren<QObject*>();
+    QList<QObject*> objects = root->findChildren<QObject*>();
+    objects.prepend(root);
     for (QObject* object : objects) {
         if (QAction* action = qobject_cast<QAction*>(object)) {
             rememberText(action, "fptTextZh", action->text());
+            rememberText(action, "fptIconTextZh", action->iconText());
             rememberText(action, "fptToolTipZh", action->toolTip());
         }
         if (QMenu* menu = qobject_cast<QMenu*>(object)) {
@@ -566,6 +1000,10 @@ void captureTranslatableText(QObject* root) {
         }
         if (QLabel* label = qobject_cast<QLabel*>(object)) {
             rememberText(label, "fptTextZh", label->text());
+        } else if (QToolButton* button = qobject_cast<QToolButton*>(object)) {
+            if (!button->defaultAction()) {
+                rememberText(button, "fptTextZh", button->text());
+            }
         } else if (QPushButton* button = qobject_cast<QPushButton*>(object)) {
             rememberText(button, "fptTextZh", button->text());
         } else if (QCheckBox* checkBox = qobject_cast<QCheckBox*>(object)) {
@@ -576,7 +1014,13 @@ void captureTranslatableText(QObject* root) {
         if (QLineEdit* lineEdit = qobject_cast<QLineEdit*>(object)) {
             rememberText(lineEdit, "fptPlaceholderZh", lineEdit->placeholderText());
         }
+        if (QSpinBox* spinBox = qobject_cast<QSpinBox*>(object)) {
+            rememberText(spinBox, "fptSuffixZh", spinBox->suffix());
+        } else if (QDoubleSpinBox* spinBox = qobject_cast<QDoubleSpinBox*>(object)) {
+            rememberText(spinBox, "fptSuffixZh", spinBox->suffix());
+        }
         if (QWidget* widget = qobject_cast<QWidget*>(object)) {
+            rememberText(widget, "fptWindowTitleZh", widget->windowTitle());
             rememberText(widget, "fptToolTipZh", widget->toolTip());
         }
     }
@@ -586,7 +1030,8 @@ void applyTranslatableText(QObject* root, const QString& languageCode) {
     if (!root) {
         return;
     }
-    const QList<QObject*> objects = root->findChildren<QObject*>();
+    QList<QObject*> objects = root->findChildren<QObject*>();
+    objects.prepend(root);
     for (QObject* object : objects) {
         auto translated = [&](QObject* target, const char* propertyName) {
             return translate(target->property(propertyName).toString(), languageCode);
@@ -598,6 +1043,12 @@ void applyTranslatableText(QObject* root, const QString& languageCode) {
             if (action->property("fptToolTipZh").isValid()) {
                 action->setToolTip(translated(action, "fptToolTipZh"));
             }
+            if (action->property("fptIconTextZh").isValid()) {
+                const QVariant englishIconText = action->property("fptIconTextEn");
+                action->setIconText(isEnglish(languageCode) && englishIconText.isValid()
+                                        ? englishIconText.toString()
+                                        : translated(action, "fptIconTextZh"));
+            }
         }
         if (QMenu* menu = qobject_cast<QMenu*>(object)) {
             if (menu->property("fptTitleZh").isValid()) {
@@ -607,6 +1058,10 @@ void applyTranslatableText(QObject* root, const QString& languageCode) {
         if (QLabel* label = qobject_cast<QLabel*>(object)) {
             if (label->property("fptTextZh").isValid()) {
                 label->setText(translated(label, "fptTextZh"));
+            }
+        } else if (QToolButton* button = qobject_cast<QToolButton*>(object)) {
+            if (!button->defaultAction() && button->property("fptTextZh").isValid()) {
+                button->setText(translated(button, "fptTextZh"));
             }
         } else if (QPushButton* button = qobject_cast<QPushButton*>(object)) {
             if (button->property("fptTextZh").isValid()) {
@@ -626,7 +1081,19 @@ void applyTranslatableText(QObject* root, const QString& languageCode) {
                 lineEdit->setPlaceholderText(translated(lineEdit, "fptPlaceholderZh"));
             }
         }
+        if (QSpinBox* spinBox = qobject_cast<QSpinBox*>(object)) {
+            if (spinBox->property("fptSuffixZh").isValid()) {
+                spinBox->setSuffix(translated(spinBox, "fptSuffixZh"));
+            }
+        } else if (QDoubleSpinBox* spinBox = qobject_cast<QDoubleSpinBox*>(object)) {
+            if (spinBox->property("fptSuffixZh").isValid()) {
+                spinBox->setSuffix(translated(spinBox, "fptSuffixZh"));
+            }
+        }
         if (QWidget* widget = qobject_cast<QWidget*>(object)) {
+            if (widget->property("fptWindowTitleZh").isValid()) {
+                widget->setWindowTitle(translated(widget, "fptWindowTitleZh"));
+            }
             if (widget->property("fptToolTipZh").isValid()) {
                 widget->setToolTip(translated(widget, "fptToolTipZh"));
             }

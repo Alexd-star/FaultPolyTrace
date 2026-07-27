@@ -1426,7 +1426,8 @@ void FaultTraceDialog::buildUi() {
         polygonLineWidthSpin_->setFixedWidth(64);
         polygonOpacitySpin_->setFixedWidth(64);
         browseDatButton->setText(QString::fromUtf8("浏览"));
-        browseDatButton->setFixedWidth(52);
+        browseDatButton->setMinimumWidth(70);
+        browseDatButton->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
         refreshButton_->setText(QString::fromUtf8("刷新网格列表"));
         refreshButton_->setToolTip(QString::fromUtf8("从 GeoEast 数据库读取可用输入网格列表"));
         refreshButton_->setIcon(fpt_ui::toolIcon(fpt_ui::IconKind::Reset));
@@ -1639,32 +1640,34 @@ void FaultTraceDialog::buildUi() {
         connect(projectStructureAction, &QAction::triggered, this, [openLocalFile]() { openLocalFile("docs/项目目录结构与文件说明.md"); });
         QAction* aboutAction = helpMenu->addAction(QString::fromUtf8("关于 FaultPolyTrace"));
         connect(aboutAction, &QAction::triggered, this, [this]() {
-            QMessageBox::information(this, QString::fromUtf8("关于 FaultPolyTrace"),
-                                     QString::fromUtf8("FaultPolyTrace 断层多边形自动追踪\n\n"
+            QMessageBox::information(this, uiText(QString::fromUtf8("关于 FaultPolyTrace")),
+                                     uiText(QString::fromUtf8("FaultPolyTrace 断层多边形自动追踪\n\n"
                                                        "定位：平面断层属性到闭合断层多边形的自动追踪工具。\n"
-                                                       "入口：可独立运行，也可通过 GeoEast 菜单调用执行程序。"));
+                                                       "入口：可独立运行，也可通过 GeoEast 菜单调用执行程序。")));
         });
 
         // 工具栏使用简短文案，菜单中仍保留完整名称。
-        const auto setBarText = [](QAction* action, const QString& shortText) {
+        const auto setBarText = [](QAction* action, const QString& shortText, const QString& englishText) {
             if (action) {
                 action->setIconText(shortText);
+                action->setProperty("fptIconTextZh", shortText);
+                action->setProperty("fptIconTextEn", englishText);
             }
         };
-        setBarText(openAction, QString::fromUtf8("打开"));
-        setBarText(saveAction, QString::fromUtf8("保存设置"));
-        setBarText(panAction, QString::fromUtf8("平移"));
-        setBarText(zoomInAction, QString::fromUtf8("放大"));
-        setBarText(zoomOutAction, QString::fromUtf8("缩小"));
-        setBarText(resetViewAction, QString::fromUtf8("重置"));
-        setBarText(runTraceAction_, QString::fromUtf8("开始追踪"));
-        setBarText(stopTraceAction_, QString::fromUtf8("停止"));
-        setBarText(configAction, QString::fromUtf8("数据库"));
-        setBarText(refreshGridAction_, QString::fromUtf8("刷新网格"));
-        setBarText(restoreDefaultsAction_, QString::fromUtf8("恢复默认"));
-        setBarText(exportViewAction_, QString::fromUtf8("导出PNG"));
-        setBarText(openBasemapAction_, QString::fromUtf8("工区底图"));
-        setBarText(helpAction, QString::fromUtf8("帮助"));
+        setBarText(openAction, QString::fromUtf8("打开"), "Open");
+        setBarText(saveAction, QString::fromUtf8("保存设置"), "Save");
+        setBarText(panAction, QString::fromUtf8("平移"), "Pan");
+        setBarText(zoomInAction, QString::fromUtf8("放大"), "Zoom In");
+        setBarText(zoomOutAction, QString::fromUtf8("缩小"), "Zoom Out");
+        setBarText(resetViewAction, QString::fromUtf8("重置"), "Reset");
+        setBarText(runTraceAction_, QString::fromUtf8("开始追踪"), "Trace");
+        setBarText(stopTraceAction_, QString::fromUtf8("停止"), "Stop");
+        setBarText(configAction, QString::fromUtf8("数据库"), "Database");
+        setBarText(refreshGridAction_, QString::fromUtf8("刷新网格"), "Grids");
+        setBarText(restoreDefaultsAction_, QString::fromUtf8("恢复默认"), "Defaults");
+        setBarText(exportViewAction_, QString::fromUtf8("导出PNG"), "PNG");
+        setBarText(openBasemapAction_, QString::fromUtf8("工区底图"), "Basemap");
+        setBarText(helpAction, QString::fromUtf8("帮助"), "Help");
 
         QToolBar* toolbar = new QToolBar(this);
         toolbar->setMovable(false);
@@ -2345,14 +2348,15 @@ void FaultTraceDialog::showDatabaseConfigDialog() {
         QLabel* label = new QLabel(labelText, body);
         label->setFixedWidth(132);
         QPushButton* browse = new QPushButton(QString::fromUtf8("浏览..."), body);
-        browse->setFixedWidth(64);
+        browse->setMinimumWidth(80);
+        browse->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
         connect(browse, &QPushButton::clicked, &dialog, [this, edit, dialogTitle, directory]() {
             QString path;
             if (directory) {
-                path = QFileDialog::getExistingDirectory(this, dialogTitle, edit->text());
+                path = QFileDialog::getExistingDirectory(this, uiText(dialogTitle), edit->text());
             } else {
-                path = QFileDialog::getOpenFileName(this, dialogTitle, QFileInfo(edit->text()).absolutePath(),
-                                                   QString::fromUtf8("可执行文件 (*.exe);;所有文件 (*.*)"));
+                path = QFileDialog::getOpenFileName(this, uiText(dialogTitle), QFileInfo(edit->text()).absolutePath(),
+                                                   uiText(QString::fromUtf8("可执行文件 (*.exe);;所有文件 (*.*)")));
             }
             if (!path.isEmpty()) {
                 edit->setText(QDir::toNativeSeparators(path));
@@ -2441,7 +2445,7 @@ void FaultTraceDialog::showDatabaseConfigDialog() {
         if (userCopy->text().trimmed().isEmpty()) {
             userCopy->setText(defaultUserName());
         }
-        checkStatus->setText(QString::fromUtf8("已执行自动检测。项目名无法安全推断，请按当前 GeoEast 项目填写后再检查配置。"));
+        checkStatus->setText(uiText(QString::fromUtf8("已执行自动检测。项目名无法安全推断，请按当前 GeoEast 项目填写后再检查配置。")));
     };
 
     auto currentIssues = [&]() {
@@ -2453,19 +2457,19 @@ void FaultTraceDialog::showDatabaseConfigDialog() {
     auto showCheckResult = [&]() -> bool {
         const QStringList issues = currentIssues();
         if (issues.isEmpty()) {
-            checkStatus->setText(QString::fromUtf8("配置检查通过。可以刷新网格列表。"));
-            QMessageBox::information(&dialog, QString::fromUtf8("配置检查通过"),
-                                     QString::fromUtf8("GeoEast 数据库配置项完整。保存后可返回主界面刷新网格列表。"));
+            checkStatus->setText(uiText(QString::fromUtf8("配置检查通过。可以刷新网格列表。")));
+            QMessageBox::information(&dialog, uiText(QString::fromUtf8("配置检查通过")),
+                                     uiText(QString::fromUtf8("GeoEast 数据库配置项完整。保存后可返回主界面刷新网格列表。")));
             return true;
         }
-        checkStatus->setText(QString::fromUtf8("配置仍有 %1 项需要处理。").arg(issues.size()));
-        QMessageBox::warning(&dialog, QString::fromUtf8("配置需要补充"),
-                             QString::fromUtf8("请处理以下项目：\n\n- %1").arg(issues.join(QString::fromUtf8("\n- "))));
+        checkStatus->setText(uiText(QString::fromUtf8("配置仍有 %1 项需要处理。").arg(issues.size())));
+        QMessageBox::warning(&dialog, uiText(QString::fromUtf8("配置需要补充")),
+                             uiText(QString::fromUtf8("请处理以下项目：\n\n- %1").arg(issues.join(QString::fromUtf8("\n- ")))));
         return false;
     };
 
     connect(helpButton, &QPushButton::clicked, &dialog, [&]() {
-        QMessageBox::information(&dialog, QString::fromUtf8("GeoEast 配置帮助"), geoEastConfigHelpText());
+        QMessageBox::information(&dialog, uiText(QString::fromUtf8("GeoEast 配置帮助")), uiText(geoEastConfigHelpText()));
     });
     connect(autoDetectButton, &QPushButton::clicked, &dialog, applyAutoDetection);
     connect(checkButton, &QPushButton::clicked, &dialog, showCheckResult);
@@ -2475,13 +2479,13 @@ void FaultTraceDialog::showDatabaseConfigDialog() {
         if (!issues.isEmpty()) {
             const int choice = QMessageBox::warning(
                 &dialog,
-                QString::fromUtf8("配置尚未完整"),
-                QString::fromUtf8("以下配置可能导致刷新网格或写库失败：\n\n- %1\n\n建议返回修改。是否仍然保存？")
-                    .arg(issues.join(QString::fromUtf8("\n- "))),
+                uiText(QString::fromUtf8("配置尚未完整")),
+                uiText(QString::fromUtf8("以下配置可能导致刷新网格或写库失败：\n\n- %1\n\n建议返回修改。是否仍然保存？")
+                    .arg(issues.join(QString::fromUtf8("\n- ")))),
                 QMessageBox::Save | QMessageBox::Cancel,
                 QMessageBox::Cancel);
             if (choice != QMessageBox::Save) {
-                checkStatus->setText(QString::fromUtf8("配置未保存，请补齐后再应用。"));
+                checkStatus->setText(uiText(QString::fromUtf8("配置未保存，请补齐后再应用。")));
                 return;
             }
         }
@@ -2504,6 +2508,8 @@ void FaultTraceDialog::showDatabaseConfigDialog() {
         }
     });
 
+    fpt_ui::captureTranslatableText(&dialog);
+    fpt_ui::applyTranslatableText(&dialog, languageCode());
     dialog.exec();
 }
 
@@ -2662,15 +2668,15 @@ void FaultTraceDialog::restoreDefaults() {
 void FaultTraceDialog::showHelpHint() {
     appendLog(QString::fromUtf8("帮助文档：docs/用户操作手册.md；异机交付说明：docs/评审交付与异机运行说明.md。"));
     QMessageBox::information(this,
-                             QString::fromUtf8("FaultPolyTrace 帮助提示"),
-                             QString::fromUtf8("常用流程：\n"
+                             uiText(QString::fromUtf8("FaultPolyTrace 帮助提示")),
+                             uiText(QString::fromUtf8("常用流程：\n"
                                                "1. 在【数据库配置】中确认 GeoEast 根目录、数据根目录、项目、用户和执行程序。\n"
                                                 "2. 点击【刷新网格列表】读取 GeoEast 中的输入网格。\n"
                                                 "3. 设置输入网格、输出多边形、结果颜色和必要参数。\n"
                                                 "4. 点击【开始追踪】，完成后本窗口会显示原始网格和结果多边形。\n"
                                                 "5. 如需用 GeoEast 官方窗口查看，点击【打开工区底图】或【打开平面成图】，再在图层树中勾选 Grids 和 Fault Polygons。\n"
                                                 "6. 如需移除旧结果，在【结果查看】中点击【删除当前结果】。\n\n"
-                                                "详细说明见 docs/用户操作手册.md 和 docs/评审交付与异机运行说明.md。"));
+                                                "详细说明见 docs/用户操作手册.md 和 docs/评审交付与异机运行说明.md。")));
 }
 
 QString FaultTraceDialog::languageCode() const {
@@ -2766,7 +2772,16 @@ void FaultTraceDialog::retranslateUi() {
     if (colorBarWidget_) {
         static_cast<ColorBarWidget*>(colorBarWidget_)->setLanguage(currentLanguage_);
     }
-    // 运行日志是进程输出，切换界面语言时不重排，避免抹掉分级着色。
+    if (logEdit_ && !logEdit_->toPlainText().isEmpty()) {
+        QStringList sourceLines;
+        for (const QString& line : logEdit_->toPlainText().split('\n')) {
+            sourceLines << fpt_ui::canonical(line);
+        }
+        logEdit_->clear();
+        for (const QString& line : sourceLines) {
+            appendLog(line);
+        }
+    }
     updateStatusContext();
 }
 
@@ -3174,8 +3189,8 @@ bool FaultTraceDialog::launchGeoEastApp(const QString& exeName, const QString& d
     const QString geoEastRoot = QDir::fromNativeSeparators(geoEastRootEdit_ ? geoEastRootEdit_->text().trimmed() : QString());
     const QString exePath = QDir(geoEastRoot).absoluteFilePath("GeoEast-RC/bin/" + exeName);
     if (!QFileInfo::exists(exePath)) {
-        QMessageBox::warning(this, QString::fromUtf8("GeoEast 程序不存在"),
-                             QString::fromUtf8("未找到 %1：\n%2").arg(displayName, QDir::toNativeSeparators(exePath)));
+        QMessageBox::warning(this, uiText(QString::fromUtf8("GeoEast 程序不存在")),
+                             uiText(QString::fromUtf8("未找到 %1：\n%2").arg(displayName, QDir::toNativeSeparators(exePath))));
         return false;
     }
 
@@ -3186,8 +3201,8 @@ bool FaultTraceDialog::launchGeoEastApp(const QString& exeName, const QString& d
     process.setWorkingDirectory(QFileInfo(exePath).absolutePath());
     process.setProcessEnvironment(environment);
     if (!process.startDetached()) {
-        QMessageBox::warning(this, QString::fromUtf8("启动失败"),
-                             QString::fromUtf8("无法启动 %1。请确认 GeoEast 环境和 license 可用。").arg(displayName));
+        QMessageBox::warning(this, uiText(QString::fromUtf8("启动失败")),
+                             uiText(QString::fromUtf8("无法启动 %1。请确认 GeoEast 环境和 license 可用。").arg(displayName)));
         return false;
     }
 
@@ -3471,8 +3486,8 @@ void FaultTraceDialog::loadSelectedOutputInternal(bool userInitiated) {
         appendStatus(QString::fromUtf8("暂无可显示结果，请先运行追踪或刷新结果列表"));
         if (userInitiated) {
             QMessageBox::information(this,
-                                     QString::fromUtf8("没有可选择的结果"),
-                                     QString::fromUtf8("请先运行追踪，或点击【刷新结果列表】读取当前项目中的结果多边形对象。"));
+                                     uiText(QString::fromUtf8("没有可选择的结果")),
+                                     uiText(QString::fromUtf8("请先运行追踪，或点击【刷新结果列表】读取当前项目中的结果多边形对象。")));
         }
         return;
     }
@@ -3951,9 +3966,10 @@ void FaultTraceDialog::appendLog(const QString& text) {
     // 与独立软件共用行级着色规则；后台英文输出默认折叠到“详细日志”。
     QString html;
     for (const QString& line : text.split('\n', Qt::SkipEmptyParts)) {
-        const fpt_ui::LogLineStyle style = fpt_ui::logLineStyle(line);
+        const QString localizedLine = uiText(fpt_ui::canonical(line));
+        const fpt_ui::LogLineStyle style = fpt_ui::logLineStyle(localizedLine);
         if (style.isDebug && verboseLogCheck_ && !verboseLogCheck_->isChecked()) {
-            pendingDebugLines_ << line;
+            pendingDebugLines_ << fpt_ui::canonical(line);
             if (pendingDebugLines_.size() > 2000) {
                 pendingDebugLines_.removeFirst();
             }
@@ -3969,7 +3985,8 @@ void FaultTraceDialog::appendLog(const QString& text) {
 }
 
 void FaultTraceDialog::appendStatus(const QString& text) {
-    statusLabel_->setText(QDateTime::currentDateTime().toString("HH:mm:ss") + "  " + text);
+    statusLabel_->setText(QDateTime::currentDateTime().toString("HH:mm:ss") + "  " +
+                          uiText(fpt_ui::canonical(text)));
     updateStatusContext();
 }
 

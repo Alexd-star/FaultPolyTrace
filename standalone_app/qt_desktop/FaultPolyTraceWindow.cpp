@@ -450,8 +450,9 @@ void configureFormGrid(QGridLayout* layout) {
 }
 
 void configureSmallButton(QPushButton* button) {
-    button->setFixedWidth(56);
+    button->setMinimumWidth(64);
     button->setMinimumHeight(24);
+    button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
 }
 void configureElasticButton(QPushButton* button) {
     button->setMinimumWidth(0);
@@ -838,7 +839,7 @@ protected:
         painter.drawText(QPoint(24, 34), uiText(QString::fromUtf8("[视图区] %1")).arg(modeText));
         painter.setFont(QFont(painter.font().family(), 9));
         painter.setPen(QColor("#777777"));
-        painter.drawText(QRect(width() - 280, 18, 250, 20), Qt::AlignRight, status_);
+        painter.drawText(QRect(width() - 280, 18, 250, 20), Qt::AlignRight, uiText(status_));
         painter.drawText(QRect(width() - 280, 38, 250, 20), Qt::AlignRight,
                          uiText(QString::fromUtf8("缩放 %1%")).arg(qRound(zoom_ * 100)));
         if (grid_.isEmpty() && polygons_.isEmpty()) {
@@ -1307,25 +1308,27 @@ void FaultPolyTraceWindow::buildUi() {
     helpMenu->addAction(projectStructureAction);
 
     // 工具栏使用简短文案，菜单中仍保留完整名称。
-    const auto setBarText = [](QAction* action, const QString& shortText) {
+    const auto setBarText = [](QAction* action, const QString& shortText, const QString& englishText) {
         if (action) {
             action->setIconText(shortText);
+            action->setProperty("fptIconTextZh", shortText);
+            action->setProperty("fptIconTextEn", englishText);
         }
     };
-    setBarText(openAction, QString::fromUtf8("打开"));
-    setBarText(saveTplAction, QString::fromUtf8("保存模板"));
-    setBarText(loadTplAction, QString::fromUtf8("载入模板"));
-    setBarText(panAction, QString::fromUtf8("平移"));
-    setBarText(zoomInAction, QString::fromUtf8("放大"));
-    setBarText(zoomOutAction, QString::fromUtf8("缩小"));
-    setBarText(resetViewAction, QString::fromUtf8("重置"));
-    setBarText(runAction_, QString::fromUtf8("开始追踪"));
-    setBarText(stopAction_, QString::fromUtf8("停止"));
-    setBarText(resetAction, QString::fromUtf8("恢复默认"));
-    setBarText(pngAction, QString::fromUtf8("导出PNG"));
-    setBarText(outputDirAction, QString::fromUtf8("输出目录"));
-    setBarText(refreshResultsAction_, QString::fromUtf8("刷新结果"));
-    setBarText(helpAction, QString::fromUtf8("帮助"));
+    setBarText(openAction, QString::fromUtf8("打开"), "Open");
+    setBarText(saveTplAction, QString::fromUtf8("保存模板"), "Save");
+    setBarText(loadTplAction, QString::fromUtf8("载入模板"), "Load");
+    setBarText(panAction, QString::fromUtf8("平移"), "Pan");
+    setBarText(zoomInAction, QString::fromUtf8("放大"), "Zoom In");
+    setBarText(zoomOutAction, QString::fromUtf8("缩小"), "Zoom Out");
+    setBarText(resetViewAction, QString::fromUtf8("重置"), "Reset");
+    setBarText(runAction_, QString::fromUtf8("开始追踪"), "Trace");
+    setBarText(stopAction_, QString::fromUtf8("停止"), "Stop");
+    setBarText(resetAction, QString::fromUtf8("恢复默认"), "Defaults");
+    setBarText(pngAction, QString::fromUtf8("导出PNG"), "PNG");
+    setBarText(outputDirAction, QString::fromUtf8("输出目录"), "Output");
+    setBarText(refreshResultsAction_, QString::fromUtf8("刷新结果"), "Results");
+    setBarText(helpAction, QString::fromUtf8("帮助"), "Help");
 
     QToolBar* toolbar = addToolBar(QString::fromUtf8("工具栏"));
     toolbar->setMovable(false);
@@ -1562,7 +1565,7 @@ void FaultPolyTraceWindow::buildUi() {
     showOverlayLayerButton_->setText(QString::fromUtf8("叠加查看"));
     showOverlayLayerButton_->setToolTip(QString::fromUtf8("同时显示原始网格和结果多边形，用于检查贴合关系。"));
     configureSmallButton(showOverlayLayerButton_);
-    showOverlayLayerButton_->setFixedWidth(72);
+    showOverlayLayerButton_->setMinimumWidth(96);
     layerPanelLayout->addWidget(showGridLayerCheck_, 0, 0, 1, 2);
     layerPanelLayout->addWidget(showPolygonLayerCheck_, 1, 0, 1, 2);
     layerPanelLayout->addWidget(layerHintLabel_, 2, 0, 1, 2);
@@ -2602,12 +2605,14 @@ void FaultPolyTraceWindow::retranslateUi() {
         static_cast<ColorBarWidget*>(colorBarWidget_)->setLanguage(currentLanguage_);
     }
     if (logEdit_ && !logEdit_->toPlainText().isEmpty()) {
-        QStringList translatedLines;
+        QStringList sourceLines;
         for (const QString& line : logEdit_->toPlainText().split('\n')) {
-            translatedLines << uiText(line);
+            sourceLines << fpt_ui::canonical(line);
         }
-        logEdit_->setPlainText(translatedLines.join('\n'));
-        logEdit_->moveCursor(QTextCursor::End);
+        logEdit_->clear();
+        for (const QString& line : sourceLines) {
+            appendLog(line);
+        }
     }
     updateTaskPreview();
     updateResultPanel();
@@ -3116,7 +3121,7 @@ void FaultPolyTraceWindow::showGeoEastConfigDialog() {
         if (userCopy->text().trimmed().isEmpty()) {
             userCopy->setText(defaultUserName());
         }
-        checkStatus->setText(QString::fromUtf8("已执行自动检测。项目名无法安全推断，请按当前 GeoEast 项目填写后再检查配置。"));
+        checkStatus->setText(uiText(QString::fromUtf8("已执行自动检测。项目名无法安全推断，请按当前 GeoEast 项目填写后再检查配置。")));
     };
 
     auto currentIssues = [&]() {
@@ -3128,19 +3133,19 @@ void FaultPolyTraceWindow::showGeoEastConfigDialog() {
     auto showCheckResult = [&]() -> bool {
         const QStringList issues = currentIssues();
         if (issues.isEmpty()) {
-            checkStatus->setText(QString::fromUtf8("配置检查通过。可以刷新网格列表。"));
-            QMessageBox::information(&dialog, QString::fromUtf8("配置检查通过"),
-                                     QString::fromUtf8("GeoEast 数据库配置项完整。保存后可返回主界面刷新网格列表。"));
+            checkStatus->setText(uiText(QString::fromUtf8("配置检查通过。可以刷新网格列表。")));
+            QMessageBox::information(&dialog, uiText(QString::fromUtf8("配置检查通过")),
+                                     uiText(QString::fromUtf8("GeoEast 数据库配置项完整。保存后可返回主界面刷新网格列表。")));
             return true;
         }
-        checkStatus->setText(QString::fromUtf8("配置仍有 %1 项需要处理。").arg(issues.size()));
-        QMessageBox::warning(&dialog, QString::fromUtf8("配置需要补充"),
-                             QString::fromUtf8("请处理以下项目：\n\n- %1").arg(issues.join(QString::fromUtf8("\n- "))));
+        checkStatus->setText(uiText(QString::fromUtf8("配置仍有 %1 项需要处理。").arg(issues.size())));
+        QMessageBox::warning(&dialog, uiText(QString::fromUtf8("配置需要补充")),
+                             uiText(QString::fromUtf8("请处理以下项目：\n\n- %1").arg(issues.join(QString::fromUtf8("\n- ")))));
         return false;
     };
 
     connect(helpButton, &QPushButton::clicked, &dialog, [&]() {
-        QMessageBox::information(&dialog, QString::fromUtf8("GeoEast 配置帮助"), geoEastConfigHelpText());
+        QMessageBox::information(&dialog, uiText(QString::fromUtf8("GeoEast 配置帮助")), uiText(geoEastConfigHelpText()));
     });
     connect(autoDetect, &QPushButton::clicked, &dialog, applyAutoDetection);
     connect(check, &QPushButton::clicked, &dialog, showCheckResult);
@@ -3150,13 +3155,13 @@ void FaultPolyTraceWindow::showGeoEastConfigDialog() {
         if (!issues.isEmpty()) {
             const int choice = QMessageBox::warning(
                 &dialog,
-                QString::fromUtf8("配置尚未完整"),
-                QString::fromUtf8("以下配置可能导致刷新网格或写库失败：\n\n- %1\n\n建议返回修改。是否仍然保存？")
-                    .arg(issues.join(QString::fromUtf8("\n- "))),
+                uiText(QString::fromUtf8("配置尚未完整")),
+                uiText(QString::fromUtf8("以下配置可能导致刷新网格或写库失败：\n\n- %1\n\n建议返回修改。是否仍然保存？")
+                    .arg(issues.join(QString::fromUtf8("\n- ")))),
                 QMessageBox::Save | QMessageBox::Cancel,
                 QMessageBox::Cancel);
             if (choice != QMessageBox::Save) {
-                checkStatus->setText(QString::fromUtf8("配置未保存，请补齐后再应用。"));
+                checkStatus->setText(uiText(QString::fromUtf8("配置未保存，请补齐后再应用。")));
                 return;
             }
         }
@@ -3179,6 +3184,8 @@ void FaultPolyTraceWindow::showGeoEastConfigDialog() {
         }
     });
 
+    fpt_ui::captureTranslatableText(&dialog);
+    fpt_ui::applyTranslatableText(&dialog, languageCode());
     dialog.exec();
 }
 
@@ -3244,15 +3251,15 @@ bool FaultPolyTraceWindow::ensureGeoEastConfigReady(const QString& operation, bo
 
     QMessageBox message(this);
     message.setIcon(QMessageBox::Warning);
-    message.setWindowTitle(QString::fromUtf8("GeoEast 配置不完整"));
-    message.setText(QString::fromUtf8("执行【%1】前需要先补齐 GeoEast 配置。").arg(operation));
-    message.setInformativeText(QString::fromUtf8("缺失或无效项：\n\n- %1\n\n请点击【打开数据库配置】补齐后再执行。保存一次后，下次打开会自动记住。")
-                                   .arg(missing.join(QString::fromUtf8("\n- "))));
+    message.setWindowTitle(uiText(QString::fromUtf8("GeoEast 配置不完整")));
+    message.setText(uiText(QString::fromUtf8("执行【%1】前需要先补齐 GeoEast 配置。").arg(operation)));
+    message.setInformativeText(uiText(QString::fromUtf8("缺失或无效项：\n\n- %1\n\n请点击【打开数据库配置】补齐后再执行。保存一次后，下次打开会自动记住。")
+                                   .arg(missing.join(QString::fromUtf8("\n- ")))));
     QPushButton* fixButton = nullptr;
     if (mainPanelFixable) {
         fixButton = message.addButton(uiText(QString::fromUtf8("去填写")), QMessageBox::AcceptRole);
     }
-    QPushButton* configButton = message.addButton(QString::fromUtf8("打开数据库配置"), QMessageBox::AcceptRole);
+    QPushButton* configButton = message.addButton(uiText(QString::fromUtf8("打开数据库配置")), QMessageBox::AcceptRole);
     message.addButton(uiText(QString::fromUtf8("取消")), QMessageBox::RejectRole);
     message.exec();
     if (fixButton && message.clickedButton() == fixButton) {
@@ -3377,8 +3384,8 @@ void FaultPolyTraceWindow::loadSelectedResultInternal(bool userInitiated) {
         updateStatus(QString::fromUtf8("暂无可载入结果，请先运行追踪或刷新已有结果列表"));
         if (userInitiated) {
             QMessageBox::information(this,
-                                     QString::fromUtf8("没有可载入的结果"),
-                                     QString::fromUtf8("请先运行追踪，或点击【刷新结果列表】读取输出目录/GeoEast 数据库中的已有结果。"));
+                                     uiText(QString::fromUtf8("没有可载入的结果")),
+                                     uiText(QString::fromUtf8("请先运行追踪，或点击【刷新结果列表】读取输出目录/GeoEast 数据库中的已有结果。")));
         }
         return;
     }
@@ -3408,7 +3415,7 @@ void FaultPolyTraceWindow::loadSelectedResultInternal(bool userInitiated) {
     if (!QFileInfo::exists(selectedData)) {
         updateStatus(QString::fromUtf8("结果文件不存在，请刷新结果列表"));
         if (userInitiated) {
-            QMessageBox::warning(this, QString::fromUtf8("结果文件不存在"), QDir::toNativeSeparators(selectedData));
+            QMessageBox::warning(this, uiText(QString::fromUtf8("结果文件不存在")), QDir::toNativeSeparators(selectedData));
         }
         refreshAvailableResults();
         return;
@@ -3544,19 +3551,19 @@ void FaultPolyTraceWindow::runTrace() {
 
     const QString runner = coreRunnerPath();
     if (!QFileInfo::exists(runner)) {
-        QMessageBox::warning(this, QString::fromUtf8("算法程序不存在"), runner);
+        QMessageBox::warning(this, uiText(QString::fromUtf8("算法程序不存在")), runner);
         return;
     }
     const QString self = QFileInfo(QCoreApplication::applicationFilePath()).absoluteFilePath();
     const QString resolvedRunner = QFileInfo(runner).absoluteFilePath();
     if (resolvedRunner.compare(self, Qt::CaseInsensitive) == 0) {
         QMessageBox::warning(this,
-                             QString::fromUtf8("算法程序定位错误"),
-                             QString::fromUtf8("独立软件不能把自身作为核心算法程序启动。请确认发布包中存在 bin/faultpolytrace.exe。"));
+                             uiText(QString::fromUtf8("算法程序定位错误")),
+                             uiText(QString::fromUtf8("独立软件不能把自身作为核心算法程序启动。请确认发布包中存在 bin/faultpolytrace.exe。")));
         return;
     }
     if (inputEdit_->text().trimmed().isEmpty() || !QFileInfo::exists(inputEdit_->text().trimmed())) {
-        QMessageBox::warning(this, QString::fromUtf8("输入文件无效"), QString::fromUtf8("请选择可读取的外部网格文件。"));
+        QMessageBox::warning(this, uiText(QString::fromUtf8("输入文件无效")), uiText(QString::fromUtf8("请选择可读取的外部网格文件。")));
         return;
     }
     logEdit_->clear();
@@ -3809,9 +3816,10 @@ void FaultPolyTraceWindow::appendLog(const QString& text) {
     // 与 GeoEast 插件共用行级着色规则：错误红、完成绿、后台输出灰。
     QString html;
     for (const QString& line : text.split('\n', Qt::SkipEmptyParts)) {
-        const fpt_ui::LogLineStyle style = fpt_ui::logLineStyle(line);
+        const QString localizedLine = uiText(fpt_ui::canonical(line));
+        const fpt_ui::LogLineStyle style = fpt_ui::logLineStyle(localizedLine);
         if (style.isDebug && verboseLogCheck_ && !verboseLogCheck_->isChecked()) {
-            pendingDebugLines_ << line;
+            pendingDebugLines_ << fpt_ui::canonical(line);
             if (pendingDebugLines_.size() > 2000) {
                 pendingDebugLines_.removeFirst();
             }
@@ -4079,7 +4087,7 @@ void FaultPolyTraceWindow::exportPng() {
             uiText(QString::fromUtf8("请先载入并显示原始网格或结果多边形图层，再导出当前视图 PNG。")));
         return;
     }
-    const QString path = QFileDialog::getSaveFileName(this, QString::fromUtf8("导出当前视图 PNG"), QDir(outputDirEdit_->text()).absoluteFilePath("FaultPolyTrace_View.png"), QString::fromUtf8("PNG 图像 (*.png);;所有文件 (*.*)"));
+    const QString path = QFileDialog::getSaveFileName(this, uiText(QString::fromUtf8("导出当前视图 PNG")), QDir(outputDirEdit_->text()).absoluteFilePath("FaultPolyTrace_View.png"), uiText(QString::fromUtf8("PNG 图像 (*.png);;所有文件 (*.*)")));
     if (path.isEmpty()) {
         return;
     }
