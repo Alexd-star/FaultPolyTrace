@@ -31,6 +31,7 @@
 #include <QGroupBox>
 #include <QGuiApplication>
 #include <QHBoxLayout>
+#include <QHash>
 #include <QImage>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -509,6 +510,9 @@ public:
     }
 
     void setMode(Mode mode) {
+        if (mode_ == mode) {
+            return;
+        }
         mode_ = mode;
         update();
     }
@@ -518,29 +522,48 @@ public:
     }
 
     void setLayerVisible(bool showGrid, bool showPolygons) {
+        if (showGridLayer_ == showGrid && showPolygonLayer_ == showPolygons) {
+            return;
+        }
         showGridLayer_ = showGrid;
         showPolygonLayer_ = showPolygons;
         update();
     }
 
     void setStyle(const QColor& color, double lineWidth, double alpha) {
-        color_ = color.isValid() ? color : QColor("#00FFFF");
+        const QColor effectiveColor = color.isValid() ? color : QColor("#00FFFF");
+        const double effectiveAlpha = qBound(0.05, alpha, 1.0);
+        if (color_ == effectiveColor && qFuzzyCompare(lineWidth_, lineWidth) &&
+            qFuzzyCompare(alpha_, effectiveAlpha)) {
+            return;
+        }
+        color_ = effectiveColor;
         lineWidth_ = lineWidth;
-        alpha_ = qBound(0.05, alpha, 1.0);
+        alpha_ = effectiveAlpha;
         update();
     }
 
     void setLanguage(UiLanguage language) {
-        languageCode_ = language == UiLanguage::English ? "en" : "zh-CN";
+        const QString code = language == UiLanguage::English ? "en" : "zh-CN";
+        if (languageCode_ == code) {
+            return;
+        }
+        languageCode_ = code;
         update();
     }
 
     void setTaskSummary(const QStringList& lines) {
+        if (taskLines_ == lines) {
+            return;
+        }
         taskLines_ = lines;
         update();
     }
 
     void setPanMode(bool enabled) {
+        if (panMode_ == enabled) {
+            return;
+        }
         panMode_ = enabled;
         setCursor(enabled ? Qt::OpenHandCursor : Qt::ArrowCursor);
         update();
@@ -654,13 +677,20 @@ public:
                 }
                 return false;
             }
-            if (grid_.size() < nx_ * ny_) {
+            const qint64 cellCount = static_cast<qint64>(nx_) * static_cast<qint64>(ny_);
+            if (cellCount > std::numeric_limits<int>::max()) {
+                if (error) {
+                    *error = QString::fromUtf8("矩阵网格尺寸过大，无法安全载入视图。");
+                }
+                return false;
+            }
+            if (grid_.size() < cellCount) {
                 if (error) {
                     *error = QString::fromUtf8("矩阵网格数值数量不足。");
                 }
                 return false;
             }
-            grid_.resize(nx_ * ny_);
+            grid_.resize(static_cast<int>(cellCount));
             xMin_ = second[0];
             yMin_ = second[1];
             const double dx = third[0] == 0.0 ? 1.0 : third[0];
@@ -668,10 +698,21 @@ public:
             xMax_ = xMin_ + dx * qMax(1, nx_);
             yMax_ = yMin_ + dy * qMax(1, ny_);
         } else {
+            struct GridSample {
+                int line = 0;
+                int cmp = 0;
+                double value = 0.0;
+            };
+            QVector<GridSample> samples;
+            if (sourceInfo.size() > 0) {
+                const qint64 estimate = qMin<qint64>(sourceInfo.size() / 72 + 1,
+                                                     std::numeric_limits<int>::max());
+                samples.reserve(static_cast<int>(estimate));
+            }
             QVector<int> lineKeys;
             QVector<int> cmpKeys;
-            QMap<int, double> lineToX;
-            QMap<int, double> cmpToY;
+            QHash<int, double> lineToX;
+            QHash<int, double> cmpToY;
 
             while (!file.atEnd()) {
                 const QVector<double> values = splitNumbers(file.readLine());
@@ -688,8 +729,9 @@ public:
                     cmpToY.insert(cmp, values[3]);
                     cmpKeys << cmp;
                 }
+                samples << GridSample{line, cmp, values[4]};
             }
-            if (lineKeys.isEmpty() || cmpKeys.isEmpty()) {
+            if (samples.isEmpty() || lineKeys.isEmpty() || cmpKeys.isEmpty()) {
                 if (error) {
                     *error = QString::fromUtf8("未识别到 GeoEast DAT 五列采样数据。");
                 }
@@ -699,10 +741,19 @@ public:
             std::sort(cmpKeys.begin(), cmpKeys.end());
             nx_ = lineKeys.size();
             ny_ = cmpKeys.size();
-            grid_.fill(0.0, nx_ * ny_);
+            const qint64 cellCount = static_cast<qint64>(nx_) * static_cast<qint64>(ny_);
+            if (cellCount > std::numeric_limits<int>::max()) {
+                if (error) {
+                    *error = QString::fromUtf8("GeoEast DAT 网格尺寸过大，无法安全载入视图。");
+                }
+                return false;
+            }
+            grid_.fill(0.0, static_cast<int>(cellCount));
 
-            QMap<int, int> lineIndex;
-            QMap<int, int> cmpIndex;
+            QHash<int, int> lineIndex;
+            QHash<int, int> cmpIndex;
+            lineIndex.reserve(lineKeys.size());
+            cmpIndex.reserve(cmpKeys.size());
             for (int i = 0; i < lineKeys.size(); ++i) {
                 lineIndex.insert(lineKeys[i], i);
             }
@@ -721,18 +772,11 @@ public:
             xMax_ = xMin_ + dx * qMax(1, nx_);
             yMax_ = yMin_ + dy * qMax(1, ny_);
 
-            file.seek(0);
-            while (!file.atEnd()) {
-                const QVector<double> values = splitNumbers(file.readLine());
-                if (values.size() < 5) {
-                    continue;
-                }
-                const int line = qRound(values[0]);
-                const int cmp = qRound(values[1]);
-                const int col = lineIndex.value(line, -1);
-                const int row = cmpIndex.value(cmp, -1);
+            for (const GridSample& sample : samples) {
+                const int col = lineIndex.value(sample.line, -1);
+                const int row = cmpIndex.value(sample.cmp, -1);
                 if (row >= 0 && row < ny_ && col >= 0 && col < nx_) {
-                    grid_[row * nx_ + col] = values[4];
+                    grid_[row * nx_ + col] = sample.value;
                 }
             }
         }
@@ -774,12 +818,12 @@ public:
             update();
             return false;
         }
-        const QStringList lines = QString::fromLocal8Bit(file.readAll()).split(QRegularExpression("[\r\n]+"), Qt::SkipEmptyParts);
         double pxMin = std::numeric_limits<double>::max();
         double pyMin = std::numeric_limits<double>::max();
         double pxMax = -std::numeric_limits<double>::max();
         double pyMax = -std::numeric_limits<double>::max();
-        for (const QString& line : lines) {
+        while (!file.atEnd()) {
+            const QString line = QString::fromLocal8Bit(file.readLine());
             if (!line.contains("POLYGON", Qt::CaseInsensitive) || !line.contains("kept", Qt::CaseInsensitive)) {
                 continue;
             }

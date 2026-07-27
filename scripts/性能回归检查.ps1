@@ -4,7 +4,8 @@
     [int]$ExpectedPolygons = 232,
     [int]$ExpectedKept = 214,
     [int]$MaxPolygonIntersections = 0,
-    [switch]$SkipCountCheck
+    [switch]$SkipCountCheck,
+    [switch]$SkipBuild
 )
 
 $ErrorActionPreference = "Stop"
@@ -31,9 +32,14 @@ if (!(Test-Path -LiteralPath $OfficialDat)) {
 
 New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
 
-& (Join-Path $repoRoot "scripts\build.ps1")
-if ($LASTEXITCODE -ne 0) {
-    throw "Build failed."
+if (!$SkipBuild) {
+    & (Join-Path $repoRoot "scripts\build.ps1")
+    if ($LASTEXITCODE -ne 0) {
+        throw "Build failed."
+    }
+}
+if (!(Test-Path -LiteralPath $exe -PathType Leaf)) {
+    throw "Core executable not found: $exe"
 }
 
 & $exe `

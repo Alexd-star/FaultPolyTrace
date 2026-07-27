@@ -69,6 +69,7 @@
 
 #include <functional>
 #include <cmath>
+#include <cstdlib>
 #include <limits>
 
 #ifdef Q_OS_WIN
@@ -80,6 +81,22 @@
 #endif
 
 namespace {
+
+QVector<double> splitByteNumbers(const QByteArray& line) {
+    QVector<double> numbers;
+    const char* cursor = line.constData();
+    char* end = nullptr;
+    while (*cursor != '\0') {
+        const double value = std::strtod(cursor, &end);
+        if (end == cursor) {
+            ++cursor;
+            continue;
+        }
+        numbers << value;
+        cursor = end;
+    }
+    return numbers;
+}
 
 #ifdef Q_OS_WIN
 DWORD findProcessIdByExecutable(const QString& executableName) {
@@ -511,6 +528,9 @@ public:
     }
 
     void setPanMode(bool enabled) {
+        if (panMode_ == enabled) {
+            return;
+        }
         panMode_ = enabled;
         setCursor(enabled ? Qt::OpenHandCursor : Qt::ArrowCursor);
         update();
@@ -548,6 +568,16 @@ public:
                     const QColor& polygonColor,
                     double polygonLineWidth,
                     double polygonOpacity) {
+        const QColor effectiveColor = polygonColor.isValid() ? polygonColor : QColor("#00FFFF");
+        const double effectiveOpacity = qBound(0.05, polygonOpacity, 1.0);
+        if (database_ == database && project_ == project && gridName_ == grid && output_ == output &&
+            preset_ == preset && traceMode_ == traceMode && thresholdMode_ == thresholdMode &&
+            qFuzzyCompare(percentile_, percentile) && qFuzzyCompare(threshold_, threshold) &&
+            qFuzzyCompare(minArea_, minArea) && polygonColor_ == effectiveColor &&
+            qFuzzyCompare(polygonLineWidth_, polygonLineWidth) &&
+            qFuzzyCompare(polygonOpacity_, effectiveOpacity)) {
+            return;
+        }
         database_ = database;
         project_ = project;
         gridName_ = grid;
@@ -558,24 +588,34 @@ public:
         percentile_ = percentile;
         threshold_ = threshold;
         minArea_ = minArea;
-        polygonColor_ = polygonColor.isValid() ? polygonColor : QColor("#00FFFF");
+        polygonColor_ = effectiveColor;
         polygonLineWidth_ = polygonLineWidth;
-        polygonOpacity_ = qBound(0.05, polygonOpacity, 1.0);
+        polygonOpacity_ = effectiveOpacity;
         update();
     }
 
     void setLayerVisibility(bool showInputLayer, bool showResultLayer) {
+        if (showInputLayer_ == showInputLayer && showResultLayer_ == showResultLayer) {
+            return;
+        }
         showInputLayer_ = showInputLayer;
         showResultLayer_ = showResultLayer;
         update();
     }
 
     void setLanguage(UiLanguage language) {
-        languageCode_ = language == UiLanguage::English ? "en" : "zh-CN";
+        const QString code = language == UiLanguage::English ? "en" : "zh-CN";
+        if (languageCode_ == code) {
+            return;
+        }
+        languageCode_ = code;
         update();
     }
 
     void setActivity(const QString& activity) {
+        if (activity_ == activity) {
+            return;
+        }
         activity_ = activity;
         update();
     }
@@ -613,29 +653,19 @@ public:
             return false;
         }
 
-        const QStringList lines = QString::fromLocal8Bit(file.readAll())
-            .split(QRegularExpression("[\r\n]+"), Qt::SkipEmptyParts);
-        if (lines.size() < 4) {
-            if (error) {
-                *error = QString::fromUtf8("原始网格导出文件格式不完整。");
+        auto readNumericLine = [&file]() {
+            while (!file.atEnd()) {
+                const QVector<double> values = splitByteNumbers(file.readLine());
+                if (!values.isEmpty()) {
+                    return values;
+                }
             }
-            update();
-            return false;
-        }
-
-        auto splitNumbers = [](const QString& text) {
-            QVector<double> values;
-            QRegularExpression numberRe("[-+]?\\d*\\.?\\d+(?:[eE][-+]?\\d+)?");
-            QRegularExpressionMatchIterator it = numberRe.globalMatch(text);
-            while (it.hasNext()) {
-                values << it.next().captured(0).toDouble();
-            }
-            return values;
+            return QVector<double>();
         };
 
-        const QVector<double> dims = splitNumbers(lines[0]);
-        const QVector<double> origin = splitNumbers(lines[1]);
-        const QVector<double> spacing = splitNumbers(lines[2]);
+        const QVector<double> dims = readNumericLine();
+        const QVector<double> origin = readNumericLine();
+        const QVector<double> spacing = readNumericLine();
         if (dims.size() < 2 || origin.size() < 2 || spacing.size() < 2) {
             if (error) {
                 *error = QString::fromUtf8("原始网格导出文件头无效。");
@@ -654,21 +684,29 @@ public:
             return false;
         }
 
-        grid_.reserve(nx_ * ny_);
-        for (int i = 3; i < lines.size(); ++i) {
-            const QVector<double> values = splitNumbers(lines[i]);
+        const qint64 cellCount = static_cast<qint64>(nx_) * static_cast<qint64>(ny_);
+        if (cellCount > std::numeric_limits<int>::max()) {
+            if (error) {
+                *error = QString::fromUtf8("原始网格尺寸过大，无法安全载入视图。");
+            }
+            update();
+            return false;
+        }
+        grid_.reserve(static_cast<int>(cellCount));
+        while (!file.atEnd()) {
+            const QVector<double> values = splitByteNumbers(file.readLine());
             for (double value : values) {
                 grid_ << value;
             }
         }
-        if (grid_.size() < nx_ * ny_) {
+        if (grid_.size() < cellCount) {
             if (error) {
                 *error = QString::fromUtf8("原始网格数值数量不足。");
             }
             update();
             return false;
         }
-        grid_.resize(nx_ * ny_);
+        grid_.resize(static_cast<int>(cellCount));
 
         const double dx = spacing[0] == 0.0 ? 1.0 : spacing[0];
         const double dy = spacing[1] == 0.0 ? 1.0 : spacing[1];
@@ -720,8 +758,6 @@ public:
             return false;
         }
 
-        const QStringList lines = QString::fromLocal8Bit(file.readAll())
-            .split(QRegularExpression("[\r\n]+"), Qt::SkipEmptyParts);
         QRegularExpression numberRe("[-+]?\\d*\\.?\\d+(?:[eE][-+]?\\d+)?");
         double pxMin = std::numeric_limits<double>::max();
         double pyMin = std::numeric_limits<double>::max();
@@ -750,7 +786,8 @@ public:
             }
         };
 
-        for (const QString& line : lines) {
+        while (!file.atEnd()) {
+            const QString line = QString::fromLocal8Bit(file.readLine());
             if (!line.contains("POLYGON", Qt::CaseInsensitive) ||
                 !line.contains("kept", Qt::CaseInsensitive)) {
                 continue;

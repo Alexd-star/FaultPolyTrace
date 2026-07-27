@@ -23,3 +23,10 @@ def test_performance_report_reads_total_elapsed_from_timing_section():
     source = (ROOT / "scripts/生成性能内存报告.py").read_text(encoding="utf-8")
     assert 'diag.get("timing", {}).get("elapsedMs", 0)' in source
     assert 'diag.get("results", {}).get("elapsedMs", 0)' not in source
+
+
+def test_performance_regression_can_reuse_a_verified_build():
+    source = (ROOT / "scripts/性能回归检查.ps1").read_text(encoding="utf-8")
+    assert "[switch]$SkipBuild" in source
+    assert "if (!$SkipBuild)" in source
+    assert "Core executable not found" in source

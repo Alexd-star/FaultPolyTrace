@@ -142,3 +142,26 @@ def test_desktop_startup_is_fast_non_modal_centered_and_single_instance():
     assert "QTimer::singleShot(0, this, [this]()" in desktop
     assert "chineseTextByEnglish" in localization
     assert "if (map.contains(text))" in localization
+
+
+def test_preview_io_is_streamed_and_redundant_repaints_are_skipped():
+    desktop = read("standalone_app/qt_desktop/FaultPolyTraceWindow.cpp")
+    launcher = read("geoeast_plugin/qt_launcher/FaultTraceDialog.cpp")
+    core_io = read("src/io/AsciiGridIO.cpp")
+
+    desktop_grid = desktop[desktop.index("bool loadGrid("):desktop.index("bool loadPolygons(")]
+    desktop_polygons = desktop[desktop.index("bool loadPolygons("):desktop.index("void clearPolygons(")]
+    launcher_grid = launcher[launcher.index("bool loadGridFile("):launcher.index("bool loadPolygonCsv(")]
+    launcher_polygons = launcher[launcher.index("bool loadPolygonCsv("):launcher.index("bool hasVisibleContent(")]
+
+    assert "QVector<GridSample> samples" in desktop_grid
+    assert "file.seek(0)" not in desktop_grid[desktop_grid.index("} else {"):]
+    assert "file.readAll()" not in desktop_polygons
+    assert "splitByteNumbers(file.readLine())" in launcher_grid
+    assert "file.readAll()" not in launcher_grid
+    assert "file.readAll()" not in launcher_polygons
+    assert "pubsetbuf" in core_io
+    assert "cellCount > std::numeric_limits<int>::max()" in desktop_grid
+    assert "cellCount > std::numeric_limits<int>::max()" in launcher_grid
+    assert "showGridLayer_ == showGrid" in desktop
+    assert "showInputLayer_ == showInputLayer" in launcher

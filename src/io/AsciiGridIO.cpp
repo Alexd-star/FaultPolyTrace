@@ -91,7 +91,10 @@ void rememberCoordinate(Map& coordinateByKey, std::vector<int>& keys, int key, d
 } // namespace
 
 Grid2D readGeoEastDatGrid(const std::string& path) {
-    std::ifstream in(path);
+    std::vector<char> inputBuffer(1024 * 1024);
+    std::ifstream in;
+    in.rdbuf()->pubsetbuf(inputBuffer.data(), static_cast<std::streamsize>(inputBuffer.size()));
+    in.open(path);
     if (!in) {
         throw std::runtime_error("Failed to open GeoEast DAT grid file: " + path);
     }
@@ -103,7 +106,15 @@ Grid2D readGeoEastDatGrid(const std::string& path) {
     };
 
     std::vector<Sample> samples;
-    samples.reserve(1024 * 1024);
+    in.seekg(0, std::ios::end);
+    const std::streamoff inputBytes = in.tellg();
+    in.seekg(0, std::ios::beg);
+    if (inputBytes > 0) {
+        const auto estimatedSamples = static_cast<std::size_t>(inputBytes / 64) + 1;
+        samples.reserve(std::min<std::size_t>(estimatedSamples, 16 * 1024 * 1024));
+    } else {
+        samples.reserve(1024 * 1024);
+    }
     std::unordered_map<int, double> lineToX;
     std::unordered_map<int, double> cmpToY;
     std::vector<int> lineKeys;
@@ -225,7 +236,10 @@ Grid2D readAutoGrid(const std::string& path) {
 }
 
 void writePolygonCsv(const std::string& path, const std::vector<Polygon>& polygons) {
-    std::ofstream out(path);
+    std::vector<char> outputBuffer(1024 * 1024);
+    std::ofstream out;
+    out.rdbuf()->pubsetbuf(outputBuffer.data(), static_cast<std::streamsize>(outputBuffer.size()));
+    out.open(path);
     if (!out) {
         throw std::runtime_error("Failed to open output file: " + path);
     }
@@ -247,7 +261,10 @@ void writePolygonCsv(const std::string& path, const std::vector<Polygon>& polygo
 }
 
 void writeBranchCsv(const std::string& path, const std::vector<BranchTrace>& branches) {
-    std::ofstream out(path);
+    std::vector<char> outputBuffer(1024 * 1024);
+    std::ofstream out;
+    out.rdbuf()->pubsetbuf(outputBuffer.data(), static_cast<std::streamsize>(outputBuffer.size()));
+    out.open(path);
     if (!out) {
         throw std::runtime_error("Failed to open branch output file: " + path);
     }

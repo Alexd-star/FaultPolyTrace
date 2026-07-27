@@ -327,6 +327,9 @@ QMap<QString, QString> buildEnglishTextMap() {
     add("请先运行追踪，或在结果列表中选择对象后点击【显示所选结果】。", "Run tracing first, or select an object in the result list and click [Display Selected Result].");
     add("原始网格载入失败", "Input Grid Load Failed");
     add("未能从 GeoEast 导出或解析所选网格。请检查当前项目、网格选择、数据库连接和日志。", "The selected grid could not be exported from GeoEast or parsed. Check the current project, grid selection, database connection, and log.");
+    add("矩阵网格尺寸过大，无法安全载入视图。", "The matrix grid is too large to load safely in the view.");
+    add("GeoEast DAT 网格尺寸过大，无法安全载入视图。", "The GeoEast DAT grid is too large to load safely in the view.");
+    add("原始网格尺寸过大，无法安全载入视图。", "The input grid is too large to load safely in the view.");
     add("结果载入失败", "Result Load Failed");
     add("未能导出或解析所选结果。请确认输入网格与结果属于当前项目，并检查数据库连接和日志。", "The selected result could not be exported or parsed. Confirm that the grid and result belong to the current project, then check the database connection and log.");
     add("图层载入失败", "Layer Load Failed");
