@@ -203,3 +203,39 @@ def test_product_manual_opens_the_current_bundled_document_without_legacy_versio
 
     assert "docs/企业级用户操作手册与产品说明书.md" in section
     assert "V1.0.1" not in section
+
+
+def test_polished_task_flow_keyboard_accessibility_and_text_presentation_are_preserved():
+    desktop = read("standalone_app/qt_desktop/FaultPolyTraceWindow.cpp")
+    launcher = read("geoeast_plugin/qt_launcher/FaultTraceDialog.cpp")
+    localization = read("src/ui/UiLocalization.cpp")
+    theme = read("src/ui/FptTheme.cpp")
+
+    for source in (desktop, launcher):
+        assert "setBuddy" in source
+        assert "setAccessibleName" in source
+        assert "setCursorPosition(0)" in source
+        assert "editingFinished" in source
+        assert "停止追踪" in source
+        assert "导出 PNG" in source
+
+    assert "QWidget::setTabOrder(sourceModeCombo_, inputEdit_)" in desktop
+    assert "QWidget::setTabOrder(gridCombo_, refreshButton_)" in launcher
+    assert "keepLineEditReadable(outputEdit_)" in launcher
+    assert "configurePathLineEdit(outputNameEdit_)" in desktop
+
+    data_position = launcher.index("sidebarContentLayout->addWidget(dataGroup)")
+    result_position = launcher.index("sidebarContentLayout->addWidget(resultGroup)")
+    trace_position = launcher.index("sidebarContentLayout->addWidget(traceGroup)")
+    assert data_position < result_position < trace_position
+
+    data_section = launcher[launcher.index("QGroupBox* dataGroup"):launcher.index("QGroupBox* resultGroup")]
+    assert data_section.index("addWidget(importDatCheck_, 4") < data_section.index("addFormRow(dataLayoutNew, 5")
+    assert data_section.index("addFormRow(dataLayoutNew, 5") < data_section.index("addWidget(overwriteGridCheck_, 6")
+
+    assert 'add("导出 PNG", "Export PNG")' in localization
+    assert '"fptAccessibleNameZh"' in localization
+    assert '"fptAccessibleDescriptionZh"' in localization
+    assert "QToolButton:focus" in theme
+    assert "QCheckBox:focus" in theme
+    assert "QPushButton:focus" in theme

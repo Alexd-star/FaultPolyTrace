@@ -109,7 +109,19 @@ QMap<QString, QString> buildEnglishTextMap() {
     add("开始追踪", "Start Trace");
     add("停止追踪", "Stop Trace");
     add("停止", "Stop");
+    add("导出 PNG", "Export PNG");
     add("选择结果颜色...", "Choose Result Color...");
+    add("选择结果颜色", "Choose Result Color");
+    add("结果颜色值", "Result Color Value");
+    add("浏览输入文件", "Browse Input File");
+    add("浏览输出目录", "Browse Output Folder");
+    add("浏览 DAT 文件", "Browse DAT File");
+    add("已有结果", "Available Results");
+    add("结果视图区", "Result View");
+    add("关闭完成提示", "Dismiss Completion Message");
+    add("重新载入视图", "Reload View");
+    add("查看叠加步骤", "View Overlay Steps");
+    add("线样式", "Line Style");
     add("打开叠合查看指南", "Open Overlay Viewing Guide");
     add("保存当前参数", "Save Current Parameters");
     add("保存参数模板...", "Save Parameter Template...");
@@ -1131,6 +1143,8 @@ void captureTranslatableText(QObject* root) {
         if (QWidget* widget = qobject_cast<QWidget*>(object)) {
             rememberText(widget, "fptWindowTitleZh", widget->windowTitle());
             rememberText(widget, "fptToolTipZh", widget->toolTip());
+            rememberText(widget, "fptAccessibleNameZh", widget->accessibleName());
+            rememberText(widget, "fptAccessibleDescriptionZh", widget->accessibleDescription());
         }
     }
 }
@@ -1209,6 +1223,12 @@ void applyTranslatableText(QObject* root, const QString& languageCode) {
             }
             if (widget->property("fptToolTipZh").isValid()) {
                 widget->setToolTip(translated(widget, "fptToolTipZh"));
+            }
+            if (widget->property("fptAccessibleNameZh").isValid()) {
+                widget->setAccessibleName(translated(widget, "fptAccessibleNameZh"));
+            }
+            if (widget->property("fptAccessibleDescriptionZh").isValid()) {
+                widget->setAccessibleDescription(translated(widget, "fptAccessibleDescriptionZh"));
             }
         }
     }

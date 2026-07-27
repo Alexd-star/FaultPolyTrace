@@ -29,6 +29,7 @@ QString appStyle() {
         QToolButton:hover { background: #CCE8FF; border-color: #99D1FF; }
         QToolButton:pressed { background: #B3DCFF; border-color: #7FBFF2; }
         QToolButton:checked { background: #CCE8FF; border-color: #6AA9D8; }
+        QToolButton:focus { background: #E5F1FB; border-color: #005A9E; }
         QToolButton:disabled { color: #999999; }
         QToolButton#advancedSectionToggle {
             background: #F0F0F0; border: 1px solid #B5B5B5; border-radius: 3px;
@@ -65,6 +66,7 @@ QString appStyle() {
         }
         QWidget#layerPanel { background: transparent; border: 0; }
         QCheckBox#layerCheck { background: transparent; min-height: 22px; padding: 2px 0; }
+        QCheckBox:focus { color: #005A9E; }
         QCheckBox:disabled { color: #999999; }
 
         /* ---- 输入控件 ---- */
@@ -84,6 +86,7 @@ QString appStyle() {
         }
         QPushButton:hover { background: #E5F1FB; border-color: #0078D7; }
         QPushButton:pressed { background: #CCE4F7; }
+        QPushButton:focus { border-color: #005A9E; }
         QPushButton:disabled { background: #D8D8D8; color: #777777; border-color: #B8B8B8; }
         QPushButton#emphasisButton {
             background: #F2F8FD; border-color: #5B9BD5; color: #124B73; font-weight: bold;

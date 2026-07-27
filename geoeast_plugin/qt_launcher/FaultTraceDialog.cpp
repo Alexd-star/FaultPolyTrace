@@ -1265,8 +1265,32 @@ QGridLayout* makeGroupLayout(QGroupBox* box) {
 
 void addFormRow(QGridLayout* layout, int row, const QString& label, QWidget* editor, QWidget* parent) {
     tuneControl(editor);
-    layout->addWidget(makeFormLabel(label, parent), row, 0);
+    QLabel* labelWidget = makeFormLabel(label, parent);
+    if (editor->focusPolicy() != Qt::NoFocus) {
+        labelWidget->setBuddy(editor);
+        if (editor->accessibleName().isEmpty()) {
+            editor->setAccessibleName(label);
+        }
+    }
+    layout->addWidget(labelWidget, row, 0);
     layout->addWidget(editor, row, 1);
+}
+
+void keepLineEditReadable(QLineEdit* edit) {
+    if (!edit) {
+        return;
+    }
+    const auto refreshPresentation = [edit](const QString& text) {
+        edit->setToolTip(text);
+        if (!edit->hasFocus()) {
+            edit->setCursorPosition(0);
+        }
+    };
+    QObject::connect(edit, &QLineEdit::textChanged, edit, refreshPresentation);
+    QObject::connect(edit, &QLineEdit::editingFinished, edit, [edit]() {
+        edit->setCursorPosition(0);
+    });
+    refreshPresentation(edit->text());
 }
 
 } // namespace
@@ -1402,22 +1426,28 @@ void FaultTraceDialog::buildUi() {
         return true;
     });
     outputEdit_ = new QLineEdit(envOrDefault("FPT_GEOEAST_OUTPUT", "FaultPolyTrace_Result"), this);
+    keepLineEditReadable(outputEdit_);
+    outputEdit_->setAccessibleName(QString::fromUtf8("输出多边形"));
     polygonColorEdit_ = new QLineEdit(envOrDefault("FPT_POLYGON_COLOR", "#00FFFF"), this);
     polygonColorEdit_->setMinimumWidth(0);
     polygonColorEdit_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
     polygonColorEdit_->setReadOnly(true);
+    polygonColorEdit_->setAccessibleName(QString::fromUtf8("结果颜色值"));
     polygonColorButton_ = new QPushButton(QString::fromUtf8("选择颜色"), this);
+    polygonColorButton_->setAccessibleName(QString::fromUtf8("选择结果颜色"));
     polygonLineWidthSpin_ = new QDoubleSpinBox(this);
     polygonLineWidthSpin_->setRange(0.01, 5.0);
     polygonLineWidthSpin_->setDecimals(2);
     polygonLineWidthSpin_->setSingleStep(0.005);
     polygonLineWidthSpin_->setValue(0.025);
+    polygonLineWidthSpin_->setAccessibleName(QString::fromUtf8("线宽"));
     polygonLineWidthSpin_->setToolTip(QString::fromUtf8("设置结果多边形在当前视图中的显示线宽"));
     polygonOpacitySpin_ = new QDoubleSpinBox(this);
     polygonOpacitySpin_->setRange(0.05, 1.0);
     polygonOpacitySpin_->setDecimals(2);
     polygonOpacitySpin_->setSingleStep(0.05);
     polygonOpacitySpin_->setValue(1.0);
+    polygonOpacitySpin_->setAccessibleName(QString::fromUtf8("透明度"));
     polygonOpacitySpin_->setToolTip(QString::fromUtf8("设置结果多边形在当前视图中的透明度，不修改数据库几何"));
     connect(polygonColorButton_, &QPushButton::clicked, this, &FaultTraceDialog::choosePolygonColor);
     connect(polygonLineWidthSpin_, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
@@ -1431,10 +1461,13 @@ void FaultTraceDialog::buildUi() {
     importDatCheck_ = new QCheckBox(QString::fromUtf8("从 DAT 导入/覆盖输入网格"), this);
     importDatCheck_->setChecked(false);
     datFileEdit_ = new QLineEdit(defaultOfficialDatPath(), this);
+    keepLineEditReadable(datFileEdit_);
+    datFileEdit_->setAccessibleName(QString::fromUtf8("DAT 文件"));
     datFileEdit_->setMinimumWidth(0);
     datFileEdit_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
     datFileEdit_->setPlaceholderText(QString::fromUtf8("可选：选择需要导入或覆盖到 GeoEast 的 DAT 文件"));
     QPushButton* browseDatButton = new QPushButton(QString::fromUtf8("浏览"), this);
+    browseDatButton->setAccessibleName(QString::fromUtf8("浏览 DAT 文件"));
     overwriteGridCheck_ = new QCheckBox(QString::fromUtf8("覆盖同名 GeoEast 网格"), this);
     overwriteGridCheck_->setChecked(true);
     connect(browseDatButton, &QPushButton::clicked, this, &FaultTraceDialog::browseDatFile);
@@ -1903,7 +1936,7 @@ void FaultTraceDialog::buildUi() {
         setBarText(configAction, QString::fromUtf8("数据库"), "Database");
         setBarText(refreshGridAction_, QString::fromUtf8("刷新网格"), "Grids");
         setBarText(restoreDefaultsAction_, QString::fromUtf8("恢复默认"), "Defaults");
-        setBarText(exportViewAction_, QString::fromUtf8("导出PNG"), "PNG");
+        setBarText(exportViewAction_, QString::fromUtf8("导出 PNG"), "PNG");
         setBarText(openBasemapAction_, QString::fromUtf8("工区底图"), "Basemap");
         setBarText(helpAction, QString::fromUtf8("帮助"), "Help");
 
@@ -1985,16 +2018,16 @@ void FaultTraceDialog::buildUi() {
         lineStyleLayout->addWidget(new QLabel(QString::fromUtf8("透明度"), lineStyleWidget));
         lineStyleLayout->addWidget(polygonOpacitySpin_);
         lineStyleLayout->addStretch(1);
-        addFormRow(dataLayoutNew, 3, QString::fromUtf8("线条"), lineStyleWidget, dataGroup);
+        addFormRow(dataLayoutNew, 3, QString::fromUtf8("线样式"), lineStyleWidget, dataGroup);
         QWidget* datLineWidget = new QWidget(dataGroup);
         QHBoxLayout* datLineLayout = new QHBoxLayout(datLineWidget);
         datLineLayout->setContentsMargins(0, 0, 0, 0);
         datLineLayout->setSpacing(5);
-        datLineLayout->addWidget(browseDatButton);
         datLineLayout->addWidget(datFileEdit_, 1);
-        addFormRow(dataLayoutNew, 4, QString::fromUtf8("DAT 文件"), datLineWidget, dataGroup);
-        dataLayoutNew->addWidget(overwriteGridCheck_, 5, 0, 1, 2);
-        dataLayoutNew->addWidget(importDatCheck_, 6, 0, 1, 2);
+        datLineLayout->addWidget(browseDatButton);
+        dataLayoutNew->addWidget(importDatCheck_, 4, 0, 1, 2);
+        addFormRow(dataLayoutNew, 5, QString::fromUtf8("DAT 文件"), datLineWidget, dataGroup);
+        dataLayoutNew->addWidget(overwriteGridCheck_, 6, 0, 1, 2);
         dataLayoutNew->addWidget(refreshButton_, 7, 0, 1, 2);
 
         QGroupBox* resultGroup = new QGroupBox(QString::fromUtf8("结果查看"), sidebarContent);
@@ -2028,6 +2061,7 @@ void FaultTraceDialog::buildUi() {
         resultLayout->addWidget(layerPanel, 0, 0, 1, 2);
         auto* guidedOutputCombo = new GuidedCatalogComboBox(resultGroup);
         outputCatalogCombo_ = guidedOutputCombo;
+        outputCatalogCombo_->setAccessibleName(QString::fromUtf8("已有结果"));
         outputCatalogCombo_->setProperty("fptCatalogReady", false);
         outputCatalogCombo_->addItem(QString::fromUtf8("请先配置项目并刷新结果"), QString());
         outputCatalogCombo_->setToolTip(QString::fromUtf8("当前 GeoEast 项目中已有的结果多边形对象。选择后可同步为当前输出名称，便于查看、覆盖或删除。"));
@@ -2076,7 +2110,7 @@ void FaultTraceDialog::buildUi() {
         resultLayout->addWidget(outputCatalogCombo_, 1, 0, 1, 2);
         resultLayout->addWidget(refreshOutputsButton_, 2, 0);
         resultLayout->addWidget(loadSelectedOutputButton_, 2, 1);
-        loadResultViewButton_ = new QPushButton(QString::fromUtf8("重新载入结果"), resultGroup);
+        loadResultViewButton_ = new QPushButton(QString::fromUtf8("重新载入视图"), resultGroup);
         loadResultViewButton_->setToolTip(QString::fromUtf8("重新读取本次计算生成的原始网格和结果多边形文件。"));
         exportViewButton_ = new QPushButton(QString::fromUtf8("导出视图 PNG"), resultGroup);
         exportViewButton_->setToolTip(QString::fromUtf8("导出当前结果视图 PNG 图片。"));
@@ -2088,7 +2122,7 @@ void FaultTraceDialog::buildUi() {
         openMappingButton_->setToolTip(QString::fromUtf8("启动 GeoEast 自带 GeoMapping，在官方图层树中查看原始网格和结果多边形。"));
         resultLayout->addWidget(openBasemapButton_, 4, 0);
         resultLayout->addWidget(openMappingButton_, 4, 1);
-        QPushButton* mappingGuideButton = new QPushButton(QString::fromUtf8("查看步骤"), resultGroup);
+        QPushButton* mappingGuideButton = new QPushButton(QString::fromUtf8("查看叠加步骤"), resultGroup);
         mappingGuideButton->setToolTip(QString::fromUtf8("打开 GeoEast 平面成图叠加查看操作指南"));
         deleteOutputButton_ = new QPushButton(QString::fromUtf8("删除当前结果"), resultGroup);
         deleteOutputButton_->setObjectName("dangerButton");
@@ -2190,13 +2224,13 @@ void FaultTraceDialog::buildUi() {
         addFormRow(expertLayoutNew, 8, QString::fromUtf8("局部比例"), localAntiMergeMinPartRatioSpin_, expertGroup);
         addFormRow(expertLayoutNew, 9, QString::fromUtf8("桥像元"), localAntiMergeMinBridgeCellsSpin_, expertGroup);
         addFormRow(expertLayoutNew, 10, QString::fromUtf8("低值占比"), localAntiMergeMinLowRatioSpin_, expertGroup);
-        // V1.1：按任务流排序——数据 → 参数 → 高级 → 结果查看。
+        // 按高频任务流排序：先选择数据并查看图层，再按需调整参数。
         sidebarContentLayout->addWidget(dataGroup);
+        sidebarContentLayout->addWidget(resultGroup);
         sidebarContentLayout->addWidget(traceGroup);
         sidebarContentLayout->addWidget(morphologyGroup);
         sidebarContentLayout->addWidget(detailsGroup);
         sidebarContentLayout->addWidget(expertGroup);
-        sidebarContentLayout->addWidget(resultGroup);
         sidebarContentLayout->addStretch(1);
 
         // 折叠箭头只控制参数区可见性，不再使用容易被误解为算法开关的分组复选框。
@@ -2243,7 +2277,7 @@ void FaultTraceDialog::buildUi() {
         actionLayout->setSpacing(10);
         runButton_ = new QPushButton(QString::fromUtf8("开始追踪"), actionDock);
         runButton_->setObjectName("runButton");
-        stopButton_ = new QPushButton(QString::fromUtf8("停止"), actionDock);
+        stopButton_ = new QPushButton(QString::fromUtf8("停止追踪"), actionDock);
         stopButton_->setObjectName("stopButton");
         stopButton_->setEnabled(false);
         actionLayout->addWidget(runButton_, 2);
@@ -2265,6 +2299,7 @@ void FaultTraceDialog::buildUi() {
         canvasLayout->setSpacing(0);
         RenderViewWidget* renderViewWidget = new RenderViewWidget(canvasRow);
         renderViewWidget_ = renderViewWidget;
+        renderViewWidget->setAccessibleName(QString::fromUtf8("结果视图区"));
         renderViewWidget->setContextMenuPolicy(Qt::CustomContextMenu);
         connect(renderViewWidget, &QWidget::customContextMenuRequested, this,
                 [this, renderViewWidget](const QPoint& pos) {
@@ -2305,7 +2340,7 @@ void FaultTraceDialog::buildUi() {
         doneBannerLabel_ = new QLabel(doneBanner_);
         doneBannerLabel_->setObjectName("doneBannerText");
         bannerLayout->addWidget(doneBannerLabel_, 1);
-        QPushButton* bannerExportButton = new QPushButton(QString::fromUtf8("导出PNG"), doneBanner_);
+        QPushButton* bannerExportButton = new QPushButton(QString::fromUtf8("导出 PNG"), doneBanner_);
         bannerExportButton->setObjectName("linkButton");
         connect(bannerExportButton, &QPushButton::clicked, this, &FaultTraceDialog::exportResultViewPng);
         bannerLayout->addWidget(bannerExportButton);
@@ -2316,6 +2351,8 @@ void FaultTraceDialog::buildUi() {
         QPushButton* bannerCloseButton = new QPushButton(QStringLiteral("✕"), doneBanner_);
         bannerCloseButton->setObjectName("linkButton");
         bannerCloseButton->setFixedWidth(24);
+        bannerCloseButton->setAccessibleName(QString::fromUtf8("关闭完成提示"));
+        bannerCloseButton->setToolTip(QString::fromUtf8("关闭完成提示"));
         connect(bannerCloseButton, &QPushButton::clicked, doneBanner_, &QWidget::hide);
         bannerLayout->addWidget(bannerCloseButton);
         workspaceLayout->addWidget(doneBanner_);
@@ -2483,6 +2520,37 @@ void FaultTraceDialog::buildUi() {
             combo->installEventFilter(noWheelFilter);
             combo->setFocusPolicy(Qt::StrongFocus);
         }
+        // 键盘顺序与可见任务流一致；折叠区和禁用的 DAT 控件由 Qt 自动跳过。
+        QWidget::setTabOrder(gridCombo_, refreshButton_);
+        QWidget::setTabOrder(refreshButton_, outputEdit_);
+        QWidget::setTabOrder(outputEdit_, polygonColorButton_);
+        QWidget::setTabOrder(polygonColorButton_, polygonLineWidthSpin_);
+        QWidget::setTabOrder(polygonLineWidthSpin_, polygonOpacitySpin_);
+        QWidget::setTabOrder(polygonOpacitySpin_, importDatCheck_);
+        QWidget::setTabOrder(importDatCheck_, datFileEdit_);
+        QWidget::setTabOrder(datFileEdit_, browseDatButton);
+        QWidget::setTabOrder(browseDatButton, overwriteGridCheck_);
+        QWidget::setTabOrder(overwriteGridCheck_, showInputLayerCheck_);
+        QWidget::setTabOrder(showInputLayerCheck_, showResultLayerCheck_);
+        QWidget::setTabOrder(showResultLayerCheck_, outputCatalogCombo_);
+        QWidget::setTabOrder(outputCatalogCombo_, refreshOutputsButton_);
+        QWidget::setTabOrder(refreshOutputsButton_, loadSelectedOutputButton_);
+        QWidget::setTabOrder(loadSelectedOutputButton_, loadResultViewButton_);
+        QWidget::setTabOrder(loadResultViewButton_, exportViewButton_);
+        QWidget::setTabOrder(exportViewButton_, openBasemapButton_);
+        QWidget::setTabOrder(openBasemapButton_, openMappingButton_);
+        QWidget::setTabOrder(openMappingButton_, mappingGuideButton);
+        QWidget::setTabOrder(mappingGuideButton, deleteOutputButton_);
+        QWidget::setTabOrder(deleteOutputButton_, presetCombo_);
+        QWidget::setTabOrder(presetCombo_, qualityModeCombo_);
+        QWidget::setTabOrder(qualityModeCombo_, traceModeCombo_);
+        QWidget::setTabOrder(traceModeCombo_, thresholdModeCombo_);
+        QWidget::setTabOrder(thresholdModeCombo_, percentileSpin_);
+        QWidget::setTabOrder(percentileSpin_, thresholdSpin_);
+        QWidget::setTabOrder(thresholdSpin_, minAreaSpin_);
+        QWidget::setTabOrder(minAreaSpin_, runButton_);
+        QWidget::setTabOrder(runButton_, stopButton_);
+        QWidget::setTabOrder(stopButton_, verboseLogCheck_);
         prepareLanguageMetadata();
         retranslateUi();
     }

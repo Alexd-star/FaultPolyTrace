@@ -491,7 +491,14 @@ QLabel* formLabel(const QString& text, QWidget* parent) {
 }
 void addRow(QGridLayout* layout, int row, const QString& label, QWidget* widget, QWidget* parent) {
     widget->setMinimumHeight(24);
-    layout->addWidget(formLabel(label, parent), row, 0);
+    QLabel* labelWidget = formLabel(label, parent);
+    if (widget->focusPolicy() != Qt::NoFocus) {
+        labelWidget->setBuddy(widget);
+        if (widget->accessibleName().isEmpty()) {
+            widget->setAccessibleName(label);
+        }
+    }
+    layout->addWidget(labelWidget, row, 0);
     layout->addWidget(widget, row, 1);
 }
 
@@ -519,6 +526,16 @@ void configurePathLineEdit(QLineEdit* edit) {
     edit->setMaximumWidth(QWIDGETSIZE_MAX);
     edit->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     edit->setCursorPosition(0);
+    const auto refreshPresentation = [edit](const QString& text) {
+        edit->setToolTip(text);
+        if (!edit->hasFocus()) {
+            edit->setCursorPosition(0);
+        }
+    };
+    QObject::connect(edit, &QLineEdit::textChanged, edit, refreshPresentation);
+    QObject::connect(edit, &QLineEdit::editingFinished, edit, [edit]() {
+        edit->setCursorPosition(0);
+    });
 }
 
 
@@ -1329,7 +1346,7 @@ void FaultPolyTraceWindow::buildUi() {
     stopAction_->setEnabled(false);
     stopAction_->setShortcut(QKeySequence("Shift+F5"));
     connect(stopAction_, &QAction::triggered, this, &FaultPolyTraceWindow::stopTrace);
-    QAction* pngAction = new QAction(fpt_ui::toolIcon(fpt_ui::IconKind::Image), QString::fromUtf8("导出PNG"), this);
+    QAction* pngAction = new QAction(fpt_ui::toolIcon(fpt_ui::IconKind::Image), QString::fromUtf8("导出 PNG"), this);
     pngAction->setToolTip(QString::fromUtf8("导出当前视图区图像 (Ctrl+Shift+P)"));
     pngAction->setShortcut(QKeySequence("Ctrl+Shift+P"));
     connect(pngAction, &QAction::triggered, this, &FaultPolyTraceWindow::exportPng);
@@ -1488,7 +1505,7 @@ void FaultPolyTraceWindow::buildUi() {
     setBarText(runAction_, QString::fromUtf8("开始追踪"), "Trace");
     setBarText(stopAction_, QString::fromUtf8("停止"), "Stop");
     setBarText(resetAction, QString::fromUtf8("恢复默认"), "Defaults");
-    setBarText(pngAction, QString::fromUtf8("导出PNG"), "PNG");
+    setBarText(pngAction, QString::fromUtf8("导出 PNG"), "PNG");
     setBarText(outputDirAction, QString::fromUtf8("输出目录"), "Output");
     setBarText(refreshResultsAction_, QString::fromUtf8("刷新结果"), "Results");
     setBarText(helpAction, QString::fromUtf8("帮助"), "Help");
@@ -1564,7 +1581,9 @@ void FaultPolyTraceWindow::buildUi() {
     configurePathLineEdit(inputEdit_);
     inputEdit_->setToolTip(QString::fromUtf8("外部断层属性网格文件路径"));
     inputEdit_->setPlaceholderText(QString::fromUtf8("请选择平面断层属性文件"));
+    inputEdit_->setAccessibleName(QString::fromUtf8("输入文件"));
     QPushButton* inputButton = new QPushButton(QString::fromUtf8("浏览"), filePage);
+    inputButton->setAccessibleName(QString::fromUtf8("浏览输入文件"));
     configureSmallButton(inputButton);
     connect(inputButton, &QPushButton::clicked, this, &FaultPolyTraceWindow::browseInput);
     QWidget* inputRow = new QWidget(filePage);
@@ -1628,7 +1647,7 @@ void FaultPolyTraceWindow::buildUi() {
     QHBoxLayout* geoEastActionLayout = new QHBoxLayout(geoEastActionRow);
     geoEastActionLayout->setContentsMargins(0, 0, 0, 0);
     geoEastActionLayout->setSpacing(6);
-    geoEastRefreshButton_ = new QPushButton(QString::fromUtf8("刷新网格"), geoEastActionRow);
+    geoEastRefreshButton_ = new QPushButton(QString::fromUtf8("刷新网格列表"), geoEastActionRow);
     geoEastConfigButton_ = new QPushButton(QString::fromUtf8("数据库配置"), geoEastActionRow);
     geoEastDeleteButton_ = new QPushButton(QString::fromUtf8("删除结果"), geoEastActionRow);
     geoEastRefreshButton_->setToolTip(QString::fromUtf8("从配置的 GeoEast 数据库刷新当前项目下的输入网格列表"));
@@ -1673,7 +1692,9 @@ void FaultPolyTraceWindow::buildUi() {
     outputDirEdit_ = new QLineEdit(dataBox);
     configurePathLineEdit(outputDirEdit_);
     outputDirEdit_->setToolTip(QString::fromUtf8("结果文件输出目录"));
+    outputDirEdit_->setAccessibleName(QString::fromUtf8("输出目录"));
     QPushButton* outputButton = new QPushButton(QString::fromUtf8("浏览"), dataBox);
+    outputButton->setAccessibleName(QString::fromUtf8("浏览输出目录"));
     configureSmallButton(outputButton);
     connect(outputButton, &QPushButton::clicked, this, &FaultPolyTraceWindow::browseOutputDir);
     QWidget* outputRow = new QWidget(dataBox);
@@ -1684,7 +1705,8 @@ void FaultPolyTraceWindow::buildUi() {
     outputRowLayout->addWidget(outputButton);
     addRow(dataLayout, 3, QString::fromUtf8("输出目录"), outputRow, dataBox);
     outputNameEdit_ = new QLineEdit("FaultPolyTrace_Result", dataBox);
-    outputNameEdit_->setMinimumWidth(0);
+    configurePathLineEdit(outputNameEdit_);
+    outputNameEdit_->setAccessibleName(QString::fromUtf8("输出名称"));
     addRow(dataLayout, 4, QString::fromUtf8("输出名称"), outputNameEdit_, dataBox);
     viewModeCombo_ = new QComboBox(dataBox);
     viewModeCombo_->setMinimumWidth(0);
@@ -1698,7 +1720,9 @@ void FaultPolyTraceWindow::buildUi() {
     colorEdit_ = new QLineEdit("#00FFFF", styleBox);
     configurePathLineEdit(colorEdit_);
     colorEdit_->setReadOnly(true);
-    QPushButton* colorButton = new QPushButton(QString::fromUtf8("颜色"), styleBox);
+    colorEdit_->setAccessibleName(QString::fromUtf8("结果颜色值"));
+    QPushButton* colorButton = new QPushButton(QString::fromUtf8("选择颜色"), styleBox);
+    colorButton->setAccessibleName(QString::fromUtf8("选择结果颜色"));
     configureSmallButton(colorButton);
     connect(colorButton, &QPushButton::clicked, this, &FaultPolyTraceWindow::chooseColor);
     QWidget* colorRow = new QWidget(styleBox);
@@ -1761,6 +1785,7 @@ void FaultPolyTraceWindow::buildUi() {
     resultLayout->addWidget(resultPathLabel_, 1, 0, 1, 2);
     auto* guidedResultCombo = new GuidedCatalogComboBox(resultBox);
     resultCatalogCombo_ = guidedResultCombo;
+    resultCatalogCombo_->setAccessibleName(QString::fromUtf8("已有结果"));
     resultCatalogCombo_->setEditable(false);
     resultCatalogCombo_->setProperty("fptCatalogReady", false);
     resultCatalogCombo_->addItem(QString::fromUtf8("请先运行追踪或刷新已有结果"), QString());
@@ -1826,7 +1851,7 @@ void FaultPolyTraceWindow::buildUi() {
     configureElasticButton(loadSelectedResultButton_);
     resultLayout->addWidget(resultCatalogCombo_, 2, 0);
     resultLayout->addWidget(refreshResultsButton_, 2, 1);
-    exportPngButton_ = new QPushButton(QString::fromUtf8("导出PNG"), resultBox);
+    exportPngButton_ = new QPushButton(QString::fromUtf8("导出 PNG"), resultBox);
     configureElasticButton(exportPngButton_);
     // V1.1：低频文件操作收进「打开文件」下拉菜单，按钮墙收敛为三个入口。
     openFilesButton_ = new QToolButton(resultBox);
@@ -2126,7 +2151,7 @@ void FaultPolyTraceWindow::buildUi() {
 
     runButton_ = new QPushButton(QString::fromUtf8("开始追踪"), leftPane);
     runButton_->setObjectName("runButton");
-    stopButton_ = new QPushButton(QString::fromUtf8("停止"), leftPane);
+    stopButton_ = new QPushButton(QString::fromUtf8("停止追踪"), leftPane);
     stopButton_->setObjectName("stopButton");
     stopButton_->setEnabled(false);
     connect(runButton_, &QPushButton::clicked, this, &FaultPolyTraceWindow::runTrace);
@@ -2154,7 +2179,7 @@ void FaultPolyTraceWindow::buildUi() {
     doneBannerLabel_ = new QLabel(doneBanner_);
     doneBannerLabel_->setObjectName("doneBannerText");
     bannerLayout->addWidget(doneBannerLabel_, 1);
-    QPushButton* bannerPngButton = new QPushButton(uiText(QString::fromUtf8("导出PNG")), doneBanner_);
+    QPushButton* bannerPngButton = new QPushButton(uiText(QString::fromUtf8("导出 PNG")), doneBanner_);
     bannerPngButton->setObjectName("linkButton");
     connect(bannerPngButton, &QPushButton::clicked, this, &FaultPolyTraceWindow::exportPng);
     bannerLayout->addWidget(bannerPngButton);
@@ -2165,6 +2190,8 @@ void FaultPolyTraceWindow::buildUi() {
     QPushButton* bannerCloseButton = new QPushButton(QStringLiteral("\u2715"), doneBanner_);
     bannerCloseButton->setObjectName("linkButton");
     bannerCloseButton->setFixedWidth(24);
+    bannerCloseButton->setAccessibleName(QString::fromUtf8("关闭完成提示"));
+    bannerCloseButton->setToolTip(QString::fromUtf8("关闭完成提示"));
     connect(bannerCloseButton, &QPushButton::clicked, doneBanner_, &QWidget::hide);
     bannerLayout->addWidget(bannerCloseButton);
     rightLayout->addWidget(doneBanner_);
@@ -2173,6 +2200,7 @@ void FaultPolyTraceWindow::buildUi() {
     viewStripLayout->setContentsMargins(0, 0, 0, 0);
     viewStripLayout->setSpacing(0);
     view_ = new AttributeView(right);
+    view_->setAccessibleName(QString::fromUtf8("结果视图区"));
     colorBarWidget_ = new ColorBarWidget(viewStrip);
     viewStripLayout->addWidget(view_, 1);
     viewStripLayout->addWidget(colorBarWidget_);
@@ -2438,6 +2466,38 @@ void FaultPolyTraceWindow::buildUi() {
         combo->installEventFilter(noWheelFilter);
         combo->setFocusPolicy(Qt::StrongFocus);
     }
+    // 键盘顺序遵循主任务流；隐藏的数据源页和折叠参数由 Qt 自动跳过。
+    QWidget::setTabOrder(sourceModeCombo_, inputEdit_);
+    QWidget::setTabOrder(inputEdit_, inputButton);
+    QWidget::setTabOrder(inputButton, inputFormatCombo_);
+    QWidget::setTabOrder(inputFormatCombo_, geoEastGridCombo_);
+    QWidget::setTabOrder(geoEastGridCombo_, geoEastRefreshButton_);
+    QWidget::setTabOrder(geoEastRefreshButton_, geoEastConfigButton_);
+    QWidget::setTabOrder(geoEastConfigButton_, geoEastDeleteButton_);
+    QWidget::setTabOrder(geoEastDeleteButton_, outputDirEdit_);
+    QWidget::setTabOrder(outputDirEdit_, outputButton);
+    QWidget::setTabOrder(outputButton, outputNameEdit_);
+    QWidget::setTabOrder(outputNameEdit_, viewModeCombo_);
+    QWidget::setTabOrder(viewModeCombo_, colorButton);
+    QWidget::setTabOrder(colorButton, lineWidthSpin_);
+    QWidget::setTabOrder(lineWidthSpin_, alphaSpin_);
+    QWidget::setTabOrder(alphaSpin_, showGridLayerCheck_);
+    QWidget::setTabOrder(showGridLayerCheck_, showPolygonLayerCheck_);
+    QWidget::setTabOrder(showPolygonLayerCheck_, resultCatalogCombo_);
+    QWidget::setTabOrder(resultCatalogCombo_, refreshResultsButton_);
+    QWidget::setTabOrder(refreshResultsButton_, loadSelectedResultButton_);
+    QWidget::setTabOrder(loadSelectedResultButton_, openFilesButton_);
+    QWidget::setTabOrder(openFilesButton_, exportPngButton_);
+    QWidget::setTabOrder(exportPngButton_, presetCombo_);
+    QWidget::setTabOrder(presetCombo_, qualityModeCombo_);
+    QWidget::setTabOrder(qualityModeCombo_, traceModeCombo_);
+    QWidget::setTabOrder(traceModeCombo_, thresholdModeCombo_);
+    QWidget::setTabOrder(thresholdModeCombo_, percentileSpin_);
+    QWidget::setTabOrder(percentileSpin_, thresholdSpin_);
+    QWidget::setTabOrder(thresholdSpin_, minAreaSpin_);
+    QWidget::setTabOrder(minAreaSpin_, runButton_);
+    QWidget::setTabOrder(runButton_, stopButton_);
+    QWidget::setTabOrder(stopButton_, verboseLogCheck_);
     appendStartupTrace(QStringLiteral("buildUi.connections"), buildTimer.restart());
     prepareLanguageMetadata();
     appendStartupTrace(QStringLiteral("buildUi.languageMetadata"), buildTimer.restart());
