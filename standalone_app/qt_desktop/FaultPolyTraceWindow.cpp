@@ -4991,13 +4991,6 @@ void FaultPolyTraceWindow::openUserManual() {
 }
 
 void FaultPolyTraceWindow::openProductManual() {
-    const QString pdfPath = locateBundledFile(QString::fromUtf8("docs/FaultPolyTrace企业级用户操作手册与产品说明书_V1.0.1.pdf"));
-    if (!pdfPath.isEmpty()) {
-        if (QDesktopServices::openUrl(QUrl::fromLocalFile(pdfPath))) {
-            updateStatus(uiText(QString::fromUtf8("已打开文档：%1")).arg(uiText(QString::fromUtf8("产品说明书"))));
-            return;
-        }
-    }
     openBundledDocument(QString::fromUtf8("docs/企业级用户操作手册与产品说明书.md"), uiText(QString::fromUtf8("产品说明书")));
 }
 

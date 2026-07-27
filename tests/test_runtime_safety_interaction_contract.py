@@ -195,3 +195,11 @@ def test_customer_builds_ship_only_the_required_simplified_chinese_qt_translatio
         assert 'translations\\qt_zh_CN.qm' in script
         assert 'Remove-Item -LiteralPath $destination -Recurse -Force' in script
         assert "Install-RequiredQtTranslations" in script[script.index("if (Test-Path -LiteralPath $windeployQt)"):]
+
+
+def test_product_manual_opens_the_current_bundled_document_without_legacy_version_lookup():
+    desktop = read("standalone_app/qt_desktop/FaultPolyTraceWindow.cpp")
+    section = desktop[desktop.index("void FaultPolyTraceWindow::openProductManual()"):desktop.index("void FaultPolyTraceWindow::openProjectStructureDoc()")]
+
+    assert "docs/企业级用户操作手册与产品说明书.md" in section
+    assert "V1.0.1" not in section
