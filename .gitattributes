@@ -1,2 +1,11 @@
 *.cmd text eol=crlf
 *.bat text eol=crlf
+
+# 这些图件是由 01_绘图代码 可重复生成的发布/审阅格式。Git 保留它们便于查看，
+# 正式源码 ZIP 只保留绘图代码和可编辑 SVG，避免重复携带 PDF、PNG、灰度图和 TIFF。
+docs/作品说明书图件/02_矢量图/*.pdf export-ignore
+docs/作品说明书图件/03_高清PNG/ export-ignore
+docs/作品说明书图件/04_灰度与审阅/ export-ignore
+docs/作品说明书图件/05_期刊TIFF/ export-ignore
+docs/作品说明书图件/全套图件联系表.png export-ignore
+docs/source_extracts/ export-ignore
