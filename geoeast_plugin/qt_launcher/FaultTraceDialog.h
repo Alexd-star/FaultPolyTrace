@@ -5,7 +5,7 @@
 #include <QString>
 #include <QStringList>
 
-namespace fpt_ui { struct TraceParameters; }
+namespace fpt_ui { class LayerToggle; struct TraceParameters; }
 
 class QCheckBox;
 class QColor;
@@ -168,9 +168,8 @@ private:
     QCheckBox* residualTraceCheck_ = nullptr;
     QSpinBox* residualTraceMinLengthSpin_ = nullptr;
     QSpinBox* residualTraceMaxCellsSpin_ = nullptr;
-    QCheckBox* showInputLayerCheck_ = nullptr;
-    QCheckBox* showResultLayerCheck_ = nullptr;
-    QPushButton* showOverlayLayerButton_ = nullptr;
+    fpt_ui::LayerToggle* showInputLayerCheck_ = nullptr;
+    fpt_ui::LayerToggle* showResultLayerCheck_ = nullptr;
     QPushButton* loadResultViewButton_ = nullptr;
     QPushButton* exportViewButton_ = nullptr;
     QPushButton* openBasemapButton_ = nullptr;
@@ -207,11 +206,14 @@ private:
     QSplitter* mainSplitter_ = nullptr;
 
     QProcess* process_ = nullptr;
+    QString processOutput_;
     bool refreshingGrids_ = false;
     bool refreshingOutputs_ = false;
     bool refreshOutputsAfterGrids_ = false;
     bool exportingOutputView_ = false;
     bool exportingGridView_ = false;
     bool deletingOutput_ = false;
+    bool startupDiscoveryScheduled_ = false;
+    QString pendingGridRestore_;
     UiLanguage currentLanguage_ = UiLanguage::SimplifiedChinese;
 };

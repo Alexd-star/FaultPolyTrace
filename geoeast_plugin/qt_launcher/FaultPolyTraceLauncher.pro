@@ -2,6 +2,7 @@ TEMPLATE = app
 CONFIG += qt release warn_off c++17
 
 QT += core gui widgets
+win32:LIBS += User32.lib
 
 QMAKE_CXXFLAGS += /utf-8
 INCLUDEPATH += ../../src/ui
@@ -21,6 +22,7 @@ SOURCES += \
     ../../src/ui/FptTheme.cpp \
     ../../src/ui/FptIcons.cpp \
     ../../src/ui/FptLog.cpp \
+    ../../src/ui/FptControls.cpp \
     ../../src/ui/TraceParameterModel.cpp \
     FaultTraceDialog.cpp
 
@@ -29,6 +31,7 @@ HEADERS += \
     ../../src/ui/FptTheme.h \
     ../../src/ui/FptIcons.h \
     ../../src/ui/FptLog.h \
+    ../../src/ui/FptControls.h \
     ../../src/ui/TraceParameterModel.h \
     FaultTraceDialog.h
 

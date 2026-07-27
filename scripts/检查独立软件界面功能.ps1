@@ -106,7 +106,7 @@ Add-ContainsCheck -Rows $rows -Group "窗口与布局" -Name "保存分隔栏宽
 Add-ContainsCheck -Rows $rows -Group "窗口与布局" -Name "恢复分隔栏宽度" -Requirement "启动时必须恢复用户上次调整的左右宽度" -Text $cpp -Needle 'settings.value("mainSplitterState")' -Detail "$cppPath 恢复分隔栏状态"
 Add-Check -Rows $rows -Group "窗口与布局" -Name "侧栏不再固定宽度" -Requirement "使用可拖动分隔栏后，左侧参数区不能继续固定为 420 像素" -Passed (-not $cpp.Contains("leftPane->setFixedWidth(420)")) -Detail "$cppPath 移除固定宽度"
 Add-Check -Rows $rows -Group "窗口与布局" -Name "不强制放大用户侧栏" -Requirement "启动恢复分割栏时只纠正低于最小美观宽度的异常侧栏，不得强行改回 520/540 像素" -Passed ($cpp.Contains("sizes.at(0) < 420") -and $cpp.Contains("mainSplitter_->setSizes({420") -and -not $cpp.Contains("sizes.at(0) < 520") -and -not $cpp.Contains("setSizes({540")) -Detail "$cppPath 仅纠正低于 420 的异常宽度"
-Add-ContainsCheck -Rows $rows -Group "窗口与布局" -Name "表单标签宽度" -Requirement "表单标签列采用 v0.9.26 验证过的宽度，保留参数面板有效空间" -Text $cpp -Needle "label->setFixedWidth(100)" -Detail "$cppPath 设置表单标签宽度"
+Add-Check -Rows $rows -Group "窗口与布局" -Name "响应式表单标签" -Requirement "表单标签保留紧凑最小宽度，并允许英文在限定宽度内自然换行" -Passed ($cpp.Contains("label->setMinimumWidth(90)") -and $cpp.Contains("label->setMaximumWidth(126)") -and $cpp.Contains("label->setWordWrap(true)")) -Detail "$cppPath 使用可换行响应式标签"
 Add-ContainsCheck -Rows $rows -Group "窗口与布局" -Name "首个分组留白" -Requirement "滚动区顶部必须留出标题绘制空间，避免首个分组标题被裁剪" -Text $cpp -Needle "sidebarLayout->setContentsMargins(0, 8, 4, 0)" -Detail "$cppPath 设置侧栏顶部留白"
 $themePath = "src\ui\FptTheme.cpp"
 $theme = Read-TextFile $themePath
@@ -185,7 +185,7 @@ Add-ContainsCheck -Rows $rows -Group "运行状态联动" -Name "动作成员" -
 
 $resultChecks = @(
     @{ Name="结果查看分组"; Needle="QGroupBox* resultBox = new QGroupBox(QString::fromUtf8(`"结果查看`")"; Requirement="左侧结果查看入口存在" },
-    @{ Name="叠加查看按钮"; Needle="showOverlayLayerButton_->setText(QString::fromUtf8(`"叠加查看`"))"; Requirement="可直接切换到叠加结果" },
+    @{ Name="叠加查看菜单"; Needle="QAction* overlayViewAction = viewMenu->addAction(QString::fromUtf8(`"叠加结果`"))"; Requirement="菜单可直接切换到叠加结果" },
     @{ Name="打开文件菜单·结果CSV"; Needle="openCsvMenuAction_ = openFilesMenu->addAction(QString::fromUtf8(`"结果 CSV`"))"; Requirement="「打开文件」菜单可打开结果 CSV" },
     @{ Name="打开文件菜单·GeoJSON"; Needle="openGeoJsonMenuAction_ = openFilesMenu->addAction(QString::fromUtf8(`"GeoJSON`"))"; Requirement="「打开文件」菜单可打开 GeoJSON" },
     @{ Name="打开文件菜单·诊断JSON"; Needle="openDiagnosticsMenuAction_ = openFilesMenu->addAction(QString::fromUtf8(`"诊断 JSON`"))"; Requirement="「打开文件」菜单可打开诊断 JSON" },
@@ -235,10 +235,10 @@ Add-ContainsCheck -Rows $rows -Group "默认值与结果状态" -Name "空输入
 Add-ContainsCheck -Rows $rows -Group "性能与按需加载" -Name "默认关闭原始网格层" -Requirement "独立软件默认不得勾选原始网格层，避免启动时自动解析大 DAT" -Text $cpp -Needle 'showGridLayerCheck_->setChecked(false)' -Detail "$cppPath 默认关闭原始网格层"
 Add-ContainsCheck -Rows $rows -Group "性能与按需加载" -Name "默认关闭结果多边形层" -Requirement "独立软件默认不得勾选结果多边形层，避免启动时自动载入旧结果" -Text $cpp -Needle 'showPolygonLayerCheck_->setChecked(false)' -Detail "$cppPath 默认关闭结果多边形层"
 Add-ContainsCheck -Rows $rows -Group "结果查看" -Name "图层开关区域" -Requirement "图层显隐应采用明确的复选控件，保持旧版简洁样式" -Text $cpp -Needle 'QWidget* layerPanel = new QWidget(styleBox)' -Detail "$cppPath 提供图层开关区域"
-Add-ContainsCheck -Rows $rows -Group "结果查看" -Name "原始网格复选项" -Requirement "原始网格图层显隐应使用明确可复选控件" -Text $cpp -Needle 'showGridLayerCheck_ = new QCheckBox' -Detail "$cppPath 使用 QCheckBox 控制原始网格层"
-Add-ContainsCheck -Rows $rows -Group "结果查看" -Name "结果多边形复选项" -Requirement "结果多边形图层显隐应使用明确可复选控件" -Text $cpp -Needle 'showPolygonLayerCheck_ = new QCheckBox' -Detail "$cppPath 使用 QCheckBox 控制结果多边形层"
-Add-ContainsCheck -Rows $rows -Group "结果查看" -Name "叠加查看快捷按钮" -Requirement "结果查看区应提供一键勾选两层的叠加查看快捷按钮" -Text $cpp -Needle 'showOverlayLayerButton_ = new QPushButton' -Detail "$cppPath 提供叠加查看快捷按钮"
-Add-ContainsCheck -Rows $rows -Group "结果查看" -Name "叠加说明" -Requirement "图层面板应说明同时勾选两层就是叠加查看" -Text $cpp -Needle '同时勾选两层即为叠加查看' -Detail "$cppPath 提供叠加查看说明"
+Add-ContainsCheck -Rows $rows -Group "结果查看" -Name "原始网格图层开关" -Requirement "原始网格图层显隐使用整行可点击的共享开关" -Text $cpp -Needle 'showGridLayerCheck_ = new fpt_ui::LayerToggle' -Detail "$cppPath 使用 LayerToggle 控制原始网格层"
+Add-ContainsCheck -Rows $rows -Group "结果查看" -Name "结果多边形图层开关" -Requirement "结果多边形图层显隐使用整行可点击的共享开关" -Text $cpp -Needle 'showPolygonLayerCheck_ = new fpt_ui::LayerToggle' -Detail "$cppPath 使用 LayerToggle 控制结果多边形层"
+Add-Check -Rows $rows -Group "结果查看" -Name "无重复叠加按钮" -Requirement "同时开启两个独立图层即可叠加，不再增加第三个重复按钮" -Passed (-not $cpp.Contains('showOverlayLayerButton_')) -Detail "$cppPath 未保留重复叠加按钮"
+Add-ContainsCheck -Rows $rows -Group "结果查看" -Name "叠加说明" -Requirement "图层面板应说明同时开启两层就是叠加查看" -Text $cpp -Needle '同时开启两层即可叠加查看' -Detail "$cppPath 提供叠加查看说明"
 Add-ContainsCheck -Rows $rows -Group "结果查看" -Name "启动自动载入不弹窗" -Requirement "启动刷新或自动载入结果时不得弹出必须点击 OK 的模态框" -Text $header -Needle 'void loadSelectedResultInternal(bool userInitiated)' -Detail "$headerPath 区分用户主动载入和自动载入"
 Add-Check -Rows $rows -Group "性能与按需加载" -Name "启动不恢复旧图层状态" -Requirement "旧配置或首次启动时图层显示状态必须默认关闭，不得因上次勾选而启动加载大图" -Passed ((Get-Section -Text $cpp -StartNeedle "void FaultPolyTraceWindow::loadSettings()" -EndNeedle "void FaultPolyTraceWindow::saveSettings()").Contains("showGridLayerCheck_->setChecked(false)") -and (Get-Section -Text $cpp -StartNeedle "void FaultPolyTraceWindow::loadSettings()" -EndNeedle "void FaultPolyTraceWindow::saveSettings()").Contains("showPolygonLayerCheck_->setChecked(false)")) -Detail "$cppPath loadSettings 强制关闭图层"
 Add-Check -Rows $rows -Group "性能与按需加载" -Name "选择文件不强制解析" -Requirement "选择输入文件后只有原始网格层已开启才解析显示，否则只提示用户按需勾选" -Passed ((Get-Section -Text $cpp -StartNeedle "void FaultPolyTraceWindow::browseInput()" -EndNeedle "void FaultPolyTraceWindow::browseOutputDir").Contains("showGridLayerCheck_->isChecked()") -and (Get-Section -Text $cpp -StartNeedle "void FaultPolyTraceWindow::browseInput()" -EndNeedle "void FaultPolyTraceWindow::browseOutputDir").Contains("未自动载入图像以保持界面流畅")) -Detail "$cppPath browseInput 实现按需载入"

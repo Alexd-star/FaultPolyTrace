@@ -1,5 +1,6 @@
 #include "FaultTraceDialog.h"
 #include "FptIcons.h"
+#include "FptControls.h"
 #include "FptLog.h"
 #include "FptTheme.h"
 #include "UiLocalization.h"
@@ -20,6 +21,7 @@
 #include <QDesktopServices>
 #include <QDir>
 #include <QDoubleSpinBox>
+#include <QEventLoop>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFile>
@@ -69,10 +71,92 @@
 #include <cmath>
 #include <limits>
 
+#ifdef Q_OS_WIN
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#include <tlhelp32.h>
+#endif
+
 namespace {
 
+#ifdef Q_OS_WIN
+DWORD findProcessIdByExecutable(const QString& executableName) {
+    const HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (snapshot == INVALID_HANDLE_VALUE) {
+        return 0;
+    }
+    PROCESSENTRY32W entry = {};
+    entry.dwSize = sizeof(entry);
+    DWORD result = 0;
+    if (Process32FirstW(snapshot, &entry)) {
+        do {
+            if (QString::fromWCharArray(entry.szExeFile).compare(executableName, Qt::CaseInsensitive) == 0) {
+                result = entry.th32ProcessID;
+                break;
+            }
+        } while (Process32NextW(snapshot, &entry));
+    }
+    CloseHandle(snapshot);
+    return result;
+}
+
+bool isProcessAlive(qint64 pid) {
+    const HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, static_cast<DWORD>(pid));
+    if (!process) {
+        return false;
+    }
+    DWORD exitCode = 0;
+    const bool alive = GetExitCodeProcess(process, &exitCode) && exitCode == STILL_ACTIVE;
+    CloseHandle(process);
+    return alive;
+}
+
+struct WindowSearchContext {
+    DWORD processId = 0;
+    HWND window = nullptr;
+};
+
+BOOL CALLBACK findVisibleWindow(HWND window, LPARAM data) {
+    auto* context = reinterpret_cast<WindowSearchContext*>(data);
+    DWORD processId = 0;
+    GetWindowThreadProcessId(window, &processId);
+    if (processId == context->processId && IsWindowVisible(window) && GetWindow(window, GW_OWNER) == nullptr) {
+        context->window = window;
+        return FALSE;
+    }
+    return TRUE;
+}
+
+bool activateApplicationWindow(const QString& executableName) {
+    const DWORD processId = findProcessIdByExecutable(executableName);
+    if (!processId) {
+        return false;
+    }
+    WindowSearchContext context;
+    context.processId = processId;
+    EnumWindows(findVisibleWindow, reinterpret_cast<LPARAM>(&context));
+    if (!context.window) {
+        return false;
+    }
+    ShowWindow(context.window, SW_RESTORE);
+    SetForegroundWindow(context.window);
+    return true;
+}
+#else
+bool isProcessAlive(qint64) { return false; }
+bool activateApplicationWindow(const QString&) { return false; }
+#endif
+
 QString launcherSettingsPath() {
-    const QString directory = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+    QString directory = QString::fromLocal8Bit(qgetenv("FPT_CONFIG_ROOT")).trimmed();
+    if (directory.isEmpty()) {
+        directory = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+    }
+    if (directory.isEmpty()) {
+        directory = QDir(QCoreApplication::applicationDirPath()).absoluteFilePath("config");
+    }
     QDir().mkpath(directory);
     return QDir(directory).filePath("faultpolytrace_launcher.ini");
 }
@@ -423,6 +507,7 @@ public:
         setMinimumSize(560, 420);
         setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
         setMouseTracking(true);
+        setCursor(Qt::OpenHandCursor);
     }
 
     void setPanMode(bool enabled) {
@@ -442,11 +527,11 @@ public:
     }
 
     void resetView() {
-        panMode_ = false;
+        panMode_ = true;
         dragging_ = false;
         zoom_ = 1.0;
         panOffset_ = QPointF(0, 0);
-        setCursor(Qt::ArrowCursor);
+        setCursor(Qt::OpenHandCursor);
         update();
     }
 
@@ -500,6 +585,14 @@ public:
     }
 
     bool loadGridFile(const QString& path, QString* error) {
+        const QFileInfo sourceInfo(path);
+        const QString canonicalPath = sourceInfo.absoluteFilePath();
+        const qint64 sourceMtime = sourceInfo.exists() ? sourceInfo.lastModified().toMSecsSinceEpoch() : -1;
+        if (sourceInfo.exists() && canonicalPath == gridCachePath_ &&
+            sourceInfo.size() == gridCacheSize_ && sourceMtime == gridCacheMtime_ &&
+            nx_ > 0 && ny_ > 0 && !grid_.isEmpty()) {
+            return true;
+        }
         gridImageDirty_ = true;
         grid_.clear();
         nx_ = 0;
@@ -601,11 +694,22 @@ public:
             valueMax_ = valueMin_ + 1.0;
         }
         dataStatus_ = QString::fromUtf8("原始网格：%1 x %2").arg(nx_).arg(ny_);
+        gridCachePath_ = canonicalPath;
+        gridCacheSize_ = sourceInfo.size();
+        gridCacheMtime_ = sourceMtime;
         update();
         return true;
     }
 
     bool loadPolygonCsv(const QString& path, QString* error) {
+        const QFileInfo sourceInfo(path);
+        const QString canonicalPath = sourceInfo.absoluteFilePath();
+        const qint64 sourceMtime = sourceInfo.exists() ? sourceInfo.lastModified().toMSecsSinceEpoch() : -1;
+        if (sourceInfo.exists() && canonicalPath == polygonCachePath_ &&
+            sourceInfo.size() == polygonCacheSize_ && sourceMtime == polygonCacheMtime_ &&
+            !polygons_.isEmpty()) {
+            return true;
+        }
         polygons_.clear();
         QFile file(path);
         if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
@@ -674,6 +778,11 @@ public:
         dataStatus_ = polygons_.isEmpty()
             ? QString::fromUtf8("未发现保留多边形")
             : QString::fromUtf8("结果多边形：%1 个，显示环：%2 条").arg(keptPolygonCount).arg(polygons_.size());
+        if (!polygons_.isEmpty()) {
+            polygonCachePath_ = canonicalPath;
+            polygonCacheSize_ = sourceInfo.size();
+            polygonCacheMtime_ = sourceMtime;
+        }
         update();
         return !polygons_.isEmpty();
     }
@@ -950,7 +1059,7 @@ private:
     }
 
     double zoom_ = 1.0;
-    bool panMode_ = false;
+    bool panMode_ = true;
     bool dragging_ = false;
     bool showInputLayer_ = true;
     bool showResultLayer_ = true;
@@ -958,6 +1067,12 @@ private:
     QPointF lastDragPos_;
     QVector<double> grid_;
     QVector<QPolygonF> polygons_;
+    QString gridCachePath_;
+    qint64 gridCacheSize_ = -1;
+    qint64 gridCacheMtime_ = -1;
+    QString polygonCachePath_;
+    qint64 polygonCacheSize_ = -1;
+    qint64 polygonCacheMtime_ = -1;
     mutable QImage gridImage_;
     mutable bool gridImageDirty_ = true;
     int nx_ = 0;
@@ -1037,7 +1152,10 @@ private:
 QLabel* makeFormLabel(const QString& text, QWidget* parent) {
     QLabel* label = new QLabel(text, parent);
     label->setObjectName("formLabel");
-    label->setMinimumWidth(110);
+    label->setMinimumWidth(88);
+    label->setMaximumWidth(126);
+    label->setWordWrap(true);
+    label->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
     label->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     return label;
 }
@@ -1075,6 +1193,18 @@ FaultTraceDialog::FaultTraceDialog(QWidget* parent) : QDialog(parent), process_(
     connect(process_, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &FaultTraceDialog::onProcessFinished);
     connect(process_, &QProcess::errorOccurred, this, &FaultTraceDialog::onProcessError);
+
+    startupDiscoveryScheduled_ = true;
+    QTimer::singleShot(120, this, [this]() {
+        startupDiscoveryScheduled_ = false;
+        if (!missingGeoEastConfig(false, false).isEmpty()) {
+            appendStatus(uiText(QString::fromUtf8("请先完成数据库配置；选择输入网格时可打开配置引导")));
+            return;
+        }
+        refreshOutputsAfterGrids_ = true;
+        appendStatus(uiText(QString::fromUtf8("正在自动读取当前项目的数据列表...")));
+        refreshGrids();
+    });
 }
 
 void FaultTraceDialog::buildUi() {
@@ -1143,6 +1273,7 @@ void FaultTraceDialog::buildUi() {
     auto* guidedGridCombo = new GuidedCatalogComboBox(this);
     gridCombo_ = guidedGridCombo;
     gridCombo_->setEditable(true);
+    gridCombo_->setProperty("fptCatalogReady", false);
     const QString defaultGrid = envValue("FPT_GEOEAST_GRID");
     if (!defaultGrid.isEmpty()) {
         gridCombo_->addItem(defaultGrid);
@@ -1152,8 +1283,7 @@ void FaultTraceDialog::buildUi() {
         gridCombo_->lineEdit()->setPlaceholderText(QString::fromUtf8("请先配置项目并刷新网格"));
     }
     guidedGridCombo->setBeforePopupHandler([this]() {
-        if ((gridCombo_ && gridCombo_->count() > 0) ||
-            (gridCombo_ && !gridCombo_->currentText().trimmed().isEmpty())) {
+        if (gridCombo_ && gridCombo_->property("fptCatalogReady").toBool() && gridCombo_->count() > 0) {
             return false;
         }
         QTimer::singleShot(0, this, [this]() {
@@ -1526,6 +1656,7 @@ void FaultTraceDialog::buildUi() {
         QAction* panAction = viewMenu->addAction(fpt_ui::toolIcon(fpt_ui::IconKind::Pan), QString::fromUtf8("平移模式"));
         panAction->setText(QString::fromUtf8("平移"));
         panAction->setCheckable(true);
+        panAction->setChecked(true);
         connect(panAction, &QAction::toggled, this, [this, renderView](bool checked) {
             if (renderView()) {
                 renderView()->setPanMode(checked);
@@ -1553,7 +1684,7 @@ void FaultTraceDialog::buildUi() {
             if (renderView()) {
                 renderView()->resetView();
             }
-            panAction->setChecked(false);
+            panAction->setChecked(true);
             appendStatus(QString::fromUtf8("视图区已重置"));
         });
         viewMenu->addSeparator();
@@ -1699,8 +1830,8 @@ void FaultTraceDialog::buildUi() {
 
         QFrame* sidebar = new QFrame(this);
         sidebar->setObjectName("sidebar");
-        sidebar->setMinimumWidth(440);
-        sidebar->setMaximumWidth(660);
+        sidebar->setMinimumWidth(400);
+        sidebar->setMaximumWidth(600);
         sidebar->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
         QVBoxLayout* sidebarRoot = new QVBoxLayout(sidebar);
         sidebarRoot->setContentsMargins(0, 0, 0, 0);
@@ -1768,32 +1899,29 @@ void FaultTraceDialog::buildUi() {
         layerPanelLayout->setSpacing(4);
         layerTitleLabel_ = new QLabel(QString::fromUtf8("显示图层"), layerPanel);
         layerTitleLabel_->setObjectName("layerPanelTitle");
-        showInputLayerCheck_ = new QCheckBox(layerPanel);
+        showInputLayerCheck_ = new fpt_ui::LayerToggle(layerPanel);
         showInputLayerCheck_->setObjectName("layerCheck");
         showInputLayerCheck_->setText(QString::fromUtf8("原始网格"));
         showInputLayerCheck_->setToolTip(QString::fromUtf8("显示或隐藏输入断层属性网格。GeoEast 模式会按需导出当前 BOMapGrid 视图。"));
         showInputLayerCheck_->setChecked(false);
-        showResultLayerCheck_ = new QCheckBox(layerPanel);
+        showInputLayerCheck_->setAccentColor(QColor(QStringLiteral("#527A9F")));
+        showResultLayerCheck_ = new fpt_ui::LayerToggle(layerPanel);
         showResultLayerCheck_->setObjectName("layerCheck");
         showResultLayerCheck_->setText(QString::fromUtf8("结果多边形"));
         showResultLayerCheck_->setToolTip(QString::fromUtf8("显示或隐藏追踪结果多边形。没有结果时请先追踪或选择已有结果。"));
         showResultLayerCheck_->setChecked(false);
-        layerHintLabel_ = new QLabel(QString::fromUtf8("同时勾选两层即为叠加查看。"), layerPanel);
+        showResultLayerCheck_->setAccentColor(QColor(polygonColorEdit_->text()));
+        layerHintLabel_ = new QLabel(QString::fromUtf8("同时开启两层即可叠加查看。"), layerPanel);
         layerHintLabel_->setObjectName("layerHint");
         layerHintLabel_->setWordWrap(true);
-        showOverlayLayerButton_ = new QPushButton(layerPanel);
-        showOverlayLayerButton_->setText(QString::fromUtf8("叠加查看"));
-        showOverlayLayerButton_->setToolTip(QString::fromUtf8("同时显示原始网格和结果多边形，用于检查贴合关系。"));
-        showOverlayLayerButton_->setMinimumHeight(24);
-        showOverlayLayerButton_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
         layerPanelLayout->addWidget(layerTitleLabel_);
         layerPanelLayout->addWidget(showInputLayerCheck_);
         layerPanelLayout->addWidget(showResultLayerCheck_);
         layerPanelLayout->addWidget(layerHintLabel_);
-        layerPanelLayout->addWidget(showOverlayLayerButton_);
         resultLayout->addWidget(layerPanel, 0, 0, 1, 2);
         auto* guidedOutputCombo = new GuidedCatalogComboBox(resultGroup);
         outputCatalogCombo_ = guidedOutputCombo;
+        outputCatalogCombo_->setProperty("fptCatalogReady", false);
         outputCatalogCombo_->addItem(QString::fromUtf8("请先配置项目并刷新结果"), QString());
         outputCatalogCombo_->setToolTip(QString::fromUtf8("当前 GeoEast 项目中已有的结果多边形对象。选择后可同步为当前输出名称，便于查看、覆盖或删除。"));
         guidedOutputCombo->setBeforePopupHandler([this]() {
@@ -1806,7 +1934,7 @@ void FaultTraceDialog::buildUi() {
                     }
                 }
             }
-            if (hasAvailableResult) {
+            if (hasAvailableResult && outputCatalogCombo_->property("fptCatalogReady").toBool()) {
                 return false;
             }
             QTimer::singleShot(0, this, [this]() {
@@ -1853,32 +1981,17 @@ void FaultTraceDialog::buildUi() {
         displayHint->setWordWrap(true);
         displayHint->setObjectName("displayHint");
         resultLayout->addWidget(displayHint, 6, 0, 1, 2);
-        connect(showInputLayerCheck_, &QCheckBox::toggled, this, [this](bool checked) {
+        connect(showInputLayerCheck_, &QAbstractButton::toggled, this, [this](bool checked) {
             if (showInputLayerAction_ && showInputLayerAction_->isChecked() != checked) {
                 showInputLayerAction_->setChecked(checked);
                 return;
             }
             updateLayerVisibility();
         });
-        connect(showResultLayerCheck_, &QCheckBox::toggled, this, [this](bool checked) {
+        connect(showResultLayerCheck_, &QAbstractButton::toggled, this, [this](bool checked) {
             if (showResultLayerAction_ && showResultLayerAction_->isChecked() != checked) {
                 showResultLayerAction_->setChecked(checked);
                 return;
-            }
-            updateLayerVisibility();
-        });
-        connect(showOverlayLayerButton_, &QPushButton::clicked, this, [this]() {
-            if (showInputLayerCheck_ && showResultLayerCheck_) {
-                QSignalBlocker inputBlocker(showInputLayerCheck_);
-                QSignalBlocker resultBlocker(showResultLayerCheck_);
-                showInputLayerCheck_->setChecked(true);
-                showResultLayerCheck_->setChecked(true);
-            }
-            if (showInputLayerAction_ && !showInputLayerAction_->isChecked()) {
-                showInputLayerAction_->setChecked(true);
-            }
-            if (showResultLayerAction_ && !showResultLayerAction_->isChecked()) {
-                showResultLayerAction_->setChecked(true);
             }
             updateLayerVisibility();
         });
@@ -2129,7 +2242,7 @@ void FaultTraceDialog::buildUi() {
         mainSplitter_->addWidget(workspace);
         mainSplitter_->setStretchFactor(0, 0);
         mainSplitter_->setStretchFactor(1, 1);
-        mainSplitter_->setSizes({480, 800});
+        mainSplitter_->setSizes({420, 860});
 
         QFrame* statusBar = new QFrame(this);
         statusBar->setObjectName("statusBar");
@@ -2741,7 +2854,7 @@ void FaultTraceDialog::retranslateUi() {
         layerTitleLabel_->setText(uiText(QString::fromUtf8("显示图层")));
     }
     if (layerHintLabel_) {
-        layerHintLabel_->setText(uiText(QString::fromUtf8("同时勾选两层即为叠加查看。")));
+        layerHintLabel_->setText(uiText(QString::fromUtf8("同时开启两层即可叠加查看。")));
     }
     if (showInputLayerCheck_) {
         showInputLayerCheck_->setText(uiText(QString::fromUtf8("原始网格")));
@@ -2750,10 +2863,6 @@ void FaultTraceDialog::retranslateUi() {
     if (showResultLayerCheck_) {
         showResultLayerCheck_->setText(uiText(QString::fromUtf8("结果多边形")));
         showResultLayerCheck_->setToolTip(uiText(QString::fromUtf8("显示或隐藏追踪结果多边形。没有结果时请先追踪或选择已有结果。")));
-    }
-    if (showOverlayLayerButton_) {
-        showOverlayLayerButton_->setText(uiText(QString::fromUtf8("叠加查看")));
-        showOverlayLayerButton_->setToolTip(uiText(QString::fromUtf8("同时显示原始网格和结果多边形，用于检查贴合关系。")));
     }
     if (languageChineseAction_) {
         languageChineseAction_->setText(uiText("简体中文"));
@@ -2791,9 +2900,13 @@ void FaultTraceDialog::loadSettings() {
     currentLanguage_ = fpt_ui::normalizeLanguageCode(settings.value("language", "zh-CN").toString()) == "en"
         ? UiLanguage::English
         : UiLanguage::SimplifiedChinese;
-    runnerEdit_->setText(settingOrCurrent(settings, "runner", runnerEdit_->text(), schemaVersion));
-    geoEastRootEdit_->setText(settingOrCurrent(settings, "geoEastRoot", geoEastRootEdit_->text(), schemaVersion));
-    geoEastDataRootEdit_->setText(settingOrCurrent(settings, "geoEastDataRoot", geoEastDataRootEdit_->text(), schemaVersion));
+    const QString savedRunner = settingOrCurrent(settings, "runner", runnerEdit_->text(), schemaVersion).trimmed();
+    runnerEdit_->setText(QFileInfo::exists(savedRunner) ? savedRunner : defaultRunnerPath());
+    const QString savedRoot = settingOrCurrent(settings, "geoEastRoot", geoEastRootEdit_->text(), schemaVersion).trimmed();
+    const QString effectiveRoot = QDir(savedRoot).exists() ? savedRoot : detectGeoEastRoot();
+    geoEastRootEdit_->setText(effectiveRoot);
+    const QString savedDataRoot = settingOrCurrent(settings, "geoEastDataRoot", geoEastDataRootEdit_->text(), schemaVersion).trimmed();
+    geoEastDataRootEdit_->setText(QDir(savedDataRoot).exists() ? savedDataRoot : detectGeoEastDataRoot(effectiveRoot));
     pgHostEdit_->setText(settings.value("pgHost", pgHostEdit_->text()).toString());
     pgPortEdit_->setText(settings.value("pgPort", pgPortEdit_->text()).toString());
     databaseEdit_->setText(settings.value("database", databaseEdit_->text()).toString());
@@ -2801,10 +2914,25 @@ void FaultTraceDialog::loadSettings() {
     userEdit_->setText(settingOrCurrent(settings, "user", userEdit_->text(), schemaVersion));
     setComboByKey(presetCombo_, settings.value("preset", comboKey(presetCombo_)).toString());
     setComboByKey(qualityModeCombo_, settings.value("qualityMode", QString::fromUtf8("正式处理")).toString());
-    gridCombo_->setCurrentText(settingOrCurrent(settings, "grid", gridCombo_->currentText(), schemaVersion));
-    outputEdit_->setText(settings.value("output", outputEdit_->text()).toString());
-    datFileEdit_->setText(settingOrCurrent(settings, "datFile", datFileEdit_->text(), schemaVersion));
-    importDatCheck_->setChecked(settings.value("importDat", importDatCheck_->isChecked()).toBool());
+    pendingGridRestore_ = settingOrCurrent(settings, "grid", gridCombo_->currentText(), schemaVersion).trimmed();
+    if (pendingGridRestore_.startsWith(QString::fromUtf8("请先")) ||
+        pendingGridRestore_.startsWith(QStringLiteral("Configure"))) {
+        pendingGridRestore_.clear();
+    }
+    gridCombo_->clear();
+    gridCombo_->setCurrentText(QString());
+    gridCombo_->setProperty("fptCatalogReady", false);
+    const QString savedOutput = settings.value("output", outputEdit_->text()).toString().trimmed();
+    outputEdit_->setText(savedOutput.isEmpty() || savedOutput.startsWith(QString::fromUtf8("请先")) ||
+                         savedOutput.startsWith(QString::fromUtf8("当前项目")) ||
+                         savedOutput.startsWith(QStringLiteral("Configure"))
+                             ? QStringLiteral("FaultPolyTrace_Result")
+                             : savedOutput);
+    const QString savedDat = settingOrCurrent(settings, "datFile", datFileEdit_->text(), schemaVersion).trimmed();
+    const bool restoreDat = settings.value("importDat", importDatCheck_->isChecked()).toBool() &&
+                            QFileInfo::exists(savedDat);
+    datFileEdit_->setText(restoreDat ? savedDat : QString());
+    importDatCheck_->setChecked(restoreDat);
     overwriteGridCheck_->setChecked(settings.value("overwriteGrid", overwriteGridCheck_->isChecked()).toBool());
     polygonColorEdit_->setText(settings.value("polygonColor", polygonColorEdit_->text()).toString());
     setPolygonColor(QColor(polygonColorEdit_->text()));
@@ -2858,8 +2986,8 @@ void FaultTraceDialog::loadSettings() {
             mainSplitter_->restoreState(splitterState);
         }
         QList<int> sizes = mainSplitter_->sizes();
-        if (sizes.size() >= 2 && sizes.at(0) < 440) {
-            mainSplitter_->setSizes({480, qMax(620, sizes.at(1))});
+        if (sizes.size() >= 2 && sizes.at(0) < 400) {
+            mainSplitter_->setSizes({420, qMax(620, sizes.at(1))});
         }
     }
     updateOptionControls();
@@ -2870,7 +2998,7 @@ void FaultTraceDialog::loadSettings() {
 
 void FaultTraceDialog::saveSettings() const {
     QSettings settings(launcherSettingsPath(), QSettings::IniFormat);
-    settings.setValue("configSchemaVersion", 3);
+    settings.setValue("configSchemaVersion", 4);
     settings.setValue("language", languageCode());
     settings.setValue("runner", runnerEdit_->text());
     settings.setValue("geoEastRoot", geoEastRootEdit_->text());
@@ -3045,6 +3173,9 @@ void FaultTraceDialog::setPolygonColor(const QColor& color) {
         .arg(effective.name(QColor::HexRgb))
         .arg(effective.lightness() < 128 ? "#FFFFFF" : "#000000");
     polygonColorEdit_->setStyleSheet(style);
+    if (showResultLayerCheck_) {
+        showResultLayerCheck_->setAccentColor(effective);
+    }
     updateStatusContext();
 }
 
@@ -3158,8 +3289,10 @@ QStringList FaultTraceDialog::commonConnectionArgs() const {
     QStringList args;
     args << "--db" << databaseEdit_->text().trimmed()
          << "--project" << projectEdit_->text().trimmed()
-         << "--user" << userEdit_->text().trimmed()
-         << "--password" << passwordEdit_->text();
+         << "--user" << userEdit_->text().trimmed();
+    if (!passwordEdit_->text().isEmpty()) {
+        args << "--password" << passwordEdit_->text();
+    }
     return args;
 }
 
@@ -3186,6 +3319,10 @@ QString FaultTraceDialog::previewPolygonsPath() const {
 }
 
 bool FaultTraceDialog::launchGeoEastApp(const QString& exeName, const QString& displayName) {
+    if (activateApplicationWindow(exeName)) {
+        appendStatus(QString::fromUtf8("已切换到正在运行的 %1").arg(displayName));
+        return true;
+    }
     const QString geoEastRoot = QDir::fromNativeSeparators(geoEastRootEdit_ ? geoEastRootEdit_->text().trimmed() : QString());
     const QString exePath = QDir(geoEastRoot).absoluteFilePath("GeoEast-RC/bin/" + exeName);
     if (!QFileInfo::exists(exePath)) {
@@ -3200,17 +3337,34 @@ bool FaultTraceDialog::launchGeoEastApp(const QString& exeName, const QString& d
     process.setProgram(QDir::toNativeSeparators(exePath));
     process.setWorkingDirectory(QFileInfo(exePath).absolutePath());
     process.setProcessEnvironment(environment);
-    if (!process.startDetached()) {
+    qint64 pid = 0;
+    appendStatus(QString::fromUtf8("正在打开 %1...").arg(displayName));
+    if (!process.startDetached(&pid)) {
         QMessageBox::warning(this, uiText(QString::fromUtf8("启动失败")),
                              uiText(QString::fromUtf8("无法启动 %1。请确认 GeoEast 环境和 license 可用。").arg(displayName)));
         return false;
     }
 
-    appendLog(QString::fromUtf8("已启动 %1：%2").arg(displayName, QDir::toNativeSeparators(exePath)));
-    appendLog(QString::fromUtf8("官方窗口中请在图层树加载 Grids/%1 与 Fault Polygons/%2；本插件无法从外部进程强制勾选 GeoEast 内部图层。")
-                  .arg(gridCombo_ ? gridCombo_->currentText().trimmed() : QString(),
-                       outputEdit_ ? outputEdit_->text().trimmed() : QString()));
-    appendStatus(QString::fromUtf8("已打开 %1，按官方图层树查看结果").arg(displayName));
+    appendLog(QString::fromUtf8("已发送 %1 启动请求（进程 %2）：%3").arg(displayName).arg(pid).arg(QDir::toNativeSeparators(exePath)));
+    appendStatus(QString::fromUtf8("正在确认 %1 是否可用...").arg(displayName));
+    QTimer::singleShot(1400, this, [this, pid, exeName, displayName]() {
+        if (isProcessAlive(pid) || activateApplicationWindow(exeName)) {
+            appendStatus(QString::fromUtf8("已打开 %1，按官方图层树查看结果").arg(displayName));
+            appendLog(QString::fromUtf8("官方窗口中请在图层树加载 Grids/%1 与 Fault Polygons/%2。")
+                          .arg(gridCombo_ ? gridCombo_->currentText().trimmed() : QString(),
+                               outputEdit_ ? outputEdit_->text().trimmed() : QString()));
+            return;
+        }
+
+        const bool hostActivated = activateApplicationWindow(QStringLiteral("geoeast.exe"));
+        appendStatus(QString::fromUtf8("%1 需要由 GeoEast 当前工区启动").arg(displayName));
+        QMessageBox::information(
+            this,
+            uiText(QString::fromUtf8("请从 GeoEast 打开工区视图")),
+            uiText(QString::fromUtf8("%1 需要 GeoEast 当前工区的会话信息，无法作为普通独立程序直接启动。%2\n\n请在 GeoEast 顶部工具栏点击【工区底图】或【平面成图】，再在图层树中选择当前网格和结果。插件内的结果视图区仍可直接查看两类图层。"))
+                .arg(displayName, hostActivated ? QString::fromUtf8("已切换回 GeoEast 主窗口。")
+                                                : QString::fromUtf8("请先打开并登录 GeoEast。")));
+    });
     return true;
 }
 
@@ -3377,6 +3531,7 @@ void FaultTraceDialog::applyTraceParameters(const fpt_ui::TraceParameters& share
 
 void FaultTraceDialog::refreshGrids() {
     if (process_->state() != QProcess::NotRunning) {
+        appendStatus(QString::fromUtf8("当前任务尚未完成，暂不能刷新网格列表"));
         return;
     }
     saveSettings();
@@ -3391,6 +3546,7 @@ void FaultTraceDialog::refreshGrids() {
     exportingGridView_ = false;
     deletingOutput_ = false;
     logEdit_->clear();
+    processOutput_.clear();
     QStringList args = commonConnectionArgs();
     args << "--list-grids";
     appendStatus(QString::fromUtf8("正在刷新 GeoEast 网格列表..."));
@@ -3408,6 +3564,7 @@ void FaultTraceDialog::refreshGrids() {
 
 void FaultTraceDialog::refreshOutputs() {
     if (process_->state() != QProcess::NotRunning) {
+        appendStatus(QString::fromUtf8("当前任务尚未完成，暂不能刷新结果列表"));
         return;
     }
     saveSettings();
@@ -3422,6 +3579,7 @@ void FaultTraceDialog::refreshOutputs() {
     exportingGridView_ = false;
     deletingOutput_ = false;
     logEdit_->clear();
+    processOutput_.clear();
     QStringList args = commonConnectionArgs();
     args << "--list-fault-polygons";
     appendStatus(QString::fromUtf8("正在刷新 GeoEast 结果列表..."));
@@ -3496,7 +3654,7 @@ void FaultTraceDialog::loadSelectedOutputInternal(bool userInitiated) {
         return;
     }
     saveSettings();
-    if (!ensureGeoEastConfigReady(QString::fromUtf8("载入已有结果"), false, false)) {
+    if (!ensureGeoEastConfigReady(QString::fromUtf8("载入已有结果"), true, false)) {
         return;
     }
     outputEdit_->setText(selected);
@@ -3530,6 +3688,7 @@ void FaultTraceDialog::runTrace() {
         doneBanner_->hide();
     }
     if (process_->state() != QProcess::NotRunning) {
+        appendStatus(QString::fromUtf8("已有任务正在运行，请等待完成或先停止任务"));
         return;
     }
     saveSettings();
@@ -3563,6 +3722,7 @@ void FaultTraceDialog::deleteOutput() {
         doneBanner_->hide();
     }
     if (process_->state() != QProcess::NotRunning) {
+        appendStatus(QString::fromUtf8("已有任务正在运行，暂不能删除结果"));
         return;
     }
     const QString outputName = outputEdit_->text().trimmed();
@@ -3615,6 +3775,9 @@ void FaultTraceDialog::loadResultView() {
     RenderViewWidget* view = static_cast<RenderViewWidget*>(renderViewWidget_);
     const QString gridPath = previewGridPath();
     const QString polygonPath = previewPolygonsPath();
+    view->setActivity(QString::fromUtf8("正在构建结果视图"));
+    QApplication::setOverrideCursor(Qt::WaitCursor);
+    QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
     const bool gridLoaded = view->loadGridFile(gridPath, &error);
     if (!gridLoaded) {
         appendLog(error);
@@ -3624,6 +3787,7 @@ void FaultTraceDialog::loadResultView() {
 
     error.clear();
     const bool polygonsLoaded = view->loadPolygonCsv(polygonPath, &error);
+    QApplication::restoreOverrideCursor();
     if (!polygonsLoaded) {
         appendLog(error);
     } else {
@@ -3685,9 +3849,11 @@ void FaultTraceDialog::onReadyRead() {
     const QString output = QString::fromLocal8Bit(process_->readAllStandardOutput());
     const QString error = QString::fromLocal8Bit(process_->readAllStandardError());
     if (!output.isEmpty()) {
+        processOutput_ += output;
         appendLog(output);
     }
     if (!error.isEmpty()) {
+        processOutput_ += error;
         appendLog(error);
     }
 }
@@ -3697,7 +3863,7 @@ void FaultTraceDialog::onProcessFinished(int exitCode, QProcess::ExitStatus stat
     setRunning(false);
 
     if (refreshingGrids_ && exitCode == 0 && status == QProcess::NormalExit) {
-        const QString text = logEdit_->toPlainText();
+        const QString text = processOutput_;
         QStringList names;
         for (const QString& rawLine : text.split('\n')) {
             const QString line = rawLine.trimmed();
@@ -3710,17 +3876,19 @@ void FaultTraceDialog::onProcessFinished(int exitCode, QProcess::ExitStatus stat
                 names << line;
             }
         }
+        const QString current = pendingGridRestore_.isEmpty() ? gridCombo_->currentText() : pendingGridRestore_;
+        pendingGridRestore_.clear();
+        gridCombo_->blockSignals(true);
+        gridCombo_->clear();
         if (!names.isEmpty()) {
-            const QString current = gridCombo_->currentText();
-            gridCombo_->blockSignals(true);
-            gridCombo_->clear();
             gridCombo_->addItems(names);
             int index = gridCombo_->findText(current);
             if (index >= 0) {
                 gridCombo_->setCurrentIndex(index);
             }
-            gridCombo_->blockSignals(false);
         }
+        gridCombo_->setProperty("fptCatalogReady", true);
+        gridCombo_->blockSignals(false);
         appendStatus(QString::fromUtf8("网格对象刷新完成"));
         if (renderViewWidget_) {
             static_cast<RenderViewWidget*>(renderViewWidget_)->setActivity(QString::fromUtf8("网格对象刷新完成"));
@@ -3736,8 +3904,16 @@ void FaultTraceDialog::onProcessFinished(int exitCode, QProcess::ExitStatus stat
         return;
     }
 
+    if (refreshingGrids_) {
+        appendStatus(QString::fromUtf8("网格对象刷新失败，请检查数据库配置和日志"));
+        gridCombo_->setProperty("fptCatalogReady", false);
+        refreshingGrids_ = false;
+        refreshOutputsAfterGrids_ = false;
+        return;
+    }
+
     if (refreshingOutputs_ && exitCode == 0 && status == QProcess::NormalExit) {
-        const QString text = logEdit_->toPlainText();
+        const QString text = processOutput_;
         QStringList names;
         for (const QString& rawLine : text.split('\n')) {
             const QString line = rawLine.trimmed();
@@ -3776,6 +3952,7 @@ void FaultTraceDialog::onProcessFinished(int exitCode, QProcess::ExitStatus stat
                 }
             }
             outputCatalogCombo_->blockSignals(false);
+            outputCatalogCombo_->setProperty("fptCatalogReady", true);
         }
         appendStatus(QString::fromUtf8("结果对象刷新完成，共 %1 个").arg(names.size()));
         if (renderViewWidget_) {
@@ -3793,6 +3970,9 @@ void FaultTraceDialog::onProcessFinished(int exitCode, QProcess::ExitStatus stat
 
     if (refreshingOutputs_) {
         appendStatus(QString::fromUtf8("结果对象刷新失败，请查看日志"));
+        if (outputCatalogCombo_) {
+            outputCatalogCombo_->setProperty("fptCatalogReady", false);
+        }
         refreshingOutputs_ = false;
         return;
     }

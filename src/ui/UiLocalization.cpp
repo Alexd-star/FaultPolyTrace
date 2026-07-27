@@ -1,6 +1,7 @@
 #include "UiLocalization.h"
 
 #include <QAction>
+#include <QAbstractButton>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDoubleSpinBox>
@@ -53,7 +54,7 @@ QMap<QString, QString> buildEnglishTextMap() {
     add("工区底图", "Basemap");
     add("帮助", "Help");
 
-    add("数据库配置", "Database Configuration");
+    add("数据库配置", "Database");
     add("刷新网格", "Refresh Grids");
     add("刷新网格列表", "Refresh Grid List");
     add("刷新结果列表", "Refresh Result List");
@@ -64,6 +65,14 @@ QMap<QString, QString> buildEnglishTextMap() {
     add("线条", "Line Style");
     add("删除当前结果", "Delete Current Result");
     add("打开工区底图", "Open Basemap");
+    add("请从 GeoEast 打开工区视图", "Open the Workspace View from GeoEast");
+    add("%1 需要 GeoEast 当前工区的会话信息，无法作为普通独立程序直接启动。%2\n\n请在 GeoEast 顶部工具栏点击【工区底图】或【平面成图】，再在图层树中选择当前网格和结果。插件内的结果视图区仍可直接查看两类图层。",
+        "%1 requires the current GeoEast workspace session and cannot be launched as a regular standalone program. %2\n\nUse Basemap or Mapping on the GeoEast toolbar, then select the current grid and result in the layer tree. Both layers remain directly available in the plugin result view.");
+    add("已切换回 GeoEast 主窗口。", "The GeoEast main window is now active.");
+    add("请先打开并登录 GeoEast。", "Open and sign in to GeoEast first.");
+    add("已切换到正在运行的 %1", "Switched to the running %1");
+    add("正在确认 %1 是否可用...", "Checking whether %1 is available...");
+    add("%1 需要由 GeoEast 当前工区启动", "%1 must be launched from the current GeoEast workspace");
     add("打开平面成图", "Open GeoMapping");
     add("关闭启动器", "Close Launcher");
     add("打开 DAT 文件...", "Open DAT File...");
@@ -90,6 +99,7 @@ QMap<QString, QString> buildEnglishTextMap() {
     add("显示图层", "Visible Layers");
     add("图层", "Layers");
     add("同时勾选两层即为叠加查看。", "Check both layers to view the overlay.");
+    add("同时开启两层即可叠加查看。", "Turn on both layers to view the overlay.");
     add("叠加查看", "Overlay View");
     add("平台复核：在工区底图或平面成图中勾选网格与结果图层。",
         "Platform review: enable the grid and result layers in GeoBasemap or GeoMapping.");
@@ -633,6 +643,13 @@ QMap<QString, QString> buildEnglishTextMap() {
     add("日志已清空", "Log cleared");
     add("视图区已切换为平移模式", "View switched to pan mode");
     add("视图区已切换为选择模式", "View switched to selection mode");
+    add("正在载入原始网格...", "Loading input grid...");
+    add("正在载入结果多边形...", "Loading result polygons...");
+    add("结果多边形已载入", "Result polygons loaded");
+    add("结果多边形载入失败", "Failed to load result polygons");
+    add("正在自动读取当前项目的数据列表...", "Reading the current project catalog...");
+    add("请先完成数据库配置；选择输入网格时可打开配置引导",
+        "Complete the database configuration first. Open the setup guide from the input grid selector.");
     add("已选择输入文件；勾选“显示原始网格层”后再载入图像",
         "Input file selected. Enable Show Input Grid Layer to load the image.");
     add("已选择输入文件，未自动载入图像以保持界面流畅",
@@ -1008,6 +1025,8 @@ void captureTranslatableText(QObject* root) {
             rememberText(button, "fptTextZh", button->text());
         } else if (QCheckBox* checkBox = qobject_cast<QCheckBox*>(object)) {
             rememberText(checkBox, "fptTextZh", checkBox->text());
+        } else if (QAbstractButton* button = qobject_cast<QAbstractButton*>(object)) {
+            rememberText(button, "fptTextZh", button->text());
         } else if (QGroupBox* groupBox = qobject_cast<QGroupBox*>(object)) {
             rememberText(groupBox, "fptTitleZh", groupBox->title());
         }
@@ -1070,6 +1089,10 @@ void applyTranslatableText(QObject* root, const QString& languageCode) {
         } else if (QCheckBox* checkBox = qobject_cast<QCheckBox*>(object)) {
             if (checkBox->property("fptTextZh").isValid()) {
                 checkBox->setText(translated(checkBox, "fptTextZh"));
+            }
+        } else if (QAbstractButton* button = qobject_cast<QAbstractButton*>(object)) {
+            if (button->property("fptTextZh").isValid()) {
+                button->setText(translated(button, "fptTextZh"));
             }
         } else if (QGroupBox* groupBox = qobject_cast<QGroupBox*>(object)) {
             if (groupBox->property("fptTitleZh").isValid()) {

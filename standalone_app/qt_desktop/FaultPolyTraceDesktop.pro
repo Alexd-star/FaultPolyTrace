@@ -21,6 +21,7 @@ SOURCES += \
     ../../src/ui/FptTheme.cpp \
     ../../src/ui/FptIcons.cpp \
     ../../src/ui/FptLog.cpp \
+    ../../src/ui/FptControls.cpp \
     ../../src/ui/TraceParameterModel.cpp \
     FaultPolyTraceWindow.cpp
 
@@ -29,6 +30,7 @@ HEADERS += \
     ../../src/ui/FptTheme.h \
     ../../src/ui/FptIcons.h \
     ../../src/ui/FptLog.h \
+    ../../src/ui/FptControls.h \
     ../../src/ui/TraceParameterModel.h \
     FaultPolyTraceWindow.h
 

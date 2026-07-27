@@ -5,7 +5,7 @@
 #include <QString>
 #include <QStringList>
 
-namespace fpt_ui { struct TraceParameters; }
+namespace fpt_ui { class LayerToggle; struct TraceParameters; }
 
 class AttributeView;
 class QAction;
@@ -142,6 +142,7 @@ private:
     QString processOutput_;
     QString lastOutputCsv_;
     QString lastGeoEastOutput_;
+    QString pendingGeoEastGridRestore_;
     bool refreshResultsAfterGrids_ = false;
 
     QComboBox* sourceModeCombo_ = nullptr;
@@ -210,9 +211,8 @@ private:
     QProgressBar* busyBar_ = nullptr;
     QDoubleSpinBox* lineWidthSpin_ = nullptr;
     QDoubleSpinBox* alphaSpin_ = nullptr;
-    QCheckBox* showGridLayerCheck_ = nullptr;
-    QCheckBox* showPolygonLayerCheck_ = nullptr;
-    QPushButton* showOverlayLayerButton_ = nullptr;
+    fpt_ui::LayerToggle* showGridLayerCheck_ = nullptr;
+    fpt_ui::LayerToggle* showPolygonLayerCheck_ = nullptr;
     QPushButton* runButton_ = nullptr;
     QPushButton* stopButton_ = nullptr;
     QToolButton* openFilesButton_ = nullptr;
