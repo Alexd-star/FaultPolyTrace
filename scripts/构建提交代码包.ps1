@@ -138,8 +138,14 @@ $pluginDir = Join-Path $Destination "03_GeoEast插件"
 $pluginName = "FaultPolyTrace_GeoEastPlugin_$Version"
 $pluginRoot = Join-Path $pluginDir $pluginName
 Copy-Tree -Source (Join-Path $releaseDir "qt_launcher") -Target (Join-Path $pluginRoot "Launcher")
-Copy-Tree -Source (Join-Path $releaseDir "geoeast_plugin\bo_runner") -Target (Join-Path $pluginRoot "BO_Runner")
-Copy-Tree -Source (Join-Path $releaseDir "geoeast_plugin\mainframe_plugin") -Target (Join-Path $pluginRoot "Mainframe_Plugin")
+$boTarget = Join-Path $pluginRoot "BO_Runner"
+$mainframeTarget = Join-Path $pluginRoot "Mainframe_Plugin"
+New-Item -ItemType Directory -Force -Path $boTarget, $mainframeTarget | Out-Null
+Copy-Item -LiteralPath (Join-Path $releaseDir "geoeast_plugin\bo_runner\faultpolytrace_geoeast_runner.exe") -Destination $boTarget -Force
+Copy-Item -LiteralPath (Join-Path $releaseDir "geoeast_plugin\bo_runner\说明.md") -Destination $boTarget -Force
+Copy-Item -LiteralPath (Join-Path $releaseDir "geoeast_plugin\mainframe_plugin\built\FaultPolyTraceMainframePlugin.dll") -Destination $mainframeTarget -Force
+Copy-Item -LiteralPath (Join-Path $releaseDir "geoeast_plugin\mainframe_plugin\built\manifest.xml") -Destination $mainframeTarget -Force
+Copy-Item -LiteralPath (Join-Path $releaseDir "geoeast_plugin\mainframe_plugin\说明.md") -Destination $mainframeTarget -Force
 New-Item -ItemType Directory -Force -Path (Join-Path $pluginRoot "图标") | Out-Null
 Copy-Item -LiteralPath (Join-Path $releaseDir "faultpolytrace.ico"), (Join-Path $releaseDir "faultpolytrace.png") -Destination (Join-Path $pluginRoot "图标") -Force
 Copy-Item -LiteralPath (Join-Path $releaseDir "构建与依赖清单.json") -Destination $pluginRoot -Force

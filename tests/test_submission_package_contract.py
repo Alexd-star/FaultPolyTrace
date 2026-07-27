@@ -31,6 +31,10 @@ def test_submission_keeps_desktop_and_plugin_packages_decoupled() -> None:
     assert 'Join-Path $pluginRoot "Launcher"' in script
     assert 'Join-Path $pluginRoot "BO_Runner"' in script
     assert 'Join-Path $pluginRoot "Mainframe_Plugin"' in script
+    assert 'mainframe_plugin\\built\\FaultPolyTraceMainframePlugin.dll' in script
+    assert 'mainframe_plugin\\built\\manifest.xml' in script
+    assert 'Copy-Tree -Source (Join-Path $releaseDir "geoeast_plugin\\bo_runner")' not in script
+    assert 'Copy-Tree -Source (Join-Path $releaseDir "geoeast_plugin\\mainframe_plugin")' not in script
 
 
 def test_submission_hash_verifier_parses_generated_format() -> None:
