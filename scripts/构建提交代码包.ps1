@@ -164,7 +164,10 @@ if (!(Test-Path -LiteralPath $smokeResult)) { throw "缺少安装器完整运行
 Copy-Item -LiteralPath $smokeResult -Destination (Join-Path $verifyDir "安装器完整运行检查.json") -Force
 $officialOut = Join-Path $verifyDir "正式官方结果"
 New-Item -ItemType Directory -Force -Path $officialOut | Out-Null
-Get-ChildItem -LiteralPath (Join-Path $smokeRoot.FullName "output") -File | Copy-Item -Destination $officialOut -Force
+$smokeOfficialResult = Get-ChildItem -LiteralPath $smokeRoot.FullName -Recurse -File -Filter "official_result.csv" |
+    Select-Object -First 1
+if (!$smokeOfficialResult) { throw "安装器完整运行检查目录中缺少 official_result.csv。" }
+Get-ChildItem -LiteralPath $smokeOfficialResult.DirectoryName -File | Copy-Item -Destination $officialOut -Force
 
 Write-Host "[5/6] 写入提交说明与许可"
 Copy-Tree -Source $templateRoot -Target $Destination -ExcludeDirs @((Join-Path $templateRoot "01_源码"))

@@ -291,6 +291,9 @@ def test_installer_and_plugin_deployment_cover_first_time_user_constraints():
     assert "-ExecutionPolicy Bypass" in plugin_cmd
     packaging = read("scripts/打包发布包.ps1")
     assert "txt|cmd|md|json" in packaging
+    submission = read("scripts/构建提交代码包.ps1")
+    assert 'Filter "official_result.csv"' in submission
+    assert "$smokeOfficialResult.DirectoryName" in submission
 
 
 def test_windows_cli_preserves_unicode_paths_end_to_end():
