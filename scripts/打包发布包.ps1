@@ -481,6 +481,17 @@ Get-ChildItem -LiteralPath $packageDir -Recurse -File |
     } |
     Remove-Item -Force
 
+# Remove packaging-only empty directory shells after optional artifacts have
+# been copied. This keeps portable deliveries concise and reproducible.
+do {
+    $emptyDirectories = @(Get-ChildItem -LiteralPath $packageDir -Recurse -Directory |
+        Where-Object {
+            @(Get-ChildItem -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue).Count -eq 0
+        } |
+        Sort-Object FullName -Descending)
+    $emptyDirectories | Remove-Item -Force
+} while ($emptyDirectories.Count -gt 0)
+
 $packageRecords = @(Get-ChildItem -LiteralPath $packageDir -Recurse -File |
     Where-Object { $_.Name -ne "构建与依赖清单.json" } |
     ForEach-Object {

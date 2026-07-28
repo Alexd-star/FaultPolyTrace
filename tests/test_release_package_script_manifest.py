@@ -61,6 +61,8 @@ def test_release_package_excludes_generated_cache_and_local_launcher_config():
     assert '$_.Name -ne "faultpolytrace_launcher.ini"' in script
     for forbidden in ("__pycache__", ".pytest_cache", ".pyc"):
         assert forbidden in script
+    assert "$emptyDirectories" in script
+    assert "Get-ChildItem -LiteralPath $_.FullName -Force" in script
 
 
 def test_final_manifest_binds_package_zip_and_installer_to_one_build_id():
