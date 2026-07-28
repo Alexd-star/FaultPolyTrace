@@ -51,7 +51,9 @@
 #include <QPixmap>
 #include <QProcessEnvironment>
 #include <QProgressBar>
+#include <QPointer>
 #include <QPushButton>
+#include <QRunnable>
 #include <QRegularExpression>
 #include <QSaveFile>
 #include <QScrollArea>
@@ -69,6 +71,7 @@
 #include <QTextEdit>
 #include <QTextCursor>
 #include <QTextStream>
+#include <QThreadPool>
 #include <QToolBar>
 #include <QToolButton>
 #include <QTimer>
@@ -616,6 +619,7 @@ public:
 
     explicit AttributeView(QWidget* parent = nullptr) : QWidget(parent) {
         setMinimumSize(640, 460);
+        setAttribute(Qt::WA_OpaquePaintEvent, true);
         setMouseTracking(true);
         setCursor(Qt::OpenHandCursor);
     }
@@ -636,8 +640,12 @@ public:
         if (showGridLayer_ == showGrid && showPolygonLayer_ == showPolygons) {
             return;
         }
+        const bool polygonVisibilityChanged = showPolygonLayer_ != showPolygons;
         showGridLayer_ = showGrid;
         showPolygonLayer_ = showPolygons;
+        if (polygonVisibilityChanged) {
+            invalidateDragLayerCache();
+        }
         update();
     }
 
@@ -651,6 +659,7 @@ public:
         color_ = effectiveColor;
         lineWidth_ = lineWidth;
         alpha_ = effectiveAlpha;
+        invalidateDragLayerCache();
         update();
     }
 
@@ -681,12 +690,18 @@ public:
     }
 
     void zoomIn() {
-        zoom_ = qMin(4.0, zoom_ * 1.25);
+        const double nextZoom = qMin(8.0, zoom_ * 1.25);
+        if (!qFuzzyCompare(zoom_, nextZoom)) {
+            zoom_ = nextZoom;
+        }
         update();
     }
 
     void zoomOut() {
-        zoom_ = qMax(0.35, zoom_ / 1.25);
+        const double nextZoom = qMax(0.35, zoom_ / 1.25);
+        if (!qFuzzyCompare(zoom_, nextZoom)) {
+            zoom_ = nextZoom;
+        }
         update();
     }
 
@@ -708,6 +723,7 @@ public:
             nx_ > 0 && ny_ > 0 && !grid_.isEmpty()) {
             return true;
         }
+        invalidateDragLayerCache();
         grid_.clear();
         gridImage_ = QImage();
         gridImageDirty_ = true;
@@ -922,6 +938,7 @@ public:
             !polygons_.isEmpty()) {
             return true;
         }
+        invalidateDragLayerCache();
         polygons_.clear();
         polygonPath_ = QPainterPath();
         QFile file(path);
@@ -968,6 +985,7 @@ public:
     }
 
     void clearPolygons(const QString& status = QString()) {
+        invalidateDragLayerCache();
         polygons_.clear();
         polygonPath_ = QPainterPath();
         if (!status.isEmpty()) {
@@ -981,6 +999,7 @@ public:
     }
 
     void clearData(const QString& status = QString()) {
+        invalidateDragLayerCache();
         grid_.clear();
         polygons_.clear();
         polygonPath_ = QPainterPath();
@@ -1032,12 +1051,25 @@ protected:
         const QRectF contentCanvas = transformedCanvas(canvas);
         painter.save();
         painter.setClipRect(canvas);
-        if (!drawDragLayerCache(painter, canvas)) {
-            if (!grid_.isEmpty() && showGridLayer_) {
-                drawGrid(painter, contentCanvas);
-            }
-            if (!polygons_.isEmpty() && showPolygonLayer_) {
-                drawPolygons(painter, contentCanvas);
+        if (!grid_.isEmpty() && showGridLayer_) {
+            drawGrid(painter, contentCanvas);
+        }
+        if (!polygons_.isEmpty() && showPolygonLayer_) {
+            rebuildDragLayerCache();
+            if (!drawDragLayerCache(painter, canvas)) {
+                if (dragCacheBuilding_) {
+                    const QRectF stateRect(canvas.left() + 16, canvas.top() + 16,
+                                           qMin(300.0, canvas.width() - 32.0), 36.0);
+                    painter.setPen(QPen(QColor("#8AA9C2"), 1));
+                    painter.setBrush(QColor(255, 255, 255, 235));
+                    painter.drawRect(stateRect);
+                    painter.setPen(QColor("#0F4D92"));
+                    painter.drawText(stateRect.adjusted(12, 0, -12, 0),
+                                     Qt::AlignLeft | Qt::AlignVCenter,
+                                     uiText(QString::fromUtf8("正在载入结果多边形...")));
+                } else {
+                    drawPolygons(painter, contentCanvas);
+                }
             }
         }
         painter.restore();
@@ -1083,17 +1115,15 @@ protected:
             const QPointF delta = event->pos() - lastDragPos_;
             panOffset_ += delta;
             lastDragPos_ = event->pos();
-            ensureDragLayerCacheCoverage();
-            update();
+            update(layerCanvas().toAlignedRect());
         }
     }
 
     void mouseReleaseEvent(QMouseEvent* event) override {
         if (event->button() == Qt::LeftButton && dragging_) {
             dragging_ = false;
-            dragLayerCache_ = QPixmap();
             setCursor(panMode_ ? Qt::OpenHandCursor : Qt::ArrowCursor);
-            update();
+            update(layerCanvas().toAlignedRect());
         }
     }
 
@@ -1121,68 +1151,163 @@ protected:
     }
 
 private:
+    struct LayerCacheLevel {
+        double referenceZoom = 1.0;
+        QPixmap pixmap;
+    };
+
     QRectF layerCanvas() const {
         return rect().adjusted(24, 54, -24, -24);
     }
 
+    void invalidateDragLayerCache() {
+        ++dragCacheGeneration_;
+        dragLayerCaches_.clear();
+        dragCacheCanvasSize_ = QSize();
+    }
+
+    QSize boundedDragCacheSize(const QRectF& target) const {
+        constexpr double kMaxDragCacheDimension = 4096.0;
+        constexpr double kMaxDragCachePixels = 12.0 * 1024.0 * 1024.0;
+        const double width = qMax(1.0, qAbs(target.width()));
+        const double height = qMax(1.0, qAbs(target.height()));
+        double scale = qMin(1.0, kMaxDragCacheDimension / qMax(width, height));
+        const double scaledPixels = width * height * scale * scale;
+        if (scaledPixels > kMaxDragCachePixels) {
+            scale *= std::sqrt(kMaxDragCachePixels / scaledPixels);
+        }
+        return QSize(qMax(1, qCeil(width * scale)),
+                     qMax(1, qCeil(height * scale)));
+    }
+
     void rebuildDragLayerCache() {
-        dragLayerCache_ = QPixmap();
         if (!showPolygonLayer_ || polygonPath_.isEmpty()) {
+            invalidateDragLayerCache();
             return;
         }
         const QRectF canvas = layerCanvas();
         if (canvas.width() < 2.0 || canvas.height() < 2.0) {
+            invalidateDragLayerCache();
             return;
         }
-        dragCacheMargin_ = QSize(
-            qMin(256, qMax(64, qRound(canvas.width() * 0.25))),
-            qMin(256, qMax(64, qRound(canvas.height() * 0.25))));
-        const QSize cacheSize(
-            qCeil(canvas.width()) + 2 * dragCacheMargin_.width(),
-            qCeil(canvas.height()) + 2 * dragCacheMargin_.height());
-        dragLayerCache_ = QPixmap(cacheSize);
-        dragLayerCache_.fill(Qt::transparent);
-
-        QPainter cachePainter(&dragLayerCache_);
-        cachePainter.translate(
-            dragCacheMargin_.width() - canvas.left(),
-            dragCacheMargin_.height() - canvas.top());
-        const QRectF expandedCanvas = canvas.adjusted(
-            -dragCacheMargin_.width(),
-            -dragCacheMargin_.height(),
-            dragCacheMargin_.width(),
-            dragCacheMargin_.height());
-        cachePainter.setClipRect(expandedCanvas);
-        const QRectF contentCanvas = transformedCanvas(canvas);
-        if (!grid_.isEmpty() && showGridLayer_) {
-            drawGrid(cachePainter, contentCanvas);
+        const QSize canvasSize(qCeil(canvas.width()), qCeil(canvas.height()));
+        if (dragCacheCanvasSize_ != canvasSize) {
+            invalidateDragLayerCache();
+            dragCacheCanvasSize_ = canvasSize;
         }
-        drawPolygons(cachePainter, contentCanvas);
-        dragCachePanOffset_ = panOffset_;
-    }
-
-    void ensureDragLayerCacheCoverage() {
-        if (dragLayerCache_.isNull()) {
+        double referenceZoom = 8.0;
+        for (double level : {1.0, 2.0, 4.0, 8.0}) {
+            if (zoom_ <= level + 1e-9) {
+                referenceZoom = level;
+                break;
+            }
+        }
+        const auto levelReady = [referenceZoom](const LayerCacheLevel& level) {
+            return qFuzzyCompare(level.referenceZoom, referenceZoom);
+        };
+        if (std::any_of(dragLayerCaches_.cbegin(), dragLayerCaches_.cend(), levelReady) ||
+            dragCacheBuilding_) {
             return;
         }
-        const QPointF delta = panOffset_ - dragCachePanOffset_;
-        if (qAbs(delta.x()) > dragCacheMargin_.width() * 0.8 ||
-            qAbs(delta.y()) > dragCacheMargin_.height() * 0.8) {
-            rebuildDragLayerCache();
+        const QRectF referenceCanvas(
+            canvas.center().x() - canvas.width() * referenceZoom / 2.0,
+            canvas.center().y() - canvas.height() * referenceZoom / 2.0,
+            canvas.width() * referenceZoom,
+            canvas.height() * referenceZoom);
+        const QRectF target = fittedRect(referenceCanvas);
+        if (!target.isValid() || target.width() < 1.0 || target.height() < 1.0) {
+            invalidateDragLayerCache();
+            return;
         }
+        const QSize cacheSize = boundedDragCacheSize(target);
+
+        const int generation = dragCacheGeneration_;
+        const QPainterPath path = polygonPath_;
+        QColor color = color_;
+        color.setAlphaF(alpha_);
+        const double penWidth = qMax(1.2, lineWidth_ * 42.0);
+        const double xMin = xMin_;
+        const double yMin = yMin_;
+        const double xRange = qMax(1e-9, xMax_ - xMin_);
+        const double yRange = qMax(1e-9, yMax_ - yMin_);
+        QPointer<AttributeView> guard(this);
+        dragCacheBuilding_ = true;
+        dragCacheBuildGeneration_ = generation;
+        dragCacheCanvasSize_ = canvasSize;
+
+        QThreadPool::globalInstance()->start(QRunnable::create(
+            [guard, generation, canvasSize, referenceZoom, cacheSize, path, color,
+             penWidth, xMin, yMin, xRange, yRange]() mutable {
+                QImage image(cacheSize, QImage::Format_ARGB32_Premultiplied);
+                if (!image.isNull()) {
+                    image.fill(Qt::transparent);
+                    QPainter cachePainter(&image);
+                    cachePainter.setRenderHint(QPainter::Antialiasing, true);
+                    QPen pen(color, penWidth, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+                    pen.setCosmetic(true);
+                    cachePainter.setPen(pen);
+                    cachePainter.setBrush(Qt::NoBrush);
+                    QTransform worldToCache;
+                    worldToCache.translate(0.0, image.height());
+                    worldToCache.scale(image.width() / xRange,
+                                       -image.height() / yRange);
+                    worldToCache.translate(-xMin, -yMin);
+                    cachePainter.setWorldTransform(worldToCache);
+                    cachePainter.drawPath(path);
+                }
+                if (!guard) {
+                    return;
+                }
+                QMetaObject::invokeMethod(guard.data(),
+                    [guard, generation, canvasSize, referenceZoom,
+                     image = std::move(image)]() mutable {
+                        if (!guard) {
+                            return;
+                        }
+                        if (guard->dragCacheGeneration_ == generation && !image.isNull()) {
+                            LayerCacheLevel level;
+                            level.referenceZoom = referenceZoom;
+                            level.pixmap = QPixmap::fromImage(std::move(image));
+                            guard->dragLayerCaches_ << std::move(level);
+                            std::sort(guard->dragLayerCaches_.begin(), guard->dragLayerCaches_.end(),
+                                      [](const LayerCacheLevel& lhs, const LayerCacheLevel& rhs) {
+                                          return lhs.referenceZoom < rhs.referenceZoom;
+                                      });
+                            guard->dragCacheCanvasSize_ = canvasSize;
+                        }
+                        if (guard->dragCacheBuildGeneration_ == generation) {
+                            guard->dragCacheBuilding_ = false;
+                        }
+                        guard->update(guard->layerCanvas().toAlignedRect());
+                    }, Qt::QueuedConnection);
+            }));
     }
 
     bool drawDragLayerCache(QPainter& painter, const QRectF& canvas) const {
-        if (!dragging_ || dragLayerCache_.isNull()) {
+        if (dragLayerCaches_.isEmpty()) {
             return false;
         }
-        const QPointF delta = panOffset_ - dragCachePanOffset_;
-        const QRectF source(
-            dragCacheMargin_.width() - delta.x(),
-            dragCacheMargin_.height() - delta.y(),
-            canvas.width(),
-            canvas.height());
-        painter.drawPixmap(canvas, dragLayerCache_, source);
+        const LayerCacheLevel* selected = &dragLayerCaches_.last();
+        for (const LayerCacheLevel& level : dragLayerCaches_) {
+            if (zoom_ <= level.referenceZoom + 1e-9) {
+                selected = &level;
+                break;
+            }
+        }
+        const QPixmap& cache = selected->pixmap;
+        const QRectF target = fittedRect(transformedCanvas(canvas));
+        const QRectF visibleTarget = target.intersected(canvas);
+        if (visibleTarget.isEmpty()) {
+            return true;
+        }
+        const double sourceScaleX = cache.width() / target.width();
+        const double sourceScaleY = cache.height() / target.height();
+        const QRectF visibleSource(
+            (visibleTarget.left() - target.left()) * sourceScaleX,
+            (visibleTarget.top() - target.top()) * sourceScaleY,
+            visibleTarget.width() * sourceScaleX,
+            visibleTarget.height() * sourceScaleY);
+        painter.drawPixmap(visibleTarget, cache, visibleSource);
         return true;
     }
 
@@ -1274,9 +1399,20 @@ private:
             gridImageDirty_ = false;
         }
         const QRectF target = fittedRect(available);
+        const QRectF visibleTarget = target.intersected(layerCanvas());
+        if (visibleTarget.isEmpty()) {
+            return;
+        }
+        const double sourceScaleX = gridImage_.width() / target.width();
+        const double sourceScaleY = gridImage_.height() / target.height();
+        const QRectF visibleSource(
+            (visibleTarget.left() - target.left()) * sourceScaleX,
+            (visibleTarget.top() - target.top()) * sourceScaleY,
+            visibleTarget.width() * sourceScaleX,
+            visibleTarget.height() * sourceScaleY);
         // 缩小显示时平滑采样避免摩尔纹，放大时保留像元边界。
         painter.setRenderHint(QPainter::SmoothPixmapTransform, target.width() < nx_);
-        painter.drawImage(target, gridImage_);
+        painter.drawImage(visibleTarget, gridImage_, visibleSource);
         painter.setPen(QColor("#222222"));
         painter.drawRect(target);
     }
@@ -1351,9 +1487,11 @@ private:
     QVector<double> grid_;
     QVector<QVector<QPolygonF>> polygons_;
     QPainterPath polygonPath_;
-    QPixmap dragLayerCache_;
-    QSize dragCacheMargin_;
-    QPointF dragCachePanOffset_;
+    QVector<LayerCacheLevel> dragLayerCaches_;
+    QSize dragCacheCanvasSize_;
+    int dragCacheGeneration_ = 0;
+    int dragCacheBuildGeneration_ = -1;
+    bool dragCacheBuilding_ = false;
     QString gridCachePath_;
     QString gridCacheFormat_;
     qint64 gridCacheSize_ = -1;
@@ -1869,14 +2007,16 @@ void FaultPolyTraceWindow::buildUi() {
     colorRowLayout->addWidget(colorEdit_, 1);
     colorRowLayout->addWidget(colorButton);
     addRow(styleLayout, 0, QString::fromUtf8("颜色"), colorRow, styleBox);
-    lineWidthSpin_ = new QDoubleSpinBox(styleBox);
-    lineWidthSpin_->setRange(0.01, 5.0);
-    lineWidthSpin_->setDecimals(2);
-    lineWidthSpin_->setValue(0.03);
+        lineWidthSpin_ = new QDoubleSpinBox(styleBox);
+        lineWidthSpin_->setRange(0.01, 5.0);
+        lineWidthSpin_->setDecimals(2);
+        lineWidthSpin_->setSingleStep(0.01);
+        lineWidthSpin_->setValue(0.03);
     addRow(styleLayout, 1, QString::fromUtf8("线宽"), lineWidthSpin_, styleBox);
-    alphaSpin_ = new QDoubleSpinBox(styleBox);
-    alphaSpin_->setRange(0.05, 1.0);
-    alphaSpin_->setDecimals(2);
+        alphaSpin_ = new QDoubleSpinBox(styleBox);
+        alphaSpin_->setRange(0.05, 1.0);
+        alphaSpin_->setDecimals(2);
+        alphaSpin_->setSingleStep(0.05);
     alphaSpin_->setValue(1.0);
     addRow(styleLayout, 2, QString::fromUtf8("透明度"), alphaSpin_, styleBox);
     QWidget* layerPanel = new QWidget(styleBox);
@@ -2391,10 +2531,12 @@ void FaultPolyTraceWindow::buildUi() {
     setCentralWidget(root);
 
     statusLabel_ = new QLabel(QString::fromUtf8("就绪"), this);
-    elapsedLabel_ = new QLabel(QString::fromUtf8("耗时: --"), this);
+    elapsedLabel_ = new QLabel(QString::fromUtf8("任务耗时: --"), this);
+    elapsedLabel_->setToolTip(QString::fromUtf8("统计当前执行程序任务从启动到结束的时间，包括读取、处理和写出；任务结束后的图层显示准备另行反馈。"));
     statusBar()->addWidget(statusLabel_, 1);
     busyBar_ = new QProgressBar(this);
-    busyBar_->setRange(0, 0);
+    busyBar_->setRange(0, 100);
+    busyBar_->setValue(0);
     busyBar_->setFixedWidth(120);
     busyBar_->setTextVisible(false);
     busyBar_->hide();
@@ -2920,7 +3062,7 @@ void FaultPolyTraceWindow::startProcess(ProcessTask task, const QString& runner,
     cancelRequested_ = false;
     appendLog("> " + runner + " " + quoteForLog(args));
     updateStatus(statusText);
-    elapsedLabel_->setText(uiText(QString::fromUtf8("耗时: 计算中")));
+    elapsedLabel_->setText(uiText(QString::fromUtf8("任务耗时: 计算中")));
     QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
     if (task == ProcessTask::GeoEastTrace ||
         task == ProcessTask::RefreshGeoEastGrids ||
@@ -3046,6 +3188,10 @@ void FaultPolyTraceWindow::retranslateUi() {
 void FaultPolyTraceWindow::loadSettings() {
     QSettings settings(settingsPath(), QSettings::IniFormat);
     const int schemaVersion = settings.value("configSchemaVersion", 0).toInt();
+    if (schemaVersion == 0) {
+        setComboByKey(presetCombo_, QString::fromUtf8("防黏连增强"));
+        applyPreset(QString::fromUtf8("防黏连增强"));
+    }
     currentLanguage_ = fpt_ui::normalizeLanguageCode(settings.value("language", "zh-CN").toString()) == "en"
         ? UiLanguage::English
         : UiLanguage::SimplifiedChinese;
@@ -3061,7 +3207,7 @@ void FaultPolyTraceWindow::loadSettings() {
     outputNameEdit_->setText(settings.value("outputName", outputNameEdit_->text()).toString());
     inputFormatCombo_->setCurrentText(settings.value("inputFormat", "auto").toString());
     setComboByKey(viewModeCombo_, settings.value("viewMode", QString::fromUtf8("任务预览")).toString());
-    setComboByKey(presetCombo_, settings.value("preset", comboKey(presetCombo_)).toString());
+    setComboByKey(presetCombo_, settings.value("preset", QString::fromUtf8("防黏连增强")).toString());
     setComboByKey(qualityModeCombo_, settings.value("qualityMode", QString::fromUtf8("正式处理")).toString());
     traceModeCombo_->setCurrentText(settings.value("traceMode", traceModeCombo_->currentText()).toString());
     thresholdModeCombo_->setCurrentText(settings.value("thresholdMode", thresholdModeCombo_->currentText()).toString());
@@ -4289,7 +4435,7 @@ void FaultPolyTraceWindow::onFinished(int exitCode, QProcess::ExitStatus status)
     onReadyRead();
     setRunning(false);
     const qint64 elapsedMs = QDateTime::currentMSecsSinceEpoch() - processStartMs_;
-    elapsedLabel_->setText(uiText(QString::fromUtf8("耗时: %1")).arg(elapsedText(elapsedMs)));
+    elapsedLabel_->setText(uiText(QString::fromUtf8("任务耗时: %1")).arg(elapsedText(elapsedMs)));
     const ProcessTask finishedTask = currentTask_;
     currentTask_ = ProcessTask::None;
     const auto disableGridLayer = [this]() {
@@ -4622,7 +4768,13 @@ void FaultPolyTraceWindow::setRunning(bool running) {
     stopButton_->setEnabled(running);
     stopButton_->setText(uiText(QString::fromUtf8("停止")));
     if (busyBar_) {
-        busyBar_->setVisible(running);
+        if (running) {
+            busyBar_->setValue(100);
+            busyBar_->show();
+        } else {
+            busyBar_->hide();
+            busyBar_->setValue(0);
+        }
     }
     if (geoEastRefreshButton_) {
         geoEastRefreshButton_->setEnabled(!running && isGeoEastMode());

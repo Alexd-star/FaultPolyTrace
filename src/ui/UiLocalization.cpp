@@ -301,6 +301,11 @@ QMap<QString, QString> buildEnglishTextMap() {
     add("耗时: --", "Elapsed: --");
     add("耗时: 计算中", "Elapsed: Running");
     add("耗时: %1", "Elapsed: %1");
+    add("任务耗时: --", "Task time: --");
+    add("任务耗时: 计算中", "Task time: Running");
+    add("任务耗时: %1", "Task time: %1");
+    add("统计当前执行程序任务从启动到结束的时间，包括读取、处理和写出；任务结束后的图层显示准备另行反馈。",
+        "Measures the executable task from start to finish, including reading, processing, and writing; post-task layer preparation is reported separately.");
     add("自动", "Auto");
     add("暂无历史记录", "No History");
     add("尚未运行追踪任务", "No trace task has run yet");

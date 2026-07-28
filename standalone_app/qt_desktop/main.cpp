@@ -260,15 +260,17 @@ int main(int argc, char* argv[]) {
     }
 
     std::unique_ptr<QSplashScreen> splash;
+    QProgressBar* startupProgress = nullptr;
     if (splashEnabled()) {
         splash = std::make_unique<QSplashScreen>(createStartupPixmap(applicationIcon));
         splash->setWindowFlag(Qt::WindowStaysOnTopHint, true);
         splash->setWindowFlag(Qt::WindowDoesNotAcceptFocus, true);
-        QProgressBar* progress = new QProgressBar(splash.get());
-        progress->setGeometry(30, 174, 440, 6);
-        progress->setRange(0, 0);
-        progress->setTextVisible(false);
-        progress->setStyleSheet(QStringLiteral(
+        startupProgress = new QProgressBar(splash.get());
+        startupProgress->setGeometry(30, 174, 440, 6);
+        startupProgress->setRange(0, 100);
+        startupProgress->setValue(24);
+        startupProgress->setTextVisible(false);
+        startupProgress->setStyleSheet(QStringLiteral(
             "QProgressBar{border:0;background:#D9E1EA;}"
             "QProgressBar::chunk{background:#0F4D92;width:48px;}"));
         centerSplash(splash.get());
@@ -278,9 +280,15 @@ int main(int argc, char* argv[]) {
 
     FaultPolyTraceWindow window;
     window.show();
+    if (startupProgress) {
+        startupProgress->setValue(100);
+    }
     app.processEvents(QEventLoop::AllEvents, 25);
     if (splash) {
         splash->finish(&window);
+        // finish() only hides the splash. Destroy it now so the indeterminate
+        // progress bar cannot keep animating for the lifetime of the app.
+        splash.reset();
     }
     return app.exec();
 }

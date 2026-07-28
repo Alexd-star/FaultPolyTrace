@@ -187,20 +187,107 @@ def test_preview_pan_zoom_reuses_parsed_samples_and_cached_polygon_paths():
     assert 'Copy-Item -LiteralPath (Join-Path $repoRoot "examples\\outputs\\official")' not in packaging
 
 
-def test_polygon_overlay_pan_uses_interaction_cache_and_restores_vector_quality():
+def test_polygon_overlay_uses_bounded_high_resolution_persistent_display_cache():
     desktop = read("standalone_app/qt_desktop/FaultPolyTraceWindow.cpp")
     launcher = read("geoeast_plugin/qt_launcher/FaultTraceDialog.cpp")
 
     for source in (desktop, launcher):
         assert "rebuildDragLayerCache()" in source
-        assert "ensureDragLayerCacheCoverage()" in source
         assert "drawDragLayerCache(painter, canvas)" in source
-        assert "QPixmap dragLayerCache_" in source
-        assert "dragCachePanOffset_" in source
+        assert "invalidateDragLayerCache()" in source
+        assert "boundedDragCacheSize" in source
+        assert "QVector<LayerCacheLevel> dragLayerCaches_" in source
+        assert "dragCacheCanvasSize_" in source
+        assert "kMaxDragCacheDimension = 4096.0" in source
+        assert "kMaxDragCachePixels = 12.0 * 1024.0 * 1024.0" in source
+        assert "const QPixmap& cache = selected->pixmap" in source
+        assert "QThreadPool::globalInstance()->start(QRunnable::create" in source
+        assert "QMetaObject::invokeMethod" in source
+        assert "QPixmap::fromImage(std::move(image))" in source
+        assert "dragCacheGeneration_" in source
+        assert "dragCacheBuilding_" in source
+        assert "正在载入结果多边形..." in source
+        grid_draw = source[source.index("void drawGrid("):source.index("void drawPolygons(")]
+        assert "target.intersected(layerCanvas())" in grid_draw
+        assert "painter.drawImage(visibleTarget, gridImage_, visibleSource)" in grid_draw
+        cache_builder = source[source.index("void rebuildDragLayerCache()"):
+                               source.index("bool drawDragLayerCache(")]
+        assert "cachePainter.drawPath(path)" in cache_builder
+        assert "drawGrid(cachePainter" not in cache_builder
+        assert "target.intersected(canvas)" in source
+        assert "setAttribute(Qt::WA_OpaquePaintEvent, true)" in source
+        assert "update(layerCanvas().toAlignedRect())" in source
+        assert "ensureDragLayerCacheCoverage" not in source
+        assert "dragCachePanOffset_" not in source
+        assert "dragCacheMargin_" not in source
+        assert "dragCacheZoom_" not in source
         assert "dragging_ = false" in source
         release = source[source.index("void mouseReleaseEvent"):source.index("void wheelEvent")]
-        assert "update();" in release
+        assert "update(layerCanvas().toAlignedRect());" in release
+        assert "dragLayerCache_ = QPixmap()" not in release
         assert "painter.drawPath(polygonPath_)" in source
+        assert "std::any_of(dragLayerCaches_.cbegin(), dragLayerCaches_.cend(), levelReady)" in source
+        assert "for (double level : {1.0, 2.0, 4.0, 8.0})" in source
+        assert "QImage image(cacheSize" in source
+        assert "referenceZooms" not in cache_builder
+        assert "dragLayerCaches_.clear();" not in cache_builder
+    assert "qMin(8.0, zoom_ * 1.25)" in desktop
+    assert "qMin(8.0, zoom_ * 1.25)" in launcher
+
+
+def test_display_style_spin_boxes_use_human_scale_steps():
+    desktop = read("standalone_app/qt_desktop/FaultPolyTraceWindow.cpp")
+    launcher = read("geoeast_plugin/qt_launcher/FaultTraceDialog.cpp")
+    assert "lineWidthSpin_->setSingleStep(0.01);" in desktop
+    assert "alphaSpin_->setSingleStep(0.05);" in desktop
+    assert "polygonLineWidthSpin_->setSingleStep(0.01);" in launcher
+    assert "polygonOpacitySpin_->setSingleStep(0.05);" in launcher
+    assert "coordinateCallbackTimer_.elapsed() >= 33" in launcher
+
+
+def test_fresh_install_uses_the_formal_root_antimerge_preset():
+    desktop = read("standalone_app/qt_desktop/FaultPolyTraceWindow.cpp")
+    launcher = read("geoeast_plugin/qt_launcher/FaultTraceDialog.cpp")
+    assert 'settings.value("preset", QString::fromUtf8("防黏连增强"))' in desktop
+    assert 'settings.value("preset", QString::fromUtf8("防黏连增强"))' in launcher
+    assert "if (schemaVersion == 0)" in desktop
+    assert 'applyPreset(QString::fromUtf8("防黏连增强"))' in desktop
+
+
+def test_task_elapsed_label_does_not_claim_to_include_layer_preparation():
+    desktop = read("standalone_app/qt_desktop/FaultPolyTraceWindow.cpp")
+    localization = read("src/ui/UiLocalization.cpp")
+    assert 'QString::fromUtf8("任务耗时: --")' in desktop
+    assert 'QString::fromUtf8("任务耗时: 计算中")' in desktop
+    assert 'QString::fromUtf8("任务耗时: %1")' in desktop
+    assert "任务结束后的图层显示准备另行反馈" in desktop
+    assert '"Task time: %1"' in localization
+
+
+def test_startup_splash_is_destroyed_after_the_main_window_is_ready():
+    desktop_main = read("standalone_app/qt_desktop/main.cpp")
+    finish = desktop_main[desktop_main.index("if (splash) {"):desktop_main.index("return app.exec();")]
+    assert "splash->finish(&window);" in finish
+    assert "splash.reset();" in finish
+    assert "startupProgress->setRange(0, 100);" in desktop_main
+    assert "startupProgress->setValue(24);" in desktop_main
+    assert "startupProgress->setValue(100);" in desktop_main
+    assert "progress->setRange(0, 0);" not in desktop_main
+
+
+def test_hidden_busy_indicators_do_not_keep_indeterminate_animations_running():
+    for path in (
+        "standalone_app/qt_desktop/FaultPolyTraceWindow.cpp",
+        "geoeast_plugin/qt_launcher/FaultTraceDialog.cpp",
+    ):
+        source = read(path)
+        construction = source[source.index("busyBar_ = new QProgressBar"):source.index("busyBar_->hide()")]
+        assert "busyBar_->setRange(0, 100);" in construction
+        running_branch = source[source.rindex("if (busyBar_) {"):]
+        assert "busyBar_->setValue(100);" in running_branch
+        assert "busyBar_->hide();" in running_branch
+        assert "busyBar_->setValue(0);" in running_branch
+        assert "busyBar_->setRange(0, 0);" not in running_branch
 
 
 def test_customer_builds_ship_only_the_required_simplified_chinese_qt_translation():
