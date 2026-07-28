@@ -75,6 +75,7 @@
 #include <QUrl>
 #include <QVBoxLayout>
 #include <QWheelEvent>
+#include <QtMath>
 
 #include <algorithm>
 #include <cmath>
@@ -1031,11 +1032,13 @@ protected:
         const QRectF contentCanvas = transformedCanvas(canvas);
         painter.save();
         painter.setClipRect(canvas);
-        if (!grid_.isEmpty() && showGridLayer_) {
-            drawGrid(painter, contentCanvas);
-        }
-        if (!polygons_.isEmpty() && showPolygonLayer_) {
-            drawPolygons(painter, contentCanvas);
+        if (!drawDragLayerCache(painter, canvas)) {
+            if (!grid_.isEmpty() && showGridLayer_) {
+                drawGrid(painter, contentCanvas);
+            }
+            if (!polygons_.isEmpty() && showPolygonLayer_) {
+                drawPolygons(painter, contentCanvas);
+            }
         }
         painter.restore();
 
@@ -1071,6 +1074,7 @@ protected:
             dragging_ = true;
             lastDragPos_ = event->pos();
             setCursor(Qt::ClosedHandCursor);
+            rebuildDragLayerCache();
         }
     }
 
@@ -1079,6 +1083,7 @@ protected:
             const QPointF delta = event->pos() - lastDragPos_;
             panOffset_ += delta;
             lastDragPos_ = event->pos();
+            ensureDragLayerCacheCoverage();
             update();
         }
     }
@@ -1086,7 +1091,9 @@ protected:
     void mouseReleaseEvent(QMouseEvent* event) override {
         if (event->button() == Qt::LeftButton && dragging_) {
             dragging_ = false;
+            dragLayerCache_ = QPixmap();
             setCursor(panMode_ ? Qt::OpenHandCursor : Qt::ArrowCursor);
+            update();
         }
     }
 
@@ -1114,6 +1121,71 @@ protected:
     }
 
 private:
+    QRectF layerCanvas() const {
+        return rect().adjusted(24, 54, -24, -24);
+    }
+
+    void rebuildDragLayerCache() {
+        dragLayerCache_ = QPixmap();
+        if (!showPolygonLayer_ || polygonPath_.isEmpty()) {
+            return;
+        }
+        const QRectF canvas = layerCanvas();
+        if (canvas.width() < 2.0 || canvas.height() < 2.0) {
+            return;
+        }
+        dragCacheMargin_ = QSize(
+            qMin(256, qMax(64, qRound(canvas.width() * 0.25))),
+            qMin(256, qMax(64, qRound(canvas.height() * 0.25))));
+        const QSize cacheSize(
+            qCeil(canvas.width()) + 2 * dragCacheMargin_.width(),
+            qCeil(canvas.height()) + 2 * dragCacheMargin_.height());
+        dragLayerCache_ = QPixmap(cacheSize);
+        dragLayerCache_.fill(Qt::transparent);
+
+        QPainter cachePainter(&dragLayerCache_);
+        cachePainter.translate(
+            dragCacheMargin_.width() - canvas.left(),
+            dragCacheMargin_.height() - canvas.top());
+        const QRectF expandedCanvas = canvas.adjusted(
+            -dragCacheMargin_.width(),
+            -dragCacheMargin_.height(),
+            dragCacheMargin_.width(),
+            dragCacheMargin_.height());
+        cachePainter.setClipRect(expandedCanvas);
+        const QRectF contentCanvas = transformedCanvas(canvas);
+        if (!grid_.isEmpty() && showGridLayer_) {
+            drawGrid(cachePainter, contentCanvas);
+        }
+        drawPolygons(cachePainter, contentCanvas);
+        dragCachePanOffset_ = panOffset_;
+    }
+
+    void ensureDragLayerCacheCoverage() {
+        if (dragLayerCache_.isNull()) {
+            return;
+        }
+        const QPointF delta = panOffset_ - dragCachePanOffset_;
+        if (qAbs(delta.x()) > dragCacheMargin_.width() * 0.8 ||
+            qAbs(delta.y()) > dragCacheMargin_.height() * 0.8) {
+            rebuildDragLayerCache();
+        }
+    }
+
+    bool drawDragLayerCache(QPainter& painter, const QRectF& canvas) const {
+        if (!dragging_ || dragLayerCache_.isNull()) {
+            return false;
+        }
+        const QPointF delta = panOffset_ - dragCachePanOffset_;
+        const QRectF source(
+            dragCacheMargin_.width() - delta.x(),
+            dragCacheMargin_.height() - delta.y(),
+            canvas.width(),
+            canvas.height());
+        painter.drawPixmap(canvas, dragLayerCache_, source);
+        return true;
+    }
+
     void drawGuideCard(QPainter& painter, const QRectF& canvas) const {
         // 空状态三步引导：新用户不必猜第一步做什么。
         const double cardW = qMin(420.0, canvas.width() - 48.0);
@@ -1279,6 +1351,9 @@ private:
     QVector<double> grid_;
     QVector<QVector<QPolygonF>> polygons_;
     QPainterPath polygonPath_;
+    QPixmap dragLayerCache_;
+    QSize dragCacheMargin_;
+    QPointF dragCachePanOffset_;
     QString gridCachePath_;
     QString gridCacheFormat_;
     qint64 gridCacheSize_ = -1;

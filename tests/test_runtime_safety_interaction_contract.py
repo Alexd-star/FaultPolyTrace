@@ -183,9 +183,24 @@ def test_preview_pan_zoom_reuses_parsed_samples_and_cached_polygon_paths():
         assert "painter.drawPath(polygonPath_)" in draw
         assert "pen.setCosmetic(true)" in draw
         assert "QPolygonF mapped" not in draw
-
     assert '"official_root_antimerge_benchmark.csv"' in packaging
     assert 'Copy-Item -LiteralPath (Join-Path $repoRoot "examples\\outputs\\official")' not in packaging
+
+
+def test_polygon_overlay_pan_uses_interaction_cache_and_restores_vector_quality():
+    desktop = read("standalone_app/qt_desktop/FaultPolyTraceWindow.cpp")
+    launcher = read("geoeast_plugin/qt_launcher/FaultTraceDialog.cpp")
+
+    for source in (desktop, launcher):
+        assert "rebuildDragLayerCache()" in source
+        assert "ensureDragLayerCacheCoverage()" in source
+        assert "drawDragLayerCache(painter, canvas)" in source
+        assert "QPixmap dragLayerCache_" in source
+        assert "dragCachePanOffset_" in source
+        assert "dragging_ = false" in source
+        release = source[source.index("void mouseReleaseEvent"):source.index("void wheelEvent")]
+        assert "update();" in release
+        assert "painter.drawPath(polygonPath_)" in source
 
 
 def test_customer_builds_ship_only_the_required_simplified_chinese_qt_translation():
