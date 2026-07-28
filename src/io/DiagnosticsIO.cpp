@@ -1,4 +1,5 @@
 #include "DiagnosticsIO.h"
+#include "AtomicOutputFile.h"
 
 #include <algorithm>
 #include <cmath>
@@ -240,10 +241,8 @@ const char* localRejectionReasonName(LocalQualityRejectionReason reason) {
 } // namespace
 
 void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
-    std::ofstream out(filesystemPath(path));
-    if (!out) {
-        throw std::runtime_error("Failed to open diagnostics file: " + path);
-    }
+    AtomicOutputFile output(filesystemPath(path));
+    std::ostream& out = output.stream();
 
     out << "{\n";
     out << "  \"inputPath\": \"" << escapeJson(jsonUtf8(d.inputPath)) << "\",\n";
@@ -486,13 +485,12 @@ void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
     out << "    \"elapsedMs\": " << d.elapsedMs << "\n";
     out << "  }\n";
     out << "}\n";
+    output.commit();
 }
 
 void writeTopologyDetailsCsv(const std::string& path, const TopologyDiagnostics& diagnostics) {
-    std::ofstream out(filesystemPath(path));
-    if (!out) {
-        throw std::runtime_error("Failed to open topology details file: " + path);
-    }
+    AtomicOutputFile output(filesystemPath(path));
+    std::ostream& out = output.stream();
 
     out << "type,polygon_a,polygon_b,edge_a,edge_b,x,y\n";
     for (const SegmentIntersectionDetail& detail : diagnostics.selfIntersectionDetails) {
@@ -513,16 +511,14 @@ void writeTopologyDetailsCsv(const std::string& path, const TopologyDiagnostics&
             << detail.point.x << ","
             << detail.point.y << "\n";
     }
+    output.commit();
 }
 
 void writeBranchAttributionDifferencesCsv(
     const std::string& path,
     const std::vector<JunctionAttributionResult>& junctions) {
-    std::ofstream out(filesystemPath(path));
-    if (!out) {
-        throw std::runtime_error(
-            "Failed to open branch attribution differences file: " + path);
-    }
+    AtomicOutputFile output(filesystemPath(path));
+    std::ostream& out = output.stream();
 
     out << "cluster_id,center_grid_x,center_grid_y,center_world_x,center_world_y,"
         << "min_grid_x,min_grid_y,max_grid_x,max_grid_y,"
@@ -587,6 +583,7 @@ void writeBranchAttributionDifferencesCsv(
             << (junction.acceptedDiffersFromLegacy ? 1 : 0)
             << "\n";
     }
+    output.commit();
 }
 
 } // namespace fpt

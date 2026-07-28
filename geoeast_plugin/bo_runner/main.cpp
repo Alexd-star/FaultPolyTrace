@@ -3,6 +3,7 @@
 #include "../../src/core/FaultTracer.h"
 #include "../../src/core/Topology.h"
 #include "../../src/io/AsciiGridIO.h"
+#include "../../src/io/AtomicOutputFile.h"
 #include "../../src/io/DiagnosticsIO.h"
 
 #include <chrono>
@@ -14,6 +15,7 @@
 #include <iomanip>
 #include <iostream>
 #include <memory>
+#include <new>
 #include <limits>
 #include <algorithm>
 #include <cmath>
@@ -539,10 +541,8 @@ void writePreviewGrid(const std::string& path, const fpt::Grid2D& grid) {
         return;
     }
 
-    std::ofstream out(path);
-    if (!out) {
-        throw std::runtime_error("Failed to open real-view grid output: " + path);
-    }
+    fpt::AtomicOutputFile output(std::filesystem::u8path(path), 1024 * 1024);
+    std::ostream& out = output.stream();
 
     out << grid.nx() << " " << grid.ny() << "\n";
     out << std::fixed << std::setprecision(6);
@@ -557,6 +557,7 @@ void writePreviewGrid(const std::string& path, const fpt::Grid2D& grid) {
         }
         out << "\n";
     }
+    output.commit();
 }
 
 void verifyFaultPolygonRoundTrip(
@@ -797,5 +798,8 @@ int main(int argc, char** argv) {
         std::cerr << "\n";
         printUsage();
         return 1;
+    } catch (...) {
+        debugLog("Error: unexpected internal failure was contained; no GeoEast success result was reported.");
+        return 2;
     }
 }

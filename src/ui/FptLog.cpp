@@ -35,4 +35,39 @@ LogLineStyle logLineStyle(const QString& line) {
     return style;
 }
 
+void appendBoundedProcessOutput(
+    QString& destination,
+    const QString& chunk,
+    int maximumCharacters) {
+    if (chunk.isEmpty() || maximumCharacters <= 0) {
+        return;
+    }
+    const QString marker = QStringLiteral("[Earlier process output omitted]\n");
+    if (maximumCharacters <= marker.size()) {
+        destination = chunk.right(maximumCharacters);
+        return;
+    }
+    if (chunk.size() >= maximumCharacters) {
+        destination = marker + chunk.right(maximumCharacters - marker.size());
+        return;
+    }
+    destination += chunk;
+    if (destination.size() > maximumCharacters) {
+        destination = marker + destination.right(maximumCharacters - marker.size());
+    }
+}
+
+QString boundedProcessLogChunk(
+    const QString& chunk,
+    int maximumCharacters) {
+    if (chunk.size() <= maximumCharacters || maximumCharacters <= 0) {
+        return maximumCharacters <= 0 ? QString() : chunk;
+    }
+    const QString marker = QStringLiteral("[Large process output block truncated]\n");
+    if (maximumCharacters <= marker.size()) {
+        return chunk.right(maximumCharacters);
+    }
+    return marker + chunk.right(maximumCharacters - marker.size());
+}
+
 }  // namespace fpt_ui

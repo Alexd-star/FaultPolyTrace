@@ -2827,12 +2827,14 @@ void FaultPolyTraceWindow::configureGeoEastEnvironment(QProcessEnvironment& envi
 
     const QString networkDir = pgHome + "/network";
     QDir().mkpath(networkDir);
-    QFile hostFile(networkDir + "/hostname.pg");
-    if (hostFile.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
+    QSaveFile hostFile(networkDir + "/hostname.pg");
+    if (hostFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
         const QByteArray line = database.toLocal8Bit() + "=" +
             pgHostEdit_->text().trimmed().toLocal8Bit() + ":" +
             pgPortEdit_->text().trimmed().toLocal8Bit() + "\n";
-        hostFile.write(line);
+        if (hostFile.write(line) != line.size() || !hostFile.commit()) {
+            qWarning("FaultPolyTrace could not atomically update hostname.pg");
+        }
     }
 }
 
@@ -4199,12 +4201,12 @@ void FaultPolyTraceWindow::onReadyRead() {
     const QString out = QString::fromLocal8Bit(process_->readAllStandardOutput());
     const QString err = QString::fromLocal8Bit(process_->readAllStandardError());
     if (!out.isEmpty()) {
-        processOutput_ += out;
-        appendLog(out);
+        fpt_ui::appendBoundedProcessOutput(processOutput_, out);
+        appendLog(fpt_ui::boundedProcessLogChunk(out));
     }
     if (!err.isEmpty()) {
-        processOutput_ += err;
-        appendLog(err);
+        fpt_ui::appendBoundedProcessOutput(processOutput_, err);
+        appendLog(fpt_ui::boundedProcessLogChunk(err));
     }
 }
 
@@ -5247,8 +5249,11 @@ bool FaultPolyTraceWindow::writeGeoJson(const QString& csvPath, QString* geoJson
         return false;
     }
     const QString outPath = QFileInfo(csvPath).absolutePath() + "/" + QFileInfo(csvPath).completeBaseName() + ".geojson";
-    QFile out(outPath);
-    if (!out.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
+    QSaveFile out(outPath);
+    if (!out.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        if (errorMessage) {
+            *errorMessage = QString::fromUtf8("无法创建 GeoJSON：%1").arg(out.errorString());
+        }
         return false;
     }
     QTextStream stream(&out);
@@ -5256,7 +5261,11 @@ bool FaultPolyTraceWindow::writeGeoJson(const QString& csvPath, QString* geoJson
     stream << "{\n  \"type\": \"FeatureCollection\",\n  \"features\": [\n";
     QRegularExpression ringRe("\\(([^()]+)\\)");
     bool first = true;
-    for (const QString& line : QString::fromLocal8Bit(csv.readAll()).split('\n', Qt::SkipEmptyParts)) {
+    while (!csv.atEnd()) {
+        const QString line = QString::fromLocal8Bit(csv.readLine()).trimmed();
+        if (line.isEmpty()) {
+            continue;
+        }
         if (!line.contains("POLYGON", Qt::CaseInsensitive) || !line.contains("kept", Qt::CaseInsensitive)) {
             continue;
         }
@@ -5294,6 +5303,12 @@ bool FaultPolyTraceWindow::writeGeoJson(const QString& csvPath, QString* geoJson
                << "},\"geometry\":{\"type\":\"Polygon\",\"coordinates\":[" << rings.join(",") << "]}}";
     }
     stream << "\n  ]\n}\n";
+    if (stream.status() != QTextStream::Ok || !out.commit()) {
+        if (errorMessage) {
+            *errorMessage = QString::fromUtf8("GeoJSON 写入未能完整提交：%1").arg(out.errorString());
+        }
+        return false;
+    }
     if (geoJsonPath) {
         *geoJsonPath = outPath;
     }

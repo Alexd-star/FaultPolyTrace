@@ -3570,11 +3570,13 @@ void FaultTraceDialog::configureGeoEastEnvironment(QProcessEnvironment& environm
 
     const QString networkDir = pgHome + "/network";
     QDir().mkpath(networkDir);
-    QFile hostFile(networkDir + "/hostname.pg");
-    if (hostFile.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
+    QSaveFile hostFile(networkDir + "/hostname.pg");
+    if (hostFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
         const QByteArray line = databaseEdit_->text().trimmed().toLocal8Bit() + "=" +
             pgHostEdit_->text().trimmed().toLocal8Bit() + ":" + pgPortEdit_->text().trimmed().toLocal8Bit() + "\n";
-        hostFile.write(line);
+        if (hostFile.write(line) != line.size() || !hostFile.commit()) {
+            qWarning("FaultPolyTrace could not atomically update hostname.pg");
+        }
     }
 }
 
@@ -4300,12 +4302,12 @@ void FaultTraceDialog::onReadyRead() {
     const QString output = QString::fromLocal8Bit(process_->readAllStandardOutput());
     const QString error = QString::fromLocal8Bit(process_->readAllStandardError());
     if (!output.isEmpty()) {
-        processOutput_ += output;
-        appendLog(output);
+        fpt_ui::appendBoundedProcessOutput(processOutput_, output);
+        appendLog(fpt_ui::boundedProcessLogChunk(output));
     }
     if (!error.isEmpty()) {
-        processOutput_ += error;
-        appendLog(error);
+        fpt_ui::appendBoundedProcessOutput(processOutput_, error);
+        appendLog(fpt_ui::boundedProcessLogChunk(error));
     }
 }
 

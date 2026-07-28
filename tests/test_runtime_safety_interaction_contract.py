@@ -264,6 +264,36 @@ def test_clean_machine_preflight_and_writable_user_storage_are_enforced():
     assert "本地缓存目录不可用" in launcher
 
 
+def test_low_overhead_resilience_guards_cover_outputs_resources_and_log_floods():
+    atomic_output = read("src/io/AtomicOutputFile.h")
+    grid = read("src/core/Grid2D.cpp")
+    ascii_io = read("src/io/AsciiGridIO.cpp")
+    diagnostics_io = read("src/io/DiagnosticsIO.cpp")
+    shared_log = read("src/ui/FptLog.cpp")
+    desktop = read("standalone_app/qt_desktop/FaultPolyTraceWindow.cpp")
+    launcher = read("geoeast_plugin/qt_launcher/FaultTraceDialog.cpp")
+    bo_runner = read("geoeast_plugin/bo_runner/main.cpp")
+
+    assert "MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH" in atomic_output
+    assert "std::filesystem::remove(temporary_" in atomic_output
+    assert "output.commit()" in ascii_io
+    assert diagnostics_io.count("output.commit()") >= 3
+    assert "values_.max_size()" in grid
+    assert "std::isfinite(metadata_.sx)" in grid
+    assert "appendBoundedProcessOutput" in shared_log
+    assert "boundedProcessLogChunk" in shared_log
+    assert "512 * 1024" in read("src/ui/FptLog.h")
+    assert "4 * 1024 * 1024" in read("src/ui/FptLog.h")
+    assert "appendBoundedProcessOutput(processOutput_" in desktop
+    assert "appendBoundedProcessOutput(processOutput_" in launcher
+    assert "QSaveFile out(outPath)" in desktop
+    assert "while (!csv.atEnd())" in desktop
+    assert "AtomicOutputFile output" in bo_runner
+    assert "catch (const std::bad_alloc&)" in read("src/app/main.cpp")
+    assert "catch (...)" in read("src/app/main.cpp")
+    assert "catch (...)" in bo_runner
+
+
 def test_installer_and_plugin_deployment_cover_first_time_user_constraints():
     installer = read("packaging/windows/FaultPolyTrace.iss")
     demo = read("packaging/windows/02_运行离线演示.cmd")

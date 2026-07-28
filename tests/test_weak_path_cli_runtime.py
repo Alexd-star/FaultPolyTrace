@@ -1,5 +1,7 @@
 import csv
 import json
+import os
+import stat
 import shutil
 import subprocess
 from pathlib import Path
@@ -133,6 +135,83 @@ def test_cli_rejects_non_finite_weak_path_ratio(core_exe, small_grid, tmp_path):
     assert "weakPathSupportRatio must be between 0 and 1" in result.stderr
     assert not output.exists()
     assert not diagnostics.exists()
+
+
+@pytest.mark.parametrize(
+    ("origin", "spacing", "expected"),
+    (
+        ("nan 0", "1 1", "Failed to read grid origin"),
+        ("0 0", "inf 1", "Failed to read grid spacing"),
+    ),
+)
+def test_cli_rejects_non_finite_grid_metadata(
+    core_exe, tmp_path, origin, spacing, expected
+):
+    grid = tmp_path / "invalid_metadata.txt"
+    grid.write_text(
+        "\n".join(("2 2", origin, spacing, "1 0", "0 1")),
+        encoding="ascii",
+    )
+    output = tmp_path / "must_not_exist.csv"
+    result = subprocess.run(
+        [
+            str(core_exe),
+            "--input",
+            str(grid),
+            "--input-format",
+            "matrix",
+            "--output",
+            str(output),
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert expected in result.stderr
+    assert not output.exists()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows replacement semantics")
+def test_atomic_output_failure_preserves_previous_result_and_cleans_temp(
+    core_exe, small_grid, tmp_path
+):
+    output = tmp_path / "protected.csv"
+    command = [
+        str(core_exe),
+        "--input",
+        str(small_grid),
+        "--input-format",
+        "matrix",
+        "--output",
+        str(output),
+        "--trace-mode",
+        "region",
+        "--threshold-mode",
+        "fixed",
+        "--threshold",
+        "0.7",
+        "--min-area",
+        "1",
+    ]
+    first = subprocess.run(
+        command, cwd=ROOT, capture_output=True, text=True, check=False
+    )
+    assert first.returncode == 0, first.stdout + first.stderr
+    previous = output.read_bytes()
+
+    os.chmod(output, stat.S_IREAD)
+    try:
+        second = subprocess.run(
+            command, cwd=ROOT, capture_output=True, text=True, check=False
+        )
+        assert second.returncode != 0
+        assert output.read_bytes() == previous
+        assert not list(tmp_path.glob("protected.csv.fpt-tmp-*"))
+    finally:
+        os.chmod(output, stat.S_IWRITE | stat.S_IREAD)
 
 
 def test_cli_writes_parseable_weak_path_diagnostics(

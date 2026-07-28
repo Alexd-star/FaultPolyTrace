@@ -1,4 +1,5 @@
 #include "AsciiGridIO.h"
+#include "AtomicOutputFile.h"
 
 #include <algorithm>
 #include <cstdlib>
@@ -260,13 +261,8 @@ Grid2D readAutoGrid(const std::string& path) {
 }
 
 void writePolygonCsv(const std::string& path, const std::vector<Polygon>& polygons) {
-    std::vector<char> outputBuffer(1024 * 1024);
-    std::ofstream out;
-    out.rdbuf()->pubsetbuf(outputBuffer.data(), static_cast<std::streamsize>(outputBuffer.size()));
-    out.open(filesystemPath(path));
-    if (!out) {
-        throw std::runtime_error("Failed to open output file: " + path);
-    }
+    AtomicOutputFile output(filesystemPath(path), 1024 * 1024);
+    std::ostream& out = output.stream();
 
     out << "id,status,area,perimeter,cell_count,mean_value,max_value,wkt\n";
     out << std::fixed << std::setprecision(6);
@@ -282,16 +278,12 @@ void writePolygonCsv(const std::string& path, const std::vector<Polygon>& polygo
         writePolygonWkt(out, polygon);
         out << '"' << '\n';
     }
+    output.commit();
 }
 
 void writeBranchCsv(const std::string& path, const std::vector<BranchTrace>& branches) {
-    std::vector<char> outputBuffer(1024 * 1024);
-    std::ofstream out;
-    out.rdbuf()->pubsetbuf(outputBuffer.data(), static_cast<std::streamsize>(outputBuffer.size()));
-    out.open(filesystemPath(path));
-    if (!out) {
-        throw std::runtime_error("Failed to open branch output file: " + path);
-    }
+    AtomicOutputFile output(filesystemPath(path), 1024 * 1024);
+    std::ostream& out = output.stream();
 
     out << "id,status,point_count,length,mean_value,max_value,start_is_junction,end_is_junction,wkt\n";
     out << std::fixed << std::setprecision(6);
@@ -308,6 +300,7 @@ void writeBranchCsv(const std::string& path, const std::vector<BranchTrace>& bra
         writeLineStringWkt(out, branch.points);
         out << '"' << '\n';
     }
+    output.commit();
 }
 
 } // namespace fpt

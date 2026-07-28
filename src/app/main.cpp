@@ -12,6 +12,7 @@
 #include <filesystem>
 #include <iostream>
 #include <limits>
+#include <new>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -1262,9 +1263,17 @@ int main(int argc, char** argv) {
             std::cout << "Branches: " << cli.branchesOutput << "\n";
         }
         return 0;
+    } catch (const std::bad_alloc&) {
+        std::cerr
+            << "Error: insufficient memory for this grid and parameter combination. "
+            << "Close other applications or process a smaller grid.\n";
+        return 2;
     } catch (const std::exception& ex) {
         std::cerr << "Error: " << ex.what() << "\n\n";
         printUsage();
         return 1;
+    } catch (...) {
+        std::cerr << "Error: an unexpected internal failure was contained. No success result was reported.\n";
+        return 2;
     }
 }

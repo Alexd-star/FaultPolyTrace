@@ -16,4 +16,13 @@ struct LogLineStyle {
 // 不含中文且不以 "> " 开头的视为后台调试输出，灰色并标记为可折叠。
 LogLineStyle logLineStyle(const QString& line);
 
+void appendBoundedProcessOutput(
+    QString& destination,
+    const QString& chunk,
+    int maximumCharacters = 4 * 1024 * 1024);
+
+QString boundedProcessLogChunk(
+    const QString& chunk,
+    int maximumCharacters = 512 * 1024);
+
 }  // namespace fpt_ui
