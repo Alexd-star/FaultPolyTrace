@@ -275,7 +275,7 @@ def test_installer_and_plugin_deployment_cover_first_time_user_constraints():
     assert "DisableWelcomePage=no" in installer
     assert "InfoBeforeFile=" in installer
     assert 'Filename: "{sys}\\notepad.exe"' in installer
-    assert "[Environment+SpecialFolder]::MyDocuments" in demo
+    assert "GetFolderPath('MyDocuments')" in demo
     assert 'set "OUTDIR=outputs\\' not in demo
     assert "全新用户 安装目录" in smoke
     assert "中文 空格输出" in smoke

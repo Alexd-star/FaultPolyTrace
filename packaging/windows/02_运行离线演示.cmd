@@ -17,7 +17,10 @@ if not exist "examples\synthetic\broken_ridge_fault_grid.txt" (
 )
 
 for /f %%i in ('powershell -NoProfile -Command "Get-Date -Format yyyyMMdd_HHmmss"') do set TS=%%i
-for /f "usebackq delims=" %%i in (`powershell -NoProfile -Command "[Console]::Write([Environment]::GetFolderPath([Environment+SpecialFolder]::MyDocuments))"`) do set "DOCROOT=%%i"
+set "ROOTFILE=%TEMP%\faultpolytrace_docroot_%RANDOM%_%RANDOM%.txt"
+powershell -NoProfile -Command "[Console]::Write([Environment]::GetFolderPath('MyDocuments'))" > "%ROOTFILE%" 2>nul
+if exist "%ROOTFILE%" set /p "DOCROOT="<"%ROOTFILE%"
+if exist "%ROOTFILE%" del /q "%ROOTFILE%" >nul 2>nul
 if not defined DOCROOT set "DOCROOT=%LOCALAPPDATA%"
 if not defined DOCROOT set "DOCROOT=%TEMP%"
 set "OUTDIR=%DOCROOT%\FaultPolyTraceOutputs\offline_demo_%TS%"
