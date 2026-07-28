@@ -63,7 +63,9 @@
 #include <QStackedWidget>
 #include <QStandardPaths>
 #include <QStatusBar>
+#include <QStorageInfo>
 #include <QStyle>
+#include <QTemporaryFile>
 #include <QTextEdit>
 #include <QTextCursor>
 #include <QTextStream>
@@ -147,16 +149,76 @@ QString repoRootFromAppDir() {
     return QDir::currentPath();
 }
 
+bool ensureWritableDirectory(const QString& path, QString* error = nullptr) {
+    const QString normalized = QDir::fromNativeSeparators(path.trimmed());
+    if (normalized.isEmpty()) {
+        if (error) {
+            *error = QString::fromUtf8("目录为空");
+        }
+        return false;
+    }
+    if (!QDir().mkpath(normalized)) {
+        if (error) {
+            *error = QString::fromUtf8("无法创建目录：%1").arg(QDir::toNativeSeparators(normalized));
+        }
+        return false;
+    }
+    QTemporaryFile probe(QDir(normalized).absoluteFilePath(QStringLiteral(".faultpolytrace-write-XXXXXX.tmp")));
+    probe.setAutoRemove(true);
+    if (!probe.open()) {
+        if (error) {
+            *error = QString::fromUtf8("目录不可写：%1\n%2")
+                         .arg(QDir::toNativeSeparators(normalized), probe.errorString());
+        }
+        return false;
+    }
+    return true;
+}
+
+QString firstWritableDirectory(const QStringList& candidates) {
+    for (const QString& candidate : candidates) {
+        if (ensureWritableDirectory(candidate)) {
+            return QDir::toNativeSeparators(QDir(candidate).absolutePath());
+        }
+    }
+    return QDir::toNativeSeparators(QDir::tempPath());
+}
+
+QString outputNameValidationError(const QString& name) {
+    QString value = name.trimmed();
+    if (value.endsWith(QStringLiteral(".csv"), Qt::CaseInsensitive)) {
+        value.chop(4);
+    }
+    if (value.isEmpty()) {
+        return QString::fromUtf8("输出名称不能为空");
+    }
+    if (value.size() > 100) {
+        return QString::fromUtf8("输出名称不能超过 100 个字符");
+    }
+    if (value.contains(QRegularExpression(QStringLiteral("[\\\\/:*?\"<>|]"))) ||
+        value.endsWith(' ') || value.endsWith('.')) {
+        return QString::fromUtf8("输出名称不能包含 \\ / : * ? \" < > |，也不能以空格或句点结尾");
+    }
+    static const QRegularExpression reserved(
+        QStringLiteral("^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$"),
+        QRegularExpression::CaseInsensitiveOption);
+    if (reserved.match(value).hasMatch() || value == QStringLiteral(".") || value == QStringLiteral("..")) {
+        return QString::fromUtf8("该名称是 Windows 保留名称，请换一个名称");
+    }
+    return QString();
+}
+
 QString appConfigDir() {
-    QString dir = QString::fromLocal8Bit(qgetenv("FPT_CONFIG_ROOT")).trimmed();
-    if (dir.isEmpty()) {
-        dir = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
-    }
-    if (dir.isEmpty()) {
-        dir = QDir(QCoreApplication::applicationDirPath()).absoluteFilePath("config");
-    }
-    QDir().mkpath(dir);
-    return dir;
+    const QString requested = QString::fromLocal8Bit(qgetenv("FPT_CONFIG_ROOT")).trimmed();
+    const QString config = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+    const QString local = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+    const QString temp = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
+    return firstWritableDirectory({
+        requested,
+        config,
+        local.isEmpty() ? QString() : QDir(local).absoluteFilePath("config"),
+        temp.isEmpty() ? QString() : QDir(temp).absoluteFilePath("FaultPolyTrace/config")
+    });
 }
 
 QString envValue(const char* name) {
@@ -2558,13 +2620,14 @@ QString FaultPolyTraceWindow::defaultInputPath() const {
 }
 
 QString FaultPolyTraceWindow::defaultOutputDir() const {
-    QString docs = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
-    if (docs.isEmpty()) {
-        docs = QCoreApplication::applicationDirPath();
-    }
-    const QString dir = QDir(docs).absoluteFilePath("FaultPolyTraceOutputs");
-    QDir().mkpath(dir);
-    return QDir::toNativeSeparators(dir);
+    const QString docs = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+    const QString local = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+    const QString temp = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
+    return firstWritableDirectory({
+        docs.isEmpty() ? QString() : QDir(docs).absoluteFilePath("FaultPolyTraceOutputs"),
+        local.isEmpty() ? QString() : QDir(local).absoluteFilePath("outputs"),
+        temp.isEmpty() ? QString() : QDir(temp).absoluteFilePath("FaultPolyTraceOutputs")
+    });
 }
 
 QString FaultPolyTraceWindow::settingsPath() const {
@@ -2608,7 +2671,13 @@ bool FaultPolyTraceWindow::openBundledDocument(const QString& relativePath, cons
         updateStatus(QString::fromUtf8("文档未找到，请检查发布包 docs 目录"));
         return false;
     }
-    if (!QDesktopServices::openUrl(QUrl::fromLocalFile(path))) {
+    bool opened = QDesktopServices::openUrl(QUrl::fromLocalFile(path));
+#ifdef Q_OS_WIN
+    if (!opened && QFileInfo(path).suffix().compare(QStringLiteral("md"), Qt::CaseInsensitive) == 0) {
+        opened = QProcess::startDetached(QStringLiteral("notepad.exe"), {QDir::toNativeSeparators(path)});
+    }
+#endif
+    if (!opened) {
         QMessageBox::warning(
             this,
             uiText(QString::fromUtf8("无法打开文档")),
@@ -3961,6 +4030,13 @@ void FaultPolyTraceWindow::runTrace() {
         return;
     }
     if (isGeoEastMode()) {
+        const QString nameError = outputNameValidationError(outputNameEdit_->text());
+        if (!nameError.isEmpty()) {
+            QMessageBox::warning(this, uiText(QString::fromUtf8("输出名称无效")), uiText(nameError));
+            outputNameEdit_->setFocus(Qt::OtherFocusReason);
+            updateStatus(QString::fromUtf8("输出名称无效，未启动追踪"));
+            return;
+        }
         saveSettings();
         if (!ensureGeoEastConfigReady(QString::fromUtf8("开始追踪"), true, true)) {
             return;
@@ -3991,9 +4067,103 @@ void FaultPolyTraceWindow::runTrace() {
                              uiText(QString::fromUtf8("独立软件不能把自身作为核心算法程序启动。请确认发布包中存在 bin/faultpolytrace.exe。")));
         return;
     }
-    if (inputEdit_->text().trimmed().isEmpty() || !QFileInfo::exists(inputEdit_->text().trimmed())) {
+    const QString inputPath = inputEdit_->text().trimmed();
+    const QFileInfo inputInfo(inputPath);
+    if (inputPath.isEmpty() || !inputInfo.exists() || !inputInfo.isFile()) {
         QMessageBox::warning(this, uiText(QString::fromUtf8("输入文件无效")), uiText(QString::fromUtf8("请选择可读取的外部网格文件。")));
         return;
+    }
+    QFile inputProbe(inputInfo.absoluteFilePath());
+    if (inputInfo.size() <= 0 || !inputProbe.open(QIODevice::ReadOnly)) {
+        QMessageBox::warning(
+            this,
+            uiText(QString::fromUtf8("输入文件不可读取")),
+            inputInfo.size() <= 0
+                ? uiText(QString::fromUtf8("所选输入文件为空，请选择包含断层属性数据的有效文件。"))
+                : uiText(QString::fromUtf8("无法读取所选输入文件。请检查文件权限、网络连接，或确认文件没有被其他程序独占。\n\n%1"))
+                      .arg(inputProbe.errorString()));
+        updateStatus(QString::fromUtf8("输入文件不可读取，未启动追踪"));
+        return;
+    }
+    inputProbe.close();
+
+    const QString nameError = outputNameValidationError(outputNameEdit_->text());
+    if (!nameError.isEmpty()) {
+        QMessageBox::warning(this, uiText(QString::fromUtf8("输出名称无效")), uiText(nameError));
+        outputNameEdit_->setFocus(Qt::OtherFocusReason);
+        updateStatus(QString::fromUtf8("输出名称无效，未启动追踪"));
+        return;
+    }
+
+    QString outputDir = outputDirEdit_->text().trimmed();
+    if (outputDir.isEmpty()) {
+        outputDir = defaultOutputDir();
+        outputDirEdit_->setText(outputDir);
+    }
+    QString outputDirError;
+    if (!ensureWritableDirectory(outputDir, &outputDirError)) {
+        QMessageBox::warning(this, uiText(QString::fromUtf8("输出目录不可用")), uiText(outputDirError));
+        outputDirEdit_->setFocus(Qt::OtherFocusReason);
+        updateStatus(QString::fromUtf8("输出目录不可用，未启动追踪"));
+        return;
+    }
+
+    const QStringList outputPaths = {
+        outputCsvPath(),
+        outputBasePath() + ".diagnostics.json",
+        outputBasePath() + ".branches.csv",
+        outputBasePath() + ".topology.csv"
+    };
+    const QString normalizedInput = QDir::cleanPath(inputInfo.absoluteFilePath()).toLower();
+    for (const QString& path : outputPaths) {
+        if (QDir::cleanPath(QFileInfo(path).absoluteFilePath()).toLower() == normalizedInput) {
+            QMessageBox::warning(
+                this,
+                uiText(QString::fromUtf8("输入文件与输出文件冲突")),
+                uiText(QString::fromUtf8("输出文件不能覆盖输入文件。请修改输出目录或输出名称后再运行。")));
+            updateStatus(QString::fromUtf8("输入输出路径冲突，未启动追踪"));
+            return;
+        }
+    }
+
+    const QStorageInfo storage(QFileInfo(outputDir).absoluteFilePath());
+    const qint64 minimumFreeBytes = qMax<qint64>(64LL * 1024 * 1024,
+                                                 qMin<qint64>(2LL * 1024 * 1024 * 1024,
+                                                              inputInfo.size() + 64LL * 1024 * 1024));
+    if (storage.isValid() && storage.isReady() && storage.bytesAvailable() >= 0 &&
+        storage.bytesAvailable() < minimumFreeBytes) {
+        QMessageBox::warning(
+            this,
+            uiText(QString::fromUtf8("可用磁盘空间不足")),
+            uiText(QString::fromUtf8("输出目录所在磁盘剩余空间不足。当前可用 %1 MB，建议至少保留 %2 MB 后再运行。"))
+                .arg(storage.bytesAvailable() / (1024 * 1024))
+                .arg(minimumFreeBytes / (1024 * 1024)));
+        updateStatus(QString::fromUtf8("磁盘空间不足，未启动追踪"));
+        return;
+    }
+
+    QStringList existingOutputs;
+    for (const QString& path : outputPaths) {
+        if (QFileInfo::exists(path)) {
+            existingOutputs << QFileInfo(path).fileName();
+        }
+    }
+    if (!existingOutputs.isEmpty()) {
+        QMessageBox overwriteBox(
+            QMessageBox::Question,
+            uiText(QString::fromUtf8("覆盖已有结果？")),
+            uiText(QString::fromUtf8("以下结果文件已经存在：\n\n- %1\n\n继续运行将替换这些文件。输入文件不会被修改。"))
+                .arg(existingOutputs.join(QString::fromUtf8("\n- "))),
+            QMessageBox::NoButton,
+            this);
+        QPushButton* cancelOverwrite = overwriteBox.addButton(uiText(QString::fromUtf8("取消")), QMessageBox::RejectRole);
+        QPushButton* confirmOverwrite = overwriteBox.addButton(uiText(QString::fromUtf8("覆盖并继续")), QMessageBox::AcceptRole);
+        overwriteBox.setDefaultButton(cancelOverwrite);
+        overwriteBox.exec();
+        if (overwriteBox.clickedButton() != confirmOverwrite) {
+            updateStatus(QString::fromUtf8("已取消，现有结果保持不变"));
+            return;
+        }
     }
     if (!confirmTraceParametersForRun()) {
         return;

@@ -57,6 +57,7 @@
 #include <QSizePolicy>
 #include <QSpinBox>
 #include <QSplitter>
+#include <QTemporaryFile>
 #include <QTextEdit>
 #include <QTextCursor>
 #include <QTextStream>
@@ -81,6 +82,41 @@
 #endif
 
 namespace {
+
+bool ensureWritableDirectory(const QString& path, QString* error = nullptr) {
+    const QString normalized = QDir::fromNativeSeparators(path.trimmed());
+    if (normalized.isEmpty()) {
+        if (error) {
+            *error = QString::fromUtf8("目录为空");
+        }
+        return false;
+    }
+    if (!QDir().mkpath(normalized)) {
+        if (error) {
+            *error = QString::fromUtf8("无法创建目录：%1").arg(QDir::toNativeSeparators(normalized));
+        }
+        return false;
+    }
+    QTemporaryFile probe(QDir(normalized).absoluteFilePath(QStringLiteral(".faultpolytrace-write-XXXXXX.tmp")));
+    probe.setAutoRemove(true);
+    if (!probe.open()) {
+        if (error) {
+            *error = QString::fromUtf8("目录不可写：%1\n%2")
+                         .arg(QDir::toNativeSeparators(normalized), probe.errorString());
+        }
+        return false;
+    }
+    return true;
+}
+
+QString firstWritableDirectory(const QStringList& candidates) {
+    for (const QString& candidate : candidates) {
+        if (ensureWritableDirectory(candidate)) {
+            return QDir::toNativeSeparators(QDir(candidate).absolutePath());
+        }
+    }
+    return QDir::toNativeSeparators(QDir::tempPath());
+}
 
 QVector<double> splitByteNumbers(const QByteArray& line) {
     QVector<double> numbers;
@@ -167,14 +203,16 @@ bool activateApplicationWindow(const QString&) { return false; }
 #endif
 
 QString launcherSettingsPath() {
-    QString directory = QString::fromLocal8Bit(qgetenv("FPT_CONFIG_ROOT")).trimmed();
-    if (directory.isEmpty()) {
-        directory = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
-    }
-    if (directory.isEmpty()) {
-        directory = QDir(QCoreApplication::applicationDirPath()).absoluteFilePath("config");
-    }
-    QDir().mkpath(directory);
+    const QString requested = QString::fromLocal8Bit(qgetenv("FPT_CONFIG_ROOT")).trimmed();
+    const QString config = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+    const QString local = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+    const QString temp = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
+    const QString directory = firstWritableDirectory({
+        requested,
+        config,
+        local.isEmpty() ? QString() : QDir(local).absoluteFilePath("config"),
+        temp.isEmpty() ? QString() : QDir(temp).absoluteFilePath("FaultPolyTrace/config")
+    });
     return QDir(directory).filePath("faultpolytrace_launcher.ini");
 }
 
@@ -486,13 +524,14 @@ QString settingOrCurrent(const QSettings& settings, const QString& key, const QS
 }
 
 QString userExportDirectory() {
-    QString base = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
-    if (base.isEmpty()) {
-        base = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
-    }
-    const QString path = QDir(base).absoluteFilePath("FaultPolyTrace");
-    QDir().mkpath(path);
-    return path;
+    const QString docs = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+    const QString local = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+    const QString temp = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
+    return firstWritableDirectory({
+        docs.isEmpty() ? QString() : QDir(docs).absoluteFilePath("FaultPolyTrace"),
+        local.isEmpty() ? QString() : QDir(local).absoluteFilePath("exports"),
+        temp.isEmpty() ? QString() : QDir(temp).absoluteFilePath("FaultPolyTraceExports")
+    });
 }
 
 QString quoteForLog(const QStringList& args) {
@@ -1274,6 +1313,27 @@ void addFormRow(QGridLayout* layout, int row, const QString& label, QWidget* edi
     }
     layout->addWidget(labelWidget, row, 0);
     layout->addWidget(editor, row, 1);
+}
+
+QString outputNameValidationError(const QString& name) {
+    const QString value = name.trimmed();
+    if (value.isEmpty()) {
+        return QString::fromUtf8("输出名称不能为空");
+    }
+    if (value.size() > 100) {
+        return QString::fromUtf8("输出名称不能超过 100 个字符");
+    }
+    if (value.contains(QRegularExpression(QStringLiteral("[\\\\/:*?\"<>|]"))) ||
+        value.endsWith(' ') || value.endsWith('.')) {
+        return QString::fromUtf8("输出名称不能包含 \\ / : * ? \" < > |，也不能以空格或句点结尾");
+    }
+    static const QRegularExpression reserved(
+        QStringLiteral("^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$"),
+        QRegularExpression::CaseInsensitiveOption);
+    if (reserved.match(value).hasMatch() || value == QStringLiteral(".") || value == QStringLiteral("..")) {
+        return QString::fromUtf8("该名称是 Windows 保留名称，请换一个名称");
+    }
+    return QString();
 }
 
 void keepLineEditReadable(QLineEdit* edit) {
@@ -3530,13 +3590,15 @@ QStringList FaultTraceDialog::commonConnectionArgs() const {
 }
 
 QString FaultTraceDialog::previewOutputDir() const {
-    QString base = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
-    if (base.isEmpty()) {
-        base = QDir(QCoreApplication::applicationDirPath()).absoluteFilePath("FaultPolyTracePreviewCache");
-    }
+    const QString local = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+    const QString temp = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
+    const QString base = firstWritableDirectory({
+        local.isEmpty() ? QString() : QDir(local).absoluteFilePath("GeoEastPreview"),
+        temp.isEmpty() ? QString() : QDir(temp).absoluteFilePath("FaultPolyTrace/GeoEastPreview")
+    });
     const QString db = sanitizeFileComponent(databaseEdit_ ? databaseEdit_->text() : QString(), "database");
     const QString project = sanitizeFileComponent(projectEdit_ ? projectEdit_->text() : QString(), "project");
-    return QDir(base).absoluteFilePath(QString("GeoEastPreview/%1/%2").arg(db, project));
+    return QDir(base).absoluteFilePath(QString("%1/%2").arg(db, project));
 }
 
 QString FaultTraceDialog::previewGridPath() const {
@@ -3991,6 +4053,19 @@ void FaultTraceDialog::runTrace() {
     }
     if (process_->state() != QProcess::NotRunning) {
         appendStatus(QString::fromUtf8("已有任务正在运行，请等待完成或先停止任务"));
+        return;
+    }
+    const QString nameError = outputNameValidationError(outputEdit_->text());
+    if (!nameError.isEmpty()) {
+        QMessageBox::warning(this, uiText(QString::fromUtf8("输出名称无效")), uiText(nameError));
+        outputEdit_->setFocus(Qt::OtherFocusReason);
+        appendStatus(QString::fromUtf8("输出名称无效，未启动追踪"));
+        return;
+    }
+    QString previewError;
+    if (!ensureWritableDirectory(previewOutputDir(), &previewError)) {
+        QMessageBox::warning(this, uiText(QString::fromUtf8("本地缓存目录不可用")), uiText(previewError));
+        appendStatus(QString::fromUtf8("本地缓存目录不可用，未启动追踪"));
         return;
     }
     saveSettings();

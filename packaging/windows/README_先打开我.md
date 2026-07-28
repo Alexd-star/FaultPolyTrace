@@ -33,7 +33,7 @@
 
 ### 3.3 没有 GeoEast 能不能验证算法？
 
-可以。运行 `02_运行离线演示.cmd` 会读取 `examples/synthetic/broken_ridge_fault_grid.txt`，并在 `outputs/offline_demo_时间戳` 下生成断层多边形 CSV、拓扑明细和诊断 JSON。独立桌面软件也可以直接打开外部网格文件并导出 CSV、GeoJSON、诊断 JSON、拓扑 CSV 和 PNG 视图。
+可以。运行 `02_运行离线演示.cmd` 会读取 `examples/synthetic/broken_ridge_fault_grid.txt`，并在当前用户“文档/FaultPolyTraceOutputs/offline_demo_时间戳”目录下生成断层多边形 CSV、拓扑明细、分支结果和诊断 JSON；文档目录不可写时自动改用当前用户临时目录。独立桌面软件也可以直接打开外部网格文件并导出 CSV、GeoJSON、诊断 JSON、拓扑 CSV 和 PNG 视图。
 
 ### 3.4 有 GeoEast 时怎么验证集成？
 

@@ -14,20 +14,27 @@ $dat = (Resolve-Path -LiteralPath $OfficialDat).Path
 $expectedIdentity = Get-Content -LiteralPath (Join-Path $package "构建与依赖清单.json") -Raw | ConvertFrom-Json
 $stamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $smokeRoot = Join-Path $repoRoot "release\installer_smoke\$stamp"
-$installDir = Join-Path $smokeRoot "installed"
-$outputDir = Join-Path $smokeRoot "output"
+$installDir = Join-Path $smokeRoot "全新用户 安装目录"
+$outputDir = Join-Path $smokeRoot "中文 空格输出"
+$configDir = Join-Path $smokeRoot "空白用户配置"
 New-Item -ItemType Directory -Force -Path $installDir, $outputDir | Out-Null
 $resultCsv = Join-Path $outputDir "official_result.csv"
 $diagnostics = Join-Path $outputDir "official_result.diagnostics.json"
 $topology = Join-Path $outputDir "official_result.topology.csv"
 $branches = Join-Path $outputDir "official_result.branches.csv"
 $uninstallAttempted = $false
+$guiProcess = $null
 
 try {
     $install = Start-Process -FilePath $installer -ArgumentList @(
         "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", "/DIR=$installDir"
     ) -Wait -PassThru
     if ($install.ExitCode -ne 0) { throw "Installer exited with code $($install.ExitCode)." }
+
+    $repairInstall = Start-Process -FilePath $installer -ArgumentList @(
+        "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", "/DIR=$installDir"
+    ) -Wait -PassThru
+    if ($repairInstall.ExitCode -ne 0) { throw "Installer repair/upgrade run exited with code $($repairInstall.ExitCode)." }
 
     $gui = Join-Path $installDir "FaultPolyTrace.exe"
     $cli = Join-Path $installDir "bin\faultpolytrace.exe"
@@ -43,6 +50,29 @@ try {
         $_.Extension.ToLowerInvariant() -in @(".cpp", ".h", ".hpp", ".pro", ".vcxproj", ".key", ".pem", ".lic")
     })
     if ($forbidden.Count -gt 0) { throw "Installer contains forbidden development or secret files." }
+
+    $oldConfigRoot = $env:FPT_CONFIG_ROOT
+    $oldQtPlatform = $env:QT_QPA_PLATFORM
+    $oldDisableSplash = $env:FPT_DISABLE_SPLASH
+    New-Item -ItemType Directory -Force -Path $configDir | Out-Null
+    Set-Content -LiteralPath (Join-Path $configDir "user-data-sentinel.txt") -Value "preserve" -Encoding ASCII
+    try {
+        $env:FPT_CONFIG_ROOT = $configDir
+        $env:QT_QPA_PLATFORM = "offscreen"
+        $env:FPT_DISABLE_SPLASH = "1"
+        $guiProcess = Start-Process -FilePath $gui -PassThru
+        Start-Sleep -Milliseconds 1800
+        if ($guiProcess.HasExited) {
+            throw "Installed GUI exited during clean-profile startup with code $($guiProcess.ExitCode)."
+        }
+        $guiProcess.Kill()
+        $guiProcess.WaitForExit()
+        $guiProcess = $null
+    } finally {
+        $env:FPT_CONFIG_ROOT = $oldConfigRoot
+        $env:QT_QPA_PLATFORM = $oldQtPlatform
+        $env:FPT_DISABLE_SPLASH = $oldDisableSplash
+    }
 
     $cliArgs = @(
         "--input", $dat, "--input-format", "geoeast-dat", "--output", $resultCsv,
@@ -82,10 +112,17 @@ try {
         resultSha256 = $resultHash
         keptPolygons = $diag.results.keptPolygonCount
         elapsedMs = $diag.timing.elapsedMs
+        cleanProfileGuiStartup = $true
+        unicodeAndSpacePaths = $true
+        repairInstall = $true
         forbiddenFileCount = $forbidden.Count
         topology = $diag.topology
     } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $smokeRoot "installer_smoke_summary.json") -Encoding UTF8
 } finally {
+    if ($guiProcess -and !$guiProcess.HasExited) {
+        $guiProcess.Kill()
+        $guiProcess.WaitForExit()
+    }
     $uninstaller = Join-Path $installDir "unins000.exe"
     if (Test-Path -LiteralPath $uninstaller -PathType Leaf) {
         $uninstallAttempted = $true
@@ -98,5 +135,11 @@ try {
 if (!$uninstallAttempted) { throw "Uninstaller was not found." }
 if (Test-Path -LiteralPath (Join-Path $installDir "FaultPolyTrace.exe") -PathType Leaf) {
     throw "FaultPolyTrace.exe remains after uninstall."
+}
+if (!(Test-Path -LiteralPath $resultCsv -PathType Leaf)) {
+    throw "User result was removed during uninstall."
+}
+if (!(Test-Path -LiteralPath (Join-Path $configDir "user-data-sentinel.txt") -PathType Leaf)) {
+    throw "User configuration data was removed during uninstall."
 }
 Write-Host "Installer smoke test passed: $smokeRoot"

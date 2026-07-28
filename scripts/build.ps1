@@ -21,7 +21,7 @@ $sources = @(
     (Join-Path $repoRoot "src\io\DiagnosticsIO.cpp")
 )
 
-& g++ -std=c++17 -O2 -Wall -Wextra -pedantic -static -static-libgcc -static-libstdc++ $sources -o $exe
+& g++ -std=c++17 -O2 -Wall -Wextra -pedantic -static -static-libgcc -static-libstdc++ $sources -lshell32 -o $exe
 if ($LASTEXITCODE -ne 0) {
     throw "C++ build failed with exit code $LASTEXITCODE."
 }

@@ -17,8 +17,20 @@ if not exist "examples\synthetic\broken_ridge_fault_grid.txt" (
 )
 
 for /f %%i in ('powershell -NoProfile -Command "Get-Date -Format yyyyMMdd_HHmmss"') do set TS=%%i
-set "OUTDIR=outputs\offline_demo_%TS%"
+for /f "usebackq delims=" %%i in (`powershell -NoProfile -Command "[Console]::Write([Environment]::GetFolderPath([Environment+SpecialFolder]::MyDocuments))"`) do set "DOCROOT=%%i"
+if not defined DOCROOT set "DOCROOT=%LOCALAPPDATA%"
+if not defined DOCROOT set "DOCROOT=%TEMP%"
+set "OUTDIR=%DOCROOT%\FaultPolyTraceOutputs\offline_demo_%TS%"
 mkdir "%OUTDIR%" >nul 2>nul
+if errorlevel 1 (
+    set "OUTDIR=%TEMP%\FaultPolyTraceOutputs\offline_demo_%TS%"
+    mkdir "%OUTDIR%" >nul 2>nul
+)
+if not exist "%OUTDIR%" (
+    echo 无法创建演示输出目录，请检查当前用户的文档目录和临时目录权限。
+    pause
+    exit /b 1
+)
 
 echo 正在运行离线断层多边形自动追踪演示...
 echo 输出目录: %OUTDIR%
@@ -27,7 +39,10 @@ echo.
 "%~dp0bin\faultpolytrace.exe" ^
   --input "%~dp0examples\synthetic\broken_ridge_fault_grid.txt" ^
   --input-format matrix ^
-  --output "%~dp0%OUTDIR%\fault_polygons.csv" ^
+  --output "%OUTDIR%\fault_polygons.csv" ^
+  --diagnostics "%OUTDIR%\fault_polygons.diagnostics.json" ^
+  --topology-output "%OUTDIR%\fault_polygons.topology.csv" ^
+  --branches-output "%OUTDIR%\fault_polygons.branches.csv" ^
   --trace-mode ridge-belt ^
   --threshold-mode percentile ^
   --percentile 0.98 ^
@@ -43,7 +58,9 @@ if errorlevel 1 (
 ) else (
     echo 离线演示运行完成。
     echo 结果文件: %OUTDIR%\fault_polygons.csv
-    echo 诊断文件: %OUTDIR%\fault_polygons.csv.diagnostics.json
+    echo 诊断文件: %OUTDIR%\fault_polygons.diagnostics.json
+    echo 拓扑检查: %OUTDIR%\fault_polygons.topology.csv
+    echo 分支结果: %OUTDIR%\fault_polygons.branches.csv
 )
 echo.
 pause

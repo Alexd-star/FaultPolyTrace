@@ -13,11 +13,13 @@ AppId={{A6D4F8E2-82AE-4D06-8A1C-86E869D0DF65}
 AppName=FaultPolyTrace
 AppVersion={#AppVersion}
 AppPublisher=FaultPolyTrace Project Team
+AppComments=Fault attribute grid tracing and polygon result viewing
 DefaultDirName={localappdata}\Programs\FaultPolyTrace
 DefaultGroupName=FaultPolyTrace
 DisableProgramGroupPage=yes
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
+MinVersion=10.0
 PrivilegesRequired=lowest
 OutputDir={#InstallerOutput}
 OutputBaseFilename=FaultPolyTrace_Setup_v{#AppVersion}
@@ -26,6 +28,11 @@ UninstallDisplayIcon={app}\FaultPolyTrace.exe
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
+DisableWelcomePage=no
+DisableReadyPage=no
+UsePreviousAppDir=yes
+UsePreviousLanguage=yes
+InfoBeforeFile={#SourcePath}\安装前说明.txt
 CloseApplications=yes
 RestartApplications=no
 Uninstallable=yes
@@ -44,7 +51,7 @@ Source: "{#PackageSource}\*"; DestDir: "{app}"; \
 
 [Icons]
 Name: "{autoprograms}\FaultPolyTrace"; Filename: "{app}\FaultPolyTrace.exe"; WorkingDir: "{app}"
-Name: "{autoprograms}\FaultPolyTrace User Manual"; Filename: "{app}\docs\用户操作手册.md"
+Name: "{autoprograms}\FaultPolyTrace User Manual"; Filename: "{sys}\notepad.exe"; Parameters: """{app}\docs\用户操作手册.md"""; WorkingDir: "{app}\docs"
 Name: "{autodesktop}\FaultPolyTrace"; Filename: "{app}\FaultPolyTrace.exe"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]

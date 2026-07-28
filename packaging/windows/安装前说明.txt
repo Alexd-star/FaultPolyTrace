@@ -1,0 +1,14 @@
+FaultPolyTrace 安装说明
+
+1. 支持 Windows 10/11 64 位系统，不需要预先安装 Qt、Python 或 Visual Studio。
+2. 默认按当前 Windows 用户安装，不要求管理员权限，也不会修改系统 PATH。
+3. 独立软件可以直接读取外部 DAT、TXT、CSV 网格。GeoEast 数据库功能需要目标电脑已经安装并能正常登录匹配版本的 GeoEast。
+4. 安装时请保留完整程序文件。若安全软件拦截，请先核对安装器 SHA256，再按所在单位的安全策略处理。
+5. 用户配置和运行结果保存在当前用户的配置目录与文档目录；升级或卸载程序不会主动删除用户结果。
+
+FaultPolyTrace Setup Notes
+
+- Requires 64-bit Windows 10 or Windows 11.
+- Qt and compiler runtime files are included; Python and Visual Studio are not required.
+- GeoEast database features require a working, compatible GeoEast installation.
+- Verify the published SHA256 before allowing the installer through endpoint security software.

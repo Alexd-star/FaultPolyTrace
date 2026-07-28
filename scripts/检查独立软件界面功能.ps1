@@ -140,7 +140,7 @@ $actions = @(
     @{ Name="打开 DAT 文件"; Var="openAction"; Label="打开 DAT 文件"; Slot="browseInput"; Menu="fileMenu"; Toolbar=$true },
     @{ Name="开始追踪"; Var="runAction_"; Label="开始追踪"; Slot="runTrace"; Menu="faultMenu"; Toolbar=$true },
     @{ Name="停止"; Var="stopAction_"; Label="停止"; Slot="stopTrace"; Menu="faultMenu"; Toolbar=$true },
-    @{ Name="导出 PNG"; Var="pngAction"; Label="导出PNG"; Slot="exportPng"; Menu="fileMenu"; Toolbar=$true },
+    @{ Name="导出 PNG"; Var="pngAction"; Label="导出 PNG"; Slot="exportPng"; Menu="fileMenu"; Toolbar=$true },
     @{ Name="保存参数模板"; Var="saveTplAction"; Label="保存参数模板"; Slot="saveTemplate"; Menu="fileMenu"; Toolbar=$true },
     @{ Name="打开参数模板"; Var="loadTplAction"; Label="打开参数模板"; Slot="loadTemplate"; Menu="fileMenu"; Toolbar=$false },
     @{ Name="恢复默认"; Var="resetAction"; Label="恢复默认参数"; Slot="restoreDefaults"; Menu="editMenu"; Toolbar=$true },

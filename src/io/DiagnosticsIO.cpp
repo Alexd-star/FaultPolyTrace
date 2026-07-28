@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <fstream>
+#include <filesystem>
 #include <iomanip>
 #include <sstream>
 #include <stdexcept>
@@ -13,6 +14,24 @@
 
 namespace fpt {
 namespace {
+
+std::filesystem::path filesystemPath(const std::string& utf8Path) {
+#ifdef _WIN32
+    const int length = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+                                           utf8Path.data(), static_cast<int>(utf8Path.size()),
+                                           nullptr, 0);
+    if (length <= 0) {
+        throw std::runtime_error("Invalid UTF-8 file path: " + utf8Path);
+    }
+    std::wstring wide(static_cast<std::size_t>(length), L'\0');
+    MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+                        utf8Path.data(), static_cast<int>(utf8Path.size()),
+                        wide.data(), length);
+    return std::filesystem::path(wide);
+#else
+    return std::filesystem::path(utf8Path);
+#endif
+}
 
 bool isValidUtf8(const std::string& value) {
     const auto* bytes = reinterpret_cast<const unsigned char*>(value.data());
@@ -221,7 +240,7 @@ const char* localRejectionReasonName(LocalQualityRejectionReason reason) {
 } // namespace
 
 void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
-    std::ofstream out(path);
+    std::ofstream out(filesystemPath(path));
     if (!out) {
         throw std::runtime_error("Failed to open diagnostics file: " + path);
     }
@@ -470,7 +489,7 @@ void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
 }
 
 void writeTopologyDetailsCsv(const std::string& path, const TopologyDiagnostics& diagnostics) {
-    std::ofstream out(path);
+    std::ofstream out(filesystemPath(path));
     if (!out) {
         throw std::runtime_error("Failed to open topology details file: " + path);
     }
@@ -499,7 +518,7 @@ void writeTopologyDetailsCsv(const std::string& path, const TopologyDiagnostics&
 void writeBranchAttributionDifferencesCsv(
     const std::string& path,
     const std::vector<JunctionAttributionResult>& junctions) {
-    std::ofstream out(path);
+    std::ofstream out(filesystemPath(path));
     if (!out) {
         throw std::runtime_error(
             "Failed to open branch attribution differences file: " + path);

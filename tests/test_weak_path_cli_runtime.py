@@ -95,6 +95,8 @@ def test_diagnostics_paths_are_utf8_in_chinese_directory(core_exe, tmp_path):
         cwd=ROOT,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         check=False,
     )
 

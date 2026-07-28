@@ -3,13 +3,37 @@
 #include <algorithm>
 #include <cstdlib>
 #include <fstream>
+#include <filesystem>
 #include <iomanip>
 #include <limits>
 #include <stdexcept>
 #include <unordered_map>
 
+#ifdef _WIN32
+#define NOMINMAX
+#include <windows.h>
+#endif
+
 namespace fpt {
 namespace {
+
+std::filesystem::path filesystemPath(const std::string& utf8Path) {
+#ifdef _WIN32
+    const int length = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+                                           utf8Path.data(), static_cast<int>(utf8Path.size()),
+                                           nullptr, 0);
+    if (length <= 0) {
+        throw std::runtime_error("Invalid UTF-8 file path: " + utf8Path);
+    }
+    std::wstring wide(static_cast<std::size_t>(length), L'\0');
+    MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+                        utf8Path.data(), static_cast<int>(utf8Path.size()),
+                        wide.data(), length);
+    return std::filesystem::path(wide);
+#else
+    return std::filesystem::path(utf8Path);
+#endif
+}
 
 void writeRingWkt(std::ostream& out, const std::vector<Point>& points) {
     out << "(";
@@ -94,7 +118,7 @@ Grid2D readGeoEastDatGrid(const std::string& path) {
     std::vector<char> inputBuffer(1024 * 1024);
     std::ifstream in;
     in.rdbuf()->pubsetbuf(inputBuffer.data(), static_cast<std::streamsize>(inputBuffer.size()));
-    in.open(path);
+    in.open(filesystemPath(path));
     if (!in) {
         throw std::runtime_error("Failed to open GeoEast DAT grid file: " + path);
     }
@@ -188,7 +212,7 @@ Grid2D readGeoEastDatGrid(const std::string& path) {
 }
 
 Grid2D readAsciiGrid(const std::string& path) {
-    std::ifstream in(path);
+    std::ifstream in(filesystemPath(path));
     if (!in) {
         throw std::runtime_error("Failed to open grid file: " + path);
     }
@@ -216,7 +240,7 @@ Grid2D readAsciiGrid(const std::string& path) {
 }
 
 Grid2D readAutoGrid(const std::string& path) {
-    std::ifstream in(path);
+    std::ifstream in(filesystemPath(path));
     if (!in) {
         throw std::runtime_error("Failed to open grid file: " + path);
     }
@@ -239,7 +263,7 @@ void writePolygonCsv(const std::string& path, const std::vector<Polygon>& polygo
     std::vector<char> outputBuffer(1024 * 1024);
     std::ofstream out;
     out.rdbuf()->pubsetbuf(outputBuffer.data(), static_cast<std::streamsize>(outputBuffer.size()));
-    out.open(path);
+    out.open(filesystemPath(path));
     if (!out) {
         throw std::runtime_error("Failed to open output file: " + path);
     }
@@ -264,7 +288,7 @@ void writeBranchCsv(const std::string& path, const std::vector<BranchTrace>& bra
     std::vector<char> outputBuffer(1024 * 1024);
     std::ofstream out;
     out.rdbuf()->pubsetbuf(outputBuffer.data(), static_cast<std::streamsize>(outputBuffer.size()));
-    out.open(path);
+    out.open(filesystemPath(path));
     if (!out) {
         throw std::runtime_error("Failed to open branch output file: " + path);
     }

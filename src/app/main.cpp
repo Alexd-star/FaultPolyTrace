@@ -7,6 +7,7 @@
 #include <cctype>
 #include <chrono>
 #include <cstdlib>
+#include <cwctype>
 #include <exception>
 #include <filesystem>
 #include <iostream>
@@ -19,9 +20,45 @@
 #ifdef _WIN32
 #define NOMINMAX
 #include <windows.h>
+#include <shellapi.h>
 #endif
 
 namespace {
+
+std::vector<std::string> commandLineArgumentsUtf8(int argc, char** argv) {
+#ifdef _WIN32
+    int wideCount = 0;
+    LPWSTR* wideArguments = CommandLineToArgvW(GetCommandLineW(), &wideCount);
+    if (wideArguments && wideCount > 0) {
+        std::vector<std::string> converted;
+        converted.reserve(static_cast<std::size_t>(wideCount));
+        for (int index = 0; index < wideCount; ++index) {
+            const wchar_t* value = wideArguments[index];
+            const int byteCount = WideCharToMultiByte(CP_UTF8, 0, value, -1, nullptr, 0, nullptr, nullptr);
+            if (byteCount <= 0) {
+                converted.clear();
+                break;
+            }
+            std::string utf8(static_cast<std::size_t>(byteCount), '\0');
+            WideCharToMultiByte(CP_UTF8, 0, value, -1, utf8.data(), byteCount, nullptr, nullptr);
+            utf8.resize(static_cast<std::size_t>(byteCount - 1));
+            converted.push_back(std::move(utf8));
+        }
+        LocalFree(wideArguments);
+        if (!converted.empty()) {
+            return converted;
+        }
+    } else if (wideArguments) {
+        LocalFree(wideArguments);
+    }
+#endif
+    std::vector<std::string> copied;
+    copied.reserve(static_cast<std::size_t>(argc));
+    for (int index = 0; index < argc; ++index) {
+        copied.emplace_back(argv[index] ? argv[index] : "");
+    }
+    return copied;
+}
 
 struct CliOptions {
     std::string input;
@@ -221,18 +258,80 @@ void printUsage() {
 }
 
 std::string normalizedPathKey(const std::string& path) {
+#ifdef _WIN32
+    const int wideLength = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+                                               path.data(), static_cast<int>(path.size()),
+                                               nullptr, 0);
+    if (wideLength <= 0) {
+        throw std::runtime_error("Invalid UTF-8 output path: " + path);
+    }
+    std::wstring wide(static_cast<std::size_t>(wideLength), L'\0');
+    MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+                        path.data(), static_cast<int>(path.size()), wide.data(), wideLength);
+    const DWORD fullLength = GetFullPathNameW(wide.c_str(), 0, nullptr, nullptr);
+    if (fullLength == 0) {
+        throw std::runtime_error("Cannot normalize output path: " + path);
+    }
+    std::wstring full(static_cast<std::size_t>(fullLength), L'\0');
+    GetFullPathNameW(wide.c_str(), fullLength, full.data(), nullptr);
+    if (!full.empty() && full.back() == L'\0') {
+        full.pop_back();
+    }
+    std::transform(full.begin(), full.end(), full.begin(), [](wchar_t value) {
+        return value == L'\\' ? L'/' : static_cast<wchar_t>(std::towlower(value));
+    });
+    const int utf8Length = WideCharToMultiByte(CP_UTF8, 0, full.data(), static_cast<int>(full.size()),
+                                               nullptr, 0, nullptr, nullptr);
+    std::string key(static_cast<std::size_t>(utf8Length), '\0');
+    WideCharToMultiByte(CP_UTF8, 0, full.data(), static_cast<int>(full.size()),
+                        key.data(), utf8Length, nullptr, nullptr);
+    return key;
+#else
     std::string key = std::filesystem::absolute(
         std::filesystem::path(path)).lexically_normal().generic_string();
-#ifdef _WIN32
-    std::transform(
-        key.begin(),
-        key.end(),
-        key.begin(),
-        [](unsigned char value) {
-            return static_cast<char>(std::tolower(value));
-        });
-#endif
     return key;
+#endif
+}
+
+std::filesystem::path filesystemPathFromUtf8(const std::string& path) {
+#ifdef _WIN32
+    const int wideLength = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+                                               path.data(), static_cast<int>(path.size()),
+                                               nullptr, 0);
+    if (wideLength <= 0) {
+        throw std::runtime_error("Invalid UTF-8 file path: " + path);
+    }
+    std::wstring wide(static_cast<std::size_t>(wideLength), L'\0');
+    MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+                        path.data(), static_cast<int>(path.size()), wide.data(), wideLength);
+    return std::filesystem::path(wide);
+#else
+    return std::filesystem::path(path);
+#endif
+}
+
+void prepareOutputDirectories(const CliOptions& options) {
+    const std::vector<std::string> paths = {
+        options.output,
+        options.diagnosticsOutput,
+        options.branchesOutput,
+        options.topologyOutput,
+        options.branchAttributionDifferencesOutput
+    };
+    for (const std::string& path : paths) {
+        if (path.empty()) {
+            continue;
+        }
+        const std::filesystem::path parent = filesystemPathFromUtf8(path).parent_path();
+        if (!parent.empty()) {
+            std::error_code error;
+            std::filesystem::create_directories(parent, error);
+            if (error) {
+                throw std::runtime_error("Cannot create output directory for: " + path +
+                                         " (" + error.message() + ")");
+            }
+        }
+    }
 }
 
 void validateDistinctOutputPaths(const CliOptions& options) {
@@ -647,6 +746,19 @@ CliOptions parseArgs(int argc, char** argv) {
 
 int main(int argc, char** argv) {
     try {
+#ifdef _WIN32
+        SetConsoleOutputCP(CP_UTF8);
+        SetConsoleCP(CP_UTF8);
+#endif
+        std::vector<std::string> utf8Arguments = commandLineArgumentsUtf8(argc, argv);
+        std::vector<char*> utf8Argv;
+        utf8Argv.reserve(utf8Arguments.size());
+        for (std::string& argument : utf8Arguments) {
+            utf8Argv.push_back(argument.data());
+        }
+        argc = static_cast<int>(utf8Argv.size());
+        argv = utf8Argv.data();
+
         if (argc == 1) {
             printNoArgumentGuide();
             if (likelyStartedByDoubleClick()) {
@@ -657,6 +769,7 @@ int main(int argc, char** argv) {
         }
 
         const CliOptions cli = parseArgs(argc, argv);
+        prepareOutputDirectories(cli);
         const auto start = std::chrono::steady_clock::now();
 
         fpt::Grid2D grid;

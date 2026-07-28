@@ -239,3 +239,73 @@ def test_polished_task_flow_keyboard_accessibility_and_text_presentation_are_pre
     assert "QToolButton:focus" in theme
     assert "QCheckBox:focus" in theme
     assert "QPushButton:focus" in theme
+
+
+def test_clean_machine_preflight_and_writable_user_storage_are_enforced():
+    desktop = read("standalone_app/qt_desktop/FaultPolyTraceWindow.cpp")
+    launcher = read("geoeast_plugin/qt_launcher/FaultTraceDialog.cpp")
+
+    for source in (desktop, launcher):
+        assert "ensureWritableDirectory" in source
+        assert "QTemporaryFile probe" in source
+        assert "QStandardPaths::AppLocalDataLocation" in source
+        assert "QStandardPaths::TempLocation" in source
+        storage_start = source.index("QString appConfigDir()") if "QString appConfigDir()" in source else source.index("QString launcherSettingsPath()")
+        storage_end = source.index("\n}\n", storage_start) + 3
+        storage_section = source[storage_start:storage_end]
+        assert "QCoreApplication::applicationDirPath()" not in storage_section
+        assert "outputNameValidationError" in source
+        assert "输出名称无效" in source
+
+    assert "输入文件不可读取" in desktop
+    assert "输入文件与输出文件冲突" in desktop
+    assert "QStorageInfo" in desktop
+    assert "覆盖已有结果？" in desktop
+    assert "本地缓存目录不可用" in launcher
+
+
+def test_installer_and_plugin_deployment_cover_first_time_user_constraints():
+    installer = read("packaging/windows/FaultPolyTrace.iss")
+    demo = read("packaging/windows/02_运行离线演示.cmd")
+    smoke = read("scripts/TestWindowsInstaller.ps1")
+    plugin_install = read("packaging/submission/03_GeoEast插件/安装GeoEast插件.ps1")
+    plugin_cmd = read("packaging/submission/03_GeoEast插件/安装GeoEast插件.cmd")
+
+    assert "MinVersion=10.0" in installer
+    assert "DisableWelcomePage=no" in installer
+    assert "InfoBeforeFile=" in installer
+    assert 'Filename: "{sys}\\notepad.exe"' in installer
+    assert "[Environment+SpecialFolder]::MyDocuments" in demo
+    assert 'set "OUTDIR=outputs\\' not in demo
+    assert "全新用户 安装目录" in smoke
+    assert "中文 空格输出" in smoke
+    assert "QT_QPA_PLATFORM = \"offscreen\"" in smoke
+    assert "cleanProfileGuiStartup" in smoke
+    assert "repairInstall" in smoke
+    assert "User result was removed during uninstall" in smoke
+    assert "Get-Process geoeast" in plugin_install
+    assert "GeoEastPluginBackups" in plugin_install
+    assert "Get-FileHash -Algorithm SHA256" in plugin_install
+    assert "C:\\GeoEast" in plugin_install and "D:\\GeoEast" in plugin_install
+    assert "-ExecutionPolicy Bypass" in plugin_cmd
+    packaging = read("scripts/打包发布包.ps1")
+    assert "txt|cmd|md|json" in packaging
+
+
+def test_windows_cli_preserves_unicode_paths_end_to_end():
+    main = read("src/app/main.cpp")
+    grid_io = read("src/io/AsciiGridIO.cpp")
+    diagnostics_io = read("src/io/DiagnosticsIO.cpp")
+    build = read("scripts/build.ps1")
+
+    assert "CommandLineToArgvW" in main
+    assert "WideCharToMultiByte(CP_UTF8" in main
+    assert "SetConsoleOutputCP(CP_UTF8)" in main
+    assert "prepareOutputDirectories(cli)" in main
+    assert "std::filesystem::create_directories" in main
+    assert "commandLineArgumentsUtf8" in main
+    assert "MultiByteToWideChar(CP_UTF8" in grid_io
+    assert "MultiByteToWideChar(CP_UTF8" in diagnostics_io
+    assert "std::filesystem::path(wide)" in grid_io
+    assert "std::filesystem::path(wide)" in diagnostics_io
+    assert "-lshell32" in build

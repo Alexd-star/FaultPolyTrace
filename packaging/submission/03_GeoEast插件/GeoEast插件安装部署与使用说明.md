@@ -6,19 +6,19 @@ GeoEast 插件包由主框架插件、集成界面和 BO 数据库执行程序�
 
 ## 2. 自动部署
 
-部署前关闭 GeoEast。右键 PowerShell 脚本并按本机执行策略运行，或在 PowerShell 中进入本目录后执行：
+部署前保存工区并完全关闭 GeoEast。普通用户优先双击 `安装GeoEast插件.cmd`；该入口会以适合中文路径的方式调用部署脚本，并在失败时保留错误提示。也可以在 PowerShell 中进入本目录后执行：
 
 ```powershell
 .\安装GeoEast插件.ps1
 ```
 
-脚本优先读取环境变量 `FPT_GEOEAST_ROOT`，其次检测当前用户目录下的 `GeoEast`。如果 GeoEast 位于其他目录，显式传入根目录：
+脚本优先读取环境变量 `FPT_GEOEAST_ROOT`，随后检测当前用户目录、`C:\GeoEast`、`D:\GeoEast` 和 Program Files 中同时包含 `GeoEast-RC`、`NGP` 的目录。如果 GeoEast 位于其他位置，显式传入根目录：
 
 ```powershell
 .\安装GeoEast插件.ps1 -GeoEastRoot "D:\GeoEast"
 ```
 
-脚本只向指定 GeoEast 安装目录复制本插件文件，不修改数据库内容，不包含参赛者电脑用户名或固定盘符。部署完成后会打印主框架插件、Launcher 和 Runner 的实际位置。
+脚本只向指定 GeoEast 安装目录复制本插件文件，不修改数据库内容，不包含参赛者电脑用户名或固定盘符。检测到 GeoEast 正在运行时会停止部署，避免 DLL 被占用；覆盖已有插件前会把关键文件备份到当前用户本地数据目录，复制完成后再逐项核对 SHA256。若 GeoEast 安装目录受系统保护，脚本会提示以管理员身份运行，而不会留下含义不明的半成品。
 
 ## 3. 启动与自动配置
 

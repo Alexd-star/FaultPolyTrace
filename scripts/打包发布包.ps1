@@ -73,7 +73,7 @@ function Get-SourceSnapshot {
             $_ -match '^(src/|standalone_app/qt_desktop/|geoeast_plugin/|packaging/windows/|scripts/|tests/|tests_cpp/)' -or
             $_ -in @('CMakeLists.txt', 'pytest.ini')
         } |
-        Where-Object { $_ -match '\.(cpp|c|h|hpp|pro|pri|vcxproj|filters|ps1|py|iss|isl|xml|ini|txt)$' } |
+        Where-Object { $_ -match '\.(cpp|c|h|hpp|pro|pri|vcxproj|filters|ps1|py|iss|isl|xml|ini|txt|cmd|md|json)$' } |
         Sort-Object -Unique
     $records = @()
     foreach ($relative in $paths) {
