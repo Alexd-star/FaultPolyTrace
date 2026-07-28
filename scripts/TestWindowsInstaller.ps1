@@ -27,12 +27,12 @@ $guiProcess = $null
 
 try {
     $install = Start-Process -FilePath $installer -ArgumentList @(
-        "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", "/DIR=$installDir"
+        "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", ('/DIR="' + $installDir + '"')
     ) -Wait -PassThru
     if ($install.ExitCode -ne 0) { throw "Installer exited with code $($install.ExitCode)." }
 
     $repairInstall = Start-Process -FilePath $installer -ArgumentList @(
-        "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", "/DIR=$installDir"
+        "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", ('/DIR="' + $installDir + '"')
     ) -Wait -PassThru
     if ($repairInstall.ExitCode -ne 0) { throw "Installer repair/upgrade run exited with code $($repairInstall.ExitCode)." }
 

@@ -282,6 +282,7 @@ def test_installer_and_plugin_deployment_cover_first_time_user_constraints():
     assert "QT_QPA_PLATFORM = \"offscreen\"" in smoke
     assert "cleanProfileGuiStartup" in smoke
     assert "repairInstall" in smoke
+    assert "('/DIR=\"' + $installDir + '\"')" in smoke
     assert "User result was removed during uninstall" in smoke
     assert "Get-Process geoeast" in plugin_install
     assert "GeoEastPluginBackups" in plugin_install
