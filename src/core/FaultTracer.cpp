@@ -1224,6 +1224,26 @@ bool finalizeAndAppendPolygon(
             polygon.points = std::move(smoothed);
         }
     }
+    std::vector<std::vector<Point>> topologySafeHoles;
+    topologySafeHoles.reserve(polygon.holes.size());
+    for (std::vector<Point>& hole : polygon.holes) {
+        bool conflict = hole.empty() || !pointInRing(hole.front(), polygon.points) ||
+            ringBoundariesConflict(polygon.points, hole, true);
+        if (!conflict) {
+            for (const std::vector<Point>& accepted : topologySafeHoles) {
+                if (ringBoundariesConflict(accepted, hole, true)) {
+                    conflict = true;
+                    break;
+                }
+            }
+        }
+        if (conflict) {
+            ++result.suppressedInternalRings;
+        } else {
+            topologySafeHoles.push_back(std::move(hole));
+        }
+    }
+    polygon.holes = std::move(topologySafeHoles);
     polygon.area = polygonArea(polygon.points);
     polygon.perimeter = polygonPerimeter(polygon.points);
     for (const std::vector<Point>& hole : polygon.holes) {

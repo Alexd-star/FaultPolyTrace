@@ -112,7 +112,7 @@ def generate_benchmark(output_dir, count=40, width=256, height=192, seed=2026072
     return manifest
 
 
-def _trace_command(executable, input_grid, output_csv):
+def _trace_command(executable, input_grid, output_csv, trace_arguments=FORMAL_TRACE_ARGUMENTS):
     output_csv = Path(output_csv)
     return [
         str(executable),
@@ -121,12 +121,12 @@ def _trace_command(executable, input_grid, output_csv):
         "--diagnostics", str(output_csv.with_suffix(".diagnostics.json")),
         "--branches-output", str(output_csv.with_suffix(".branches.csv")),
         "--topology-output", str(output_csv.with_suffix(".topology.csv")),
-        *FORMAL_TRACE_ARGUMENTS,
+        *trace_arguments,
     ]
 
 
-def run_trace(executable, input_grid, output_csv):
-    command = _trace_command(Path(executable), Path(input_grid), Path(output_csv))
+def run_trace(executable, input_grid, output_csv, trace_arguments=FORMAL_TRACE_ARGUMENTS):
+    command = _trace_command(Path(executable), Path(input_grid), Path(output_csv), trace_arguments)
     started = time.perf_counter()
     process = subprocess.run(command, capture_output=True, text=True, encoding="utf-8", errors="replace")
     elapsed_ms = int(round((time.perf_counter() - started) * 1000.0))
@@ -180,7 +180,15 @@ def _perturbations(attribute, seed):
     }
 
 
-def _case_stability(executable, case_id, case_dir, result_dir, baseline_mask, seed):
+def _case_stability(
+    executable,
+    case_id,
+    case_dir,
+    result_dir,
+    baseline_mask,
+    seed,
+    trace_arguments=FORMAL_TRACE_ARGUMENTS,
+):
     attribute = np.asarray(np.load(case_dir / "attribute.npy", allow_pickle=False), dtype=np.float32)
     records = []
     variant_dir = result_dir / "perturbations"
@@ -189,7 +197,7 @@ def _case_stability(executable, case_id, case_dir, result_dir, baseline_mask, se
         grid_path = variant_dir / f"{name}.txt"
         csv_path = variant_dir / f"{name}.csv"
         write_ascii_grid(grid_path, values)
-        run = run_trace(executable, grid_path, csv_path)
+        run = run_trace(executable, grid_path, csv_path, trace_arguments)
         mask = _prediction_union(csv_path, attribute.shape)
         records.append({"variant": name, "iou_to_baseline": _mask_iou(mask, baseline_mask), "elapsed_ms": run["elapsed_ms"]})
     return {
@@ -213,7 +221,11 @@ def _aggregate(records):
         "centerline_corridor_precision_mean": float(np.mean([item["metrics"]["centerline"]["corridor_precision"] for item in records])),
         "centerline_corridor_f1_mean": float(np.mean([item["metrics"]["centerline"]["corridor_f1"] for item in records])),
         "merge_count_total": int(sum(item["metrics"]["objects"]["merge_count"] for item in records)),
+        "merge_excess_total": int(sum(item["metrics"]["objects"].get("merge_excess", 0) for item in records)),
+        "max_references_per_prediction": int(max(item["metrics"]["objects"].get("max_references_per_prediction", 0) for item in records)),
         "split_count_total": int(sum(item["metrics"]["objects"]["split_count"] for item in records)),
+        "split_excess_total": int(sum(item["metrics"]["objects"].get("split_excess", 0) for item in records)),
+        "max_predictions_per_reference": int(max(item["metrics"]["objects"].get("max_predictions_per_reference", 0) for item in records)),
         "missed_object_count_total": int(sum(item["metrics"]["objects"]["missed_reference_count"] for item in records)),
         "invalid_polygon_count_total": int(sum(item["metrics"]["topology"]["invalid_polygon_count"] for item in records)),
         "polygon_intersection_count_total": int(sum(item["metrics"]["topology"]["polygon_intersection_count"] for item in records)),
@@ -236,7 +248,7 @@ def _write_reports(output_dir, payload):
         json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     with (output_dir / "逐案例指标.csv").open("w", encoding="utf-8-sig", newline="") as stream:
-        fields = ["case_id", "family", "iou", "precision", "recall", "boundary_f1", "centerline_coverage", "centerline_corridor_precision", "centerline_corridor_f1", "merge_count", "split_count", "missed_objects", "elapsed_ms"]
+        fields = ["case_id", "family", "iou", "precision", "recall", "boundary_f1", "centerline_coverage", "centerline_corridor_precision", "centerline_corridor_f1", "merge_count", "merge_excess", "split_count", "split_excess", "missed_objects", "elapsed_ms"]
         writer = csv.DictWriter(stream, fieldnames=fields)
         writer.writeheader()
         for item in payload["cases"]:
@@ -248,7 +260,10 @@ def _write_reports(output_dir, payload):
                 "centerline_coverage": metrics["centerline"]["coverage"],
                 "centerline_corridor_precision": metrics["centerline"]["corridor_precision"],
                 "centerline_corridor_f1": metrics["centerline"]["corridor_f1"],
-                "merge_count": metrics["objects"]["merge_count"], "split_count": metrics["objects"]["split_count"],
+                "merge_count": metrics["objects"]["merge_count"],
+                "merge_excess": metrics["objects"].get("merge_excess", 0),
+                "split_count": metrics["objects"]["split_count"],
+                "split_excess": metrics["objects"].get("split_excess", 0),
                 "missed_objects": metrics["objects"]["missed_reference_count"], "elapsed_ms": item["run"]["elapsed_ms"],
             })
     summary = payload["summary"]
@@ -266,7 +281,9 @@ def _write_reports(output_dir, payload):
         f"| 细线走廊 Precision 均值 | {summary['centerline_corridor_precision_mean']:.6f} |",
         f"| 细线走廊 F1 均值 | {summary['centerline_corridor_f1_mean']:.6f} |",
         f"| 误合并总数 | {summary['merge_count_total']} |",
+        f"| 误合并额外吞并对象数 | {summary['merge_excess_total']} |",
         f"| 过度拆分总数 | {summary['split_count_total']} |",
+        f"| 过度拆分额外结果数 | {summary['split_excess_total']} |",
         f"| 漏对象总数 | {summary['missed_object_count_total']} |",
         f"| 非法多边形总数 | {summary['invalid_polygon_count_total']} |",
         f"| 多边形面积相交总数 | {summary['polygon_intersection_count_total']} |",
@@ -286,6 +303,8 @@ def run_benchmark(
     boundary_tolerance=2.0,
     with_perturbations=False,
     centerline_tolerance=3.0,
+    trace_arguments=FORMAL_TRACE_ARGUMENTS,
+    reuse_existing=False,
 ):
     dataset_dir = Path(dataset_dir)
     executable = Path(executable)
@@ -300,7 +319,21 @@ def run_benchmark(
         result_dir = output_dir / case_id
         result_dir.mkdir(parents=True, exist_ok=True)
         output_csv = result_dir / "result.csv"
-        run = run_trace(executable, case_dir / "attribute.txt", output_csv)
+        if reuse_existing and output_csv.exists():
+            diagnostics_path = output_csv.with_suffix(".diagnostics.json")
+            elapsed_ms = 0
+            if diagnostics_path.exists():
+                diagnostics = json.loads(diagnostics_path.read_text(encoding="utf-8"))
+                elapsed_ms = int(diagnostics.get("results", {}).get("elapsedMs", 0))
+            run = {
+                "elapsed_ms": elapsed_ms,
+                "command": _trace_command(executable, case_dir / "attribute.txt", output_csv, trace_arguments),
+                "stdout": "",
+                "stderr": "",
+                "reused_existing_output": True,
+            }
+        else:
+            run = run_trace(executable, case_dir / "attribute.txt", output_csv, trace_arguments)
         truth_archive = np.load(case_dir / "truth_masks.npz", allow_pickle=False)
         object_masks = truth_archive["object_masks"].astype(bool)
         centerline = truth_archive["centerline_mask"].astype(bool)
@@ -318,7 +351,17 @@ def run_benchmark(
         record = {"case_id": case_id, "family": case_info["family"], "metrics": metrics, "run": run}
         records.append(record)
         if with_perturbations:
-            stability.append(_case_stability(executable, case_id, case_dir, result_dir, predicted, int(case_info.get("seed", 0))))
+            stability.append(
+                _case_stability(
+                    executable,
+                    case_id,
+                    case_dir,
+                    result_dir,
+                    predicted,
+                    int(case_info.get("seed", 0)),
+                    trace_arguments,
+                )
+            )
     payload = {
         "schema_version": 1,
         "evidence_level": manifest.get("evidence_level", "controlled_synthetic_or_semisynthetic_truth"),
@@ -327,7 +370,7 @@ def run_benchmark(
             manifest.get("direct_planar_evidence", manifest.get("benchmark_type") == "controlled_planar_fault_attribute")
         ),
         "real_cross_survey_generalization_proven": False,
-        "formal_trace_arguments": list(FORMAL_TRACE_ARGUMENTS),
+        "formal_trace_arguments": list(trace_arguments),
         "summary": _aggregate(records),
         "cases": records,
         "stability": stability,

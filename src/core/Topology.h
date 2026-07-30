@@ -28,6 +28,10 @@ struct TopologyDiagnostics {
 
 TopologyDiagnostics diagnoseTopology(const std::vector<Polygon>& polygons);
 TopologyDiagnostics diagnoseTopology(const std::vector<Polygon>& polygons, bool keptOnly);
+bool ringBoundariesConflict(
+    const std::vector<Point>& first,
+    const std::vector<Point>& second,
+    bool rejectMultiplePointTouches = true);
 bool polygonHasTopologyConflict(
     const Polygon& candidate,
     const std::vector<Polygon>& polygons,

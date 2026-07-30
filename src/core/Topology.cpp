@@ -181,6 +181,49 @@ bool adjacentEdges(std::size_t edgeA, std::size_t edgeB, std::size_t edgeCount) 
     return false;
 }
 
+bool samePoint(const Point& first, const Point& second) {
+    return std::abs(first.x - second.x) <= Epsilon &&
+        std::abs(first.y - second.y) <= Epsilon;
+}
+
+bool ringBoundaryConflict(
+    const std::vector<Point>& first,
+    const std::vector<Point>& second,
+    bool rejectMultiplePointTouches) {
+    if (first.size() < 3 || second.size() < 3) {
+        return false;
+    }
+    const std::vector<SegmentRef> firstSegments = buildSegmentsFromRing(first);
+    const std::vector<SegmentRef> secondSegments = buildSegmentsFromRing(second);
+    std::vector<Point> pointTouches;
+    for (const SegmentRef& a : firstSegments) {
+        for (const SegmentRef& b : secondSegments) {
+            if (!boundsOverlap(a.bounds, b.bounds)) {
+                continue;
+            }
+            if (segmentsCrossOrOverlap(*a.a, *a.b, *b.a, *b.b)) {
+                return true;
+            }
+            if (!rejectMultiplePointTouches ||
+                !segmentsIntersect(*a.a, *a.b, *b.a, *b.b)) {
+                continue;
+            }
+            const Point contact = approximateIntersectionPoint(*a.a, *a.b, *b.a, *b.b);
+            const bool duplicate = std::any_of(
+                pointTouches.begin(),
+                pointTouches.end(),
+                [&](const Point& existing) { return samePoint(existing, contact); });
+            if (!duplicate) {
+                pointTouches.push_back(contact);
+                if (pointTouches.size() > 1) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
 bool ringSelfIntersects(const std::vector<Point>& ring, const Polygon& polygon, int ringIndex, TopologyDiagnostics& diagnostics) {
     const std::size_t n = ring.size();
     if (n < 4) {
@@ -225,7 +268,9 @@ bool ringsIntersect(
         return false;
     }
 
-    bool found = false;
+    if (!ringBoundaryConflict(aRing, bRing, true)) {
+        return false;
+    }
     const std::vector<SegmentRef> aSegments = buildSegmentsFromRing(aRing);
     const std::vector<SegmentRef> bSegments = buildSegmentsFromRing(bRing);
     for (std::size_t i = 0; i < aSegments.size(); ++i) {
@@ -235,8 +280,7 @@ bool ringsIntersect(
             if (!boundsOverlap(a.bounds, b.bounds)) {
                 continue;
             }
-            if (segmentsCrossOrOverlap(*a.a, *a.b, *b.a, *b.b)) {
-                found = true;
+            if (segmentsIntersect(*a.a, *a.b, *b.a, *b.b)) {
                 diagnostics.selfIntersectionDetails.push_back({
                     ringAIndex == 0 || ringBIndex == 0 ? "hole-exterior" : "hole-hole",
                     polygon.id,
@@ -245,10 +289,11 @@ bool ringsIntersect(
                     static_cast<int>(j),
                     approximateIntersectionPoint(*a.a, *a.b, *b.a, *b.b)
                 });
+                return true;
             }
         }
     }
-    return found;
+    return true;
 }
 
 bool polygonSelfIntersects(const Polygon& polygon, TopologyDiagnostics& diagnostics) {
@@ -297,6 +342,13 @@ bool polygonsIntersect(const Polygon& aPoly, const Polygon& bPoly, TopologyDiagn
 }
 
 } // namespace
+
+bool ringBoundariesConflict(
+    const std::vector<Point>& first,
+    const std::vector<Point>& second,
+    bool rejectMultiplePointTouches) {
+    return ringBoundaryConflict(first, second, rejectMultiplePointTouches);
+}
 
 TopologyDiagnostics diagnoseTopology(const std::vector<Polygon>& polygons) {
     return diagnoseTopology(polygons, false);

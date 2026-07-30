@@ -1,10 +1,17 @@
 import csv
 from pathlib import Path
+import sys
 
 import numpy as np
 from scipy.ndimage import binary_erosion, distance_transform_edt, label
-from shapely import contains_xy
+from shapely import contains_xy, prepare
 from shapely import wkt as shapely_wkt
+
+
+try:
+    csv.field_size_limit(min(sys.maxsize, 2**31 - 1))
+except OverflowError:
+    csv.field_size_limit(2**31 - 1)
 
 
 def _safe_ratio(numerator, denominator):
@@ -53,6 +60,7 @@ def _rasterize_geometry(geometry, shape):
     xs = np.arange(x0, x1, dtype=np.float64) + 0.5
     ys = np.arange(y0, y1, dtype=np.float64) + 0.5
     xx, yy = np.meshgrid(xs, ys)
+    prepare(geometry)
     result[y0:y1, x0:x1] = np.asarray(contains_xy(geometry, xx, yy), dtype=bool)
     return result
 
@@ -91,22 +99,37 @@ def _boundary_metrics(predicted, truth, tolerance):
 
 def _object_metrics(predicted_masks, reference_masks):
     overlap = np.zeros((len(predicted_masks), len(reference_masks)), dtype=np.int64)
-    for pred_index, predicted in enumerate(predicted_masks):
+    if len(predicted_masks):
+        prediction_labels = np.zeros(reference_masks[0].shape, dtype=np.int32)
+        for pred_index, predicted in enumerate(predicted_masks, start=1):
+            prediction_labels[np.asarray(predicted, dtype=bool)] = pred_index
         for truth_index, truth in enumerate(reference_masks):
-            overlap[pred_index, truth_index] = int(np.count_nonzero(predicted & truth))
+            counts = np.bincount(
+                prediction_labels[np.asarray(truth, dtype=bool)],
+                minlength=len(predicted_masks) + 1,
+            )
+            overlap[:, truth_index] = counts[1 : len(predicted_masks) + 1]
     merge_count = 0
+    merge_excess = 0
+    max_references_per_prediction = 0
     for pred_index, predicted in enumerate(predicted_masks):
         linked = 0
         for truth_index, truth in enumerate(reference_masks):
             minimum = max(1, int(0.05 * np.count_nonzero(truth)))
             linked += int(overlap[pred_index, truth_index] >= minimum)
         merge_count += int(linked > 1)
+        merge_excess += max(0, linked - 1)
+        max_references_per_prediction = max(max_references_per_prediction, linked)
     split_count = 0
+    split_excess = 0
+    max_predictions_per_reference = 0
     detected_count = 0
     for truth_index, truth in enumerate(reference_masks):
         minimum = max(1, int(0.05 * np.count_nonzero(truth)))
         linked = int(np.count_nonzero(overlap[:, truth_index] >= minimum)) if len(predicted_masks) else 0
         split_count += int(linked > 1)
+        split_excess += max(0, linked - 1)
+        max_predictions_per_reference = max(max_predictions_per_reference, linked)
         detected_count += int(linked > 0)
     return {
         "reference_object_count": int(len(reference_masks)),
@@ -114,7 +137,11 @@ def _object_metrics(predicted_masks, reference_masks):
         "detected_reference_count": int(detected_count),
         "missed_reference_count": int(len(reference_masks) - detected_count),
         "merge_count": int(merge_count),
+        "merge_excess": int(merge_excess),
+        "max_references_per_prediction": int(max_references_per_prediction),
         "split_count": int(split_count),
+        "split_excess": int(split_excess),
+        "max_predictions_per_reference": int(max_predictions_per_reference),
     }
 
 
