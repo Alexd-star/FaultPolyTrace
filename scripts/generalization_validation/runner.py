@@ -8,6 +8,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 from matplotlib import font_manager
 import numpy as np
 from scipy.ndimage import binary_erosion, gaussian_filter
@@ -154,6 +155,16 @@ def _save_review_figure(attribute, truth, predicted, output_path, title):
     predicted_boundary = _binary_boundary(predicted)
     axes[2].contour(truth_boundary.astype(float), levels=[0.5], colors=["#198754"], linewidths=0.8, origin="lower")
     axes[2].contour(predicted_boundary.astype(float), levels=[0.5], colors=["#C62828"], linewidths=0.8, origin="lower")
+    axes[2].legend(
+        handles=[
+            Line2D([0], [0], color="#198754", lw=1.4, label="几何真值边界"),
+            Line2D([0], [0], color="#C62828", lw=1.4, label="算法结果边界"),
+        ],
+        loc="lower right",
+        frameon=True,
+        framealpha=0.9,
+        fontsize=6.5,
+    )
     fig.suptitle(title, fontsize=10)
     fig.tight_layout()
     fig.savefig(output_path, bbox_inches="tight")

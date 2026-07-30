@@ -163,6 +163,10 @@ def run(executable, dataset, output, modes, reuse_existing=False):
             "mean_metric_tolerance": 0.002,
             "production_default_unchanged": True,
         },
+        "metric_interpretation": {
+            "pixel_boundary_centerline_topology": "可按定义直接解释。",
+            "object_overlap": "长路径真值与交点间结果片段的粒度不同，对象重叠数量仅作为同一基准内的A/B压力代理，不等同于经专家确认的地质误合并或过分割数量。",
+        },
     }
     (output / "复杂同域验证摘要.json").write_text(
         json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
@@ -178,8 +182,8 @@ def run(executable, dataset, output, modes, reuse_existing=False):
         f"- IoU：`{baseline['summary']['pixel_iou_mean']:.6f}`",
         f"- Recall：`{baseline['summary']['pixel_recall_mean']:.6f}`",
         f"- Boundary F1：`{baseline['summary']['boundary_f1_mean']:.6f}`",
-        f"- 误合并/过分割/漏对象：`{baseline['summary']['merge_count_total']}/{baseline['summary']['split_count_total']}/{baseline['summary']['missed_object_count_total']}`",
-        f"- 误合并额外吞并/过分割额外结果：`{baseline['summary']['merge_excess_total']}/{baseline['summary']['split_excess_total']}`",
+        f"- 对象重叠代理（合并/拆分/未关联）：`{baseline['summary']['merge_count_total']}/{baseline['summary']['split_count_total']}/{baseline['summary']['missed_object_count_total']}`",
+        f"- 对象重叠代理严重度（额外关联真值/额外关联结果）：`{baseline['summary']['merge_excess_total']}/{baseline['summary']['split_excess_total']}`",
         f"- 非法几何/异常相交：`{baseline['summary']['invalid_polygon_count_total']}/{baseline['summary']['polygon_intersection_count_total']}`",
         "",
         "## 候选A/B门控",
@@ -198,7 +202,7 @@ def run(executable, dataset, output, modes, reuse_existing=False):
             "",
             "## 判定边界",
             "",
-            "复杂度级可控基准用于暴露算法在密集网络、近邻平行、独立交叉、分支和弱缺口条件下的行为。它不能替代独立真实工区的专家解释。任何候选模式即使局部指标改善，只要对象误合并、拓扑、覆盖或稳定性发生退化，也不替换正式214基线。",
+            "复杂度级可控基准用于暴露算法在密集网络、近邻平行、独立交叉、分支和弱缺口条件下的行为。长路径真值与交点间结果多边形的对象粒度不同，因此对象重叠数量只用于同一基准、同一规则下的候选A/B比较，不应直接表述为专家确认的地质错误数量。该基准不能替代独立真实工区的专家解释。任何候选模式即使局部指标改善，只要对象重叠代理、拓扑、覆盖或稳定性发生退化，也不替换正式214基线。",
         ]
     )
     (output / "复杂同域验证报告.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
