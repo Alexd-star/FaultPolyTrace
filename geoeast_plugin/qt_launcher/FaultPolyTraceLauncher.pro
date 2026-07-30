@@ -24,6 +24,7 @@ SOURCES += \
     ../../src/ui/FptLog.cpp \
     ../../src/ui/FptControls.cpp \
     ../../src/ui/TraceParameterModel.cpp \
+    ../../src/ui/QualityReviewModel.cpp \
     FaultTraceDialog.cpp
 
 HEADERS += \
@@ -33,6 +34,7 @@ HEADERS += \
     ../../src/ui/FptLog.h \
     ../../src/ui/FptControls.h \
     ../../src/ui/TraceParameterModel.h \
+    ../../src/ui/QualityReviewModel.h \
     FaultTraceDialog.h
 
 OBJECTS_DIR = .obj

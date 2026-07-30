@@ -1,4 +1,5 @@
 #include "GeoEastBoAdapter.h"
+#include "StagedCommit.h"
 
 #include "../../src/core/FaultTracer.h"
 #include "../../src/core/Topology.h"
@@ -40,6 +41,8 @@ struct Options {
     std::string password;
     std::string gridName;
     std::string outputName;
+    std::string diagnosticsOutputPath;
+    std::string transactionReportPath;
     std::string topologyOutputPath;
     std::string previewGridOutputPath;
     std::string previewPolygonsOutputPath;
@@ -139,6 +142,8 @@ void printUsage() {
         << "  --polygon-color <cyan|yellow|magenta|white|green|blue|red|R,G,B|#RRGGBB>\n"
         << "  --polygon-linewidth <value>\n"
         << "  --topology-output <csv>\n"
+        << "  --diagnostics <json>\n"
+        << "  --transaction-report <json>\n"
         << "  --view-grid-output <txt>\n"
         << "  --view-polygons-output <csv>\n"
         << "  --export-fault-polygons-output <csv>\n"
@@ -290,6 +295,10 @@ Options parseArgs(int argc, char** argv) {
             options.outputName = requireValue(arg);
         } else if (arg == "--topology-output") {
             options.topologyOutputPath = requireValue(arg);
+        } else if (arg == "--diagnostics") {
+            options.diagnosticsOutputPath = requireValue(arg);
+        } else if (arg == "--transaction-report") {
+            options.transactionReportPath = requireValue(arg);
         } else if (arg == "--preview-grid-output" || arg == "--view-grid-output") {
             options.previewGridOutputPath = requireValue(arg);
         } else if (arg == "--preview-polygons-output" || arg == "--view-polygons-output") {
@@ -356,6 +365,10 @@ Options parseArgs(int argc, char** argv) {
             options.trace.branchAttributionShadow = true;
         } else if (arg == "--no-branch-attribution-shadow") {
             options.trace.branchAttributionShadow = false;
+        } else if (arg == "--local-polygon-quality-shadow") {
+            options.trace.localPolygonQualityShadow = true;
+        } else if (arg == "--no-local-polygon-quality-shadow") {
+            options.trace.localPolygonQualityShadow = false;
         } else if (arg == "--local-polygon-quality") {
             options.trace.localPolygonQuality = true;
         } else if (arg == "--no-local-polygon-quality") {
@@ -579,7 +592,7 @@ void verifyFaultPolygonRoundTrip(
             std::to_string(actual.size()));
     }
 
-    auto bounds = [](const std::vector<fpt::Point>& points) {
+    auto signature = [](const std::vector<fpt::Point>& points) {
         double minX = std::numeric_limits<double>::max();
         double minY = std::numeric_limits<double>::max();
         double maxX = -std::numeric_limits<double>::max();
@@ -590,34 +603,170 @@ void verifyFaultPolygonRoundTrip(
             maxX = std::max(maxX, point.x);
             maxY = std::max(maxY, point.y);
         }
-        return std::array<double, 4>{minX, minY, maxX, maxY};
+        return std::array<double, 6>{
+            minX,
+            minY,
+            maxX,
+            maxY,
+            fpt::polygonArea(points),
+            static_cast<double>(points.size())};
     };
-    std::vector<std::array<double, 4>> expectedBounds;
-    std::vector<std::array<double, 4>> actualBounds;
-    expectedBounds.reserve(expected.size());
-    actualBounds.reserve(actual.size());
+    std::vector<std::array<double, 6>> expectedSignatures;
+    std::vector<std::array<double, 6>> actualSignatures;
+    expectedSignatures.reserve(expected.size());
+    actualSignatures.reserve(actual.size());
     for (const fpt::Polygon* polygon : expected) {
-        expectedBounds.push_back(bounds(polygon->points));
+        expectedSignatures.push_back(signature(polygon->points));
     }
     for (const fpt::Polygon& polygon : actual) {
-        actualBounds.push_back(bounds(polygon.points));
+        actualSignatures.push_back(signature(polygon.points));
     }
-    std::sort(expectedBounds.begin(), expectedBounds.end());
-    std::sort(actualBounds.begin(), actualBounds.end());
+    std::sort(expectedSignatures.begin(), expectedSignatures.end());
+    std::sort(actualSignatures.begin(), actualSignatures.end());
 
     constexpr double tolerance = 1e-7;
-    for (std::size_t index = 0; index < expectedBounds.size(); ++index) {
-        for (std::size_t axis = 0; axis < expectedBounds[index].size(); ++axis) {
-            const double scale = std::max(1.0, std::abs(expectedBounds[index][axis]));
-            if (std::abs(expectedBounds[index][axis] - actualBounds[index][axis]) > tolerance * scale) {
+    for (std::size_t index = 0; index < expectedSignatures.size(); ++index) {
+        for (std::size_t field = 0; field < expectedSignatures[index].size(); ++field) {
+            const double scale = std::max(1.0, std::abs(expectedSignatures[index][field]));
+            if (std::abs(expectedSignatures[index][field] - actualSignatures[index][field]) > tolerance * scale) {
                 throw std::runtime_error(
-                    "GeoEast round-trip bounds mismatch at polygon " +
+                    "GeoEast round-trip geometry signature mismatch at polygon " +
                     std::to_string(index + 1));
             }
         }
     }
     std::cout << "GeoEast round-trip verified: " << actual.size()
-              << " polygons, bounds preserved.\n";
+              << " polygons; bounds, area, and vertex counts preserved.\n";
+}
+
+std::string makeStagingName(
+    const fpt_geoeast::GeoEastProjectPtr& project) {
+    const auto ticks = std::chrono::high_resolution_clock::now()
+        .time_since_epoch().count();
+    const std::string prefix = "FPT_STAGE_" + std::to_string(ticks);
+    for (int suffix = 0; suffix < 100; ++suffix) {
+        const std::string candidate = suffix == 0
+            ? prefix
+            : prefix + "_" + std::to_string(suffix);
+        if (!fpt_geoeast::faultPolygonsExist(project, candidate)) {
+            return candidate;
+        }
+    }
+    throw std::runtime_error("Cannot allocate a unique GeoEast staging object name.");
+}
+
+std::string jsonEscape(const std::string& value) {
+    std::string escaped;
+    escaped.reserve(value.size() + 8);
+    for (unsigned char character : value) {
+        switch (character) {
+        case '\\': escaped += "\\\\"; break;
+        case '"': escaped += "\\\""; break;
+        case '\n': escaped += "\\n"; break;
+        case '\r': escaped += "\\r"; break;
+        case '\t': escaped += "\\t"; break;
+        default:
+            if (character < 0x20) {
+                escaped += "?";
+            } else {
+                escaped.push_back(static_cast<char>(character));
+            }
+        }
+    }
+    return escaped;
+}
+
+void writeStagedCommitReport(
+    const std::string& path,
+    const std::string& targetName,
+    const std::string& stagingName,
+    bool previousObjectExisted,
+    const fpt_geoeast::StagedCommitResult& result) {
+    if (path.empty()) {
+        return;
+    }
+    fpt::AtomicOutputFile output(std::filesystem::u8path(path), 256 * 1024);
+    std::ostream& out = output.stream();
+    out << "{\n"
+        << "  \"format\": \"FaultPolyTrace.GeoEastStagedCommit\",\n"
+        << "  \"schemaVersion\": 1,\n"
+        << "  \"mode\": \"application_staged_commit\",\n"
+        << "  \"targetName\": \"" << jsonEscape(targetName) << "\",\n"
+        << "  \"stagingName\": \"" << jsonEscape(stagingName) << "\",\n"
+        << "  \"previousObjectExisted\": " << (previousObjectExisted ? "true" : "false") << ",\n"
+        << "  \"stagingVerified\": " << (result.stagingVerified ? "true" : "false") << ",\n"
+        << "  \"targetVerified\": " << (result.targetVerified ? "true" : "false") << ",\n"
+        << "  \"rollbackPerformed\": " << (result.rollbackPerformed ? "true" : "false") << ",\n"
+        << "  \"rollbackSucceeded\": " << (result.rollbackSucceeded ? "true" : "false") << ",\n"
+        << "  \"stagingCleanupSucceeded\": " << (result.stagingCleanupSucceeded ? "true" : "false") << ",\n"
+        << "  \"committed\": " << (result.committed ? "true" : "false") << ",\n"
+        << "  \"success\": " << (result.success() ? "true" : "false") << ",\n"
+        << "  \"failureMessage\": \"" << jsonEscape(result.failureMessage) << "\",\n"
+        << "  \"rollbackFailureMessage\": \"" << jsonEscape(result.rollbackFailureMessage) << "\",\n"
+        << "  \"cleanupFailureMessage\": \"" << jsonEscape(result.cleanupFailureMessage) << "\"\n"
+        << "}\n";
+    output.commit();
+}
+
+fpt_geoeast::StagedCommitResult commitFaultPolygonsWithReadback(
+    const fpt_geoeast::GeoEastProjectPtr& project,
+    const std::string& outputName,
+    const std::vector<fpt::Polygon>& polygons,
+    const fpt_geoeast::FaultPolygonStyle& style,
+    const std::string& reportPath) {
+    const bool previousExists =
+        fpt_geoeast::faultPolygonsExist(project, outputName);
+    std::vector<fpt::Polygon> previousPolygons;
+    fpt_geoeast::FaultPolygonStyle previousStyle;
+    if (previousExists) {
+        previousPolygons = fpt_geoeast::readFaultPolygons(project, outputName);
+        previousStyle = fpt_geoeast::readFaultPolygonStyle(project, outputName);
+    }
+    const std::string stagingName = makeStagingName(project);
+
+    fpt_geoeast::StagedCommitOperations operations;
+    operations.writeStaging = [&](const std::string& name) {
+        fpt_geoeast::writeFaultPolygons(project, name, polygons, true, style);
+    };
+    operations.verifyStaging = [&](const std::string& name) {
+        verifyFaultPolygonRoundTrip(project, name, polygons);
+    };
+    operations.replaceTarget = [&](const std::string& name) {
+        fpt_geoeast::writeFaultPolygons(project, name, polygons, true, style);
+    };
+    operations.verifyTarget = [&](const std::string& name) {
+        verifyFaultPolygonRoundTrip(project, name, polygons);
+    };
+    operations.rollbackTarget = [&](const std::string& name) {
+        if (previousExists) {
+            fpt_geoeast::writeFaultPolygons(
+                project, name, previousPolygons, true, previousStyle);
+            verifyFaultPolygonRoundTrip(project, name, previousPolygons);
+        } else if (fpt_geoeast::faultPolygonsExist(project, name)) {
+            fpt_geoeast::deleteFaultPolygons(project, name);
+        }
+    };
+    operations.deleteStaging = [&](const std::string& name) {
+        if (fpt_geoeast::faultPolygonsExist(project, name)) {
+            fpt_geoeast::deleteFaultPolygons(project, name);
+        }
+    };
+
+    const fpt_geoeast::StagedCommitResult result =
+        fpt_geoeast::runStagedCommit(outputName, stagingName, operations);
+    writeStagedCommitReport(
+        reportPath, outputName, stagingName, previousExists, result);
+    if (!result.success()) {
+        std::string message = "GeoEast staged commit failed: " + result.failureMessage;
+        if (result.rollbackPerformed && !result.rollbackSucceeded) {
+            message += "; rollback failed: " + result.rollbackFailureMessage;
+        }
+        if (!result.stagingCleanupSucceeded) {
+            message += "; staging cleanup failed: " + result.cleanupFailureMessage;
+        }
+        throw std::runtime_error(message);
+    }
+    return result;
 }
 
 } // namespace
@@ -728,8 +877,19 @@ int main(int argc, char** argv) {
             fpt::writePolygonCsv(options.previewPolygonsOutputPath, result.polygons);
         }
         debugLog("Writing BOFaultPolygon: " + options.outputName);
-        fpt_geoeast::writeFaultPolygons(project, options.outputName, result.polygons, true, options.polygonStyle);
-        verifyFaultPolygonRoundTrip(project, options.outputName, result.polygons);
+        const std::string transactionReportPath =
+            !options.transactionReportPath.empty()
+                ? options.transactionReportPath
+                : (options.diagnosticsOutputPath.empty()
+                    ? std::string()
+                    : options.diagnosticsOutputPath + ".geoeast-commit.json");
+        const fpt_geoeast::StagedCommitResult commitResult =
+            commitFaultPolygonsWithReadback(
+                project,
+                options.outputName,
+                result.polygons,
+                options.polygonStyle,
+                transactionReportPath);
         debugLog("BOFaultPolygon write completed.");
 
         int kept = 0;
@@ -742,9 +902,60 @@ int main(int argc, char** argv) {
         const auto end = std::chrono::steady_clock::now();
         const auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
+        if (!options.diagnosticsOutputPath.empty()) {
+            fpt::RunDiagnostics diagnostics;
+            diagnostics.inputPath = std::string("BOMapGrid/") + options.gridName;
+            diagnostics.outputPath = std::string("BOFaultPolygon/") + options.outputName;
+            diagnostics.traceMode = options.trace.traceMode == fpt::TraceMode::RidgeBelt
+                ? "ridge-belt" : "region";
+            diagnostics.thresholdMode = options.trace.thresholdMode == fpt::ThresholdMode::Fixed
+                ? "fixed"
+                : (options.trace.thresholdMode == fpt::ThresholdMode::PositivePercentile
+                    ? "positive-percentile" : "percentile");
+            diagnostics.threshold = options.trace.threshold;
+            diagnostics.percentile = options.trace.percentile;
+            diagnostics.effectiveThreshold = result.effectiveThreshold;
+            diagnostics.minArea = options.trace.minArea;
+            diagnostics.minCells = options.trace.minCells;
+            diagnostics.branchAttributionShadow = options.trace.branchAttributionShadow;
+            diagnostics.branchAttributionCandidateGroups = options.trace.branchAttributionCandidateGroups;
+            diagnostics.localPolygonQualityShadow = options.trace.localPolygonQualityShadow;
+            diagnostics.localPolygonQuality = options.trace.localPolygonQuality;
+            diagnostics.gridNx = grid.nx();
+            diagnostics.gridNy = grid.ny();
+            diagnostics.activeCellCount = result.activeCellCount;
+            diagnostics.polygonCount = static_cast<int>(result.polygons.size());
+            diagnostics.keptPolygonCount = kept;
+            diagnostics.localQualityDetectedCount = result.localPolygonQualityStats.detectedCount;
+            diagnostics.localQualityAcceptedCount = result.localPolygonQualityStats.acceptedCount;
+            diagnostics.localQualityReviewCount = result.localPolygonQualityStats.reviewCount;
+            diagnostics.localQualityRejectedCount = result.localPolygonQualityStats.rejectedCount;
+            diagnostics.localQualityTotalEvidence = result.localPolygonQualityStats.totalEvidence;
+            diagnostics.localQualityStoredEvidence = result.localPolygonQualityStats.storedEvidence;
+            diagnostics.localQualityTruncatedEvidence = result.localPolygonQualityStats.truncatedEvidence;
+            diagnostics.localQualityMaxEvidenceRecords = options.trace.localQualityMaxEvidenceRecords;
+            diagnostics.localPolygonQualityEvidence = result.localPolygonQualityEvidence;
+            diagnostics.openRingCount = topology.openRingCount;
+            diagnostics.selfIntersectingPolygonCount = topology.selfIntersectingPolygonCount;
+            diagnostics.polygonIntersectionCount = topology.polygonIntersectionCount;
+            diagnostics.elapsedMs = static_cast<int>(std::min<long long>(
+                elapsedMs, std::numeric_limits<int>::max()));
+            fpt::writeDiagnosticsJson(options.diagnosticsOutputPath, diagnostics);
+        }
+
         std::cout << "FaultPolyTrace GeoEast runner completed.\n";
         std::cout << "Grid: " << grid.nx() << " x " << grid.ny() << "\n";
         std::cout << "Effective threshold: " << result.effectiveThreshold << "\n";
+        std::cout << "Active cells: " << result.activeCellCount << "\n";
+        std::cout << "Skeleton endpoints: " << result.skeletonEndpoints << "\n";
+        std::cout << "Skeleton junctions: " << result.skeletonJunctions << "\n";
+        std::cout << "Skeleton branches: " << result.skeletonBranches << "\n";
+        std::cout << "Connected gaps: " << result.connectedGaps << "\n";
+        std::cout << "Kept branches: " << result.keptBranches << "\n";
+        std::cout << "Pruned branches: " << result.prunedBranches << "\n";
+        std::cout << "Residual fill candidate cells: " << result.residualFillCandidateCells << "\n";
+        std::cout << "Residual fill added cells: " << result.residualFillAddedCells << "\n";
+        std::cout << "Residual fill rejected components: " << result.residualFillRejectedComponents << "\n";
         std::cout << "Polygons: " << result.polygons.size() << " total, " << kept << " kept\n";
         if (options.trace.rootAntiMerge) {
             std::cout << "Root anti-merge candidate cut cells: " << result.rootAntiMergeCandidateCutCells << "\n";
@@ -786,6 +997,11 @@ int main(int argc, char** argv) {
             std::cout << "View polygons: " << options.previewPolygonsOutputPath << "\n";
         }
         std::cout << "Output BOFaultPolygon: " << options.outputName << "\n";
+        std::cout << "GeoEast staged commit: "
+                  << (commitResult.success() ? "verified" : "failed") << "\n";
+        if (!transactionReportPath.empty()) {
+            std::cout << "GeoEast commit report: " << transactionReportPath << "\n";
+        }
         std::cout << "Elapsed: " << elapsedMs << " ms\n";
         return 0;
     } catch (const std::bad_alloc& ex) {

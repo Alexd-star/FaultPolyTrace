@@ -33,5 +33,25 @@ def test_overwrite_delete_and_explicit_delete_check_sdk_status():
 def test_runner_re_reads_written_polygons_before_reporting_success():
     assert "verifyFaultPolygonRoundTrip" in RUNNER
     assert "GeoEast round-trip verified" in RUNNER
-    assert "std::sort(expectedBounds.begin(), expectedBounds.end())" in RUNNER
-    assert "std::sort(actualBounds.begin(), actualBounds.end())" in RUNNER
+    assert "std::sort(expectedSignatures.begin(), expectedSignatures.end())" in RUNNER
+    assert "std::sort(actualSignatures.begin(), actualSignatures.end())" in RUNNER
+    assert "fpt::polygonArea(points)" in RUNNER
+    assert "static_cast<double>(points.size())" in RUNNER
+
+
+def test_runner_uses_staged_commit_with_readback_and_compensating_rollback():
+    assert "commitFaultPolygonsWithReadback" in RUNNER
+    assert "runStagedCommit" in RUNNER
+    assert "writeStaging" in RUNNER
+    assert "verifyStaging" in RUNNER
+    assert "replaceTarget" in RUNNER
+    assert "verifyTarget" in RUNNER
+    assert "rollbackTarget" in RUNNER
+    assert "deleteStaging" in RUNNER
+    assert "application_staged_commit" in RUNNER
+
+
+def test_runner_preserves_previous_geometry_and_style_for_rollback():
+    assert "previousPolygons = fpt_geoeast::readFaultPolygons" in RUNNER
+    assert "previousStyle = fpt_geoeast::readFaultPolygonStyle" in RUNNER
+    assert "previousPolygons, true, previousStyle" in RUNNER

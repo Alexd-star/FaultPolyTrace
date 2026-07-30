@@ -97,3 +97,23 @@ def test_promotion_rejects_topology_or_high_priority_shape_risk():
     failed = {item["name"] for item in decision["checks"] if not item["pass"]}
     assert "拓扑零问题" in failed
     assert "高优先级局部形态候选不增加" in failed
+
+
+def test_promotion_rejects_a_candidate_that_is_identical_to_baseline():
+    baseline = {
+        "strong_coverage": 0.99846,
+        "weak_coverage": 0.97149,
+        "kept_polygons": 214,
+        "open_rings": 0,
+        "self_intersections": 0,
+        "polygon_intersections": 0,
+        "local_shape_candidates": 29,
+        "high_priority_local_shape_candidates": 3,
+        "background_leakage_ratio_proxy": 0.02,
+    }
+
+    decision = decide_promotion(baseline, dict(baseline))
+
+    assert decision["pass"] is False
+    failed = {item["name"] for item in decision["checks"] if not item["pass"]}
+    assert "至少一项质量指标严格改善" in failed

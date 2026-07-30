@@ -24,9 +24,17 @@ std::vector<std::string> listMapGrids(const GeoEastProjectPtr& project);
 
 std::vector<std::string> listFaultPolygons(const GeoEastProjectPtr& project);
 
+bool faultPolygonsExist(
+    const GeoEastProjectPtr& project,
+    const std::string& outputName);
+
 fpt::Grid2D readMapGrid(const GeoEastProjectPtr& project, const std::string& gridName);
 
 std::vector<fpt::Polygon> readFaultPolygons(const GeoEastProjectPtr& project, const std::string& outputName);
+
+FaultPolygonStyle readFaultPolygonStyle(
+    const GeoEastProjectPtr& project,
+    const std::string& outputName);
 
 void validateMapGrid(const GeoEastProjectPtr& project, const std::string& gridName);
 

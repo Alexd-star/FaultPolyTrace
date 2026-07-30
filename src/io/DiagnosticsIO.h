@@ -28,6 +28,7 @@ struct RunDiagnostics {
     int weakPathMaxUnsupportedRun = 3;
     bool branchAttributionShadow = false;
     bool branchAttributionCandidateGroups = false;
+    bool localPolygonQualityShadow = false;
     bool localPolygonQuality = false;
     double localQualityWidthRatio = 2.4;
     int localQualityMinExtraCells = 8;

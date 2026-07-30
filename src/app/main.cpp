@@ -86,6 +86,7 @@ struct CliOptions {
     int weakPathMaxUnsupportedRun = 3;
     bool branchAttributionShadow = false;
     bool branchAttributionCandidateGroups = false;
+    bool localPolygonQualityShadow = false;
     bool localPolygonQuality = false;
     double localQualityWidthRatio = 2.4;
     int localQualityMinExtraCells = 8;
@@ -183,6 +184,8 @@ void printUsage() {
         << "  --branch-attribution-differences <path> Write per-junction legacy/new pairing evidence CSV. Requires shadow or candidate mode\n"
         << "  --local-polygon-quality   Enable experimental local polygon quality repair. Default: off\n"
         << "  --no-local-polygon-quality Disable experimental local polygon quality repair\n"
+        << "  --local-polygon-quality-shadow Diagnose local polygon quality without changing output. Default: off\n"
+        << "  --no-local-polygon-quality-shadow Disable local polygon quality shadow diagnostics\n"
         << "  --local-quality-width-ratio <v> Local width anomaly ratio. Default: 2.4\n"
         << "  --local-quality-min-extra-cells <n> Minimum excess cells for a candidate. Default: 8\n"
         << "  --local-quality-support-threshold-ratio <v> Support threshold relative to effective threshold. Default: 0.70\n"
@@ -514,6 +517,10 @@ CliOptions parseArgs(int argc, char** argv) {
             options.branchAttributionCandidateGroups = true;
         } else if (arg == "--no-branch-attribution-candidate-groups") {
             options.branchAttributionCandidateGroups = false;
+        } else if (arg == "--local-polygon-quality-shadow") {
+            options.localPolygonQualityShadow = true;
+        } else if (arg == "--no-local-polygon-quality-shadow") {
+            options.localPolygonQualityShadow = false;
         } else if (arg == "--local-polygon-quality") {
             options.localPolygonQuality = true;
         } else if (arg == "--no-local-polygon-quality") {
@@ -736,7 +743,7 @@ CliOptions parseArgs(int argc, char** argv) {
     localQualityOptions.maxObjectCells = options.localQualityMaxObjectCells;
     localQualityOptions.maxEvidenceRecords =
         options.localQualityMaxEvidenceRecords;
-    if (options.localPolygonQuality) {
+    if (options.localPolygonQuality || options.localPolygonQualityShadow) {
         fpt::validateLocalPolygonQualityOptions(localQualityOptions);
     }
     validateDistinctOutputPaths(options);
@@ -803,6 +810,8 @@ int main(int argc, char** argv) {
             cli.branchAttributionShadow;
         traceOptions.branchAttributionCandidateGroups =
             cli.branchAttributionCandidateGroups;
+        traceOptions.localPolygonQualityShadow =
+            cli.localPolygonQualityShadow;
         traceOptions.localPolygonQuality = cli.localPolygonQuality;
         traceOptions.localQualityWidthRatio = cli.localQualityWidthRatio;
         traceOptions.localQualityMinExtraCells = cli.localQualityMinExtraCells;
@@ -931,6 +940,8 @@ int main(int argc, char** argv) {
             cli.branchAttributionShadow;
         diagnostics.branchAttributionCandidateGroups =
             cli.branchAttributionCandidateGroups;
+        diagnostics.localPolygonQualityShadow =
+            cli.localPolygonQualityShadow;
         diagnostics.localPolygonQuality = cli.localPolygonQuality;
         diagnostics.localQualityWidthRatio = cli.localQualityWidthRatio;
         diagnostics.localQualityMinExtraCells = cli.localQualityMinExtraCells;
@@ -1203,7 +1214,7 @@ int main(int argc, char** argv) {
                       << result.branchAttributionCandidateGroupingRootGroups
                       << "\n";
         }
-        if (cli.localPolygonQuality) {
+        if (cli.localPolygonQuality || cli.localPolygonQualityShadow) {
             std::cout << "Local polygon quality detected/accepted/review/rejected: "
                       << result.localPolygonQualityStats.detectedCount << "/"
                       << result.localPolygonQualityStats.acceptedCount << "/"

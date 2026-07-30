@@ -5,6 +5,7 @@
 #include "FptTheme.h"
 #include "UiLocalization.h"
 #include "TraceParameterModel.h"
+#include "QualityReviewModel.h"
 
 #include <QAction>
 #include <QActionGroup>
@@ -668,6 +669,39 @@ public:
         update();
     }
 
+    void setQualityReviewWindows(const QVector<QRect>& windows, int selectedIndex) {
+        reviewWindows_ = windows;
+        selectedReviewIndex_ = selectedIndex;
+        update(layerCanvas().toAlignedRect());
+    }
+
+    void setQualityReviewVisible(bool visible) {
+        if (showQualityReviewLayer_ == visible) return;
+        showQualityReviewLayer_ = visible;
+        update(layerCanvas().toAlignedRect());
+    }
+
+    void clearQualityReviewWindows() {
+        reviewWindows_.clear();
+        selectedReviewIndex_ = -1;
+        update(layerCanvas().toAlignedRect());
+    }
+
+    void focusGridRect(const QRect& gridRect) {
+        if (nx_ <= 0 || ny_ <= 0 || !gridRect.isValid()) return;
+        const double widthRatio = qMax(1.0 / nx_, (gridRect.width() + 1.0) / nx_);
+        const double heightRatio = qMax(1.0 / ny_, (gridRect.height() + 1.0) / ny_);
+        zoom_ = qBound(1.0, 0.55 / qMax(widthRatio, heightRatio), 8.0);
+        panOffset_ = QPointF(0, 0);
+        const QPointF worldCenter(
+            xMin_ + (gridRect.center().x() + 0.5) / qMax(1, nx_) * (xMax_ - xMin_),
+            yMin_ + (gridRect.center().y() + 0.5) / qMax(1, ny_) * (yMax_ - yMin_));
+        const QRectF canvas = layerCanvas();
+        const QRectF target = fittedRect(transformedCanvas(canvas));
+        panOffset_ += canvas.center() - mapPoint(worldCenter, target);
+        update(canvas.toAlignedRect());
+    }
+
     void setActivity(const QString& activity) {
         if (activity_ == activity) {
             return;
@@ -770,8 +804,8 @@ public:
         const double dy = spacing[1] == 0.0 ? 1.0 : spacing[1];
         xMin_ = origin[0];
         yMin_ = origin[1];
-        xMax_ = xMin_ + dx * qMax(1, nx_ - 1);
-        yMax_ = yMin_ + dy * qMax(1, ny_ - 1);
+        xMax_ = xMin_ + dx * qMax(1, nx_);
+        yMax_ = yMin_ + dy * qMax(1, ny_);
 
         valueMin_ = std::numeric_limits<double>::max();
         valueMax_ = -std::numeric_limits<double>::max();
@@ -944,6 +978,9 @@ protected:
                     }
                 }
             }
+            if (showQualityReviewLayer_ && !reviewWindows_.isEmpty()) {
+                drawQualityReview(painter, contentCanvas);
+            }
             painter.restore();
         }
 
@@ -997,16 +1034,16 @@ protected:
     }
 
     void mouseMoveEvent(QMouseEvent* event) override {
-        if (coordinateCallback_ &&
-            (!coordinateCallbackTimer_.isValid() || coordinateCallbackTimer_.elapsed() >= 33)) {
-            coordinateCallback_(viewToWorld(event->pos()));
-            coordinateCallbackTimer_.restart();
-        }
         if (dragging_) {
             const QPointF delta = event->pos() - lastDragPos_;
             panOffset_ += delta;
             lastDragPos_ = event->pos();
             update(layerCanvas().toAlignedRect());
+        }
+        if (coordinateCallback_ &&
+            (!coordinateCallbackTimer_.isValid() || coordinateCallbackTimer_.elapsed() >= 33)) {
+            coordinateCallback_(viewToWorld(event->pos()));
+            coordinateCallbackTimer_.restart();
         }
         QWidget::mouseMoveEvent(event);
     }
@@ -1034,6 +1071,11 @@ protected:
             const QPointF newCenter = anchor - (anchor - center) * (zoom_ / oldZoom);
             panOffset_ = newCenter - QPointF(rect().center());
             update();
+        }
+        if (coordinateCallback_ &&
+            (!coordinateCallbackTimer_.isValid() || coordinateCallbackTimer_.elapsed() >= 33)) {
+            coordinateCallback_(viewToWorld(event->position()));
+            coordinateCallbackTimer_.restart();
         }
         QWidget::wheelEvent(event);
     }
@@ -1391,6 +1433,32 @@ private:
         painter.restore();
     }
 
+    void drawQualityReview(QPainter& painter, const QRectF& available) const {
+        if (nx_ <= 0 || ny_ <= 0) return;
+        const QRectF target = fittedRect(available);
+        const double xRange = qMax(1e-9, xMax_ - xMin_);
+        const double yRange = qMax(1e-9, yMax_ - yMin_);
+        painter.save();
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        for (int index = 0; index < reviewWindows_.size(); ++index) {
+            const QRect window = reviewWindows_.at(index);
+            const double wx0 = xMin_ + static_cast<double>(window.left()) / nx_ * xRange;
+            const double wx1 = xMin_ + static_cast<double>(window.right() + 1) / nx_ * xRange;
+            const double wy0 = yMin_ + static_cast<double>(window.top()) / ny_ * yRange;
+            const double wy1 = yMin_ + static_cast<double>(window.bottom() + 1) / ny_ * yRange;
+            QRectF box(mapPoint(QPointF(wx0, wy1), target), mapPoint(QPointF(wx1, wy0), target));
+            box = box.normalized();
+            const bool selected = index == selectedReviewIndex_;
+            QPen pen(selected ? QColor("#C62828") : QColor("#D99A00"), selected ? 2.2 : 1.2,
+                     selected ? Qt::SolidLine : Qt::DashLine);
+            pen.setCosmetic(true);
+            painter.setPen(pen);
+            painter.setBrush(selected ? QColor(198, 40, 40, 24) : QColor(217, 154, 0, 14));
+            painter.drawRect(box);
+        }
+        painter.restore();
+    }
+
     QString uiText(const QString& zh) const {
         return fpt_ui::translate(zh, languageCode_);
     }
@@ -1400,6 +1468,9 @@ private:
     bool dragging_ = false;
     bool showInputLayer_ = true;
     bool showResultLayer_ = true;
+    bool showQualityReviewLayer_ = false;
+    QVector<QRect> reviewWindows_;
+    int selectedReviewIndex_ = -1;
     QPointF panOffset_;
     QPointF lastDragPos_;
     QVector<double> grid_;
@@ -2452,6 +2523,59 @@ void FaultTraceDialog::buildUi() {
             }
         });
 
+        QGroupBox* qualityReviewGroup = new QGroupBox(QString::fromUtf8("多边形质量检查"), sidebarContent);
+        QGridLayout* qualityReviewLayout = makeGroupLayout(qualityReviewGroup);
+        qualityReviewSummaryLabel_ = new QLabel(QString::fromUtf8("完成质量诊断后显示候选与拓扑摘要。"), qualityReviewGroup);
+        qualityReviewSummaryLabel_->setWordWrap(true);
+        qualityReviewDetailLabel_ = new QLabel(QString::fromUtf8("尚未载入复核候选。"), qualityReviewGroup);
+        qualityReviewDetailLabel_->setWordWrap(true);
+        showQualityReviewLayerCheck_ = new fpt_ui::LayerToggle(qualityReviewGroup);
+        showQualityReviewLayerCheck_->setText(QString::fromUtf8("显示复核候选层"));
+        showQualityReviewLayerCheck_->setChecked(false);
+        showQualityReviewLayerCheck_->setAccentColor(QColor(QStringLiteral("#D99A00")));
+        qualityReviewFilterCombo_ = new QComboBox(qualityReviewGroup);
+        qualityReviewFilterCombo_->addItem(QString::fromUtf8("全部候选"), QStringLiteral("all"));
+        qualityReviewFilterCombo_->addItem(QString::fromUtf8("需要人工复核"), QStringLiteral("review"));
+        qualityReviewFilterCombo_->addItem(QString::fromUtf8("可晋级候选"), QStringLiteral("accepted"));
+        qualityReviewFilterCombo_->addItem(QString::fromUtf8("未通过门控"), QStringLiteral("rejected"));
+        qualityReviewCombo_ = new QComboBox(qualityReviewGroup);
+        qualityReviewCombo_->addItem(QString::fromUtf8("暂无候选"), -1);
+        qualityReviewPreviousButton_ = new QPushButton(QString::fromUtf8("上一处"), qualityReviewGroup);
+        qualityReviewNextButton_ = new QPushButton(QString::fromUtf8("下一处"), qualityReviewGroup);
+        qualityReviewLocateButton_ = new QPushButton(QString::fromUtf8("定位"), qualityReviewGroup);
+        qualityReviewExportButton_ = new QPushButton(QString::fromUtf8("导出检查摘要"), qualityReviewGroup);
+        qualityReviewLayout->addWidget(qualityReviewSummaryLabel_, 0, 0, 1, 2);
+        qualityReviewLayout->addWidget(showQualityReviewLayerCheck_, 1, 0, 1, 2);
+        qualityReviewLayout->addWidget(qualityReviewFilterCombo_, 2, 0);
+        qualityReviewLayout->addWidget(qualityReviewCombo_, 2, 1);
+        QWidget* reviewNavigation = new QWidget(qualityReviewGroup);
+        QHBoxLayout* reviewNavigationLayout = new QHBoxLayout(reviewNavigation);
+        reviewNavigationLayout->setContentsMargins(0, 0, 0, 0);
+        reviewNavigationLayout->setSpacing(5);
+        reviewNavigationLayout->addWidget(qualityReviewPreviousButton_);
+        reviewNavigationLayout->addWidget(qualityReviewNextButton_);
+        reviewNavigationLayout->addWidget(qualityReviewLocateButton_);
+        qualityReviewLayout->addWidget(reviewNavigation, 3, 0, 1, 2);
+        qualityReviewLayout->addWidget(qualityReviewDetailLabel_, 4, 0, 1, 2);
+        qualityReviewLayout->addWidget(qualityReviewExportButton_, 5, 0, 1, 2);
+        connect(showQualityReviewLayerCheck_, &QAbstractButton::toggled, this, [this](bool visible) {
+            if (auto* view = static_cast<RenderViewWidget*>(renderViewWidget_)) {
+                view->setQualityReviewVisible(visible);
+            }
+        });
+        connect(qualityReviewFilterCombo_, &QComboBox::currentTextChanged,
+                this, &FaultTraceDialog::updateQualityReviewFilter);
+        connect(qualityReviewCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged),
+                this, [this]() { refreshQualityReviewSelection(false); });
+        connect(qualityReviewPreviousButton_, &QPushButton::clicked,
+                this, &FaultTraceDialog::showPreviousQualityReview);
+        connect(qualityReviewNextButton_, &QPushButton::clicked,
+                this, &FaultTraceDialog::showNextQualityReview);
+        connect(qualityReviewLocateButton_, &QPushButton::clicked,
+                this, &FaultTraceDialog::locateCurrentQualityReview);
+        connect(qualityReviewExportButton_, &QPushButton::clicked,
+                this, &FaultTraceDialog::exportQualityReviewSummary);
+
         QGroupBox* traceGroup = new QGroupBox(QString::fromUtf8("追踪参数"), sidebarContent);
         QGridLayout* traceLayoutNew = makeGroupLayout(traceGroup);
         addFormRow(traceLayoutNew, 0, QString::fromUtf8("预设模板"), presetCombo_, traceGroup);
@@ -2504,6 +2628,7 @@ void FaultTraceDialog::buildUi() {
         // 按高频任务流排序：先选择数据并查看图层，再按需调整参数。
         sidebarContentLayout->addWidget(dataGroup);
         sidebarContentLayout->addWidget(resultGroup);
+        sidebarContentLayout->addWidget(qualityReviewGroup);
         sidebarContentLayout->addWidget(traceGroup);
         sidebarContentLayout->addWidget(morphologyGroup);
         sidebarContentLayout->addWidget(detailsGroup);
@@ -3981,6 +4106,7 @@ QStringList FaultTraceDialog::traceArgs() const {
     args << fpt_ui::traceArguments(currentTraceParameters());
     args << "--polygon-color" << polygonColorEdit_->text()
          << "--polygon-linewidth" << QString::number(polygonLineWidthSpin_->value(), 'g', 12)
+         << "--diagnostics" << previewOutputDir() + "/" + outputEdit_->text().trimmed() + ".diagnostics.json"
          << "--view-grid-output" << previewGridPath()
          << "--view-polygons-output" << previewPolygonsPath();
     return args;
@@ -4268,6 +4394,7 @@ void FaultTraceDialog::loadSelectedOutputInternal(bool userInitiated) {
 }
 
 void FaultTraceDialog::runTrace() {
+    clearQualityReview();
     if (doneBanner_) {
         doneBanner_->hide();
     }
@@ -4444,6 +4571,7 @@ void FaultTraceDialog::loadResultView() {
             loadedOutputName_ = outputEdit_->text().trimmed();
         }
         view->setActivity(QString::fromUtf8("结果视图已载入"));
+        loadQualityReview();
         appendStatus(QString::fromUtf8("结果视图已载入"));
     } else {
         view->setActivity(QString::fromUtf8("未找到结果视图文件，请先运行追踪"));
@@ -4514,6 +4642,166 @@ void FaultTraceDialog::stopProcess() {
         }
         process_->kill();
     }
+}
+
+void FaultTraceDialog::loadQualityReview() {
+    const QString diagnosticsPath = previewOutputDir() + "/" +
+        outputEdit_->text().trimmed() + ".diagnostics.json";
+    QString error;
+    if (!qualityReviewModel_.loadDiagnostics(diagnosticsPath, &error)) {
+        clearQualityReview();
+        if (qualityReviewSummaryLabel_) {
+            qualityReviewSummaryLabel_->setText(QFileInfo::exists(diagnosticsPath)
+                ? uiText(QString::fromUtf8("质量检查文件无法载入：%1")).arg(error)
+                : uiText(QString::fromUtf8("当前结果没有质量检查文件；选择“质量诊断”模式重新运行可生成复核候选。")));
+        }
+        return;
+    }
+    const auto& summary = qualityReviewModel_.summary();
+    qualityReviewSummaryLabel_->setText(uiText(QString::fromUtf8(
+        "候选 %1（可晋级 %2 / 复核 %3 / 拒绝 %4）\n拓扑：开放环 %5，自相交 %6，异常相交 %7"))
+        .arg(qualityReviewModel_.items().size()).arg(summary.acceptedCount)
+        .arg(summary.reviewCount).arg(summary.rejectedCount)
+        .arg(summary.openRingCount).arg(summary.selfIntersectionCount)
+        .arg(summary.polygonIntersectionCount));
+    updateQualityReviewFilter();
+}
+
+void FaultTraceDialog::clearQualityReview() {
+    qualityReviewModel_.clear();
+    filteredQualityReviewIndexes_.clear();
+    if (qualityReviewCombo_) {
+        QSignalBlocker blocker(qualityReviewCombo_);
+        qualityReviewCombo_->clear();
+        qualityReviewCombo_->addItem(uiText(QString::fromUtf8("暂无候选")), -1);
+    }
+    if (qualityReviewDetailLabel_) {
+        qualityReviewDetailLabel_->setText(uiText(QString::fromUtf8("尚未载入复核候选。")));
+    }
+    if (renderViewWidget_) {
+        static_cast<RenderViewWidget*>(renderViewWidget_)->clearQualityReviewWindows();
+    }
+    for (QPushButton* button : {qualityReviewPreviousButton_, qualityReviewNextButton_,
+                                qualityReviewLocateButton_, qualityReviewExportButton_}) {
+        if (button) button->setEnabled(false);
+    }
+}
+
+void FaultTraceDialog::updateQualityReviewFilter() {
+    const QString filterKey = qualityReviewFilterCombo_
+        ? qualityReviewFilterCombo_->currentData().toString() : QStringLiteral("all");
+    filteredQualityReviewIndexes_ = qualityReviewModel_.filteredIndexes(filterKey);
+    QVector<QRect> windows;
+    if (qualityReviewCombo_) {
+        QSignalBlocker blocker(qualityReviewCombo_);
+        qualityReviewCombo_->clear();
+        for (int modelIndex : filteredQualityReviewIndexes_) {
+            const auto& item = qualityReviewModel_.items().at(modelIndex);
+            const QString objectText = item.polygonId > 0
+                ? QString::fromUtf8("多边形 %1").arg(item.polygonId)
+                : QString::fromUtf8("对象 %1").arg(item.objectIndex + 1);
+            qualityReviewCombo_->addItem(QString::fromUtf8("%1  %2 · %3")
+                .arg(item.id, fpt_ui::QualityReviewModel::typeText(item.type, languageCode()), objectText),
+                modelIndex);
+            windows.push_back(item.gridWindow);
+        }
+        if (filteredQualityReviewIndexes_.isEmpty()) {
+            qualityReviewCombo_->addItem(uiText(QString::fromUtf8("当前筛选无候选")), -1);
+        }
+    }
+    if (renderViewWidget_) {
+        static_cast<RenderViewWidget*>(renderViewWidget_)->setQualityReviewWindows(
+            windows, filteredQualityReviewIndexes_.isEmpty() ? -1 : 0);
+    }
+    const bool hasItems = !filteredQualityReviewIndexes_.isEmpty();
+    for (QPushButton* button : {qualityReviewPreviousButton_, qualityReviewNextButton_, qualityReviewLocateButton_}) {
+        if (button) button->setEnabled(hasItems);
+    }
+    if (qualityReviewExportButton_) qualityReviewExportButton_->setEnabled(!qualityReviewModel_.sourcePath().isEmpty());
+    refreshQualityReviewSelection(false);
+}
+
+void FaultTraceDialog::refreshQualityReviewSelection(bool locate) {
+    if (!qualityReviewCombo_ || filteredQualityReviewIndexes_.isEmpty()) {
+        if (qualityReviewDetailLabel_) qualityReviewDetailLabel_->setText(uiText(QString::fromUtf8("当前筛选条件下没有候选。")));
+        return;
+    }
+    const int visibleIndex = qBound(0, qualityReviewCombo_->currentIndex(), filteredQualityReviewIndexes_.size() - 1);
+    const int modelIndex = qualityReviewCombo_->itemData(visibleIndex).toInt();
+    if (modelIndex < 0 || modelIndex >= qualityReviewModel_.items().size()) return;
+    const auto& item = qualityReviewModel_.items().at(modelIndex);
+    qualityReviewDetailLabel_->setText(uiText(QString::fromUtf8(
+        "%1；%2\n网格范围 X %3-%4，Y %5-%6\n支撑率 %7%，稳定性 %8，门控原因：%9"))
+        .arg(fpt_ui::QualityReviewModel::typeText(item.type, languageCode()))
+        .arg(fpt_ui::QualityReviewModel::decisionText(item, qualityReviewModel_.summary().shadowMode, languageCode()))
+        .arg(item.gridWindow.left()).arg(item.gridWindow.right())
+        .arg(item.gridWindow.top()).arg(item.gridWindow.bottom())
+        .arg(item.supportRatio * 100.0, 0, 'f', 1).arg(item.stabilityJaccard, 0, 'f', 3)
+        .arg(fpt_ui::QualityReviewModel::reasonText(item.rejectionReason, languageCode())));
+    QVector<QRect> windows;
+    for (int index : filteredQualityReviewIndexes_) windows.push_back(qualityReviewModel_.items().at(index).gridWindow);
+    if (renderViewWidget_) {
+        auto* view = static_cast<RenderViewWidget*>(renderViewWidget_);
+        view->setQualityReviewWindows(windows, visibleIndex);
+        if (locate) view->focusGridRect(item.gridWindow);
+    }
+}
+
+void FaultTraceDialog::showPreviousQualityReview() {
+    if (!qualityReviewCombo_ || filteredQualityReviewIndexes_.isEmpty()) return;
+    const int count = filteredQualityReviewIndexes_.size();
+    qualityReviewCombo_->setCurrentIndex((qualityReviewCombo_->currentIndex() - 1 + count) % count);
+    refreshQualityReviewSelection(true);
+}
+
+void FaultTraceDialog::showNextQualityReview() {
+    if (!qualityReviewCombo_ || filteredQualityReviewIndexes_.isEmpty()) return;
+    const int count = filteredQualityReviewIndexes_.size();
+    qualityReviewCombo_->setCurrentIndex((qualityReviewCombo_->currentIndex() + 1) % count);
+    refreshQualityReviewSelection(true);
+}
+
+void FaultTraceDialog::locateCurrentQualityReview() {
+    refreshQualityReviewSelection(true);
+}
+
+void FaultTraceDialog::exportQualityReviewSummary() {
+    if (qualityReviewModel_.sourcePath().isEmpty()) return;
+    const QString path = QFileDialog::getSaveFileName(
+        this, uiText(QString::fromUtf8("导出质量检查摘要")),
+        previewOutputDir() + "/多边形质量检查摘要.md",
+        uiText(QString::fromUtf8("Markdown 文档 (*.md)")));
+    if (path.isEmpty()) return;
+    QSaveFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QMessageBox::warning(this, uiText(QString::fromUtf8("导出失败")), file.errorString());
+        return;
+    }
+    QTextStream out(&file);
+    out.setCodec("UTF-8");
+    const auto& summary = qualityReviewModel_.summary();
+    out << "# FaultPolyTrace 多边形质量检查摘要\n\n"
+        << "- GeoEast对象：`BOFaultPolygon/" << outputEdit_->text().trimmed() << "`\n"
+        << "- 运行方式：" << (summary.shadowMode ? "影子诊断（未修改正式结果）" : "受控质量检查") << "\n"
+        << "- 候选：" << qualityReviewModel_.items().size() << "（可晋级 " << summary.acceptedCount
+        << "，复核 " << summary.reviewCount << "，拒绝 " << summary.rejectedCount << "）\n"
+        << "- 拓扑：开放环 " << summary.openRingCount << "，自相交 " << summary.selfIntersectionCount
+        << "，异常相交 " << summary.polygonIntersectionCount << "\n\n"
+        << "| 编号 | 类型 | 判定 | 网格范围 | 支撑率 | 稳定性 | 原因 |\n|---|---|---|---|---:|---:|---|\n";
+    for (const auto& item : qualityReviewModel_.items()) {
+        out << "| " << item.id << " | " << fpt_ui::QualityReviewModel::typeText(item.type, "zh-CN")
+            << " | " << fpt_ui::QualityReviewModel::decisionText(item, summary.shadowMode, "zh-CN")
+            << " | X " << item.gridWindow.left() << "-" << item.gridWindow.right() << "，Y "
+            << item.gridWindow.top() << "-" << item.gridWindow.bottom() << " | "
+            << QString::number(item.supportRatio * 100.0, 'f', 1) << "% | "
+            << QString::number(item.stabilityJaccard, 'f', 3) << " | "
+            << fpt_ui::QualityReviewModel::reasonText(item.rejectionReason, "zh-CN") << " |\n";
+    }
+    if (!file.commit()) {
+        QMessageBox::warning(this, uiText(QString::fromUtf8("导出失败")), file.errorString());
+        return;
+    }
+    appendStatus(uiText(QString::fromUtf8("质量检查摘要已导出")));
 }
 
 void FaultTraceDialog::onReadyRead() {

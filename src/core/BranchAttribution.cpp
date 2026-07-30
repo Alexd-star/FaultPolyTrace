@@ -593,6 +593,9 @@ LegacyGreedyBranchPairingResult computeLegacyGreedyBranchPairing(
         return result;
     }
 
+    // Preserve the released legacy traversal exactly. The deterministic
+    // multi-scale alternative runs in the shadow path and must not silently
+    // change production root ownership before promotion gates pass.
     std::unordered_map<std::string, std::vector<LegacyBranchEnd>>
         endsByPoint;
     endsByPoint.reserve(branches.size() * 2);

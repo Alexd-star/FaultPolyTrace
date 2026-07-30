@@ -245,6 +245,8 @@ void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
     std::ostream& out = output.stream();
 
     out << "{\n";
+    out << "  \"format\": \"FaultPolyTrace.RunDiagnostics\",\n";
+    out << "  \"schemaVersion\": 2,\n";
     out << "  \"inputPath\": \"" << escapeJson(jsonUtf8(d.inputPath)) << "\",\n";
     out << "  \"outputPath\": \"" << escapeJson(jsonUtf8(d.outputPath)) << "\",\n";
     out << "  \"traceMode\": \"" << escapeJson(d.traceMode) << "\",\n";
@@ -266,6 +268,7 @@ void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
     out << "    \"weakPathMaxUnsupportedRun\": " << d.weakPathMaxUnsupportedRun << ",\n";
     out << "    \"branchAttributionShadow\": " << (d.branchAttributionShadow ? "true" : "false") << ",\n";
     out << "    \"branchAttributionCandidateGroups\": " << (d.branchAttributionCandidateGroups ? "true" : "false") << ",\n";
+    out << "    \"localPolygonQualityShadow\": " << (d.localPolygonQualityShadow ? "true" : "false") << ",\n";
     out << "    \"localPolygonQuality\": " << (d.localPolygonQuality ? "true" : "false") << ",\n";
     out << "    \"localQualityWidthRatio\": " << d.localQualityWidthRatio << ",\n";
     out << "    \"localQualityMinExtraCells\": " << d.localQualityMinExtraCells << ",\n";
@@ -444,6 +447,7 @@ void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
         }
         out << "\n      {\n";
         out << "        \"objectIndex\": " << evidence.objectIndex << ",\n";
+        out << "        \"polygonId\": " << evidence.polygonId << ",\n";
         out << "        \"type\": \"" << localCandidateTypeName(evidence.type) << "\",\n";
         out << "        \"window\": {\n";
         out << "          \"minGridX\": " << evidence.minGridX << ",\n";

@@ -138,6 +138,28 @@ def decide_promotion(
         and int(candidate["self_intersections"]) == 0
         and int(candidate["polygon_intersections"]) == 0
     )
+    strict_improvements = [
+        strong_delta > coverage_tolerance,
+        weak_delta > coverage_tolerance,
+        local_shape_delta < 0,
+        high_shape_delta < 0,
+    ]
+    for key, delta in (
+        ("background_leakage_ratio_proxy", background_delta),
+        ("unsupported_inside_ratio_proxy", unsupported_delta),
+        ("low_support_bridge_ratio_proxy", bridge_delta),
+    ):
+        if key in baseline and key in candidate:
+            strict_improvements.append(delta < -proxy_tolerance)
+    for key in ("reference_iou", "reference_boundary_f1", "reference_cldice"):
+        if key in baseline and key in candidate:
+            strict_improvements.append(
+                float(candidate[key]) - float(baseline[key]) > coverage_tolerance
+            )
+    for key in ("reference_split_excess_count", "reference_merge_excess_count"):
+        if key in baseline and key in candidate:
+            strict_improvements.append(int(candidate[key]) - int(baseline[key]) < 0)
+    has_strict_improvement = any(strict_improvements)
 
     checks = [
         _check("强响应覆盖率不退化", strong_delta >= -coverage_tolerance, f"变化 {strong_delta:.6%}"),
@@ -181,6 +203,11 @@ def decide_promotion(
         ),
         _optional_count_not_increase_check(
             baseline, candidate, "reference_merge_excess_count", "参考对象误合并不增加"
+        ),
+        _check(
+            "至少一项质量指标严格改善",
+            has_strict_improvement,
+            "覆盖、形态、泄漏、边界、中心线或对象粒度至少一项必须优于基线",
         ),
     ]
     return {

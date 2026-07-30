@@ -295,6 +295,7 @@ QMap<QString, QString> buildEnglishTextMap() {
     add("运行日志与输出信息", "Run Log and Output");
     add("详细日志", "Verbose Log");
     add("视图 X: --   |   Y: --", "View X: --   |   Y: --");
+    add("鼠标在结果视图区内移动时显示当前数据坐标。", "Move the pointer in the result view to show the current data coordinates.");
     add("数据库连接待验证", "Database Connection Pending");
     add("就绪", "Ready");
     add("界面语言已切换", "Interface language changed");

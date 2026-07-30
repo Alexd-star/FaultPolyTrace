@@ -4,6 +4,9 @@
 #include <QProcess>
 #include <QString>
 #include <QStringList>
+#include <QVector>
+
+#include "QualityReviewModel.h"
 
 namespace fpt_ui { class LayerToggle; struct TraceParameters; }
 
@@ -72,6 +75,12 @@ private slots:
     void updateOptionControls();
     void updateDataSourceMode();
     void updateLayerVisibility();
+    void loadQualityReview();
+    void updateQualityReviewFilter();
+    void showPreviousQualityReview();
+    void showNextQualityReview();
+    void locateCurrentQualityReview();
+    void exportQualityReviewSummary();
     void setLanguage(UiLanguage language);
 
 protected:
@@ -110,6 +119,8 @@ private:
     void refreshHistory();
     void appendHistory(qint64 elapsedMs);
     void updateResultPanel();
+    void clearQualityReview();
+    void refreshQualityReviewSelection(bool locate);
     void updateTaskPreview();
     void loadSelectedResultInternal(bool userInitiated);
     QStringList traceArgs() const;
@@ -221,6 +232,7 @@ private:
     QDoubleSpinBox* alphaSpin_ = nullptr;
     fpt_ui::LayerToggle* showGridLayerCheck_ = nullptr;
     fpt_ui::LayerToggle* showPolygonLayerCheck_ = nullptr;
+    fpt_ui::LayerToggle* showQualityReviewLayerCheck_ = nullptr;
     QPushButton* runButton_ = nullptr;
     QPushButton* stopButton_ = nullptr;
     QToolButton* openFilesButton_ = nullptr;
@@ -243,13 +255,24 @@ private:
     QAction* languageEnglishAction_ = nullptr;
     QTextEdit* logEdit_ = nullptr;
     QLabel* statusLabel_ = nullptr;
+    QLabel* coordinateLabel_ = nullptr;
     QLabel* elapsedLabel_ = nullptr;
     QLabel* resultSummaryLabel_ = nullptr;
     QLabel* resultPathLabel_ = nullptr;
+    QLabel* qualityReviewSummaryLabel_ = nullptr;
+    QLabel* qualityReviewDetailLabel_ = nullptr;
+    QComboBox* qualityReviewFilterCombo_ = nullptr;
+    QComboBox* qualityReviewCombo_ = nullptr;
+    QPushButton* qualityReviewPreviousButton_ = nullptr;
+    QPushButton* qualityReviewNextButton_ = nullptr;
+    QPushButton* qualityReviewLocateButton_ = nullptr;
+    QPushButton* qualityReviewExportButton_ = nullptr;
     QLabel* layerTitleLabel_ = nullptr;
     QLabel* layerHintLabel_ = nullptr;
     AttributeView* view_ = nullptr;
     QWidget* colorBarWidget_ = nullptr;
     QSplitter* mainSplitter_ = nullptr;
+    fpt_ui::QualityReviewModel qualityReviewModel_;
+    QVector<int> filteredQualityReviewIndexes_;
     UiLanguage currentLanguage_ = UiLanguage::SimplifiedChinese;
 };

@@ -63,6 +63,19 @@ std::vector<std::string> listFaultPolygons(const GeoEastProjectPtr& project) {
     return names;
 }
 
+bool faultPolygonsExist(
+    const GeoEastProjectPtr& project,
+    const std::string& outputName) {
+    if (!project) {
+        throw std::runtime_error("GeoEast project is null.");
+    }
+    if (outputName.empty()) {
+        return false;
+    }
+    return static_cast<bool>(
+        project->getChild<geobo::BOFaultPolygon>(outputName));
+}
+
 std::vector<fpt::Polygon> readFaultPolygons(const GeoEastProjectPtr& project, const std::string& outputName) {
     if (!project) {
         throw std::runtime_error("GeoEast project is null.");
@@ -114,6 +127,33 @@ std::vector<fpt::Polygon> readFaultPolygons(const GeoEastProjectPtr& project, co
     return polygons;
 }
 
+FaultPolygonStyle readFaultPolygonStyle(
+    const GeoEastProjectPtr& project,
+    const std::string& outputName) {
+    if (!project) {
+        throw std::runtime_error("GeoEast project is null.");
+    }
+    if (outputName.empty()) {
+        throw std::runtime_error("GeoEast BOFaultPolygon output name is empty.");
+    }
+    std::shared_ptr<geobo::BOFaultPolygon> boPolygon =
+        project->getChild<geobo::BOFaultPolygon>(outputName);
+    if (!boPolygon) {
+        throw std::runtime_error("Failed to get BOFaultPolygon: " + outputName);
+    }
+    BAFaultPolygonHead head;
+    BAFaultPolygonData data;
+    if (!boPolygon->readData(head, data)) {
+        throw std::runtime_error("Failed to read BOFaultPolygon style: " + outputName);
+    }
+    FaultPolygonStyle style;
+    style.red = head.red;
+    style.green = head.green;
+    style.blue = head.blue;
+    style.lineWidth = head.linewidth;
+    return style;
+}
+
 fpt::Grid2D readMapGrid(const GeoEastProjectPtr& project, const std::string& gridName) {
     if (!project) {
         throw std::runtime_error("GeoEast project is null.");
@@ -131,8 +171,10 @@ fpt::Grid2D readMapGrid(const GeoEastProjectPtr& project, const std::string& gri
     fpt::GridMetadata metadata;
     metadata.nx = head.nx;
     metadata.ny = head.ny;
-    metadata.sx = head.sx;
-    metadata.sy = head.sy;
+    // BOMapGrid stores the first sample center, while Grid2D stores the
+    // lower-left cell boundary used by polygon rings.
+    metadata.sx = head.sx - 0.5 * std::abs(head.dx);
+    metadata.sy = head.sy - 0.5 * std::abs(head.dy);
     metadata.dx = head.dx;
     metadata.dy = head.dy;
 
@@ -208,8 +250,8 @@ void writeMapGrid(
     BAMapGridHead head;
     head.nx = grid.nx();
     head.ny = grid.ny();
-    head.sx = grid.sx();
-    head.sy = grid.sy();
+    head.sx = grid.sx() + 0.5 * grid.dx();
+    head.sy = grid.sy() + 0.5 * grid.dy();
     head.dx = grid.dx();
     head.dy = grid.dy();
     head.angle = 0.0;
@@ -225,8 +267,8 @@ void writeMapGrid(
         for (int j = 0; j < grid.ny(); ++j) {
             const double value = grid.value(i, j);
             BAMapGridPoint point;
-            point.x = grid.worldX(i);
-            point.y = grid.worldY(j);
+            point.x = grid.worldX(i + 0.5);
+            point.y = grid.worldY(j + 0.5);
             point.z = value;
             data[static_cast<std::size_t>(i)][static_cast<std::size_t>(j)] = point;
             if (std::isfinite(value)) {

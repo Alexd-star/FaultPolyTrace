@@ -5,6 +5,7 @@
     [int]$MaxElapsedMs = 5000,
     [double]$MaxWorkingSetGrowthMb = 64.0,
     [int]$MaxHandleGrowth = 32,
+    [string]$ExpectedSha256 = "A2A9644692B1E6635B152823CAE192C9C6EF19320AB5EF4273D5B2DB90638ECF",
     [switch]$SkipBuild
 )
 
@@ -49,11 +50,13 @@ function Invoke-StabilityRun {
     $startInfo.Arguments = $quotedArguments -join ' '
     $startInfo.UseShellExecute = $false
     $startInfo.CreateNoWindow = $true
-    $startInfo.RedirectStandardOutput = $false
-    $startInfo.RedirectStandardError = $false
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
     $process = [System.Diagnostics.Process]::new()
     $process.StartInfo = $startInfo
     [void]$process.Start()
+    $standardOutputTask = $process.StandardOutput.ReadToEndAsync()
+    $standardErrorTask = $process.StandardError.ReadToEndAsync()
     $peakWorkingSet = 0L
     $peakHandles = 0
     while (!$process.HasExited) {
@@ -63,6 +66,8 @@ function Invoke-StabilityRun {
         Start-Sleep -Milliseconds 25
     }
     $process.WaitForExit()
+    $standardOutput = $standardOutputTask.GetAwaiter().GetResult()
+    $standardError = $standardErrorTask.GetAwaiter().GetResult()
     $process.Refresh()
     $exitCode = $process.ExitCode
     return [pscustomobject]@{
@@ -71,6 +76,8 @@ function Invoke-StabilityRun {
         PeakWorkingSet64 = $peakWorkingSet
         HandleCount = $peakHandles
         Output = $OutputPath
+        StandardOutput = $standardOutput
+        StandardError = $standardError
     }
 }
 
@@ -78,7 +85,9 @@ try {
     for ($i = 1; $i -le $Runs; $i++) {
         $csv = Join-Path $tempDir ("run_{0:D3}.csv" -f $i)
         $sample = Invoke-StabilityRun -Index $i -InputPath $OfficialDat -OutputPath $csv
-        if ($sample.ExitCode -ne 0) { throw "第 $i 次连续运行失败，退出码 $($sample.ExitCode)。" }
+        if ($sample.ExitCode -ne 0) {
+            throw "第 $i 次连续运行失败，退出码 $($sample.ExitCode)：$($sample.StandardError)"
+        }
         $diag = Get-Content -LiteralPath "$csv.diagnostics.json" -Raw | ConvertFrom-Json
         if ([int]$diag.timing.elapsedMs -gt $MaxElapsedMs) {
             throw "第 $i 次运行耗时 $($diag.timing.elapsedMs) ms 超过门限 $MaxElapsedMs ms。"
@@ -93,10 +102,15 @@ try {
             peakHandleCount = $sample.HandleCount
             keptPolygons = [int]$diag.results.keptPolygonCount
         })
+        Get-ChildItem -LiteralPath $tempDir -Filter ("run_{0:D3}.csv*" -f $i) -File |
+            Remove-Item -Force
     }
 
     $hashes = @($rows | Select-Object -ExpandProperty hash -Unique)
     if ($hashes.Count -ne 1) { throw "结果哈希不一致，连续运行不具备确定性。" }
+    if (![string]::IsNullOrWhiteSpace($ExpectedSha256) -and $hashes[0] -ne $ExpectedSha256) {
+        throw "连续运行结果虽然一致，但已偏离正式基线哈希。期望 $ExpectedSha256，实际 $($hashes[0])。"
+    }
 
     $firstWindow = @($rows | Select-Object -First ([Math]::Min(5, $rows.Count)))
     $lastWindow = @($rows | Select-Object -Last ([Math]::Min(5, $rows.Count)))
@@ -118,11 +132,25 @@ try {
 
     New-Item -ItemType Directory -Force -Path $outputRoot | Out-Null
     $rows | Export-Csv -LiteralPath $detailCsv -NoTypeInformation -Encoding UTF8
+    function Get-Percentile {
+        param([double[]]$Values, [double]$Percentile)
+        $sorted = @($Values | Sort-Object)
+        if ($sorted.Count -eq 0) { return 0.0 }
+        $rank = [Math]::Ceiling($Percentile * $sorted.Count) - 1
+        $rank = [Math]::Max(0, [Math]::Min($sorted.Count - 1, $rank))
+        return [double]$sorted[$rank]
+    }
+    $elapsedValues = [double[]]@($rows | Select-Object -ExpandProperty elapsedMs)
+    $traceValues = [double[]]@($rows | Select-Object -ExpandProperty traceMs)
     [ordered]@{
         generatedAt = (Get-Date).ToString("o")
         runs = $Runs
         deterministicSha256 = $hashes[0]
         maxElapsedMs = ($rows | Measure-Object elapsedMs -Maximum).Maximum
+        p50ElapsedMs = Get-Percentile -Values $elapsedValues -Percentile 0.50
+        p95ElapsedMs = Get-Percentile -Values $elapsedValues -Percentile 0.95
+        p50TraceMs = Get-Percentile -Values $traceValues -Percentile 0.50
+        p95TraceMs = Get-Percentile -Values $traceValues -Percentile 0.95
         maxPeakWorkingSetBytes = ($rows | Measure-Object peakWorkingSetBytes -Maximum).Maximum
         maxPeakHandleCount = ($rows | Measure-Object peakHandleCount -Maximum).Maximum
         workingSetTrendMb = [Math]::Round($rssGrowthMb, 3)

@@ -857,6 +857,31 @@ void testFaultTracerLocalQualityStatisticsStayConsistent() {
             "A zero evidence budget must count every record as truncated.");
 }
 
+void testFaultTracerShadowCollectsEvidenceWithoutChangingPolygons() {
+    const fpt::Grid2D grid = makeTraceBulgeGrid();
+    fpt::TraceOptions baselineOptions = localQualityTraceOptions();
+    baselineOptions.localPolygonQuality = false;
+    baselineOptions.localPolygonQualityShadow = false;
+    const fpt::TraceResult baseline = fpt::traceFaultPolygons(grid, baselineOptions);
+
+    fpt::TraceOptions shadowOptions = baselineOptions;
+    shadowOptions.localPolygonQualityShadow = true;
+    const fpt::TraceResult shadow = fpt::traceFaultPolygons(grid, shadowOptions);
+
+    require(shadow.polygons.size() == baseline.polygons.size(),
+            "Shadow quality diagnostics must preserve polygon count.");
+    for (std::size_t index = 0; index < baseline.polygons.size(); ++index) {
+        require(std::abs(shadow.polygons[index].area - baseline.polygons[index].area) < 1e-9,
+                "Shadow quality diagnostics must preserve polygon area.");
+        require(shadow.polygons[index].cellCount == baseline.polygons[index].cellCount,
+                "Shadow quality diagnostics must preserve polygon raster cell count.");
+        require(shadow.polygons[index].points.size() == baseline.polygons[index].points.size(),
+                "Shadow quality diagnostics must preserve polygon vertices.");
+    }
+    require(shadow.activeCellCount == baseline.activeCellCount,
+            "Shadow quality diagnostics must preserve segmentation statistics.");
+}
+
 } // namespace
 
 int main() {
@@ -885,6 +910,7 @@ int main() {
         testFaultTracerDoesNotValidateDisabledLocalQualityOptions();
         testFaultTracerFiltersAcceptedRepairByFinalAreaAndCells();
         testFaultTracerLocalQualityStatisticsStayConsistent();
+        testFaultTracerShadowCollectsEvidenceWithoutChangingPolygons();
         std::cout << "test_local_polygon_quality: PASS\n";
         return 0;
     } catch (const std::exception& error) {

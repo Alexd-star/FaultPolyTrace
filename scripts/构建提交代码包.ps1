@@ -169,6 +169,23 @@ $smokeOfficialResult = Get-ChildItem -LiteralPath $smokeRoot.FullName -Recurse -
 if (!$smokeOfficialResult) { throw "安装器完整运行检查目录中缺少 official_result.csv。" }
 Get-ChildItem -LiteralPath $smokeOfficialResult.DirectoryName -File | Copy-Item -Destination $officialOut -Force
 
+$secondPlanarEvidence = Join-Path $repoRoot "outputs\evidence\second_planar_generalization_20260730"
+if (Test-Path -LiteralPath $secondPlanarEvidence -PathType Container) {
+    $secondPlanarTarget = Join-Path $verifyDir "第二套同域平面验证"
+    New-Item -ItemType Directory -Force -Path $secondPlanarTarget | Out-Null
+    foreach ($name in @(
+        "01_第二套同域八类输入真值结果.png",
+        "02_两套同域指标与扰动稳定性.png",
+        "第二套同域验证与PPT展示文案.md",
+        "第二套同域验证摘要.json"
+    )) {
+        $source = Join-Path $secondPlanarEvidence $name
+        if (Test-Path -LiteralPath $source -PathType Leaf) {
+            Copy-Item -LiteralPath $source -Destination $secondPlanarTarget -Force
+        }
+    }
+}
+
 Write-Host "[5/6] 写入提交说明与许可"
 Copy-Tree -Source $templateRoot -Target $Destination -ExcludeDirs @((Join-Path $templateRoot "01_源码"))
 Copy-Item -LiteralPath $manifestFile.FullName -Destination (Join-Path $Destination "唯一构建清单.json") -Force

@@ -151,16 +151,19 @@ QStringList traceArguments(const TraceParameters& p) {
     case QualityMode::Experimental:
         args << "--branch-attribution-shadow"
              << "--weak-path-gate"
-             << "--local-polygon-quality";
+             << "--local-polygon-quality-shadow"
+             << "--no-local-polygon-quality";
         break;
     case QualityMode::Diagnostics:
         args << "--branch-attribution-shadow"
              << "--no-weak-path-gate"
+             << "--local-polygon-quality-shadow"
              << "--no-local-polygon-quality";
         break;
     case QualityMode::Production:
         args << "--no-branch-attribution-shadow"
              << "--no-weak-path-gate"
+             << "--no-local-polygon-quality-shadow"
              << "--no-local-polygon-quality";
         break;
     }
@@ -232,7 +235,7 @@ TraceParameterValidation validateTraceParameters(const TraceParameters& p) {
         result.warnings << QString::fromUtf8("局部桥分裂与弱响应补追同时启用时，会先增加弱响应候选再执行局部分裂，处理时间和结果敏感性都会提高。");
     }
     if (p.qualityMode == QualityMode::Experimental) {
-        result.warnings << QString::fromUtf8("当前使用受控实验模式，运行时间和输出对象可能与正式处理模式不同。");
+        result.warnings << QString::fromUtf8("当前使用受控实验模式：仅将受限弱路径应用于候选结果，分支归属和局部修形只做影子诊断。运行时间和输出对象可能与正式处理模式不同。");
     }
     return result;
 }

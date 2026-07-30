@@ -38,6 +38,7 @@ win32 {
 }
 
 SOURCES += \
+    StagedCommit.cpp \
     main.cpp \
     GeoEastBoAdapter.cpp \
     ../../src/core/BinaryMask.cpp \
@@ -54,6 +55,7 @@ SOURCES += \
     ../../src/core/Topology.cpp
 
 HEADERS += \
+    StagedCommit.h \
     GeoEastBoAdapter.h \
     ../../src/core/BinaryMask.h \
     ../../src/core/BranchAttribution.h \

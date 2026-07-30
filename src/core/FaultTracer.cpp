@@ -2506,6 +2506,19 @@ LocalPolygonQualityOptions makeLocalPolygonQualityOptions(
     local.maxWindowCells = options.localQualityMaxWindowCells;
     local.maxObjectCells = options.localQualityMaxObjectCells;
     local.maxEvidenceRecords = options.localQualityMaxEvidenceRecords;
+    if (options.localPolygonQualityShadow && !options.localPolygonQuality) {
+        // Shadow diagnostics should surface a compact review queue rather
+        // than thousands of pixel-scale bridge fragments. Repair mode keeps
+        // the caller's full budgets because it is evaluated separately.
+        local.minExtraCells = std::max(local.minExtraCells, 24);
+        local.bridgeMinCells = std::max(local.bridgeMinCells, 6);
+        local.maxCandidatesPerObject = std::min<std::size_t>(
+            local.maxCandidatesPerObject, 16);
+        local.maxTotalCandidates = std::min<std::size_t>(
+            local.maxTotalCandidates, 512);
+        local.maxEvidenceRecords = std::min<std::size_t>(
+            local.maxEvidenceRecords, 2048);
+    }
     return local;
 }
 
@@ -2513,7 +2526,7 @@ void applyLocalPolygonQualityIfEnabled(
     const Grid2D& grid,
     const TraceOptions& options,
     TraceResult& result) {
-    if (!options.localPolygonQuality) {
+    if (!options.localPolygonQuality && !options.localPolygonQualityShadow) {
         return;
     }
     const LocalPolygonQualityOptions localOptions =
@@ -2531,9 +2544,12 @@ void applyLocalPolygonQualityIfEnabled(
         result.polygons,
         result.effectiveThreshold,
         localOptions);
-    result.polygons = std::move(localResult.polygons);
     result.localPolygonQualityStats = localResult.stats;
     result.localPolygonQualityEvidence = std::move(localResult.evidence);
+    if (options.localPolygonQualityShadow) {
+        return;
+    }
+    result.polygons = std::move(localResult.polygons);
     for (std::size_t index = 0; index < result.polygons.size(); ++index) {
         Polygon& polygon = result.polygons[index];
         const bool repaired =
@@ -2587,7 +2603,7 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
     if (options.weakPathMaxUnsupportedRun < 0) {
         throw std::runtime_error("weakPathMaxUnsupportedRun must be non-negative.");
     }
-    if (options.localPolygonQuality) {
+    if (options.localPolygonQuality || options.localPolygonQualityShadow) {
         validateLocalPolygonQualityOptions(
             makeLocalPolygonQualityOptions(options));
     }

@@ -288,7 +288,7 @@ def test_cli_writes_local_quality_parameters_stats_and_evidence_array(
     assert quality["rejected"] == sum(quality[field] for field in rejection_reasons)
 
 
-def test_diagnostics_serializes_candidate_location_without_polygon_id(tmp_path):
+def test_diagnostics_serializes_candidate_location_with_polygon_id(tmp_path):
     helper_source = tmp_path / "write_local_quality_diagnostics.cpp"
     helper_exe = tmp_path / "write_local_quality_diagnostics.exe"
     output = tmp_path / "local_quality_diagnostics.json"
@@ -371,25 +371,26 @@ int main(int argc, char** argv) {
     evidence = quality["candidateEvidence"]
     assert len(evidence) == 2
     assert evidence[0] == {
-            "objectIndex": 3,
-            "type": "local_bulge",
-            "window": {
-                "minGridX": 12,
-                "maxGridX": 18,
-                "minGridY": 7,
-                "maxGridY": 13,
-            },
-            "decision": "rejected",
-            "rejectionReason": "stability_risk",
-            "supportRatio": 0.625,
-            "areaLossRatio": 0.125,
-            "strongCoverageLossRatio": 0.01,
-            "weakCoverageLossRatio": 0.02,
-            "backgroundLeakageDelta": 0.03,
-            "stabilityJaccard": 0.94,
+        "objectIndex": 3,
+        "polygonId": 999,
+        "type": "local_bulge",
+        "window": {
+            "minGridX": 12,
+            "maxGridX": 18,
+            "minGridY": 7,
+            "maxGridY": 13,
+        },
+        "decision": "rejected",
+        "rejectionReason": "stability_risk",
+        "supportRatio": 0.625,
+        "areaLossRatio": 0.125,
+        "strongCoverageLossRatio": 0.01,
+        "weakCoverageLossRatio": 0.02,
+        "backgroundLeakageDelta": 0.03,
+        "stabilityJaccard": 0.94,
     }
     assert evidence[1]["objectIndex"] == 4
-    assert "polygonId" not in evidence[0]
+    assert evidence[1]["polygonId"] == 999
     assert quality["totalEvidence"] == 3
     assert quality["storedEvidence"] == 2
     assert quality["truncatedEvidence"] == 1

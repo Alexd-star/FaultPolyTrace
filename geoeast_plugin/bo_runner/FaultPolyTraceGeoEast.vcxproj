@@ -173,6 +173,7 @@
     <ClCompile Include="..\..\src\core\LocalPolygonQuality.cpp" />
     <ClCompile Include="..\..\src\core\WeakPathSupport.cpp" />
     <ClCompile Include="GeoEastBoAdapter.cpp" />
+    <ClCompile Include="StagedCommit.cpp" />
     <ClCompile Include="..\..\src\core\Grid2D.cpp" />
     <ClCompile Include="..\..\src\io\AsciiGridIO.cpp" />
     <ClCompile Include="..\..\src\io\DiagnosticsIO.cpp" />
@@ -189,6 +190,7 @@
     <ClInclude Include="..\..\src\core\LocalPolygonQuality.h" />
     <ClInclude Include="..\..\src\core\WeakPathSupport.h" />
     <ClInclude Include="GeoEastBoAdapter.h" />
+    <ClInclude Include="StagedCommit.h" />
     <ClInclude Include="..\..\src\core\Grid2D.h" />
     <ClInclude Include="..\..\src\io\AsciiGridIO.h" />
     <ClInclude Include="..\..\src\io\DiagnosticsIO.h" />

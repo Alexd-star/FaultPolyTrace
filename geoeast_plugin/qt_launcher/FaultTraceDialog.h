@@ -4,6 +4,9 @@
 #include <QProcess>
 #include <QString>
 #include <QStringList>
+#include <QVector>
+
+#include "QualityReviewModel.h"
 
 namespace fpt_ui { class LayerToggle; struct TraceParameters; }
 
@@ -65,6 +68,12 @@ private slots:
     void onProcessFinished(int exitCode, QProcess::ExitStatus status);
     void onProcessError(QProcess::ProcessError error);
     void updateLayerVisibility();
+    void loadQualityReview();
+    void updateQualityReviewFilter();
+    void showPreviousQualityReview();
+    void showNextQualityReview();
+    void locateCurrentQualityReview();
+    void exportQualityReviewSummary();
     void setLanguage(UiLanguage language);
 
 protected:
@@ -104,6 +113,8 @@ private:
     QString defaultOfficialDatPath() const;
     QStringList missingGeoEastConfig(bool requireGrid, bool requireOutput) const;
     bool ensureGeoEastConfigReady(const QString& operation, bool requireGrid, bool requireOutput);
+    void clearQualityReview();
+    void refreshQualityReviewSelection(bool locate);
 
     QLineEdit* runnerEdit_ = nullptr;
     QLineEdit* geoEastRootEdit_ = nullptr;
@@ -171,6 +182,7 @@ private:
     QSpinBox* residualTraceMaxCellsSpin_ = nullptr;
     fpt_ui::LayerToggle* showInputLayerCheck_ = nullptr;
     fpt_ui::LayerToggle* showResultLayerCheck_ = nullptr;
+    fpt_ui::LayerToggle* showQualityReviewLayerCheck_ = nullptr;
     QPushButton* loadResultViewButton_ = nullptr;
     QPushButton* exportViewButton_ = nullptr;
     QPushButton* openBasemapButton_ = nullptr;
@@ -202,6 +214,14 @@ private:
     QLabel* gridStatusLabel_ = nullptr;
     QLabel* layerTitleLabel_ = nullptr;
     QLabel* layerHintLabel_ = nullptr;
+    QLabel* qualityReviewSummaryLabel_ = nullptr;
+    QLabel* qualityReviewDetailLabel_ = nullptr;
+    QComboBox* qualityReviewFilterCombo_ = nullptr;
+    QComboBox* qualityReviewCombo_ = nullptr;
+    QPushButton* qualityReviewPreviousButton_ = nullptr;
+    QPushButton* qualityReviewNextButton_ = nullptr;
+    QPushButton* qualityReviewLocateButton_ = nullptr;
+    QPushButton* qualityReviewExportButton_ = nullptr;
     QWidget* renderViewWidget_ = nullptr;
     QWidget* colorBarWidget_ = nullptr;
     QSplitter* mainSplitter_ = nullptr;
@@ -223,5 +243,7 @@ private:
     QString pendingGridRestore_;
     QString pendingOutputRestore_;
     QStringList startupNotices_;
+    fpt_ui::QualityReviewModel qualityReviewModel_;
+    QVector<int> filteredQualityReviewIndexes_;
     UiLanguage currentLanguage_ = UiLanguage::SimplifiedChinese;
 };
