@@ -186,6 +186,27 @@ if (Test-Path -LiteralPath $secondPlanarEvidence -PathType Container) {
     }
 }
 
+$reliabilityTarget = Join-Path $verifyDir "可靠性验证"
+New-Item -ItemType Directory -Force -Path $reliabilityTarget | Out-Null
+foreach ($item in @(
+    @{
+        Source = (Join-Path $repoRoot "outputs\verification\msvc_asan\asan_report.json")
+        Target = "AddressSanitizer验证摘要.json"
+    },
+    @{
+        Source = (Join-Path $repoRoot "examples\outputs\stability\稳定性摘要.json")
+        Target = "100次连续运行稳定性摘要.json"
+    },
+    @{
+        Source = (Join-Path $repoRoot "examples\outputs\stability\连续运行明细.csv")
+        Target = "100次连续运行明细.csv"
+    }
+)) {
+    if (Test-Path -LiteralPath $item.Source -PathType Leaf) {
+        Copy-Item -LiteralPath $item.Source -Destination (Join-Path $reliabilityTarget $item.Target) -Force
+    }
+}
+
 Write-Host "[5/6] 写入提交说明与许可"
 Copy-Tree -Source $templateRoot -Target $Destination -ExcludeDirs @((Join-Path $templateRoot "01_源码"))
 Copy-Item -LiteralPath $manifestFile.FullName -Destination (Join-Path $Destination "唯一构建清单.json") -Force
