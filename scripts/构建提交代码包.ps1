@@ -186,6 +186,24 @@ if (Test-Path -LiteralPath $secondPlanarEvidence -PathType Container) {
     }
 }
 
+$complexPlanarEvidence = Join-Path $repoRoot "outputs\evidence\official_like_v2_topology_fixed_20260730"
+if (Test-Path -LiteralPath $complexPlanarEvidence -PathType Container) {
+    $complexPlanarTarget = Join-Path $verifyDir "复杂同域平面验证"
+    New-Item -ItemType Directory -Force -Path $complexPlanarTarget | Out-Null
+    foreach ($name in @("复杂同域验证报告.md", "复杂同域验证摘要.json")) {
+        $source = Join-Path $complexPlanarEvidence $name
+        if (Test-Path -LiteralPath $source -PathType Leaf) {
+            Copy-Item -LiteralPath $source -Destination $complexPlanarTarget -Force
+        }
+    }
+    foreach ($case in @("case_01_mixed_network", "case_04_mixed_network", "case_08_mixed_network")) {
+        $source = Join-Path $complexPlanarEvidence "baseline\$case\复核图.png"
+        if (Test-Path -LiteralPath $source -PathType Leaf) {
+            Copy-Item -LiteralPath $source -Destination (Join-Path $complexPlanarTarget "$case`_正式基线复核图.png") -Force
+        }
+    }
+}
+
 $reliabilityTarget = Join-Path $verifyDir "可靠性验证"
 New-Item -ItemType Directory -Force -Path $reliabilityTarget | Out-Null
 foreach ($item in @(
