@@ -91,8 +91,8 @@ FaultPolyTrace 最终结果复现参数
 八、最终 GeoEast DAT
 文件名：lc_result.dat
 逻辑多边形数：200
-闭合外环坐标记录：62218 行
+闭合外环坐标记录：62232 行
 文件大小：2950797 字节
-SHA256：6EC6270AE1F39F4CCDFF4DF1ED8EDD0ABFCBDA15A4F02A450DA0E2CBFB69520A
+SHA256：660760357797B4CE3C03E5AFE49AFE29A8C2D93CB7DFAF8DC9BDF744E4B5E695
 
 DAT 由软件内置 GeoEast 导出器按 default_full.fmt 八列定义生成，配套 lc_result.fmt 一并提供。文件已完成结构、字段、坐标、闭合性、对象数量和哈希校验。
