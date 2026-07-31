@@ -151,6 +151,17 @@ Copy-Item -LiteralPath (Join-Path $releaseDir "faultpolytrace.ico"), (Join-Path 
 Copy-Item -LiteralPath (Join-Path $releaseDir "构建与依赖清单.json") -Destination $pluginRoot -Force
 New-Zip -SourceDir $pluginRoot -ZipPath (Join-Path $pluginDir "$pluginName.zip")
 
+$evaluationDir = Join-Path $Destination "06_评测运行程序"
+$evaluationName = "FaultPolyTrace_评测运行程序_$Version"
+$evaluationStaging = Join-Path $releaseRoot $evaluationName
+& (Join-Path $PSScriptRoot "build_evaluation_package.ps1") `
+    -Version $Version `
+    -OutputDir $evaluationStaging `
+    -LauncherPayloadDir (Join-Path $releaseDir "qt_launcher") `
+    -RunnerExe (Join-Path $releaseDir "geoeast_plugin\bo_runner\faultpolytrace_geoeast_runner.exe")
+Copy-Tree -Source $evaluationStaging -Target (Join-Path $evaluationDir $evaluationName)
+Copy-Item -LiteralPath "$evaluationStaging.zip" -Destination (Join-Path $evaluationDir "$evaluationName.zip") -Force
+
 Write-Host "[4/6] 组织复现资料"
 $verifyDir = Join-Path $Destination "04_复现与验证"
 New-Item -ItemType Directory -Force -Path $verifyDir | Out-Null

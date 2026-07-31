@@ -1,0 +1,32 @@
+#include <windows.h>
+#pragma code_page(65001)
+
+101 ICON "../../assets/icons/faultpolytrace.ico"
+
+1 VERSIONINFO
+ FILEVERSION 1,1,0,0
+ PRODUCTVERSION 1,1,0,0
+ FILEFLAGSMASK 0x3fL
+ FILEFLAGS 0x0L
+ FILEOS VOS_NT_WINDOWS32
+ FILETYPE VFT_APP
+ FILESUBTYPE VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "080404b0"
+        BEGIN
+            VALUE "CompanyName", "东华理工大学\0"
+            VALUE "FileDescription", "FaultPolyTrace GeoEast 评测启动器\0"
+            VALUE "FileVersion", "1.1.0\0"
+            VALUE "InternalName", "FaultPolyTrace\0"
+            VALUE "OriginalFilename", "FaultPolyTrace.exe\0"
+            VALUE "ProductName", "FaultPolyTrace\0"
+            VALUE "ProductVersion", "1.1.0\0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0804, 1200
+    END
+END

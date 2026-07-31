@@ -4,6 +4,8 @@
 #include "LocalPolygonQuality.h"
 #include "Polygon.h"
 #include "Segmentation.h"
+#include "WeakContinuityConnector.h"
+#include "WeakTailRestorer.h"
 
 #include <cstddef>
 #include <vector>
@@ -60,6 +62,38 @@ struct TraceOptions {
     int maxGapDistance = 0;
     double maxGapAngle = 35.0;
     double minGapSupportRatio = 0.25;
+    bool weakContinuityShadow = false;
+    bool weakContinuity = false;
+    bool weakContinuitySecondPass = false;
+    bool weakContinuityFinalObjectPass = false;
+    int weakContinuityMaxDistance = 42;
+    int weakContinuityTangentWindow = 8;
+    int weakContinuityCorridorRadius = 8;
+    int weakContinuityMaxCandidatesPerEndpoint = 4;
+    double weakContinuityMaxEndpointAngle = 42.0;
+    double weakContinuityMaxWidthRatio = 2.5;
+    double weakContinuityMinAttributeRatio = 0.45;
+    double weakContinuityReferenceThresholdRatio = 0.70;
+    double weakContinuityLocalContrastRatio = 0.15;
+    double weakContinuityMinSupportRatio = 0.65;
+    double weakContinuityMinMeanSupport = 0.28;
+    int weakContinuityMaxUnsupportedRun = 5;
+    double weakContinuityMaxPathLengthRatio = 1.45;
+    double weakContinuityMaxTurnAngle = 50.0;
+    int weakContinuityEndpointExclusionRadius = 2;
+    int weakContinuityThirdPartySkeletonClearanceRadius = 2;
+    double weakContinuityMinCompetitionMargin = 0.18;
+    bool weakTailCompletionShadow = false;
+    bool weakTailCompletion = false;
+    int weakTailMinCells = 6;
+    int weakTailMaxCells = 64;
+    double weakTailMinAspect = 5.0;
+    double weakTailMinMeanSupportRatio = 0.75;
+    double weakTailMinPeakSupportRatio = 0.90;
+    double weakTailMaxAlignmentAngle = 35.0;
+    int weakTailOwnershipClearanceRadius = 2;
+    int weakTailTangentRadius = 12;
+    bool preserveObservedSkeletonEnvelope = false;
     bool separateBranchBelts = false;
     bool rootAntiMerge = false;
     int rootAntiMergeRadius = 1;
@@ -129,6 +163,15 @@ struct TraceResult {
     int keptBranches = 0;
     int prunedBranches = 0;
     int connectedGaps = 0;
+    WeakContinuityStats weakContinuityStats;
+    std::vector<WeakContinuityCandidate> weakContinuityCandidates;
+    int weakContinuityProtectedFromAntiMergeCells = 0;
+    int weakContinuityFinalObjectAcceptedConnections = 0;
+    int weakContinuityFinalObjectRejectedConnections = 0;
+    int weakContinuityFinalObjectAddedEnvelopeCells = 0;
+    WeakTailStats weakTailStats;
+    std::vector<WeakTailCandidate> weakTailCandidates;
+    int weakTailProtectedFromAntiMergeCells = 0;
     int rootAntiMergeCandidateCutCells = 0;
     int rootAntiMergeCutCells = 0;
     int rootAntiMergeRejectedCutCells = 0;

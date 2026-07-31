@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<formatDefine id="5" filetypeName="FaultPolygon">
+    <line>
+        <startline>2</startline>
+        <endline enable="0">1</endline>
+    </line>
+    <connectFlag>1</connectFlag>
+    <body>
+        <item>
+            <CHECK>1</CHECK>
+            <COLNUM>1</COLNUM>
+            <KEYNAME>faultPolygonName</KEYNAME>
+            <DISNAME>Fault Polygon Name</DISNAME>
+            <KEYID>4</KEYID>
+            <UNIT>Unknown</UNIT>
+            <DATATYPE>1</DATATYPE>
+            <WIDTH>16</WIDTH>
+            <PRECISION>4</PRECISION>
+        </item>
+        <item>
+            <CHECK>1</CHECK>
+            <COLNUM>2</COLNUM>
+            <KEYNAME>x</KEYNAME>
+            <DISNAME>X</DISNAME>
+            <KEYID>9</KEYID>
+            <UNIT>Unknown</UNIT>
+            <DATATYPE>3</DATATYPE>
+            <WIDTH>16</WIDTH>
+            <PRECISION>4</PRECISION>
+        </item>
+        <item>
+            <CHECK>1</CHECK>
+            <COLNUM>3</COLNUM>
+            <KEYNAME>y</KEYNAME>
+            <DISNAME>Y</DISNAME>
+            <KEYID>10</KEYID>
+            <UNIT>Unknown</UNIT>
+            <DATATYPE>3</DATATYPE>
+            <WIDTH>16</WIDTH>
+            <PRECISION>4</PRECISION>
+        </item>
+        <item>
+            <CHECK>1</CHECK>
+            <COLNUM>4</COLNUM>
+            <KEYNAME>connectionFlag</KEYNAME>
+            <DISNAME>Connection Flag</DISNAME>
+            <KEYID>7</KEYID>
+            <UNIT>Unknown</UNIT>
+            <DATATYPE>2</DATATYPE>
+            <WIDTH>16</WIDTH>
+            <PRECISION>4</PRECISION>
+        </item>
+        <item>
+            <CHECK>1</CHECK>
+            <COLNUM>5</COLNUM>
+            <KEYNAME>faultLevel</KEYNAME>
+            <DISNAME>Fault Level</DISNAME>
+            <KEYID>8</KEYID>
+            <UNIT>Unknown</UNIT>
+            <DATATYPE>2</DATATYPE>
+            <WIDTH>16</WIDTH>
+            <PRECISION>4</PRECISION>
+        </item>
+        <item>
+            <CHECK>1</CHECK>
+            <COLNUM>6</COLNUM>
+            <KEYNAME>faultPointType</KEYNAME>
+            <DISNAME>Fault Point Type</DISNAME>
+            <KEYID>13</KEYID>
+            <UNIT>Unknown</UNIT>
+            <DATATYPE>2</DATATYPE>
+            <WIDTH>16</WIDTH>
+            <PRECISION>4</PRECISION>
+        </item>
+        <item>
+            <CHECK>1</CHECK>
+            <COLNUM>7</COLNUM>
+            <KEYNAME>faultPolygonType</KEYNAME>
+            <DISNAME>Fault Polygon Type</DISNAME>
+            <KEYID>12</KEYID>
+            <UNIT>Unknown</UNIT>
+            <DATATYPE>2</DATATYPE>
+            <WIDTH>16</WIDTH>
+            <PRECISION>4</PRECISION>
+        </item>
+        <item>
+            <CHECK>1</CHECK>
+            <COLNUM>8</COLNUM>
+            <KEYNAME>closeType</KEYNAME>
+            <DISNAME>Closing Type</DISNAME>
+            <KEYID>11</KEYID>
+            <UNIT>Unknown</UNIT>
+            <DATATYPE>2</DATATYPE>
+            <WIDTH>16</WIDTH>
+            <PRECISION>4</PRECISION>
+        </item>
+    </body>
+</formatDefine>

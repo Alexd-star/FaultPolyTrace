@@ -8,7 +8,7 @@ param(
 $ErrorActionPreference = "Stop"
 $official = (Resolve-Path -LiteralPath $OfficialDat).Path
 $expectedInput = "21AB29456CE19B05CFC5646A1BD67BBA579FF65E30ECA99C3D39DC3C8BFFC07B"
-$expectedResult = "A2A9644692B1E6635B152823CAE192C9C6EF19320AB5EF4273D5B2DB90638ECF"
+$expectedResult = "2911D696F880E1173F6633E6B8A4587316FDC7DFA19109CE8EB28083A076ED3A"
 
 if ([string]::IsNullOrWhiteSpace($CliPath)) {
     $CliPath = Join-Path $PSScriptRoot "..\02_独立软件\FaultPolyTrace_Portable_{{VERSION}}\bin\faultpolytrace.exe"
@@ -39,7 +39,9 @@ $arguments = @(
     "--attribute-envelope-radius", "1", "--post-belt-close-radius", "1",
     "--min-branch-length", "4", "--min-junction-branch-length", "2",
     "--min-junction-branch-mean", "0.94", "--max-gap-distance", "12", "--max-gap-angle", "55",
-    "--min-gap-support-ratio", "0.25", "--no-separate-branch-belts", "--root-anti-merge",
+    "--min-gap-support-ratio", "0.25", "--no-weak-continuity", "--no-weak-continuity-second-pass",
+    "--weak-continuity-final-object-pass", "--weak-tail-completion",
+    "--preserve-observed-skeleton-envelope", "--no-separate-branch-belts", "--root-anti-merge",
     "--root-anti-merge-support-ratio", "0.25", "--root-anti-merge-min-part-cells", "0",
     "--root-anti-merge-min-part-ratio", "0.12", "--root-anti-merge-weak-guard-threshold", "0.66",
     "--root-anti-merge-weak-guard-radius", "0", "--residual-percentile", "0.955",
@@ -55,7 +57,7 @@ if ($LASTEXITCODE -ne 0) { throw "核心执行程序退出码为 $LASTEXITCODE" 
 
 $diag = Get-Content -LiteralPath $diagnostics -Raw | ConvertFrom-Json
 $resultHash = (Get-FileHash -LiteralPath $csv -Algorithm SHA256).Hash
-if ($diag.results.keptPolygonCount -ne 214) { throw "保留多边形数量不一致：$($diag.results.keptPolygonCount)" }
+if ($diag.results.keptPolygonCount -ne 200) { throw "保留多边形数量不一致：$($diag.results.keptPolygonCount)" }
 if ($diag.topology.openRings -ne 0 -or $diag.topology.selfIntersectingPolygons -ne 0 -or $diag.topology.polygonIntersections -ne 0) {
     throw "拓扑检查未通过：$($diag.topology | ConvertTo-Json -Compress)"
 }

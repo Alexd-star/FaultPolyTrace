@@ -411,16 +411,41 @@ def detect_local_bulges(
 
 
 def read_geoeast_dat(path):
-    rows = []
     with open(path, "r", encoding="utf-8", errors="ignore") as f:
-        for line in f:
-            text = line.strip()
-            if not text or text.startswith("#"):
-                continue
-            parts = text.split()
-            if len(parts) < 5:
-                continue
-            rows.append((int(float(parts[0])), int(float(parts[1])), float(parts[2]), float(parts[3]), float(parts[4])))
+        text_rows = [
+            line.strip().split()
+            for line in f
+            if line.strip() and not line.lstrip().startswith("#")
+        ]
+
+    # The GeoEast runner review export uses a compact matrix: dimensions,
+    # lower-left cell boundary, spacing, then ny rows of nx attribute values.
+    if (
+        len(text_rows) >= 4
+        and len(text_rows[0]) == 2
+        and len(text_rows[1]) == 2
+        and len(text_rows[2]) == 2
+    ):
+        nx, ny = (int(float(value)) for value in text_rows[0])
+        sx, sy = (float(value) for value in text_rows[1])
+        dx, dy = (float(value) for value in text_rows[2])
+        flat_values = [float(value) for row in text_rows[3:] for value in row]
+        expected = nx * ny
+        if len(flat_values) != expected:
+            raise RuntimeError(
+                f"GeoEast 矩阵网格数量不匹配：期望 {expected}，实际 {len(flat_values)}：{path}"
+            )
+        values = np.asarray(flat_values, dtype=float).reshape((ny, nx))
+        xs = sx + (np.arange(nx, dtype=float) + 0.5) * dx
+        ys = sy + (np.arange(ny, dtype=float) + 0.5) * dy
+        extent_edges = (sx, sx + nx * dx, sy, sy + ny * dy)
+        return values, xs, ys, abs(dx), abs(dy), extent_edges
+
+    rows = []
+    for parts in text_rows:
+        if len(parts) < 5:
+            continue
+        rows.append((int(float(parts[0])), int(float(parts[1])), float(parts[2]), float(parts[3]), float(parts[4])))
     if not rows:
         raise RuntimeError(f"未读取到有效 GeoEast DAT 网格：{path}")
 

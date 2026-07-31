@@ -55,6 +55,37 @@ struct RunDiagnostics {
     int maxGapDistance = 0;
     double maxGapAngle = 0.0;
     double minGapSupportRatio = 0.0;
+    bool weakContinuityShadow = false;
+    bool weakContinuity = false;
+    bool weakContinuitySecondPass = false;
+    bool weakContinuityFinalObjectPass = false;
+    int weakContinuityMaxDistance = 0;
+    int weakContinuityTangentWindow = 0;
+    int weakContinuityCorridorRadius = 0;
+    int weakContinuityMaxCandidatesPerEndpoint = 0;
+    double weakContinuityMaxEndpointAngle = 0.0;
+    double weakContinuityMaxWidthRatio = 0.0;
+    double weakContinuityMinAttributeRatio = 0.0;
+    double weakContinuityReferenceThresholdRatio = 0.0;
+    double weakContinuityLocalContrastRatio = 0.0;
+    double weakContinuityMinSupportRatio = 0.0;
+    double weakContinuityMinMeanSupport = 0.0;
+    int weakContinuityMaxUnsupportedRun = 0;
+    double weakContinuityMaxPathLengthRatio = 0.0;
+    double weakContinuityMaxTurnAngle = 0.0;
+    double weakContinuityMinCompetitionMargin = 0.0;
+    int weakContinuityThirdPartySkeletonClearanceRadius = 0;
+    bool weakTailCompletionShadow = false;
+    bool weakTailCompletion = false;
+    int weakTailMinCells = 0;
+    int weakTailMaxCells = 0;
+    double weakTailMinAspect = 0.0;
+    double weakTailMinMeanSupportRatio = 0.0;
+    double weakTailMinPeakSupportRatio = 0.0;
+    double weakTailMaxAlignmentAngle = 0.0;
+    int weakTailOwnershipClearanceRadius = 0;
+    int weakTailTangentRadius = 0;
+    bool preserveObservedSkeletonEnvelope = false;
     bool rootAntiMerge = false;
     int rootAntiMergeRadius = 0;
     double rootAntiMergeSupportRatio = 0.0;
@@ -107,6 +138,13 @@ struct RunDiagnostics {
     int keptBranches = 0;
     int prunedBranches = 0;
     int connectedGaps = 0;
+    WeakContinuityStats weakContinuityStats;
+    int weakContinuityProtectedFromAntiMergeCells = 0;
+    int weakContinuityFinalObjectAcceptedConnections = 0;
+    int weakContinuityFinalObjectRejectedConnections = 0;
+    int weakContinuityFinalObjectAddedEnvelopeCells = 0;
+    WeakTailStats weakTailStats;
+    int weakTailProtectedFromAntiMergeCells = 0;
     int rootAntiMergeCandidateCutCells = 0;
     int rootAntiMergeCutCells = 0;
     int rootAntiMergeRejectedCutCells = 0;
@@ -192,5 +230,15 @@ void writeTopologyDetailsCsv(const std::string& path, const TopologyDiagnostics&
 void writeBranchAttributionDifferencesCsv(
     const std::string& path,
     const std::vector<JunctionAttributionResult>& junctions);
+void writeWeakContinuityCandidatesCsv(
+    const std::string& path,
+    const std::vector<WeakContinuityCandidate>& candidates);
+void writeWeakContinuityCandidatesWorldCsv(
+    const std::string& path,
+    const std::vector<WeakContinuityCandidate>& candidates,
+    const Grid2D& grid);
+void writeWeakTailCandidatesCsv(
+    const std::string& path,
+    const std::vector<WeakTailCandidate>& candidates);
 
 } // namespace fpt

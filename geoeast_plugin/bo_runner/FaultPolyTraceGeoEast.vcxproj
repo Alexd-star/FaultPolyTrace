@@ -172,6 +172,8 @@
     <ClCompile Include="..\..\src\core\FaultTracer.cpp" />
     <ClCompile Include="..\..\src\core\LocalPolygonQuality.cpp" />
     <ClCompile Include="..\..\src\core\WeakPathSupport.cpp" />
+    <ClCompile Include="..\..\src\core\WeakContinuityConnector.cpp" />
+    <ClCompile Include="..\..\src\core\WeakTailRestorer.cpp" />
     <ClCompile Include="GeoEastBoAdapter.cpp" />
     <ClCompile Include="StagedCommit.cpp" />
     <ClCompile Include="..\..\src\core\Grid2D.cpp" />
@@ -189,6 +191,8 @@
     <ClInclude Include="..\..\src\core\FaultTracer.h" />
     <ClInclude Include="..\..\src\core\LocalPolygonQuality.h" />
     <ClInclude Include="..\..\src\core\WeakPathSupport.h" />
+    <ClInclude Include="..\..\src\core\WeakContinuityConnector.h" />
+    <ClInclude Include="..\..\src\core\WeakTailRestorer.h" />
     <ClInclude Include="GeoEastBoAdapter.h" />
     <ClInclude Include="StagedCommit.h" />
     <ClInclude Include="..\..\src\core\Grid2D.h" />

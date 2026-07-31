@@ -6,7 +6,7 @@
     [double]$MinWeakCoverage = 0.955,
     [int]$MaxTraceMs = 60000,
     [int]$MaxElapsedMs = 8000,
-    [int]$ReferenceKeptPolygons = 214,
+    [int]$ReferenceKeptPolygons = 200,
     [int]$MaxKeptPolygonDelta = 25,
     [switch]$StrictManual
 )

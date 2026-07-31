@@ -4,12 +4,14 @@
 #include "SkeletonGraph.h"
 #include "Topology.h"
 #include "WeakPathSupport.h"
+#include "WeakContinuityConnector.h"
 
 #include <algorithm>
 #include <cmath>
 #include <limits>
 #include <map>
 #include <queue>
+#include <set>
 #include <stdexcept>
 #include <unordered_map>
 #include <vector>
@@ -2586,6 +2588,663 @@ void applyLocalPolygonQualityIfEnabled(
     }
 }
 
+WeakContinuityOptions makeWeakContinuityOptions(const TraceOptions& options) {
+    WeakContinuityOptions continuityOptions;
+    continuityOptions.maxDistance = options.weakContinuityMaxDistance;
+    continuityOptions.tangentWindow = options.weakContinuityTangentWindow;
+    continuityOptions.corridorRadius = options.weakContinuityCorridorRadius;
+    continuityOptions.maxCandidatesPerEndpoint = options.weakContinuityMaxCandidatesPerEndpoint;
+    continuityOptions.maxEndpointAngleDegrees = options.weakContinuityMaxEndpointAngle;
+    continuityOptions.maxWidthRatio = options.weakContinuityMaxWidthRatio;
+    continuityOptions.minAttributeRatio = options.weakContinuityMinAttributeRatio;
+    continuityOptions.localContrastRatio = options.weakContinuityLocalContrastRatio;
+    continuityOptions.minSupportRatio = options.weakContinuityMinSupportRatio;
+    continuityOptions.minMeanSupport = options.weakContinuityMinMeanSupport;
+    continuityOptions.maxUnsupportedRun = options.weakContinuityMaxUnsupportedRun;
+    continuityOptions.maxPathLengthRatio = options.weakContinuityMaxPathLengthRatio;
+    continuityOptions.maxTurnAngleDegrees = options.weakContinuityMaxTurnAngle;
+    continuityOptions.endpointExclusionRadius = options.weakContinuityEndpointExclusionRadius;
+    continuityOptions.thirdPartySkeletonClearanceRadius =
+        options.weakContinuityThirdPartySkeletonClearanceRadius;
+    continuityOptions.minCompetitionMargin = options.weakContinuityMinCompetitionMargin;
+    return continuityOptions;
+}
+
+void accumulateWeakContinuityStats(
+    WeakContinuityStats& target,
+    const WeakContinuityStats& source) {
+    target.endpointCount += source.endpointCount;
+    target.distanceCandidatePairs += source.distanceCandidatePairs;
+    target.directionRejectedPairs += source.directionRejectedPairs;
+    target.widthRejectedPairs += source.widthRejectedPairs;
+    target.sameComponentRejectedPairs += source.sameComponentRejectedPairs;
+    target.preselectedPairs += source.preselectedPairs;
+    target.searchedPaths += source.searchedPaths;
+    target.foundPaths += source.foundPaths;
+    target.noPathRejected += source.noPathRejected;
+    target.attributeRejected += source.attributeRejected;
+    target.unsupportedRunRejected += source.unsupportedRunRejected;
+    target.curvatureRejected += source.curvatureRejected;
+    target.detourRejected += source.detourRejected;
+    target.competitionRejected += source.competitionRejected;
+    target.endpointReuseRejected += source.endpointReuseRejected;
+    target.acceptedConnections += source.acceptedConnections;
+    target.addedPathPixels += source.addedPathPixels;
+}
+
+struct MaskComponentMap {
+    std::vector<int> labels;
+    int count = 0;
+};
+
+MaskComponentMap labelActiveComponents(const BinaryMask& mask) {
+    MaskComponentMap result;
+    const int width = mask.width();
+    const int height = mask.height();
+    result.labels.assign(static_cast<std::size_t>(width * height), 0);
+    constexpr int offsets[8][2] = {
+        {-1, -1}, {0, -1}, {1, -1},
+        {-1, 0},           {1, 0},
+        {-1, 1},  {0, 1},  {1, 1}
+    };
+    auto indexOf = [width](int x, int y) {
+        return y * width + x;
+    };
+    for (int y0 = 0; y0 < height; ++y0) {
+        for (int x0 = 0; x0 < width; ++x0) {
+            const std::size_t start = static_cast<std::size_t>(indexOf(x0, y0));
+            if (!mask.get(x0, y0) || result.labels[start] != 0) {
+                continue;
+            }
+            ++result.count;
+            std::queue<Cell> queue;
+            queue.push({x0, y0});
+            result.labels[start] = result.count;
+            while (!queue.empty()) {
+                const Cell cell = queue.front();
+                queue.pop();
+                for (const auto& offset : offsets) {
+                    const int x = cell.x + offset[0];
+                    const int y = cell.y + offset[1];
+                    if (!mask.inBounds(x, y) || !mask.get(x, y)) {
+                        continue;
+                    }
+                    const std::size_t position =
+                        static_cast<std::size_t>(indexOf(x, y));
+                    if (result.labels[position] != 0) {
+                        continue;
+                    }
+                    result.labels[position] = result.count;
+                    queue.push({x, y});
+                }
+            }
+        }
+    }
+    return result;
+}
+
+int countLocalInactiveHoles(
+    const BinaryMask& mask,
+    int minX,
+    int minY,
+    int maxX,
+    int maxY) {
+    minX = std::max(0, minX);
+    minY = std::max(0, minY);
+    maxX = std::min(mask.width() - 1, maxX);
+    maxY = std::min(mask.height() - 1, maxY);
+    if (minX > maxX || minY > maxY) {
+        return 0;
+    }
+    const int width = maxX - minX + 1;
+    const int height = maxY - minY + 1;
+    std::vector<unsigned char> visited(
+        static_cast<std::size_t>(width * height), 0);
+    constexpr int offsets[4][2] = {
+        {-1, 0}, {1, 0}, {0, -1}, {0, 1}
+    };
+    auto localIndex = [minX, minY, width](int x, int y) {
+        return (y - minY) * width + (x - minX);
+    };
+    int holes = 0;
+    for (int y0 = minY; y0 <= maxY; ++y0) {
+        for (int x0 = minX; x0 <= maxX; ++x0) {
+            const std::size_t start =
+                static_cast<std::size_t>(localIndex(x0, y0));
+            if (mask.get(x0, y0) || visited[start]) {
+                continue;
+            }
+            bool touchesWindowBorder = false;
+            std::queue<Cell> queue;
+            queue.push({x0, y0});
+            visited[start] = 1;
+            while (!queue.empty()) {
+                const Cell cell = queue.front();
+                queue.pop();
+                touchesWindowBorder = touchesWindowBorder ||
+                    cell.x == minX || cell.x == maxX ||
+                    cell.y == minY || cell.y == maxY;
+                for (const auto& offset : offsets) {
+                    const int x = cell.x + offset[0];
+                    const int y = cell.y + offset[1];
+                    if (x < minX || x > maxX || y < minY || y > maxY ||
+                        mask.get(x, y)) {
+                        continue;
+                    }
+                    const std::size_t position =
+                        static_cast<std::size_t>(localIndex(x, y));
+                    if (visited[position]) {
+                        continue;
+                    }
+                    visited[position] = 1;
+                    queue.push({x, y});
+                }
+            }
+            if (!touchesWindowBorder) {
+                ++holes;
+            }
+        }
+    }
+    return holes;
+}
+
+struct EndpointJunctionContext {
+    int branchId = -1;
+    double distanceToJunction = -1.0;
+    int clusterId = -1;
+    int armCount = 0;
+    double confidence = -1.0;
+    bool attributionAvailable = false;
+    bool branchMatched = false;
+    bool ambiguous = false;
+};
+
+using EndpointJunctionContextMap =
+    std::map<std::pair<int, int>, EndpointJunctionContext>;
+
+EndpointJunctionContextMap buildEndpointJunctionContexts(
+    const Grid2D& grid,
+    const SkeletonGraph& graph,
+    double supportThreshold) {
+    std::vector<const SkeletonBranch*> branches;
+    branches.reserve(graph.branches.size());
+    for (const SkeletonBranch& branch : graph.branches) {
+        branches.push_back(&branch);
+    }
+    BranchAttributionOptions attributionOptions;
+    attributionOptions.supportThreshold = supportThreshold;
+    const BranchAttributionSummary attribution =
+        analyzeBranchAttribution(grid, branches, attributionOptions);
+
+    std::map<int, EndpointJunctionContext> attributionByBranch;
+    for (const JunctionAttributionResult& junction : attribution.junctions) {
+        std::set<int> branchIds;
+        std::set<int> matchedBranchIds;
+        for (const BranchAttributionPair& pair : junction.pairs) {
+            branchIds.insert(pair.firstBranchId);
+            branchIds.insert(pair.secondBranchId);
+            matchedBranchIds.insert(pair.firstBranchId);
+            matchedBranchIds.insert(pair.secondBranchId);
+        }
+        branchIds.insert(
+            junction.unmatchedBranchIds.begin(),
+            junction.unmatchedBranchIds.end());
+        for (const int branchId : branchIds) {
+            EndpointJunctionContext context;
+            context.branchId = branchId;
+            context.clusterId = junction.clusterId;
+            context.armCount = static_cast<int>(branchIds.size());
+            context.confidence = junction.confidence;
+            context.attributionAvailable = true;
+            context.branchMatched =
+                matchedBranchIds.find(branchId) != matchedBranchIds.end();
+            context.ambiguous = junction.ambiguous;
+            attributionByBranch[branchId] = context;
+        }
+    }
+
+    EndpointJunctionContextMap contexts;
+    for (const SkeletonBranch& branch : graph.branches) {
+        if (branch.points.size() < 2) {
+            continue;
+        }
+        SkeletonPoint endpoint;
+        bool hasEndpointToJunctionPath = false;
+        if (!branch.startIsJunction && branch.endIsJunction) {
+            endpoint = branch.points.front();
+            hasEndpointToJunctionPath = true;
+        } else if (branch.startIsJunction && !branch.endIsJunction) {
+            endpoint = branch.points.back();
+            hasEndpointToJunctionPath = true;
+        }
+        if (!hasEndpointToJunctionPath) {
+            continue;
+        }
+
+        EndpointJunctionContext context;
+        const auto attributionIt = attributionByBranch.find(branch.id);
+        if (attributionIt != attributionByBranch.end()) {
+            context = attributionIt->second;
+        }
+        context.branchId = branch.id;
+        context.distanceToJunction = 0.0;
+        for (std::size_t index = 1; index < branch.points.size(); ++index) {
+            const SkeletonPoint& previous = branch.points[index - 1];
+            const SkeletonPoint& current = branch.points[index];
+            context.distanceToJunction += std::hypot(
+                static_cast<double>(current.x - previous.x),
+                static_cast<double>(current.y - previous.y));
+        }
+        contexts[{endpoint.x, endpoint.y}] = context;
+    }
+    return contexts;
+}
+
+void assignJunctionContext(
+    const EndpointJunctionContextMap& contexts,
+    const SkeletonPoint& endpoint,
+    bool endpointA,
+    WeakContinuityCandidate& candidate) {
+    const auto it = contexts.find({endpoint.x, endpoint.y});
+    if (it == contexts.end()) {
+        return;
+    }
+    const EndpointJunctionContext& context = it->second;
+    if (endpointA) {
+        candidate.endpointBranchIdA = context.branchId;
+        candidate.endpointJunctionDistanceA = context.distanceToJunction;
+        candidate.junctionClusterIdA = context.clusterId;
+        candidate.junctionArmCountA = context.armCount;
+        candidate.junctionConfidenceA = context.confidence;
+        candidate.junctionAttributionAvailableA = context.attributionAvailable;
+        candidate.junctionBranchMatchedA = context.branchMatched;
+        candidate.junctionAmbiguousA = context.ambiguous;
+    } else {
+        candidate.endpointBranchIdB = context.branchId;
+        candidate.endpointJunctionDistanceB = context.distanceToJunction;
+        candidate.junctionClusterIdB = context.clusterId;
+        candidate.junctionArmCountB = context.armCount;
+        candidate.junctionConfidenceB = context.confidence;
+        candidate.junctionAttributionAvailableB = context.attributionAvailable;
+        candidate.junctionBranchMatchedB = context.branchMatched;
+        candidate.junctionAmbiguousB = context.ambiguous;
+    }
+}
+
+int countComponentHoles(
+    const BinaryMask& mask,
+    const MaskComponentMap& components,
+    int componentLabel) {
+    if (componentLabel <= 0) {
+        return 0;
+    }
+    BinaryMask componentMask(mask.width(), mask.height());
+    int minX = mask.width() - 1;
+    int minY = mask.height() - 1;
+    int maxX = 0;
+    int maxY = 0;
+    bool found = false;
+    for (int y = 0; y < mask.height(); ++y) {
+        for (int x = 0; x < mask.width(); ++x) {
+            const int label = components.labels[static_cast<std::size_t>(
+                y * mask.width() + x)];
+            if (label != componentLabel) {
+                continue;
+            }
+            componentMask.set(x, y, true);
+            minX = std::min(minX, x);
+            minY = std::min(minY, y);
+            maxX = std::max(maxX, x);
+            maxY = std::max(maxY, y);
+            found = true;
+        }
+    }
+    if (!found) {
+        return 0;
+    }
+    return countLocalInactiveHoles(
+        componentMask,
+        minX - 1,
+        minY - 1,
+        maxX + 1,
+        maxY + 1);
+}
+
+bool hasNearbyAttributeSupport(
+    const Grid2D& grid,
+    int x,
+    int y,
+    double minimumValue,
+    int radius) {
+    for (int oy = -radius; oy <= radius; ++oy) {
+        for (int ox = -radius; ox <= radius; ++ox) {
+            const int nx = x + ox;
+            const int ny = y + oy;
+            if (!grid.inBounds(nx, ny)) {
+                continue;
+            }
+            const double value = grid.value(nx, ny);
+            if (std::isfinite(value) && value >= minimumValue) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+BinaryMask applyFinalObjectBridgeGates(
+    const Grid2D& grid,
+    const BinaryMask& activeMask,
+    const SkeletonGraph& finalGraph,
+    double supportThreshold,
+    int junctionInfluenceDistance,
+    int maximumBeltRadius,
+    int supportEnvelopeRadius,
+    WeakContinuityResult& pass,
+    int& acceptedConnections,
+    int& rejectedConnections,
+    int& addedEnvelopeCells) {
+    BinaryMask output = activeMask;
+    acceptedConnections = 0;
+    rejectedConnections = 0;
+    addedEnvelopeCells = 0;
+    const int width = grid.nx();
+    auto indexOf = [width](int x, int y) {
+        return y * width + x;
+    };
+    const EndpointJunctionContextMap junctionContexts =
+        buildEndpointJunctionContexts(grid, finalGraph, supportThreshold);
+    pass.stats.acceptedConnections = 0;
+    pass.stats.addedPathPixels = 0;
+
+    std::vector<std::size_t> candidateOrder;
+    candidateOrder.reserve(pass.candidates.size());
+    for (std::size_t index = 0; index < pass.candidates.size(); ++index) {
+        if (pass.candidates[index].accepted &&
+            pass.candidates[index].path.size() >= 2) {
+            candidateOrder.push_back(index);
+        }
+    }
+    std::sort(
+        candidateOrder.begin(),
+        candidateOrder.end(),
+        [&](std::size_t firstIndex, std::size_t secondIndex) {
+            const WeakContinuityCandidate& first = pass.candidates[firstIndex];
+            const WeakContinuityCandidate& second = pass.candidates[secondIndex];
+            return std::make_tuple(
+                       first.normalizedCost,
+                       -first.supportRatio,
+                       -first.meanSupport,
+                       first.pathLength,
+                       first.id) <
+                std::make_tuple(
+                       second.normalizedCost,
+                       -second.supportRatio,
+                       -second.meanSupport,
+                       second.pathLength,
+                       second.id);
+        });
+
+    for (const std::size_t candidateIndex : candidateOrder) {
+        WeakContinuityCandidate& candidate = pass.candidates[candidateIndex];
+        candidate.accepted = false;
+        candidate.stage = 3;
+        assignJunctionContext(
+            junctionContexts, candidate.endpointA, true, candidate);
+        assignJunctionContext(
+            junctionContexts, candidate.endpointB, false, candidate);
+
+        const auto junctionFailure = [&](bool endpointA) -> const char* {
+            const double distanceToJunction = endpointA
+                ? candidate.endpointJunctionDistanceA
+                : candidate.endpointJunctionDistanceB;
+            if (distanceToJunction < 0.0 ||
+                distanceToJunction > junctionInfluenceDistance) {
+                return nullptr;
+            }
+            const bool available = endpointA
+                ? candidate.junctionAttributionAvailableA
+                : candidate.junctionAttributionAvailableB;
+            const bool matched = endpointA
+                ? candidate.junctionBranchMatchedA
+                : candidate.junctionBranchMatchedB;
+            const bool ambiguous = endpointA
+                ? candidate.junctionAmbiguousA
+                : candidate.junctionAmbiguousB;
+            if (!available) {
+                return "final_bridge_unresolved_near_junction";
+            }
+            if (ambiguous) {
+                return "final_bridge_ambiguous_junction_attribution";
+            }
+            if (!matched) {
+                return "final_bridge_unmatched_junction_branch";
+            }
+            return nullptr;
+        };
+        if (const char* failure = junctionFailure(true)) {
+            candidate.decision = failure;
+            ++rejectedConnections;
+            continue;
+        }
+        if (const char* failure = junctionFailure(false)) {
+            candidate.decision = failure;
+            ++rejectedConnections;
+            continue;
+        }
+
+        const MaskComponentMap currentOwners = labelActiveComponents(output);
+        const int endpointLabelA = currentOwners.labels[static_cast<std::size_t>(
+            indexOf(candidate.endpointA.x, candidate.endpointA.y))];
+        const int endpointLabelB = currentOwners.labels[static_cast<std::size_t>(
+            indexOf(candidate.endpointB.x, candidate.endpointB.y))];
+        if (endpointLabelA <= 0 || endpointLabelB <= 0) {
+            candidate.decision = "final_bridge_missing_object_owner";
+            ++rejectedConnections;
+            continue;
+        }
+        if (endpointLabelA == endpointLabelB) {
+            candidate.decision = "final_bridge_already_connected_by_prior_bridge";
+            ++rejectedConnections;
+            continue;
+        }
+        candidate.endpointComponentHolesA = countComponentHoles(
+            output, currentOwners, endpointLabelA);
+        candidate.endpointComponentHolesB = countComponentHoles(
+            output, currentOwners, endpointLabelB);
+        if (candidate.endpointComponentHolesA > 0 ||
+            candidate.endpointComponentHolesB > 0) {
+            candidate.decision = "final_bridge_endpoint_component_has_internal_hole";
+            ++rejectedConnections;
+            continue;
+        }
+
+        const int beltRadius = std::clamp(
+            static_cast<int>(std::lround(
+                0.5 * (candidate.widthA + candidate.widthB))),
+            1,
+            std::max(1, maximumBeltRadius));
+        const int requiredThirdObjectClearance = beltRadius + 1;
+        const int thirdObjectSearchRadius = requiredThirdObjectClearance + 1;
+        double minimumThirdObjectClearance =
+            std::numeric_limits<double>::infinity();
+        std::set<int> nearbyThirdObjectLabels;
+        for (const SkeletonPoint& point : candidate.path) {
+            for (int oy = -thirdObjectSearchRadius;
+                 oy <= thirdObjectSearchRadius; ++oy) {
+                for (int ox = -thirdObjectSearchRadius;
+                     ox <= thirdObjectSearchRadius; ++ox) {
+                    const int x = point.x + ox;
+                    const int y = point.y + oy;
+                    if (!output.inBounds(x, y)) {
+                        continue;
+                    }
+                    const int label = currentOwners.labels[
+                        static_cast<std::size_t>(indexOf(x, y))];
+                    if (label <= 0 || label == endpointLabelA ||
+                        label == endpointLabelB) {
+                        continue;
+                    }
+                    const double clearance = std::hypot(
+                        static_cast<double>(ox),
+                        static_cast<double>(oy));
+                    if (clearance <= thirdObjectSearchRadius + 1e-9) {
+                        minimumThirdObjectClearance = std::min(
+                            minimumThirdObjectClearance, clearance);
+                        nearbyThirdObjectLabels.insert(label);
+                    }
+                }
+            }
+        }
+        candidate.nearbyThirdObjectCount =
+            static_cast<int>(nearbyThirdObjectLabels.size());
+        if (std::isfinite(minimumThirdObjectClearance)) {
+            candidate.minimumThirdObjectClearance =
+                minimumThirdObjectClearance;
+        }
+        if (minimumThirdObjectClearance <=
+            requiredThirdObjectClearance + 1e-9) {
+            candidate.decision = "final_bridge_insufficient_third_object_clearance";
+            ++rejectedConnections;
+            continue;
+        }
+
+        BinaryMask bridgeMask(grid.nx(), grid.ny());
+        int minX = grid.nx() - 1;
+        int minY = grid.ny() - 1;
+        int maxX = 0;
+        int maxY = 0;
+        for (const SkeletonPoint& point : candidate.path) {
+            minX = std::min(minX, point.x);
+            minY = std::min(minY, point.y);
+            maxX = std::max(maxX, point.x);
+            maxY = std::max(maxY, point.y);
+            for (int oy = -beltRadius; oy <= beltRadius; ++oy) {
+                for (int ox = -beltRadius; ox <= beltRadius; ++ox) {
+                    if (ox * ox + oy * oy > beltRadius * beltRadius) {
+                        continue;
+                    }
+                    const int x = point.x + ox;
+                    const int y = point.y + oy;
+                    if (!grid.inBounds(x, y)) {
+                        continue;
+                    }
+                    if (output.get(x, y) || hasNearbyAttributeSupport(
+                            grid,
+                            x,
+                            y,
+                            candidate.minimumSupportedValue,
+                            std::max(0, supportEnvelopeRadius))) {
+                        bridgeMask.set(x, y, true);
+                    }
+                }
+            }
+            bridgeMask.set(point.x, point.y, true);
+        }
+
+        std::vector<int> contactedLabels;
+        const int contactPadding = beltRadius + 1;
+        minX = std::max(0, minX - contactPadding);
+        minY = std::max(0, minY - contactPadding);
+        maxX = std::min(grid.nx() - 1, maxX + contactPadding);
+        maxY = std::min(grid.ny() - 1, maxY + contactPadding);
+        int addedCells = 0;
+        for (int y = minY; y <= maxY; ++y) {
+            for (int x = minX; x <= maxX; ++x) {
+                if (bridgeMask.get(x, y) && !output.get(x, y)) {
+                    ++addedCells;
+                }
+                if (!bridgeMask.get(x, y)) {
+                    continue;
+                }
+                for (int oy = -1; oy <= 1; ++oy) {
+                    for (int ox = -1; ox <= 1; ++ox) {
+                        const int nx = x + ox;
+                        const int ny = y + oy;
+                        if (!activeMask.inBounds(nx, ny)) {
+                            continue;
+                        }
+                        const int label = currentOwners.labels[static_cast<std::size_t>(
+                            indexOf(nx, ny))];
+                        if (label > 0 &&
+                            std::find(contactedLabels.begin(), contactedLabels.end(), label) ==
+                                contactedLabels.end()) {
+                            contactedLabels.push_back(label);
+                        }
+                    }
+                }
+            }
+        }
+        candidate.contactedObjectCount = static_cast<int>(contactedLabels.size());
+        const bool hasEndpointA =
+            std::find(contactedLabels.begin(), contactedLabels.end(), endpointLabelA) !=
+            contactedLabels.end();
+        const bool hasEndpointB =
+            std::find(contactedLabels.begin(), contactedLabels.end(), endpointLabelB) !=
+            contactedLabels.end();
+        if (contactedLabels.size() != 2 || !hasEndpointA || !hasEndpointB) {
+            candidate.decision = "final_bridge_third_object_or_owner_mismatch";
+            ++rejectedConnections;
+            continue;
+        }
+        if (addedCells <= 0) {
+            candidate.decision = "final_bridge_no_new_envelope";
+            ++rejectedConnections;
+            continue;
+        }
+        const int maximumAddedCells = static_cast<int>(std::ceil(
+            std::max(1.0, candidate.pathLength) *
+            static_cast<double>(2 * beltRadius + 1) * 1.5)) + 8;
+        if (addedCells > maximumAddedCells) {
+            candidate.decision = "final_bridge_envelope_growth_too_large";
+            ++rejectedConnections;
+            continue;
+        }
+
+        const int topologyPadding = beltRadius + 4;
+        const int holesBefore = countLocalInactiveHoles(
+            output,
+            minX - topologyPadding,
+            minY - topologyPadding,
+            maxX + topologyPadding,
+            maxY + topologyPadding);
+        BinaryMask trial = unionMask(output, bridgeMask);
+        const int holesAfter = countLocalInactiveHoles(
+            trial,
+            minX - topologyPadding,
+            minY - topologyPadding,
+            maxX + topologyPadding,
+            maxY + topologyPadding);
+        candidate.localHolesBefore = holesBefore;
+        candidate.localHolesAfter = holesAfter;
+        if (holesAfter > holesBefore) {
+            candidate.decision = "final_bridge_new_internal_hole";
+            ++rejectedConnections;
+            continue;
+        }
+        const MaskComponentMap trialOwners = labelActiveComponents(trial);
+        const int mergedLabel = trialOwners.labels[static_cast<std::size_t>(
+            indexOf(candidate.endpointA.x, candidate.endpointA.y))];
+        candidate.mergedComponentHolesAfter = countComponentHoles(
+            trial, trialOwners, mergedLabel);
+        if (candidate.mergedComponentHolesAfter > 0) {
+            candidate.decision = "final_bridge_merged_component_has_internal_hole";
+            ++rejectedConnections;
+            continue;
+        }
+
+        output = std::move(trial);
+        candidate.addedEnvelopeCells = addedCells;
+        candidate.accepted = true;
+        candidate.decision = "accepted_final_object_bridge";
+        ++acceptedConnections;
+        addedEnvelopeCells += addedCells;
+        ++pass.stats.acceptedConnections;
+        pass.stats.addedPathPixels += candidate.addedPathPixels;
+    }
+    return output;
+}
+
 } // namespace
 
 TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) {
@@ -2674,6 +3333,51 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
     }
     if (options.maxGapAngle < 0.0 || options.maxGapAngle > 180.0) {
         throw std::runtime_error("maxGapAngle must be between 0 and 180 degrees.");
+    }
+    if (options.weakContinuity || options.weakContinuityShadow) {
+        WeakContinuityOptions continuityOptions;
+        continuityOptions.maxDistance = options.weakContinuityMaxDistance;
+        continuityOptions.tangentWindow = options.weakContinuityTangentWindow;
+        continuityOptions.corridorRadius = options.weakContinuityCorridorRadius;
+        continuityOptions.maxCandidatesPerEndpoint = options.weakContinuityMaxCandidatesPerEndpoint;
+        continuityOptions.maxEndpointAngleDegrees = options.weakContinuityMaxEndpointAngle;
+        continuityOptions.maxWidthRatio = options.weakContinuityMaxWidthRatio;
+        continuityOptions.minAttributeRatio = options.weakContinuityMinAttributeRatio;
+        continuityOptions.localContrastRatio = options.weakContinuityLocalContrastRatio;
+        continuityOptions.minSupportRatio = options.weakContinuityMinSupportRatio;
+        continuityOptions.minMeanSupport = options.weakContinuityMinMeanSupport;
+        continuityOptions.maxUnsupportedRun = options.weakContinuityMaxUnsupportedRun;
+        continuityOptions.maxPathLengthRatio = options.weakContinuityMaxPathLengthRatio;
+        continuityOptions.maxTurnAngleDegrees = options.weakContinuityMaxTurnAngle;
+        continuityOptions.endpointExclusionRadius = options.weakContinuityEndpointExclusionRadius;
+        continuityOptions.thirdPartySkeletonClearanceRadius =
+            options.weakContinuityThirdPartySkeletonClearanceRadius;
+        continuityOptions.minCompetitionMargin = options.weakContinuityMinCompetitionMargin;
+        validateWeakContinuityOptions(continuityOptions);
+        if (options.weakContinuityReferenceThresholdRatio <= 0.0 ||
+            options.weakContinuityReferenceThresholdRatio > 1.0) {
+            throw std::runtime_error(
+                "weakContinuityReferenceThresholdRatio must be in (0,1].");
+        }
+    }
+    if (options.weakTailCompletion || options.weakTailCompletionShadow) {
+        WeakTailOptions tailOptions;
+        tailOptions.minCells = options.weakTailMinCells;
+        tailOptions.maxCells = options.weakTailMaxCells;
+        tailOptions.minAspect = options.weakTailMinAspect;
+        tailOptions.minMeanSupportRatio = options.weakTailMinMeanSupportRatio;
+        tailOptions.minPeakSupportRatio = options.weakTailMinPeakSupportRatio;
+        tailOptions.maxAlignmentAngleDegrees = options.weakTailMaxAlignmentAngle;
+        tailOptions.ownershipClearanceRadius = options.weakTailOwnershipClearanceRadius;
+        tailOptions.tangentRadius = options.weakTailTangentRadius;
+        validateWeakTailOptions(tailOptions);
+    }
+    if (options.weakContinuityFinalObjectPass &&
+        (options.traceMode != TraceMode::RidgeBelt ||
+         options.separateBranchBelts)) {
+        throw std::runtime_error(
+            "weakContinuityFinalObjectPass requires RidgeBelt mode with "
+            "separateBranchBelts disabled.");
     }
     if (options.rootAntiMergeRadius < 0) {
         throw std::runtime_error("rootAntiMergeRadius must be non-negative.");
@@ -2768,6 +3472,8 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
                 : computePercentileThreshold(grid, options.residualPercentile))
             : result.effectiveThreshold;
     BinaryMask activeMask = segmentation.mask;
+    BinaryMask acceptedWeakContinuityPathMask(nx, ny);
+    BinaryMask acceptedWeakTailMask(nx, ny);
     WeakExtensionStats weakExtensionStats;
     activeMask = extendThroughWeakAttributes(
         grid,
@@ -2839,7 +3545,51 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
             gapHasAttributeSupport,
             &supportContext);
         result.connectedGaps = connection.connectedGaps;
-        SkeletonGraph connectedGraph = buildSkeletonGraph(connection.mask);
+        BinaryMask connectedSkeleton = connection.mask;
+        if (options.weakContinuity || options.weakContinuityShadow) {
+            WeakContinuityOptions continuityOptions;
+            continuityOptions.maxDistance = options.weakContinuityMaxDistance;
+            continuityOptions.tangentWindow = options.weakContinuityTangentWindow;
+            continuityOptions.corridorRadius = options.weakContinuityCorridorRadius;
+            continuityOptions.maxCandidatesPerEndpoint = options.weakContinuityMaxCandidatesPerEndpoint;
+            continuityOptions.maxEndpointAngleDegrees = options.weakContinuityMaxEndpointAngle;
+            continuityOptions.maxWidthRatio = options.weakContinuityMaxWidthRatio;
+            continuityOptions.minAttributeRatio = options.weakContinuityMinAttributeRatio;
+            continuityOptions.localContrastRatio = options.weakContinuityLocalContrastRatio;
+            continuityOptions.minSupportRatio = options.weakContinuityMinSupportRatio;
+            continuityOptions.minMeanSupport = options.weakContinuityMinMeanSupport;
+            continuityOptions.maxUnsupportedRun = options.weakContinuityMaxUnsupportedRun;
+            continuityOptions.maxPathLengthRatio = options.weakContinuityMaxPathLengthRatio;
+            continuityOptions.maxTurnAngleDegrees = options.weakContinuityMaxTurnAngle;
+            continuityOptions.endpointExclusionRadius = options.weakContinuityEndpointExclusionRadius;
+            continuityOptions.thirdPartySkeletonClearanceRadius =
+                options.weakContinuityThirdPartySkeletonClearanceRadius;
+            continuityOptions.minCompetitionMargin = options.weakContinuityMinCompetitionMargin;
+            WeakContinuityResult continuity = connectWeakContinuityPaths(
+                grid,
+                connectedSkeleton,
+                attributeMask,
+                buildSkeletonGraph(connectedSkeleton),
+                std::max(
+                    residualSupportThreshold,
+                    result.effectiveThreshold *
+                        options.weakContinuityReferenceThresholdRatio),
+                continuityOptions);
+            result.weakContinuityStats = continuity.stats;
+            if (options.weakContinuity) {
+                for (const WeakContinuityCandidate& candidate : continuity.candidates) {
+                    if (!candidate.accepted) {
+                        continue;
+                    }
+                    for (const SkeletonPoint& point : candidate.path) {
+                        acceptedWeakContinuityPathMask.set(point.x, point.y, true);
+                    }
+                }
+                connectedSkeleton = std::move(continuity.mask);
+            }
+            result.weakContinuityCandidates = std::move(continuity.candidates);
+        }
+        SkeletonGraph connectedGraph = buildSkeletonGraph(connectedSkeleton);
         result.branches.reserve(connectedGraph.branches.size());
         BinaryMask branchMask(nx, ny);
         std::vector<const SkeletonBranch*> keptBranchRefs;
@@ -2862,6 +3612,86 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
                 ++result.prunedBranches;
             }
             result.branches.push_back(std::move(branchTrace));
+        }
+        if (options.weakTailCompletion || options.weakTailCompletionShadow) {
+            WeakTailOptions tailOptions;
+            tailOptions.minCells = options.weakTailMinCells;
+            tailOptions.maxCells = options.weakTailMaxCells;
+            tailOptions.minAspect = options.weakTailMinAspect;
+            tailOptions.minMeanSupportRatio = options.weakTailMinMeanSupportRatio;
+            tailOptions.minPeakSupportRatio = options.weakTailMinPeakSupportRatio;
+            tailOptions.maxAlignmentAngleDegrees = options.weakTailMaxAlignmentAngle;
+            tailOptions.ownershipClearanceRadius = options.weakTailOwnershipClearanceRadius;
+            tailOptions.tangentRadius = options.weakTailTangentRadius;
+            WeakTailResult tails = restoreSupportedWeakTails(
+                grid,
+                connectedSkeleton,
+                branchMask,
+                result.effectiveThreshold,
+                tailOptions);
+            result.weakTailStats = tails.stats;
+            result.weakTailCandidates = std::move(tails.candidates);
+            if (options.weakTailCompletion) {
+                branchMask = std::move(tails.mask);
+                acceptedWeakTailMask = std::move(tails.acceptedMask);
+            }
+        }
+        if (options.weakContinuity && options.weakContinuitySecondPass) {
+            WeakContinuityOptions secondPassOptions =
+                makeWeakContinuityOptions(options);
+            secondPassOptions.maxDistance = std::min(secondPassOptions.maxDistance, 12);
+            secondPassOptions.maxCandidatesPerEndpoint =
+                std::min(secondPassOptions.maxCandidatesPerEndpoint, 2);
+            secondPassOptions.maxEndpointAngleDegrees =
+                std::min(secondPassOptions.maxEndpointAngleDegrees, 30.0);
+            secondPassOptions.minSupportRatio =
+                std::max(secondPassOptions.minSupportRatio, 0.85);
+            secondPassOptions.minMeanSupport =
+                std::max(secondPassOptions.minMeanSupport, 0.55);
+            secondPassOptions.maxUnsupportedRun =
+                std::min(secondPassOptions.maxUnsupportedRun, 2);
+            secondPassOptions.maxPathLengthRatio =
+                std::min(secondPassOptions.maxPathLengthRatio, 1.25);
+            secondPassOptions.maxTurnAngleDegrees =
+                std::min(secondPassOptions.maxTurnAngleDegrees, 35.0);
+            secondPassOptions.minCompetitionMargin =
+                std::max(secondPassOptions.minCompetitionMargin, 0.25);
+            BinaryMask provisionalConnectivity =
+                bufferMask(branchMask, options.beltRadius);
+            if (options.postBeltCloseRadius > 0) {
+                provisionalConnectivity = closeMask(
+                    provisionalConnectivity,
+                    options.postBeltCloseRadius);
+            }
+            WeakContinuityResult secondPass = connectWeakContinuityPaths(
+                grid,
+                branchMask,
+                attributeMask,
+                buildSkeletonGraph(branchMask),
+                std::max(
+                    residualSupportThreshold,
+                    result.effectiveThreshold *
+                        options.weakContinuityReferenceThresholdRatio),
+                secondPassOptions,
+                &provisionalConnectivity);
+            int nextCandidateId = 1;
+            for (const WeakContinuityCandidate& candidate : result.weakContinuityCandidates) {
+                nextCandidateId = std::max(nextCandidateId, candidate.id + 1);
+            }
+            for (WeakContinuityCandidate& candidate : secondPass.candidates) {
+                candidate.id = nextCandidateId++;
+                candidate.stage = 2;
+                if (candidate.accepted) {
+                    for (const SkeletonPoint& point : candidate.path) {
+                        acceptedWeakContinuityPathMask.set(point.x, point.y, true);
+                    }
+                }
+                result.weakContinuityCandidates.push_back(std::move(candidate));
+            }
+            accumulateWeakContinuityStats(
+                result.weakContinuityStats,
+                secondPass.stats);
+            branchMask = std::move(secondPass.mask);
         }
         if (options.branchAttributionShadow ||
             options.branchAttributionCandidateGroups) {
@@ -2985,9 +3815,29 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
 
         activeMask = bufferMask(branchMask, options.beltRadius);
         if (options.attributeConstrainedBelt) {
+            BinaryMask envelopeSeedMask = attributeMask;
+            if (options.preserveObservedSkeletonEnvelope) {
+                for (int y = 0; y < ny; ++y) {
+                    for (int x = 0; x < nx; ++x) {
+                        if (branchMask.get(x, y) && skeleton.get(x, y)) {
+                            envelopeSeedMask.set(x, y, true);
+                        }
+                    }
+                }
+            }
+            if (options.weakContinuity || options.weakTailCompletion) {
+                for (int y = 0; y < ny; ++y) {
+                    for (int x = 0; x < nx; ++x) {
+                        if (acceptedWeakContinuityPathMask.get(x, y) ||
+                            acceptedWeakTailMask.get(x, y)) {
+                            envelopeSeedMask.set(x, y, true);
+                        }
+                    }
+                }
+            }
             BinaryMask envelopeMask = options.attributeEnvelopeRadius > 0
-                ? dilate(attributeMask, options.attributeEnvelopeRadius)
-                : attributeMask;
+                ? dilate(envelopeSeedMask, options.attributeEnvelopeRadius)
+                : envelopeSeedMask;
             activeMask = intersectMask(activeMask, envelopeMask);
         }
         if (options.postBeltCloseRadius > 0) {
@@ -3058,13 +3908,44 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
             result.rootAntiMergeRejectedComponents = validationStats.rejectedComponents;
             result.rootAntiMergeWeakGuardRejectedCutCells = validationStats.weakGuardRejectedCutCells;
             result.rootAntiMergeWeakGuardRejectedComponents = validationStats.weakGuardRejectedComponents;
+            BinaryMask protectedWeakSeedMask(nx, ny);
+            if (options.weakContinuity || options.weakTailCompletion) {
+                for (int y = 0; y < ny; ++y) {
+                    for (int x = 0; x < nx; ++x) {
+                        if (acceptedWeakContinuityPathMask.get(x, y) ||
+                            acceptedWeakTailMask.get(x, y)) {
+                            protectedWeakSeedMask.set(x, y, true);
+                        }
+                    }
+                }
+            }
+            const BinaryMask protectedWeakPathMask =
+                (options.weakContinuity || options.weakTailCompletion)
+                ? dilate(protectedWeakSeedMask, 1)
+                : BinaryMask(nx, ny);
             for (int y = 0; y < ny; ++y) {
                 for (int x = 0; x < nx; ++x) {
                     if (cutMask.get(x, y)) {
+                        if (protectedWeakPathMask.get(x, y)) {
+                            if (acceptedWeakTailMask.get(x, y)) {
+                                ++result.weakTailProtectedFromAntiMergeCells;
+                            } else {
+                                ++result.weakContinuityProtectedFromAntiMergeCells;
+                            }
+                            continue;
+                        }
                         activeMask.set(x, y, false);
                     }
                 }
             }
+            result.rootAntiMergeCutCells = std::max(
+                0,
+                result.rootAntiMergeCutCells -
+                    result.weakContinuityProtectedFromAntiMergeCells -
+                    result.weakTailProtectedFromAntiMergeCells);
+            result.rootAntiMergeRejectedCutCells +=
+                result.weakContinuityProtectedFromAntiMergeCells +
+                result.weakTailProtectedFromAntiMergeCells;
         }
         if (options.localAntiMerge) {
             LocalAntiMergeValidationStats validationStats;
@@ -3084,6 +3965,78 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
                         activeMask.set(x, y, false);
                     }
                 }
+            }
+        }
+        if (options.weakContinuityFinalObjectPass) {
+            WeakContinuityOptions finalPassOptions =
+                makeWeakContinuityOptions(options);
+            finalPassOptions.maxDistance =
+                std::min(finalPassOptions.maxDistance, 12);
+            finalPassOptions.tangentWindow =
+                std::min(finalPassOptions.tangentWindow, 6);
+            finalPassOptions.corridorRadius =
+                std::min(finalPassOptions.corridorRadius, 5);
+            finalPassOptions.maxCandidatesPerEndpoint =
+                std::min(finalPassOptions.maxCandidatesPerEndpoint, 2);
+            finalPassOptions.maxEndpointAngleDegrees =
+                std::min(finalPassOptions.maxEndpointAngleDegrees, 35.0);
+            finalPassOptions.maxWidthRatio =
+                std::min(finalPassOptions.maxWidthRatio, 2.0);
+            finalPassOptions.minSupportRatio =
+                std::max(finalPassOptions.minSupportRatio, 0.65);
+            finalPassOptions.minMeanSupport =
+                std::max(finalPassOptions.minMeanSupport, 0.52);
+            finalPassOptions.maxUnsupportedRun =
+                std::min(finalPassOptions.maxUnsupportedRun, 2);
+            finalPassOptions.maxPathLengthRatio =
+                std::min(finalPassOptions.maxPathLengthRatio, 1.25);
+            finalPassOptions.maxTurnAngleDegrees =
+                std::min(finalPassOptions.maxTurnAngleDegrees, 35.0);
+            finalPassOptions.thirdPartySkeletonClearanceRadius =
+                std::min(finalPassOptions.thirdPartySkeletonClearanceRadius, 1);
+            finalPassOptions.minCompetitionMargin =
+                std::max(finalPassOptions.minCompetitionMargin, 0.18);
+
+            const BinaryMask finalSkeleton = skeletonizeZhangSuen(activeMask);
+            const SkeletonGraph finalGraph = buildSkeletonGraph(finalSkeleton);
+            const double finalSupportThreshold = std::max(
+                residualSupportThreshold,
+                result.effectiveThreshold *
+                    options.weakContinuityReferenceThresholdRatio);
+            WeakContinuityResult finalPass = connectWeakContinuityPaths(
+                grid,
+                finalSkeleton,
+                activeMask,
+                finalGraph,
+                finalSupportThreshold,
+                finalPassOptions,
+                &activeMask);
+            int nextCandidateId = 1;
+            for (const WeakContinuityCandidate& candidate :
+                 result.weakContinuityCandidates) {
+                nextCandidateId = std::max(nextCandidateId, candidate.id + 1);
+            }
+            for (WeakContinuityCandidate& candidate : finalPass.candidates) {
+                candidate.id = nextCandidateId++;
+                candidate.stage = 3;
+            }
+            activeMask = applyFinalObjectBridgeGates(
+                grid,
+                activeMask,
+                finalGraph,
+                finalSupportThreshold,
+                std::max(2, finalPassOptions.tangentWindow * 3),
+                options.beltRadius,
+                options.attributeEnvelopeRadius,
+                finalPass,
+                result.weakContinuityFinalObjectAcceptedConnections,
+                result.weakContinuityFinalObjectRejectedConnections,
+                result.weakContinuityFinalObjectAddedEnvelopeCells);
+            accumulateWeakContinuityStats(
+                result.weakContinuityStats,
+                finalPass.stats);
+            for (WeakContinuityCandidate& candidate : finalPass.candidates) {
+                result.weakContinuityCandidates.push_back(std::move(candidate));
             }
         }
     }

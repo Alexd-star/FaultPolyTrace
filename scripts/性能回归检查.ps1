@@ -1,8 +1,8 @@
 ﻿param(
     [string]$OfficialDat = "",
     [int]$MaxElapsedMs = 5000,
-    [int]$ExpectedPolygons = 232,
-    [int]$ExpectedKept = 214,
+    [int]$ExpectedPolygons = 212,
+    [int]$ExpectedKept = 200,
     [int]$MaxPolygonIntersections = 0,
     [switch]$SkipCountCheck,
     [switch]$SkipBuild
@@ -65,6 +65,11 @@ if (!(Test-Path -LiteralPath $exe -PathType Leaf)) {
     --max-gap-distance 12 `
     --max-gap-angle 55 `
     --min-gap-support-ratio 0.25 `
+    --no-weak-continuity `
+    --no-weak-continuity-second-pass `
+    --weak-continuity-final-object-pass `
+    --weak-tail-completion `
+    --preserve-observed-skeleton-envelope `
     --no-separate-branch-belts `
     --root-anti-merge `
     --root-anti-merge-support-ratio 0.25 `

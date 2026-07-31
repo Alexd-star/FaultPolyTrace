@@ -23,7 +23,9 @@ $sources = @(
     "src\core\SkeletonGraph.cpp",
     "src\core\Topology.cpp",
     "src\core\FaultTracer.cpp",
+    "src\core\WeakContinuityConnector.cpp",
     "src\core\WeakPathSupport.cpp",
+    "src\core\WeakTailRestorer.cpp",
     "src\io\AsciiGridIO.cpp",
     "src\io\DiagnosticsIO.cpp"
 ) | ForEach-Object { '"' + (Join-Path $repoRoot $_) + '"' }
@@ -50,6 +52,9 @@ $arguments = @(
     "--post-belt-close-radius", "1", "--min-branch-length", "4",
     "--min-junction-branch-length", "2", "--min-junction-branch-mean", "0.94",
     "--max-gap-distance", "12", "--max-gap-angle", "55", "--min-gap-support-ratio", "0.25",
+    "--no-weak-continuity", "--no-weak-continuity-second-pass",
+    "--weak-continuity-final-object-pass", "--weak-tail-completion",
+    "--preserve-observed-skeleton-envelope",
     "--no-separate-branch-belts", "--root-anti-merge", "--root-anti-merge-support-ratio", "0.25",
     "--root-anti-merge-min-part-cells", "0", "--root-anti-merge-min-part-ratio", "0.12",
     "--root-anti-merge-weak-guard-threshold", "0.66", "--root-anti-merge-weak-guard-radius", "0",
@@ -84,7 +89,7 @@ $runText = Get-Content -LiteralPath $runLog -Raw -ErrorAction SilentlyContinue
 if ($runText -match 'AddressSanitizer|ERROR:') {
     throw "AddressSanitizer reported a memory error. See $runLog"
 }
-$expectedHash = "A2A9644692B1E6635B152823CAE192C9C6EF19320AB5EF4273D5B2DB90638ECF"
+$expectedHash = "2911D696F880E1173F6633E6B8A4587316FDC7DFA19109CE8EB28083A076ED3A"
 $actualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $resultCsv).Hash
 if ($actualHash -ne $expectedHash) {
     throw "ASan result hash mismatch. Expected $expectedHash, actual $actualHash"
@@ -106,7 +111,7 @@ if ($malformedExit -eq 0) { throw "Malformed input was not rejected under ASan."
     msvcRuntimeStatus = $msvcRuntimeStatus
     officialDataExitCode = $officialExit
     malformedInputRejected = $true
-    keptPolygonCount = 214
+    keptPolygonCount = 200
     resultSha256 = $actualHash
     asanDumpCreated = (Test-Path -LiteralPath $env:ASAN_SAVE_DUMPS)
     note = "No AddressSanitizer memory-safety report was observed in the covered CLI paths. MSVC ASan does not provide LeakSanitizer."

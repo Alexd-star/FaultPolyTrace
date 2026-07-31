@@ -118,6 +118,11 @@ QStringList traceArguments(const TraceParameters& p) {
          << "--max-gap-distance" << QString::number(p.maxGapDistance)
          << "--max-gap-angle" << number(p.maxGapAngle)
          << "--min-gap-support-ratio" << number(p.minGapSupportRatio)
+         << "--no-weak-continuity"
+         << "--no-weak-continuity-second-pass"
+         << "--weak-continuity-final-object-pass"
+         << "--weak-tail-completion"
+         << "--preserve-observed-skeleton-envelope"
          << (p.separateBranchBelts ? "--separate-branch-belts" : "--no-separate-branch-belts")
          << (p.attributeConstrainedBelt ? "--attribute-constrained-belt" : "--no-attribute-constrained-belt")
          << (p.rootAntiMerge ? "--root-anti-merge" : "--no-root-anti-merge")

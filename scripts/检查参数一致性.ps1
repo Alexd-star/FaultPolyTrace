@@ -169,7 +169,12 @@ $fixedParams = @(
     @{ Label="边界微补值比"; Cli="--residual-edge-fill-min-value-ratio" },
     @{ Label="边界微补跨度"; Cli="--residual-edge-fill-max-patch-span" },
     @{ Label="残余最少点数"; Cli="--residual-min-cells" },
-    @{ Label="残余覆盖保护半径"; Cli="--residual-covered-guard-radius" }
+    @{ Label="残余覆盖保护半径"; Cli="--residual-covered-guard-radius" },
+    @{ Label="关闭宽松弱连续追踪"; Cli="--no-weak-continuity" },
+    @{ Label="关闭弱连续二次追踪"; Cli="--no-weak-continuity-second-pass" },
+    @{ Label="最终对象弱连续门控"; Cli="--weak-continuity-final-object-pass" },
+    @{ Label="弱尾链恢复"; Cli="--weak-tail-completion" },
+    @{ Label="观测骨架包络保护"; Cli="--preserve-observed-skeleton-envelope" }
 )
 
 foreach ($fixed in $fixedParams) {

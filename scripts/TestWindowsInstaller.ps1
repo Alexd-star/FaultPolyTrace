@@ -84,7 +84,9 @@ try {
         "--attribute-envelope-radius", "1", "--post-belt-close-radius", "1",
         "--min-branch-length", "4", "--min-junction-branch-length", "2",
         "--min-junction-branch-mean", "0.94", "--max-gap-distance", "12", "--max-gap-angle", "55",
-        "--min-gap-support-ratio", "0.25", "--no-separate-branch-belts", "--root-anti-merge",
+        "--min-gap-support-ratio", "0.25", "--no-weak-continuity", "--no-weak-continuity-second-pass",
+        "--weak-continuity-final-object-pass", "--weak-tail-completion",
+        "--preserve-observed-skeleton-envelope", "--no-separate-branch-belts", "--root-anti-merge",
         "--root-anti-merge-support-ratio", "0.25", "--root-anti-merge-min-part-cells", "0",
         "--root-anti-merge-min-part-ratio", "0.12", "--root-anti-merge-weak-guard-threshold", "0.66",
         "--root-anti-merge-weak-guard-radius", "0", "--residual-percentile", "0.955",
@@ -97,7 +99,7 @@ try {
     & $cli @cliArgs | Out-Host
     if ($LASTEXITCODE -ne 0) { throw "Installed CLI failed with code $LASTEXITCODE." }
     $diag = Get-Content -LiteralPath $diagnostics -Raw | ConvertFrom-Json
-    if ($diag.results.keptPolygonCount -ne 214) { throw "Expected 214 kept polygons." }
+    if ($diag.results.keptPolygonCount -ne 200) { throw "Expected 200 kept polygons." }
     if ($diag.topology.openRings -ne 0 -or $diag.topology.selfIntersectingPolygons -ne 0 -or $diag.topology.polygonIntersections -ne 0) {
         throw "Installed CLI topology gate failed."
     }

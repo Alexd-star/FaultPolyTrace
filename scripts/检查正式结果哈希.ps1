@@ -20,7 +20,7 @@ if (!(Test-Path -LiteralPath $Executable)) {
 }
 
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
-$output = Join-Path $OutputDirectory "official_root_antimerge.csv"
+$output = Join-Path $OutputDirectory "official_final_200.csv"
 & $Executable `
     --input $OfficialDat --input-format geoeast-dat --output $output `
     --trace-mode ridge-belt --threshold-mode percentile --percentile 0.98 `
@@ -30,6 +30,9 @@ $output = Join-Path $OutputDirectory "official_root_antimerge.csv"
     --post-belt-close-radius 1 --min-branch-length 4 `
     --min-junction-branch-length 2 --min-junction-branch-mean 0.94 `
     --max-gap-distance 12 --max-gap-angle 55 --min-gap-support-ratio 0.25 `
+    --no-weak-continuity --no-weak-continuity-second-pass `
+    --weak-continuity-final-object-pass --weak-tail-completion `
+    --preserve-observed-skeleton-envelope `
     --no-separate-branch-belts --root-anti-merge `
     --root-anti-merge-support-ratio 0.25 --root-anti-merge-min-part-cells 0 `
     --root-anti-merge-min-part-ratio 0.12 --root-anti-merge-weak-guard-threshold 0.66 `
@@ -43,13 +46,13 @@ if ($LASTEXITCODE -ne 0) {
     throw "Official baseline run failed with exit code $LASTEXITCODE."
 }
 
-$expected = "A2A9644692B1E6635B152823CAE192C9C6EF19320AB5EF4273D5B2DB90638ECF"
+$expected = "2911D696F880E1173F6633E6B8A4587316FDC7DFA19109CE8EB28083A076ED3A"
 $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $output).Hash
 if ($actual -ne $expected) {
     throw "Official result hash regressed. Expected $expected, actual $actual."
 }
 $diagnostics = Get-Content -LiteralPath "$output.diagnostics.json" -Raw -Encoding UTF8 | ConvertFrom-Json
-if ([int]$diagnostics.results.keptPolygonCount -ne 214) {
+if ([int]$diagnostics.results.keptPolygonCount -ne 200) {
     throw "Official kept-polygon count regressed: $($diagnostics.results.keptPolygonCount)."
 }
 if ([int]$diagnostics.topology.openRings -ne 0 -or
@@ -63,7 +66,7 @@ if ([int]$diagnostics.topology.openRings -ne 0 -or
     input = (Resolve-Path -LiteralPath $OfficialDat).Path
     executable = (Resolve-Path -LiteralPath $Executable).Path
     output = (Resolve-Path -LiteralPath $output).Path
-    keptPolygonCount = 214
+    keptPolygonCount = 200
     sha256 = $actual
     expectedSha256 = $expected
     topology = [ordered]@{ openRings = 0; selfIntersections = 0; polygonIntersections = 0 }

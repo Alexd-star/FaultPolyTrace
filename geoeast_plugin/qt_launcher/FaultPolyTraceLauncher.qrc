@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/faultpolytrace/formats">
+        <file alias="default_full.fmt">formats/GeoEast_FaultPolygon_default_full.fmt</file>
+    </qresource>
+</RCC>

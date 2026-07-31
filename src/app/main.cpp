@@ -68,6 +68,8 @@ struct CliOptions {
     std::string branchesOutput;
     std::string topologyOutput;
     std::string branchAttributionDifferencesOutput;
+    std::string weakContinuityOutput;
+    std::string weakTailOutput;
     std::string inputFormat = "auto";
     fpt::TraceMode traceMode = fpt::TraceMode::RidgeBelt;
     fpt::ThresholdMode thresholdMode = fpt::ThresholdMode::Percentile;
@@ -113,8 +115,39 @@ struct CliOptions {
     int maxGapDistance = 12;
     double maxGapAngle = 55.0;
     double minGapSupportRatio = 0.25;
+    bool weakContinuityShadow = false;
+    bool weakContinuity = false;
+    bool weakContinuitySecondPass = false;
+    bool weakContinuityFinalObjectPass = true;
+    int weakContinuityMaxDistance = 42;
+    int weakContinuityTangentWindow = 8;
+    int weakContinuityCorridorRadius = 8;
+    int weakContinuityMaxCandidatesPerEndpoint = 4;
+    double weakContinuityMaxEndpointAngle = 42.0;
+    double weakContinuityMaxWidthRatio = 2.5;
+    double weakContinuityMinAttributeRatio = 0.45;
+    double weakContinuityReferenceThresholdRatio = 0.70;
+    double weakContinuityLocalContrastRatio = 0.15;
+    double weakContinuityMinSupportRatio = 0.65;
+    double weakContinuityMinMeanSupport = 0.28;
+    int weakContinuityMaxUnsupportedRun = 5;
+    double weakContinuityMaxPathLengthRatio = 1.45;
+    double weakContinuityMaxTurnAngle = 50.0;
+    double weakContinuityMinCompetitionMargin = 0.18;
+    int weakContinuityThirdPartySkeletonClearanceRadius = 2;
+    bool weakTailCompletionShadow = false;
+    bool weakTailCompletion = true;
+    int weakTailMinCells = 6;
+    int weakTailMaxCells = 64;
+    double weakTailMinAspect = 5.0;
+    double weakTailMinMeanSupportRatio = 0.75;
+    double weakTailMinPeakSupportRatio = 0.90;
+    double weakTailMaxAlignmentAngle = 35.0;
+    int weakTailOwnershipClearanceRadius = 2;
+    int weakTailTangentRadius = 12;
+    bool preserveObservedSkeletonEnvelope = true;
     bool separateBranchBelts = false;
-    bool rootAntiMerge = false;
+    bool rootAntiMerge = true;
     int rootAntiMergeRadius = 1;
     double rootAntiMergeSupportRatio = 0.25;
     double rootAntiMergeMaxBridgeValue = 1e-12;
@@ -212,10 +245,43 @@ void printUsage() {
         << "  --max-gap-distance <count>  Max endpoint gap connected in ridge-belt mode. Default: 12\n"
         << "  --max-gap-angle <degrees>   Max endpoint direction mismatch. Default: 55\n"
         << "  --min-gap-support-ratio <v> Minimum weak support ratio for endpoint continuation. Default: 0.25\n"
+        << "  --weak-continuity       Apply constrained weak-attribute endpoint path connections. Default: off\n"
+        << "  --weak-continuity-shadow Diagnose constrained weak paths without changing polygons. Default: off\n"
+        << "  --weak-continuity-second-pass Re-run constrained paths after branch/tail selection. Default: off\n"
+        << "  --weak-continuity-final-object-pass Re-run strict path and envelope gates on final polygon objects. Default: on\n"
+        << "  --weak-continuity-output <path> Write per-candidate path evidence CSV\n"
+        << "  --weak-continuity-max-distance <n> Maximum endpoint distance. Default: 42\n"
+        << "  --weak-continuity-tangent-window <n> Skeleton cells used for endpoint tangent. Default: 8\n"
+        << "  --weak-continuity-corridor-radius <n> A* search corridor radius. Default: 8\n"
+        << "  --weak-continuity-max-candidates <n> Geometric candidates retained per endpoint. Default: 4\n"
+        << "  --weak-continuity-max-angle <degrees> Maximum endpoint direction mismatch. Default: 42\n"
+        << "  --weak-continuity-max-width-ratio <v> Maximum endpoint width ratio. Default: 2.5\n"
+        << "  --weak-continuity-min-attribute-ratio <v> Minimum path value relative to support threshold. Default: 0.45\n"
+        << "  --weak-continuity-reference-threshold-ratio <v> Minimum support reference relative to strong threshold. Default: 0.70\n"
+        << "  --weak-continuity-local-contrast-ratio <v> Local background contrast fraction. Default: 0.15\n"
+        << "  --weak-continuity-min-support-ratio <v> Minimum supported path-cell ratio. Default: 0.65\n"
+        << "  --weak-continuity-min-mean-support <v> Minimum normalized mean path support. Default: 0.28\n"
+        << "  --weak-continuity-max-unsupported-run <n> Maximum consecutive unsupported cells. Default: 5\n"
+        << "  --weak-continuity-max-length-ratio <v> Maximum path/endpoint-distance ratio. Default: 1.45\n"
+        << "  --weak-continuity-max-turn-angle <degrees> Maximum windowed path turn. Default: 50\n"
+        << "  --weak-continuity-min-competition-margin <v> Minimum best/second-best cost margin. Default: 0.18\n"
+        << "  --weak-continuity-third-party-clearance <n> Clearance from unrelated skeletons. Default: 2\n"
+        << "  --weak-tail-completion Apply chain-level supported endpoint-tail restoration. Default: on\n"
+        << "  --weak-tail-completion-shadow Diagnose endpoint tails without changing polygons. Default: off\n"
+        << "  --weak-tail-output <path> Write per-tail evidence CSV\n"
+        << "  --weak-tail-min-cells <n> Minimum tail-chain cells. Default: 6\n"
+        << "  --weak-tail-max-cells <n> Maximum tail-chain cells. Default: 64\n"
+        << "  --weak-tail-min-aspect <v> Minimum PCA elongation. Default: 5\n"
+        << "  --weak-tail-min-mean-support-ratio <v> Minimum mean value/strong threshold. Default: 0.75\n"
+        << "  --weak-tail-min-peak-support-ratio <v> Minimum peak value/strong threshold. Default: 0.90\n"
+        << "  --weak-tail-max-alignment-angle <degrees> Maximum tail/owner direction mismatch. Default: 35\n"
+        << "  --weak-tail-owner-clearance <n> Radius used to reject multiple owners. Default: 2\n"
+        << "  --weak-tail-tangent-radius <n> Local owner direction window. Default: 12\n"
+        << "  --preserve-observed-skeleton-envelope Keep accepted observed centerlines in the attribute envelope. Default: on\n"
         << "  --separate-branch-belts    Output root-trace-separated local belts. Default: off\n"
         << "  --no-separate-branch-belts Use one merged ridge belt before polygon tracing. Default: on\n"
-        << "  --root-anti-merge          Cut unsupported bridge cells between different root traces. Default: off\n"
-        << "  --no-root-anti-merge       Disable root-trace anti-merge guard. Root anti-merge is off by default\n"
+        << "  --root-anti-merge          Cut unsupported bridge cells between different root traces. Default: on\n"
+        << "  --no-root-anti-merge       Disable the default root-trace anti-merge guard\n"
         << "  --root-anti-merge-radius <n> Neighborhood radius for bridge detection. Default: 1\n"
         << "  --root-anti-merge-support-ratio <v> Attribute support ratio needed to keep bridge cells. Default: 0.25\n"
         << "  --root-anti-merge-max-bridge-value <v> Max raw attribute value treated as background bridge. Default: 1e-12\n"
@@ -321,6 +387,8 @@ void prepareOutputDirectories(const CliOptions& options) {
         options.branchesOutput,
         options.topologyOutput,
         options.branchAttributionDifferencesOutput
+        , options.weakContinuityOutput
+        , options.weakTailOutput
     };
     for (const std::string& path : paths) {
         if (path.empty()) {
@@ -347,7 +415,9 @@ void validateDistinctOutputPaths(const CliOptions& options) {
         {
             "--branch-attribution-differences",
             options.branchAttributionDifferencesOutput
-        }
+        },
+        {"--weak-continuity-output", options.weakContinuityOutput},
+        {"--weak-tail-output", options.weakTailOutput}
     };
     const std::string inputKey = normalizedPathKey(options.input);
     std::unordered_map<std::string, std::string> optionByPath;
@@ -461,6 +531,10 @@ CliOptions parseArgs(int argc, char** argv) {
         } else if (arg == "--branch-attribution-differences") {
             options.branchAttributionDifferencesOutput =
                 requireValue(arg);
+        } else if (arg == "--weak-continuity-output") {
+            options.weakContinuityOutput = requireValue(arg);
+        } else if (arg == "--weak-tail-output") {
+            options.weakTailOutput = requireValue(arg);
         } else if (arg == "--trace-mode") {
             const std::string mode = requireValue(arg);
             if (mode == "region") {
@@ -582,6 +656,82 @@ CliOptions parseArgs(int argc, char** argv) {
             options.maxGapAngle = std::stod(requireValue(arg));
         } else if (arg == "--min-gap-support-ratio") {
             options.minGapSupportRatio = std::stod(requireValue(arg));
+        } else if (arg == "--weak-continuity") {
+            options.weakContinuity = true;
+        } else if (arg == "--no-weak-continuity") {
+            options.weakContinuity = false;
+        } else if (arg == "--weak-continuity-second-pass") {
+            options.weakContinuitySecondPass = true;
+        } else if (arg == "--no-weak-continuity-second-pass") {
+            options.weakContinuitySecondPass = false;
+        } else if (arg == "--weak-continuity-final-object-pass") {
+            options.weakContinuityFinalObjectPass = true;
+        } else if (arg == "--no-weak-continuity-final-object-pass") {
+            options.weakContinuityFinalObjectPass = false;
+        } else if (arg == "--weak-continuity-shadow") {
+            options.weakContinuityShadow = true;
+        } else if (arg == "--no-weak-continuity-shadow") {
+            options.weakContinuityShadow = false;
+        } else if (arg == "--weak-continuity-max-distance") {
+            options.weakContinuityMaxDistance = std::stoi(requireValue(arg));
+        } else if (arg == "--weak-continuity-tangent-window") {
+            options.weakContinuityTangentWindow = std::stoi(requireValue(arg));
+        } else if (arg == "--weak-continuity-corridor-radius") {
+            options.weakContinuityCorridorRadius = std::stoi(requireValue(arg));
+        } else if (arg == "--weak-continuity-max-candidates") {
+            options.weakContinuityMaxCandidatesPerEndpoint = std::stoi(requireValue(arg));
+        } else if (arg == "--weak-continuity-max-angle") {
+            options.weakContinuityMaxEndpointAngle = std::stod(requireValue(arg));
+        } else if (arg == "--weak-continuity-max-width-ratio") {
+            options.weakContinuityMaxWidthRatio = std::stod(requireValue(arg));
+        } else if (arg == "--weak-continuity-min-attribute-ratio") {
+            options.weakContinuityMinAttributeRatio = std::stod(requireValue(arg));
+        } else if (arg == "--weak-continuity-reference-threshold-ratio") {
+            options.weakContinuityReferenceThresholdRatio = std::stod(requireValue(arg));
+        } else if (arg == "--weak-continuity-local-contrast-ratio") {
+            options.weakContinuityLocalContrastRatio = std::stod(requireValue(arg));
+        } else if (arg == "--weak-continuity-min-support-ratio") {
+            options.weakContinuityMinSupportRatio = std::stod(requireValue(arg));
+        } else if (arg == "--weak-continuity-min-mean-support") {
+            options.weakContinuityMinMeanSupport = std::stod(requireValue(arg));
+        } else if (arg == "--weak-continuity-max-unsupported-run") {
+            options.weakContinuityMaxUnsupportedRun = std::stoi(requireValue(arg));
+        } else if (arg == "--weak-continuity-max-length-ratio") {
+            options.weakContinuityMaxPathLengthRatio = std::stod(requireValue(arg));
+        } else if (arg == "--weak-continuity-max-turn-angle") {
+            options.weakContinuityMaxTurnAngle = std::stod(requireValue(arg));
+        } else if (arg == "--weak-continuity-min-competition-margin") {
+            options.weakContinuityMinCompetitionMargin = std::stod(requireValue(arg));
+        } else if (arg == "--weak-continuity-third-party-clearance") {
+            options.weakContinuityThirdPartySkeletonClearanceRadius = std::stoi(requireValue(arg));
+        } else if (arg == "--weak-tail-completion") {
+            options.weakTailCompletion = true;
+        } else if (arg == "--no-weak-tail-completion") {
+            options.weakTailCompletion = false;
+        } else if (arg == "--weak-tail-completion-shadow") {
+            options.weakTailCompletionShadow = true;
+        } else if (arg == "--no-weak-tail-completion-shadow") {
+            options.weakTailCompletionShadow = false;
+        } else if (arg == "--weak-tail-min-cells") {
+            options.weakTailMinCells = std::stoi(requireValue(arg));
+        } else if (arg == "--weak-tail-max-cells") {
+            options.weakTailMaxCells = std::stoi(requireValue(arg));
+        } else if (arg == "--weak-tail-min-aspect") {
+            options.weakTailMinAspect = std::stod(requireValue(arg));
+        } else if (arg == "--weak-tail-min-mean-support-ratio") {
+            options.weakTailMinMeanSupportRatio = std::stod(requireValue(arg));
+        } else if (arg == "--weak-tail-min-peak-support-ratio") {
+            options.weakTailMinPeakSupportRatio = std::stod(requireValue(arg));
+        } else if (arg == "--weak-tail-max-alignment-angle") {
+            options.weakTailMaxAlignmentAngle = std::stod(requireValue(arg));
+        } else if (arg == "--weak-tail-owner-clearance") {
+            options.weakTailOwnershipClearanceRadius = std::stoi(requireValue(arg));
+        } else if (arg == "--weak-tail-tangent-radius") {
+            options.weakTailTangentRadius = std::stoi(requireValue(arg));
+        } else if (arg == "--preserve-observed-skeleton-envelope") {
+            options.preserveObservedSkeletonEnvelope = true;
+        } else if (arg == "--no-preserve-observed-skeleton-envelope") {
+            options.preserveObservedSkeletonEnvelope = false;
         } else if (arg == "--separate-branch-belts") {
             options.separateBranchBelts = true;
         } else if (arg == "--no-separate-branch-belts") {
@@ -689,6 +839,15 @@ CliOptions parseArgs(int argc, char** argv) {
     }
     if (options.topologyOutput.empty()) {
         options.topologyOutput = options.output + ".topology.csv";
+    }
+    if (options.weakContinuityOutput.empty() &&
+        (options.weakContinuity || options.weakContinuityShadow ||
+         options.weakContinuityFinalObjectPass)) {
+        options.weakContinuityOutput = options.output + ".weak-continuity.csv";
+    }
+    if (options.weakTailOutput.empty() &&
+        (options.weakTailCompletion || options.weakTailCompletionShadow)) {
+        options.weakTailOutput = options.output + ".weak-tails.csv";
     }
     if (!options.branchAttributionDifferencesOutput.empty() &&
         !options.branchAttributionShadow &&
@@ -851,6 +1010,40 @@ int main(int argc, char** argv) {
         traceOptions.maxGapDistance = cli.maxGapDistance;
         traceOptions.maxGapAngle = cli.maxGapAngle;
         traceOptions.minGapSupportRatio = cli.minGapSupportRatio;
+        traceOptions.weakContinuityShadow = cli.weakContinuityShadow;
+        traceOptions.weakContinuity = cli.weakContinuity;
+        traceOptions.weakContinuitySecondPass = cli.weakContinuitySecondPass;
+        traceOptions.weakContinuityFinalObjectPass =
+            cli.weakContinuityFinalObjectPass;
+        traceOptions.weakContinuityMaxDistance = cli.weakContinuityMaxDistance;
+        traceOptions.weakContinuityTangentWindow = cli.weakContinuityTangentWindow;
+        traceOptions.weakContinuityCorridorRadius = cli.weakContinuityCorridorRadius;
+        traceOptions.weakContinuityMaxCandidatesPerEndpoint = cli.weakContinuityMaxCandidatesPerEndpoint;
+        traceOptions.weakContinuityMaxEndpointAngle = cli.weakContinuityMaxEndpointAngle;
+        traceOptions.weakContinuityMaxWidthRatio = cli.weakContinuityMaxWidthRatio;
+        traceOptions.weakContinuityMinAttributeRatio = cli.weakContinuityMinAttributeRatio;
+        traceOptions.weakContinuityReferenceThresholdRatio = cli.weakContinuityReferenceThresholdRatio;
+        traceOptions.weakContinuityLocalContrastRatio = cli.weakContinuityLocalContrastRatio;
+        traceOptions.weakContinuityMinSupportRatio = cli.weakContinuityMinSupportRatio;
+        traceOptions.weakContinuityMinMeanSupport = cli.weakContinuityMinMeanSupport;
+        traceOptions.weakContinuityMaxUnsupportedRun = cli.weakContinuityMaxUnsupportedRun;
+        traceOptions.weakContinuityMaxPathLengthRatio = cli.weakContinuityMaxPathLengthRatio;
+        traceOptions.weakContinuityMaxTurnAngle = cli.weakContinuityMaxTurnAngle;
+        traceOptions.weakContinuityMinCompetitionMargin = cli.weakContinuityMinCompetitionMargin;
+        traceOptions.weakContinuityThirdPartySkeletonClearanceRadius =
+            cli.weakContinuityThirdPartySkeletonClearanceRadius;
+        traceOptions.weakTailCompletionShadow = cli.weakTailCompletionShadow;
+        traceOptions.weakTailCompletion = cli.weakTailCompletion;
+        traceOptions.weakTailMinCells = cli.weakTailMinCells;
+        traceOptions.weakTailMaxCells = cli.weakTailMaxCells;
+        traceOptions.weakTailMinAspect = cli.weakTailMinAspect;
+        traceOptions.weakTailMinMeanSupportRatio = cli.weakTailMinMeanSupportRatio;
+        traceOptions.weakTailMinPeakSupportRatio = cli.weakTailMinPeakSupportRatio;
+        traceOptions.weakTailMaxAlignmentAngle = cli.weakTailMaxAlignmentAngle;
+        traceOptions.weakTailOwnershipClearanceRadius = cli.weakTailOwnershipClearanceRadius;
+        traceOptions.weakTailTangentRadius = cli.weakTailTangentRadius;
+        traceOptions.preserveObservedSkeletonEnvelope =
+            cli.preserveObservedSkeletonEnvelope;
         traceOptions.separateBranchBelts = cli.separateBranchBelts;
         traceOptions.rootAntiMerge = cli.rootAntiMerge;
         traceOptions.rootAntiMergeRadius = cli.rootAntiMergeRadius;
@@ -905,6 +1098,16 @@ int main(int argc, char** argv) {
             fpt::writeBranchAttributionDifferencesCsv(
                 cli.branchAttributionDifferencesOutput,
                 result.branchAttributionJunctions);
+        }
+        if (!cli.weakContinuityOutput.empty()) {
+            fpt::writeWeakContinuityCandidatesCsv(
+                cli.weakContinuityOutput,
+                result.weakContinuityCandidates);
+        }
+        if (!cli.weakTailOutput.empty()) {
+            fpt::writeWeakTailCandidatesCsv(
+                cli.weakTailOutput,
+                result.weakTailCandidates);
         }
         const auto afterWrites = std::chrono::steady_clock::now();
 
@@ -981,6 +1184,40 @@ int main(int argc, char** argv) {
         diagnostics.maxGapDistance = cli.maxGapDistance;
         diagnostics.maxGapAngle = cli.maxGapAngle;
         diagnostics.minGapSupportRatio = cli.minGapSupportRatio;
+        diagnostics.weakContinuityShadow = cli.weakContinuityShadow;
+        diagnostics.weakContinuity = cli.weakContinuity;
+        diagnostics.weakContinuitySecondPass = cli.weakContinuitySecondPass;
+        diagnostics.weakContinuityFinalObjectPass =
+            cli.weakContinuityFinalObjectPass;
+        diagnostics.weakContinuityMaxDistance = cli.weakContinuityMaxDistance;
+        diagnostics.weakContinuityTangentWindow = cli.weakContinuityTangentWindow;
+        diagnostics.weakContinuityCorridorRadius = cli.weakContinuityCorridorRadius;
+        diagnostics.weakContinuityMaxCandidatesPerEndpoint = cli.weakContinuityMaxCandidatesPerEndpoint;
+        diagnostics.weakContinuityMaxEndpointAngle = cli.weakContinuityMaxEndpointAngle;
+        diagnostics.weakContinuityMaxWidthRatio = cli.weakContinuityMaxWidthRatio;
+        diagnostics.weakContinuityMinAttributeRatio = cli.weakContinuityMinAttributeRatio;
+        diagnostics.weakContinuityReferenceThresholdRatio = cli.weakContinuityReferenceThresholdRatio;
+        diagnostics.weakContinuityLocalContrastRatio = cli.weakContinuityLocalContrastRatio;
+        diagnostics.weakContinuityMinSupportRatio = cli.weakContinuityMinSupportRatio;
+        diagnostics.weakContinuityMinMeanSupport = cli.weakContinuityMinMeanSupport;
+        diagnostics.weakContinuityMaxUnsupportedRun = cli.weakContinuityMaxUnsupportedRun;
+        diagnostics.weakContinuityMaxPathLengthRatio = cli.weakContinuityMaxPathLengthRatio;
+        diagnostics.weakContinuityMaxTurnAngle = cli.weakContinuityMaxTurnAngle;
+        diagnostics.weakContinuityMinCompetitionMargin = cli.weakContinuityMinCompetitionMargin;
+        diagnostics.weakContinuityThirdPartySkeletonClearanceRadius =
+            cli.weakContinuityThirdPartySkeletonClearanceRadius;
+        diagnostics.weakTailCompletionShadow = cli.weakTailCompletionShadow;
+        diagnostics.weakTailCompletion = cli.weakTailCompletion;
+        diagnostics.weakTailMinCells = cli.weakTailMinCells;
+        diagnostics.weakTailMaxCells = cli.weakTailMaxCells;
+        diagnostics.weakTailMinAspect = cli.weakTailMinAspect;
+        diagnostics.weakTailMinMeanSupportRatio = cli.weakTailMinMeanSupportRatio;
+        diagnostics.weakTailMinPeakSupportRatio = cli.weakTailMinPeakSupportRatio;
+        diagnostics.weakTailMaxAlignmentAngle = cli.weakTailMaxAlignmentAngle;
+        diagnostics.weakTailOwnershipClearanceRadius = cli.weakTailOwnershipClearanceRadius;
+        diagnostics.weakTailTangentRadius = cli.weakTailTangentRadius;
+        diagnostics.preserveObservedSkeletonEnvelope =
+            cli.preserveObservedSkeletonEnvelope;
         diagnostics.rootAntiMerge = cli.rootAntiMerge;
         diagnostics.rootAntiMergeRadius = cli.rootAntiMergeRadius;
         diagnostics.rootAntiMergeSupportRatio = cli.rootAntiMergeSupportRatio;
@@ -1033,6 +1270,18 @@ int main(int argc, char** argv) {
         diagnostics.keptBranches = result.keptBranches;
         diagnostics.prunedBranches = result.prunedBranches;
         diagnostics.connectedGaps = result.connectedGaps;
+        diagnostics.weakContinuityStats = result.weakContinuityStats;
+        diagnostics.weakContinuityProtectedFromAntiMergeCells =
+            result.weakContinuityProtectedFromAntiMergeCells;
+        diagnostics.weakContinuityFinalObjectAcceptedConnections =
+            result.weakContinuityFinalObjectAcceptedConnections;
+        diagnostics.weakContinuityFinalObjectRejectedConnections =
+            result.weakContinuityFinalObjectRejectedConnections;
+        diagnostics.weakContinuityFinalObjectAddedEnvelopeCells =
+            result.weakContinuityFinalObjectAddedEnvelopeCells;
+        diagnostics.weakTailStats = result.weakTailStats;
+        diagnostics.weakTailProtectedFromAntiMergeCells =
+            result.weakTailProtectedFromAntiMergeCells;
         diagnostics.rootAntiMergeCandidateCutCells = result.rootAntiMergeCandidateCutCells;
         diagnostics.rootAntiMergeCutCells = result.rootAntiMergeCutCells;
         diagnostics.rootAntiMergeRejectedCutCells = result.rootAntiMergeRejectedCutCells;
@@ -1238,6 +1487,22 @@ int main(int argc, char** argv) {
             std::cout << "Skeleton junctions: " << result.skeletonJunctions << "\n";
             std::cout << "Skeleton branches: " << result.skeletonBranches << "\n";
             std::cout << "Connected gaps: " << result.connectedGaps << "\n";
+            if (cli.weakContinuity || cli.weakContinuityShadow ||
+                cli.weakContinuityFinalObjectPass) {
+                std::cout << "Weak continuity searched/found/accepted paths: "
+                          << result.weakContinuityStats.searchedPaths << "/"
+                          << result.weakContinuityStats.foundPaths << "/"
+                          << result.weakContinuityStats.acceptedConnections << "\n";
+                std::cout << "Weak continuity added path pixels: "
+                          << result.weakContinuityStats.addedPathPixels << "\n";
+                if (cli.weakContinuityFinalObjectPass) {
+                    std::cout << "Final-object weak continuity accepted/rejected: "
+                              << result.weakContinuityFinalObjectAcceptedConnections << "/"
+                              << result.weakContinuityFinalObjectRejectedConnections << "\n";
+                    std::cout << "Final-object weak continuity added envelope cells: "
+                              << result.weakContinuityFinalObjectAddedEnvelopeCells << "\n";
+                }
+            }
             std::cout << "Kept branches: " << result.keptBranches << "\n";
             std::cout << "Pruned branches: " << result.prunedBranches << "\n";
             if (cli.rootAntiMerge) {

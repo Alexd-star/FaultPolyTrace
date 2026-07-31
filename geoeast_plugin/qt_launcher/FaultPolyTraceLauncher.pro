@@ -25,6 +25,7 @@ SOURCES += \
     ../../src/ui/FptControls.cpp \
     ../../src/ui/TraceParameterModel.cpp \
     ../../src/ui/QualityReviewModel.cpp \
+    GeoEastDatExporter.cpp \
     FaultTraceDialog.cpp
 
 HEADERS += \
@@ -35,7 +36,10 @@ HEADERS += \
     ../../src/ui/FptControls.h \
     ../../src/ui/TraceParameterModel.h \
     ../../src/ui/QualityReviewModel.h \
+    GeoEastDatExporter.h \
     FaultTraceDialog.h
+
+RESOURCES += FaultPolyTraceLauncher.qrc
 
 OBJECTS_DIR = .obj
 MOC_DIR = .moc

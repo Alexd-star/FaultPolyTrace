@@ -111,7 +111,7 @@ def test_legacy_dangerous_settings_are_migrated_and_reported():
         assert "startupNotices_" in source
         assert "检测到旧版分位数设置" in source
         assert "检测到旧版最小面积设置" in source
-        assert 'settings.setValue("configSchemaVersion", 5)' in source
+        assert 'settings.setValue("configSchemaVersion", 6)' in source
 
 
 def test_layer_actions_have_user_facing_precondition_guidance():
@@ -250,8 +250,9 @@ def test_fresh_install_uses_the_formal_root_antimerge_preset():
     launcher = read("geoeast_plugin/qt_launcher/FaultTraceDialog.cpp")
     assert 'settings.value("preset", QString::fromUtf8("防黏连增强"))' in desktop
     assert 'settings.value("preset", QString::fromUtf8("防黏连增强"))' in launcher
-    assert "if (schemaVersion == 0)" in desktop
+    assert "const bool migrateFinalDefaults = schemaVersion < 6" in desktop
     assert 'applyPreset(QString::fromUtf8("防黏连增强"))' in desktop
+    assert 'applyParameterPreset(QString::fromUtf8("防黏连增强"))' in launcher
 
 
 def test_task_elapsed_label_does_not_claim_to_include_layer_preparation():

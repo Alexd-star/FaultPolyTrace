@@ -714,8 +714,25 @@ LegacyGreedyBranchPairingResult computeLegacyGreedyBranchPairing(
     }
     result.rootBranchIndices.reserve(grouped.size());
     for (auto& item : grouped) {
+        // Root IDs are implementation details of the union-find structure.
+        // Canonicalize the exported groups by their member branch indices so
+        // downstream ownership propagation does not depend on hash-map or
+        // union-by-rank traversal order across compilers.
+        std::sort(item.second.begin(), item.second.end());
         result.rootBranchIndices.push_back(std::move(item.second));
     }
+    std::sort(
+        result.rootBranchIndices.begin(),
+        result.rootBranchIndices.end(),
+        [](const std::vector<int>& first, const std::vector<int>& second) {
+            if (first.empty() || second.empty()) {
+                return first.size() < second.size();
+            }
+            if (first.front() != second.front()) {
+                return first.front() > second.front();
+            }
+            return first > second;
+        });
     return result;
 }
 

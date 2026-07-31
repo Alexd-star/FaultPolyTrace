@@ -45,6 +45,10 @@ void writeMapGrid(
     const fpt::Grid2D& grid,
     bool overwrite);
 
+void deleteMapGrid(
+    const GeoEastProjectPtr& project,
+    const std::string& gridName);
+
 void writeFaultPolygons(
     const GeoEastProjectPtr& project,
     const std::string& outputName,

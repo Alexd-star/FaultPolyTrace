@@ -112,6 +112,19 @@ GeoEast 帮助文档中的关键信息：
 - 多边形顶点包含 X/Y 坐标和 wall type 信息。
 - Basemap 支持断层多边形显示、图层顺序和样式调整。
 
+### 5.1 官方数据语义核对
+
+根据 `GeoBasemap.pdf`、`GeoFaultPolygonBrowser.pdf` 和 NGP SDK 的 `bofaultpolygon.h`：
+
+- 一个 `BOFaultPolygon` 对象可包含多条 `BAFaultPolygonSegment`。
+- 每条段具有独立段标识、组合标识、`closeFlag`、断层类型、级别和顶点列表。
+- GeoEast 同时支持未闭合段与闭合段；本赛题输出为断层带外边界，因此 FaultPolyTrace 写出的正式段统一使用闭合标识。
+- 两个未闭合段可通过端点连接；两个闭合段只有在相交时才由 GeoEast 的 `Link` 操作合并。自动追踪结果若需要补齐短缺口，应先依据属性和方向重建连续断层带，再重新生成闭合外边界，不能只在数据库层强行合并两个相离多边形。
+- `Fill Closed Fault Polygon`、颜色、线型、线宽和平滑均为底图显示参数。调整它们不会补上真实缺失像元，也不会改变输出顶点；人工核验应同时查看原始属性与实际边界。
+- GeoEast 数据结构没有表达“某外环的内环”的父子字段。当前适配器只写外边界，保留完整含洞几何到 CSV/WKT，避免把内环误写成独立断层对象。
+
+当前 `GeoEastBoAdapter` 的正式写入设置 `closeFlag=1`，每个保留外边界写成一条独立段，并在事务式替换后回读外环数量、范围、外环面积、顶点数量和样式。外边界写入语义与官方说明书一致，但 `BOFaultPolygon` 不提供内环父子关系，含洞 WKT 不能完整往返；适配器会省略内环而不是把它误写成独立断层。后续弱连续性候选仍须先通过内环、局部包络和几何门控，不能绕过核心算法直接修改数据库段关系。
+
 ## 6. 从 PowerShell 运行
 
 本机默认验证命令：
@@ -159,6 +172,16 @@ GeoEast 帮助文档中的关键信息：
 8. 默认使用 `ridge-belt`、`percentile=0.98`、`min area=120`，推荐预设为“防黏连增强”。
 9. 点击 `开始追踪`。
 10. 保存或截图日志证据：网格尺寸、多边形数量、拓扑诊断、耗时。
+11. 在结果区点击【导出 GeoEast DAT】，保存为通知要求的 `lc_result.dat`。
+12. 确认界面提示“已导出并通过结构校验”，再在 GeoEast 中使用【Import Fault Polygons】回导为临时对象并核对显示。
+
+### 7.1 最终 DAT 的格式与验收
+
+【导出 GeoEast DAT】不是把内部 CSV 修改扩展名。启动器会先调用 BO Runner 从当前项目的 `BOFaultPolygon` 回读最终外环，然后按本机 GeoEast 官方 `default_full.fmt` 输出八列，并在同一目录生成同名 `.fmt`。每条外环使用连续分段号，首点在末尾重复，`faultLevel/faultPointType/faultPolygonType/closeType` 固定为与 BO Writer 一致的 `0/0/1/1`。
+
+GeoDataIO 会保留上一次导入任务的字段映射，因此仅选择 DAT 后直接导入可能出现“主控列表有对象和段数量，但内部没有有效点、平面成图为空”的假成功。正确流程是在格式定义页面点击【打开】，选择软件生成的同名 `.fmt`，确认数据体开始行是 `2`，且第 1—8 列依次映射为名称、X、Y、Connection Flag、Fault Level、Fault Point Type、Fault Polygon Type、Closing Type，再点击【导入】。
+
+导出器会在原子替换目标文件前后分别检查表头、列数、有限坐标、不同顶点数、非零面积、闭合性、分段连续性和总记录数，并记录 SHA256。软件结构校验通过后，仍须在最终使用的 GeoEast 版本中回导一次。只有回导无字段解析错误、坐标和外环数量正常、临时对象与正式 `BOFaultPolygon` 显示一致，才算完成提交级验收。
 
 ## 8. 从 GeoEast 主控入口运行
 

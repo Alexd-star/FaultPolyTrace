@@ -19,7 +19,18 @@ namespace geobo = ngp::bo;
 namespace {
 
 bool isValidGridValue(double value) {
-    return value <= 0.1 * static_cast<double>(FLT_MAX);
+    return std::isfinite(value) &&
+           std::abs(value) <= 0.1 * static_cast<double>(FLT_MAX);
+}
+
+double stableStoredGridValue(double value, bool normalizedAttributeGrid) {
+    if (!isValidGridValue(value)) {
+        return 0.0;
+    }
+    if (normalizedAttributeGrid) {
+        return std::round(value * 1.0e6) / 1.0e6;
+    }
+    return value;
 }
 
 void updateBounds(const fpt::Point& point, double& minX, double& minY, double& maxX, double& maxY) {
@@ -99,6 +110,12 @@ std::vector<fpt::Polygon> readFaultPolygons(const GeoEastProjectPtr& project, co
     polygons.reserve(data.faultPolygonList.size());
     int id = 1;
     for (const BAFaultPolygonSegment& segment : data.faultPolygonList) {
+        if (segment.closeFlag == 0) {
+            throw std::runtime_error(
+                "BOFaultPolygon contains an open segment that cannot be represented "
+                "as a closed FaultPolyTrace polygon: " +
+                std::to_string(static_cast<long long>(segment.faultPolygonSegID)));
+        }
         if (segment.faultPolygonData.size() < 3) {
             continue;
         }
@@ -177,12 +194,25 @@ fpt::Grid2D readMapGrid(const GeoEastProjectPtr& project, const std::string& gri
     metadata.sy = head.sy - 0.5 * std::abs(head.dy);
     metadata.dx = head.dx;
     metadata.dy = head.dy;
-
     fpt::Grid2D grid(metadata);
+    double observedMin = std::numeric_limits<double>::infinity();
+    double observedMax = -std::numeric_limits<double>::infinity();
     for (int i = 0; i < head.nx; ++i) {
         for (int j = 0; j < head.ny; ++j) {
             BAMapGridPoint point = boGrid->getData(i, j);
-            grid.value(i, j) = isValidGridValue(point.z) ? point.z : 0.0;
+            const double value = isValidGridValue(point.z) ? point.z : 0.0;
+            grid.value(i, j) = value;
+            observedMin = std::min(observedMin, value);
+            observedMax = std::max(observedMax, value);
+        }
+    }
+    const bool normalizedAttributeGrid =
+        observedMin >= -1.000001 && observedMax <= 1.000001;
+    if (normalizedAttributeGrid) {
+        for (int i = 0; i < head.nx; ++i) {
+            for (int j = 0; j < head.ny; ++j) {
+                grid.value(i, j) = stableStoredGridValue(grid.value(i, j), true);
+            }
         }
     }
     return grid;
@@ -293,6 +323,25 @@ void writeMapGrid(
 
     std::cout << "BOMapGrid written: " << gridName << "\n";
     std::cout << "BOMapGrid file: " << griddingsPath << "/" << gridName << "\n";
+}
+
+void deleteMapGrid(
+    const GeoEastProjectPtr& project,
+    const std::string& gridName) {
+    if (!project) {
+        throw std::runtime_error("GeoEast project is null.");
+    }
+    if (gridName.empty()) {
+        throw std::runtime_error("GeoEast BOMapGrid name is empty.");
+    }
+    if (!project->getChild<geobo::BOMapGrid>(gridName)) {
+        throw std::runtime_error("BOMapGrid does not exist: " + gridName);
+    }
+    NStatus eraseResult = project->eraseChild<geobo::BOMapGrid>(gridName);
+    if (eraseResult.Value() == NStatus::NFail) {
+        throw std::runtime_error("Failed to delete BOMapGrid: " + gridName);
+    }
+    std::cout << "BOMapGrid deleted: " << gridName << "\n";
 }
 
 void writeFaultPolygons(

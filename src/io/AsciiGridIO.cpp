@@ -2,13 +2,19 @@
 #include "AtomicOutputFile.h"
 
 #include <algorithm>
+#include <cctype>
+#include <cmath>
 #include <cstdlib>
 #include <fstream>
 #include <filesystem>
 #include <iomanip>
+#include <iterator>
 #include <limits>
+#include <set>
+#include <sstream>
 #include <stdexcept>
 #include <unordered_map>
+#include <utility>
 
 #ifdef _WIN32
 #define NOMINMAX
@@ -72,6 +78,233 @@ void writeLineStringWkt(std::ostream& out, const std::vector<Point>& points) {
         out << points[i].x << " " << points[i].y;
     }
     out << ")";
+}
+
+std::string trimCopy(const std::string& value) {
+    std::size_t first = 0;
+    while (first < value.size() &&
+           std::isspace(static_cast<unsigned char>(value[first]))) {
+        ++first;
+    }
+    std::size_t last = value.size();
+    while (last > first &&
+           std::isspace(static_cast<unsigned char>(value[last - 1]))) {
+        --last;
+    }
+    return value.substr(first, last - first);
+}
+
+bool equalsIgnoreCase(const std::string& first, const std::string& second) {
+    if (first.size() != second.size()) {
+        return false;
+    }
+    for (std::size_t index = 0; index < first.size(); ++index) {
+        if (std::tolower(static_cast<unsigned char>(first[index])) !=
+            std::tolower(static_cast<unsigned char>(second[index]))) {
+            return false;
+        }
+    }
+    return true;
+}
+
+std::vector<std::string> splitCommaFields(const std::string& value) {
+    std::vector<std::string> fields;
+    std::size_t start = 0;
+    while (start <= value.size()) {
+        const std::size_t comma = value.find(',', start);
+        if (comma == std::string::npos) {
+            fields.push_back(trimCopy(value.substr(start)));
+            break;
+        }
+        fields.push_back(trimCopy(value.substr(start, comma - start)));
+        start = comma + 1;
+    }
+    return fields;
+}
+
+int parseIntegerField(
+    const std::string& value,
+    std::size_t lineNumber,
+    const char* fieldName) {
+    std::size_t parsed = 0;
+    long long result = 0;
+    try {
+        result = std::stoll(value, &parsed);
+    } catch (const std::exception&) {
+        throw std::runtime_error(
+            "Invalid " + std::string(fieldName) + " at polygon CSV line " +
+            std::to_string(lineNumber) + ".");
+    }
+    if (parsed != value.size() ||
+        result < std::numeric_limits<int>::min() ||
+        result > std::numeric_limits<int>::max()) {
+        throw std::runtime_error(
+            "Invalid " + std::string(fieldName) + " at polygon CSV line " +
+            std::to_string(lineNumber) + ".");
+    }
+    return static_cast<int>(result);
+}
+
+double parseDoubleField(
+    const std::string& value,
+    std::size_t lineNumber,
+    const char* fieldName) {
+    std::size_t parsed = 0;
+    double result = 0.0;
+    try {
+        result = std::stod(value, &parsed);
+    } catch (const std::exception&) {
+        throw std::runtime_error(
+            "Invalid " + std::string(fieldName) + " at polygon CSV line " +
+            std::to_string(lineNumber) + ".");
+    }
+    if (parsed != value.size() || !std::isfinite(result)) {
+        throw std::runtime_error(
+            "Invalid " + std::string(fieldName) + " at polygon CSV line " +
+            std::to_string(lineNumber) + ".");
+    }
+    return result;
+}
+
+bool samePoint(const Point& first, const Point& second) {
+    const double scale = std::max({
+        1.0,
+        std::abs(first.x),
+        std::abs(first.y),
+        std::abs(second.x),
+        std::abs(second.y)});
+    return std::abs(first.x - second.x) <= 1e-12 * scale &&
+           std::abs(first.y - second.y) <= 1e-12 * scale;
+}
+
+std::vector<Point> parseWktRing(
+    const std::string& coordinates,
+    std::size_t lineNumber) {
+    std::vector<Point> points;
+    std::size_t start = 0;
+    while (start <= coordinates.size()) {
+        const std::size_t comma = coordinates.find(',', start);
+        const std::string token = trimCopy(coordinates.substr(
+            start,
+            comma == std::string::npos
+                ? std::string::npos
+                : comma - start));
+        std::istringstream stream(token);
+        Point point;
+        if (!(stream >> point.x >> point.y) ||
+            !std::isfinite(point.x) ||
+            !std::isfinite(point.y)) {
+            throw std::runtime_error(
+                "Invalid POLYGON coordinate at polygon CSV line " +
+                std::to_string(lineNumber) + ".");
+        }
+        stream >> std::ws;
+        if (!stream.eof()) {
+            throw std::runtime_error(
+                "Unexpected POLYGON coordinate token at polygon CSV line " +
+                std::to_string(lineNumber) + ".");
+        }
+        points.push_back(point);
+        if (comma == std::string::npos) {
+            break;
+        }
+        start = comma + 1;
+    }
+
+    if (points.size() >= 2 && samePoint(points.front(), points.back())) {
+        points.pop_back();
+    }
+    if (points.size() < 3 || polygonArea(points) <= 0.0) {
+        throw std::runtime_error(
+            "Degenerate POLYGON ring at polygon CSV line " +
+            std::to_string(lineNumber) + ".");
+    }
+    return points;
+}
+
+void parsePolygonWkt(
+    const std::string& wkt,
+    std::size_t lineNumber,
+    Polygon& polygon) {
+    std::size_t cursor = 0;
+    while (cursor < wkt.size() &&
+           std::isspace(static_cast<unsigned char>(wkt[cursor]))) {
+        ++cursor;
+    }
+    constexpr char keyword[] = "POLYGON";
+    for (std::size_t index = 0; index < sizeof(keyword) - 1; ++index) {
+        if (cursor + index >= wkt.size() ||
+            std::toupper(static_cast<unsigned char>(wkt[cursor + index])) !=
+                keyword[index]) {
+            throw std::runtime_error(
+                "Expected POLYGON WKT at polygon CSV line " +
+                std::to_string(lineNumber) + ".");
+        }
+    }
+    cursor += sizeof(keyword) - 1;
+    while (cursor < wkt.size() &&
+           std::isspace(static_cast<unsigned char>(wkt[cursor]))) {
+        ++cursor;
+    }
+    if (cursor >= wkt.size() || wkt[cursor] != '(') {
+        throw std::runtime_error(
+            "Malformed POLYGON WKT at polygon CSV line " +
+            std::to_string(lineNumber) + ".");
+    }
+    ++cursor;
+
+    std::vector<std::vector<Point>> rings;
+    while (true) {
+        while (cursor < wkt.size() &&
+               std::isspace(static_cast<unsigned char>(wkt[cursor]))) {
+            ++cursor;
+        }
+        if (cursor >= wkt.size() || wkt[cursor] != '(') {
+            throw std::runtime_error(
+                "Malformed POLYGON ring at polygon CSV line " +
+                std::to_string(lineNumber) + ".");
+        }
+        const std::size_t ringStart = ++cursor;
+        const std::size_t ringEnd = wkt.find(')', ringStart);
+        if (ringEnd == std::string::npos) {
+            throw std::runtime_error(
+                "Unclosed POLYGON ring at polygon CSV line " +
+                std::to_string(lineNumber) + ".");
+        }
+        rings.push_back(parseWktRing(
+            wkt.substr(ringStart, ringEnd - ringStart),
+            lineNumber));
+        cursor = ringEnd + 1;
+        while (cursor < wkt.size() &&
+               std::isspace(static_cast<unsigned char>(wkt[cursor]))) {
+            ++cursor;
+        }
+        if (cursor < wkt.size() && wkt[cursor] == ',') {
+            ++cursor;
+            continue;
+        }
+        if (cursor >= wkt.size() || wkt[cursor] != ')') {
+            throw std::runtime_error(
+                "Malformed POLYGON closure at polygon CSV line " +
+                std::to_string(lineNumber) + ".");
+        }
+        ++cursor;
+        break;
+    }
+    while (cursor < wkt.size() &&
+           std::isspace(static_cast<unsigned char>(wkt[cursor]))) {
+        ++cursor;
+    }
+    if (cursor != wkt.size() || rings.empty()) {
+        throw std::runtime_error(
+            "Unexpected text after POLYGON WKT at polygon CSV line " +
+            std::to_string(lineNumber) + ".");
+    }
+
+    polygon.points = std::move(rings.front());
+    polygon.holes.assign(
+        std::make_move_iterator(rings.begin() + 1),
+        std::make_move_iterator(rings.end()));
 }
 
 bool parseGeoEastDatSample(const std::string& textLine, int& line, int& cmp, double& x, double& y, double& value) {
@@ -258,6 +491,104 @@ Grid2D readAutoGrid(const std::string& path) {
         return readGeoEastDatGrid(path);
     }
     return readAsciiGrid(path);
+}
+
+std::vector<Polygon> readKeptPolygonCsv(const std::string& path) {
+    std::ifstream in(filesystemPath(path));
+    if (!in) {
+        throw std::runtime_error("Failed to open polygon CSV file: " + path);
+    }
+
+    std::string header;
+    if (!std::getline(in, header)) {
+        throw std::runtime_error("Polygon CSV file is empty: " + path);
+    }
+    if (!header.empty() && header.back() == '\r') {
+        header.pop_back();
+    }
+    const std::vector<std::string> headerFields = splitCommaFields(header);
+    const std::vector<std::string> expectedHeader{
+        "id", "status", "area", "perimeter", "cell_count",
+        "mean_value", "max_value", "wkt"};
+    if (headerFields.size() != expectedHeader.size()) {
+        throw std::runtime_error(
+            "Polygon CSV header does not match the FaultPolyTrace schema: " + path);
+    }
+    for (std::size_t index = 0; index < expectedHeader.size(); ++index) {
+        if (!equalsIgnoreCase(headerFields[index], expectedHeader[index])) {
+            throw std::runtime_error(
+                "Polygon CSV header does not match the FaultPolyTrace schema: " + path);
+        }
+    }
+
+    std::vector<Polygon> polygons;
+    std::set<int> keptIds;
+    std::string line;
+    std::size_t lineNumber = 1;
+    while (std::getline(in, line)) {
+        ++lineNumber;
+        if (!line.empty() && line.back() == '\r') {
+            line.pop_back();
+        }
+        if (trimCopy(line).empty()) {
+            continue;
+        }
+
+        const std::size_t firstQuote = line.find('"');
+        const std::size_t lastQuote = line.rfind('"');
+        if (firstQuote == std::string::npos ||
+            lastQuote == firstQuote ||
+            !trimCopy(line.substr(lastQuote + 1)).empty()) {
+            throw std::runtime_error(
+                "Malformed quoted WKT at polygon CSV line " +
+                std::to_string(lineNumber) + ".");
+        }
+        std::string prefix = line.substr(0, firstQuote);
+        if (prefix.empty() || prefix.back() != ',') {
+            throw std::runtime_error(
+                "Malformed polygon CSV fields at line " +
+                std::to_string(lineNumber) + ".");
+        }
+        prefix.pop_back();
+        const std::vector<std::string> fields = splitCommaFields(prefix);
+        if (fields.size() != 7) {
+            throw std::runtime_error(
+                "Expected seven polygon fields before WKT at line " +
+                std::to_string(lineNumber) + ".");
+        }
+        if (!equalsIgnoreCase(fields[1], "kept") &&
+            !equalsIgnoreCase(fields[1], "filtered")) {
+            throw std::runtime_error(
+                "Unknown polygon status at polygon CSV line " +
+                std::to_string(lineNumber) + ".");
+        }
+        if (equalsIgnoreCase(fields[1], "filtered")) {
+            continue;
+        }
+
+        Polygon polygon;
+        polygon.id = parseIntegerField(fields[0], lineNumber, "polygon id");
+        if (!keptIds.insert(polygon.id).second) {
+            throw std::runtime_error(
+                "Duplicate kept polygon id at polygon CSV line " +
+                std::to_string(lineNumber) + ".");
+        }
+        polygon.area = parseDoubleField(fields[2], lineNumber, "polygon area");
+        polygon.perimeter = parseDoubleField(fields[3], lineNumber, "polygon perimeter");
+        polygon.cellCount = parseIntegerField(fields[4], lineNumber, "cell count");
+        polygon.meanValue = parseDoubleField(fields[5], lineNumber, "mean value");
+        polygon.maxValue = parseDoubleField(fields[6], lineNumber, "max value");
+        polygon.kept = true;
+        parsePolygonWkt(
+            line.substr(firstQuote + 1, lastQuote - firstQuote - 1),
+            lineNumber,
+            polygon);
+        polygons.push_back(std::move(polygon));
+    }
+    if (polygons.empty()) {
+        throw std::runtime_error("Polygon CSV contains no kept polygons: " + path);
+    }
+    return polygons;
 }
 
 void writePolygonCsv(const std::string& path, const std::vector<Polygon>& polygons) {

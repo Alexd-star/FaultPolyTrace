@@ -17,6 +17,8 @@ $sources = @(
     (Join-Path $repoRoot "src\core\Topology.cpp"),
     (Join-Path $repoRoot "src\core\FaultTracer.cpp"),
     (Join-Path $repoRoot "src\core\WeakPathSupport.cpp"),
+    (Join-Path $repoRoot "src\core\WeakContinuityConnector.cpp"),
+    (Join-Path $repoRoot "src\core\WeakTailRestorer.cpp"),
     (Join-Path $repoRoot "src\io\AsciiGridIO.cpp"),
     (Join-Path $repoRoot "src\io\DiagnosticsIO.cpp")
 )

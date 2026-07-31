@@ -46,6 +46,8 @@ SOURCES += \
     ../../src/core/FaultTracer.cpp \
     ../../src/core/LocalPolygonQuality.cpp \
     ../../src/core/WeakPathSupport.cpp \
+    ../../src/core/WeakContinuityConnector.cpp \
+    ../../src/core/WeakTailRestorer.cpp \
     ../../src/core/Grid2D.cpp \
     ../../src/io/AsciiGridIO.cpp \
     ../../src/io/DiagnosticsIO.cpp \
@@ -62,6 +64,8 @@ HEADERS += \
     ../../src/core/FaultTracer.h \
     ../../src/core/LocalPolygonQuality.h \
     ../../src/core/WeakPathSupport.h \
+    ../../src/core/WeakContinuityConnector.h \
+    ../../src/core/WeakTailRestorer.h \
     ../../src/core/Grid2D.h \
     ../../src/io/AsciiGridIO.h \
     ../../src/io/DiagnosticsIO.h \

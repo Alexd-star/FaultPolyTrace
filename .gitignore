@@ -64,5 +64,8 @@ data/cache/
 data/generated/
 data/processed/
 
+# Local GeoEast round-trip and document inspection scratch files.
+tmp/
+
 # 文档排版实验的本地中间产物，不属于软件交付内容
 paperfmt_prototype/

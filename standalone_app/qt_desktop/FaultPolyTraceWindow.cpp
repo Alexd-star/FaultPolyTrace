@@ -3389,10 +3389,7 @@ void FaultPolyTraceWindow::retranslateUi() {
 void FaultPolyTraceWindow::loadSettings() {
     QSettings settings(settingsPath(), QSettings::IniFormat);
     const int schemaVersion = settings.value("configSchemaVersion", 0).toInt();
-    if (schemaVersion == 0) {
-        setComboByKey(presetCombo_, QString::fromUtf8("防黏连增强"));
-        applyPreset(QString::fromUtf8("防黏连增强"));
-    }
+    const bool migrateFinalDefaults = schemaVersion < 6;
     currentLanguage_ = fpt_ui::normalizeLanguageCode(settings.value("language", "zh-CN").toString()) == "en"
         ? UiLanguage::English
         : UiLanguage::SimplifiedChinese;
@@ -3459,6 +3456,14 @@ void FaultPolyTraceWindow::loadSettings() {
     residualTraceMaxCellsSpin_->setValue(settings.value("residualTraceMaxCells", residualTraceMaxCellsSpin_->value()).toInt());
     smoothIterationsSpin_->setValue(settings.value("smoothIterations", smoothIterationsSpin_->value()).toInt());
     simplifyToleranceSpin_->setValue(settings.value("simplifyTolerance", simplifyToleranceSpin_->value()).toDouble());
+    if (migrateFinalDefaults) {
+        setComboByKey(presetCombo_, QString::fromUtf8("防黏连增强"));
+        setComboByKey(qualityModeCombo_, QString::fromUtf8("正式处理"));
+        applyPreset(QString::fromUtf8("防黏连增强"));
+        if (schemaVersion > 0) {
+            startupNotices_ << QString::fromUtf8("算法参数已迁移到当前正式默认方案；输入输出路径、GeoEast 连接和显示设置保持不变。");
+        }
+    }
     setPolygonColor(QColor(settings.value("color", colorEdit_->text()).toString()));
     lineWidthSpin_->setValue(settings.value("lineWidth", lineWidthSpin_->value()).toDouble());
     alphaSpin_->setValue(settings.value("alpha", alphaSpin_->value()).toDouble());
@@ -3524,16 +3529,18 @@ void FaultPolyTraceWindow::loadSettings() {
     updateDataSourceMode();
     updateLayerVisibility();
     retranslateUi();
-    if (!startupNotices_.isEmpty()) {
+    if (migrateFinalDefaults) {
+        saveSettings();
+    } else if (!startupNotices_.isEmpty()) {
         settings.setValue("percentile", percentileSpin_->value());
         settings.setValue("minArea", minAreaSpin_->value());
-        settings.setValue("configSchemaVersion", 5);
+        settings.setValue("configSchemaVersion", 6);
     }
 }
 
 void FaultPolyTraceWindow::saveSettings() const {
     QSettings settings(settingsPath(), QSettings::IniFormat);
-    settings.setValue("configSchemaVersion", 5);
+    settings.setValue("configSchemaVersion", 6);
     settings.setValue("language", languageCode());
     settings.setValue("sourceMode", comboKey(sourceModeCombo_));
     settings.setValue("input", inputEdit_->text());

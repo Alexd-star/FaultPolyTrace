@@ -60,6 +60,7 @@ private slots:
     void deleteOutput();
     void loadResultView();
     void exportResultViewPng();
+    void exportGeoEastDat();
     void openGeoEastBasemap();
     void openGeoEastMapping();
     void runTrace();
@@ -100,6 +101,7 @@ private:
     QString previewOutputDir() const;
     QString previewGridPath() const;
     QString previewPolygonsPath() const;
+    QString geoEastDatSourcePath() const;
     bool launchGeoEastApp(const QString& exeName, const QString& displayName);
     void syncPresetIndicator();
     void applyParameterPreset(const QString& presetName);
@@ -185,6 +187,7 @@ private:
     fpt_ui::LayerToggle* showQualityReviewLayerCheck_ = nullptr;
     QPushButton* loadResultViewButton_ = nullptr;
     QPushButton* exportViewButton_ = nullptr;
+    QPushButton* exportDatButton_ = nullptr;
     QPushButton* openBasemapButton_ = nullptr;
     QPushButton* openMappingButton_ = nullptr;
     QPushButton* refreshButton_ = nullptr;
@@ -193,6 +196,7 @@ private:
     QPushButton* deleteOutputButton_ = nullptr;
     QAction* loadResultViewAction_ = nullptr;
     QAction* exportViewAction_ = nullptr;
+    QAction* exportDatAction_ = nullptr;
     QAction* openBasemapAction_ = nullptr;
     QAction* openMappingAction_ = nullptr;
     QPushButton* runButton_ = nullptr;
@@ -233,6 +237,7 @@ private:
     bool refreshOutputsAfterGrids_ = false;
     bool exportingOutputView_ = false;
     bool exportingGridView_ = false;
+    bool exportingGeoEastDat_ = false;
     bool deletingOutput_ = false;
     bool startupDiscoveryScheduled_ = false;
     bool cancelRequested_ = false;
@@ -240,6 +245,10 @@ private:
     bool userInitiatedLayerLoad_ = false;
     QString loadedGridName_;
     QString loadedOutputName_;
+    QString pendingGeoEastDatPath_;
+    QString pendingGeoEastDatSourcePath_;
+    QString pendingGeoEastDatObjectName_;
+    QString pendingGeoEastDatFaultPolygonName_;
     QString pendingGridRestore_;
     QString pendingOutputRestore_;
     QStringList startupNotices_;

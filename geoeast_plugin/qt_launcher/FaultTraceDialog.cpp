@@ -6,6 +6,7 @@
 #include "UiLocalization.h"
 #include "TraceParameterModel.h"
 #include "QualityReviewModel.h"
+#include "GeoEastDatExporter.h"
 
 #include <QAction>
 #include <QActionGroup>
@@ -2107,6 +2108,13 @@ void FaultTraceDialog::buildUi() {
         saveAction->setToolTip(QString::fromUtf8("保存当前界面配置和参数"));
         saveAction->setShortcut(QKeySequence("Ctrl+Alt+S"));
         connect(saveAction, &QAction::triggered, this, &FaultTraceDialog::saveCurrentPreset);
+        exportDatAction_ = fileMenu->addAction(
+            fpt_ui::toolIcon(fpt_ui::IconKind::Save),
+            QString::fromUtf8("导出 GeoEast DAT..."));
+        exportDatAction_->setToolTip(QString::fromUtf8(
+            "从当前 GeoEast BOFaultPolygon 重新回读，导出官方八列 DAT 和匹配的 .fmt，并执行结构校验。"));
+        exportDatAction_->setShortcut(QKeySequence("Ctrl+Shift+D"));
+        connect(exportDatAction_, &QAction::triggered, this, &FaultTraceDialog::exportGeoEastDat);
         QAction* outputDirAction = fileMenu->addAction(QString::fromUtf8("打开输出目录"));
         connect(outputDirAction, &QAction::triggered, this, []() {
             QDesktopServices::openUrl(QUrl::fromLocalFile(userExportDirectory()));
@@ -2285,6 +2293,7 @@ void FaultTraceDialog::buildUi() {
         setBarText(refreshGridAction_, QString::fromUtf8("刷新网格"), "Grids");
         setBarText(restoreDefaultsAction_, QString::fromUtf8("恢复默认"), "Defaults");
         setBarText(exportViewAction_, QString::fromUtf8("导出 PNG"), "PNG");
+        setBarText(exportDatAction_, QString::fromUtf8("导出 DAT"), "DAT");
         setBarText(openBasemapAction_, QString::fromUtf8("工区底图"), "Basemap");
         setBarText(helpAction, QString::fromUtf8("帮助"), "Help");
 
@@ -2309,6 +2318,7 @@ void FaultTraceDialog::buildUi() {
         toolbar->addAction(restoreDefaultsAction_);
         toolbar->addSeparator();
         toolbar->addAction(exportViewAction_);
+        toolbar->addAction(exportDatAction_);
         toolbar->addAction(openBasemapAction_);
         toolbar->addSeparator();
         toolbar->addAction(helpAction);
@@ -2464,23 +2474,28 @@ void FaultTraceDialog::buildUi() {
         exportViewButton_->setToolTip(QString::fromUtf8("导出当前结果视图 PNG 图片。"));
         resultLayout->addWidget(loadResultViewButton_, 3, 0);
         resultLayout->addWidget(exportViewButton_, 3, 1);
+        exportDatButton_ = new QPushButton(QString::fromUtf8("导出 GeoEast DAT"), resultGroup);
+        exportDatButton_->setObjectName("emphasisButton");
+        exportDatButton_->setToolTip(QString::fromUtf8(
+            "从当前 BOFaultPolygon 回读最终几何，导出 GeoEast 八列 DAT 及配套格式定义并自动校验。"));
+        resultLayout->addWidget(exportDatButton_, 4, 0, 1, 2);
         openBasemapButton_ = new QPushButton(QString::fromUtf8("打开工区底图"), resultGroup);
         openBasemapButton_->setToolTip(QString::fromUtf8("启动 GeoEast 自带 GeoBasemap，在官方图层树中查看原始网格和结果多边形。"));
         openMappingButton_ = new QPushButton(QString::fromUtf8("打开平面成图"), resultGroup);
         openMappingButton_->setToolTip(QString::fromUtf8("启动 GeoEast 自带 GeoMapping，在官方图层树中查看原始网格和结果多边形。"));
-        resultLayout->addWidget(openBasemapButton_, 4, 0);
-        resultLayout->addWidget(openMappingButton_, 4, 1);
+        resultLayout->addWidget(openBasemapButton_, 5, 0);
+        resultLayout->addWidget(openMappingButton_, 5, 1);
         QPushButton* mappingGuideButton = new QPushButton(QString::fromUtf8("查看叠加步骤"), resultGroup);
         mappingGuideButton->setToolTip(QString::fromUtf8("打开 GeoEast 平面成图叠加查看操作指南"));
         deleteOutputButton_ = new QPushButton(QString::fromUtf8("删除当前结果"), resultGroup);
         deleteOutputButton_->setObjectName("dangerButton");
         deleteOutputButton_->setToolTip(QString::fromUtf8("删除当前输出名称对应的结果多边形对象"));
-        resultLayout->addWidget(mappingGuideButton, 5, 0);
-        resultLayout->addWidget(deleteOutputButton_, 5, 1);
+        resultLayout->addWidget(mappingGuideButton, 6, 0);
+        resultLayout->addWidget(deleteOutputButton_, 6, 1);
         QLabel* displayHint = new QLabel(QString::fromUtf8("平台复核：在工区底图或平面成图中勾选网格与结果图层。"), resultGroup);
         displayHint->setWordWrap(true);
         displayHint->setObjectName("displayHint");
-        resultLayout->addWidget(displayHint, 6, 0, 1, 2);
+        resultLayout->addWidget(displayHint, 7, 0, 1, 2);
         connect(showInputLayerCheck_, &QAbstractButton::toggled, this, [this](bool checked) {
             if (showInputLayerAction_ && showInputLayerAction_->isChecked() != checked) {
                 QSignalBlocker blocker(showInputLayerAction_);
@@ -2505,6 +2520,7 @@ void FaultTraceDialog::buildUi() {
         });
         connect(loadResultViewButton_, &QPushButton::clicked, this, &FaultTraceDialog::loadResultView);
         connect(exportViewButton_, &QPushButton::clicked, this, &FaultTraceDialog::exportResultViewPng);
+        connect(exportDatButton_, &QPushButton::clicked, this, &FaultTraceDialog::exportGeoEastDat);
         connect(openBasemapButton_, &QPushButton::clicked, this, &FaultTraceDialog::openGeoEastBasemap);
         connect(openMappingButton_, &QPushButton::clicked, this, &FaultTraceDialog::openGeoEastMapping);
         connect(deleteOutputButton_, &QPushButton::clicked, this, &FaultTraceDialog::deleteOutput);
@@ -3515,6 +3531,7 @@ void FaultTraceDialog::retranslateUi() {
 void FaultTraceDialog::loadSettings() {
     QSettings settings(launcherSettingsPath(), QSettings::IniFormat);
     const int schemaVersion = settings.value("configSchemaVersion", 0).toInt();
+    const bool migrateFinalDefaults = schemaVersion < 6;
     currentLanguage_ = fpt_ui::normalizeLanguageCode(settings.value("language", "zh-CN").toString()) == "en"
         ? UiLanguage::English
         : UiLanguage::SimplifiedChinese;
@@ -3605,6 +3622,14 @@ void FaultTraceDialog::loadSettings() {
     residualTraceCheck_->setChecked(settings.value("residualTrace", residualTraceCheck_->isChecked()).toBool());
     residualTraceMinLengthSpin_->setValue(settings.value("residualTraceMinLength", residualTraceMinLengthSpin_->value()).toInt());
     residualTraceMaxCellsSpin_->setValue(settings.value("residualTraceMaxCells", residualTraceMaxCellsSpin_->value()).toInt());
+    if (migrateFinalDefaults) {
+        setComboByKey(presetCombo_, QString::fromUtf8("防黏连增强"));
+        setComboByKey(qualityModeCombo_, QString::fromUtf8("正式处理"));
+        applyParameterPreset(QString::fromUtf8("防黏连增强"));
+        if (schemaVersion > 0) {
+            startupNotices_ << QString::fromUtf8("算法参数已迁移到当前正式默认方案；数据库连接、工区、输入网格和显示设置保持不变。");
+        }
+    }
     if (showInputLayerCheck_) {
         showInputLayerCheck_->setChecked(false);
     }
@@ -3625,16 +3650,18 @@ void FaultTraceDialog::loadSettings() {
     updateLayerVisibility();
     updateStatusContext();
     retranslateUi();
-    if (!startupNotices_.isEmpty()) {
+    if (migrateFinalDefaults) {
+        saveSettings();
+    } else if (!startupNotices_.isEmpty()) {
         settings.setValue("percentile", percentileSpin_->value());
         settings.setValue("minArea", minAreaSpin_->value());
-        settings.setValue("configSchemaVersion", 5);
+        settings.setValue("configSchemaVersion", 6);
     }
 }
 
 void FaultTraceDialog::saveSettings() const {
     QSettings settings(launcherSettingsPath(), QSettings::IniFormat);
-    settings.setValue("configSchemaVersion", 5);
+    settings.setValue("configSchemaVersion", 6);
     settings.setValue("language", languageCode());
     settings.setValue("runner", runnerEdit_->text());
     settings.setValue("geoEastRoot", geoEastRootEdit_->text());
@@ -3956,6 +3983,12 @@ QString FaultTraceDialog::previewPolygonsPath() const {
     const QString grid = sanitizeFileComponent(gridCombo_ ? gridCombo_->currentText() : QString(), "grid");
     const QString output = sanitizeFileComponent(outputEdit_ ? outputEdit_->text() : QString(), "output");
     return QDir(previewOutputDir()).absoluteFilePath(QString("%1_%2_polygons.csv").arg(grid, output));
+}
+
+QString FaultTraceDialog::geoEastDatSourcePath() const {
+    const QString output = sanitizeFileComponent(outputEdit_ ? outputEdit_->text() : QString(), "output");
+    return QDir(previewOutputDir()).absoluteFilePath(
+        QString("%1_geoeast_dat_source.csv").arg(output));
 }
 
 bool FaultTraceDialog::launchGeoEastApp(const QString& exeName, const QString& displayName) {
@@ -4607,6 +4640,93 @@ void FaultTraceDialog::exportResultViewPng() {
     }
 }
 
+void FaultTraceDialog::exportGeoEastDat() {
+    if (process_ && process_->state() != QProcess::NotRunning) {
+        QMessageBox::information(
+            this,
+            uiText(QString::fromUtf8("任务正在运行")),
+            uiText(QString::fromUtf8("请等待当前任务完成或先点击【停止】，再导出 GeoEast DAT。")));
+        appendStatus(QString::fromUtf8("任务运行中，暂不能导出 GeoEast DAT"));
+        return;
+    }
+
+    const QString outputName = outputEdit_ ? outputEdit_->text().trimmed() : QString();
+    const QString nameError = outputNameValidationError(outputName);
+    if (!nameError.isEmpty()) {
+        QMessageBox::warning(
+            this,
+            uiText(QString::fromUtf8("结果名称无效")),
+            uiText(nameError));
+        return;
+    }
+    saveSettings();
+    if (!ensureGeoEastConfigReady(QString::fromUtf8("导出 GeoEast DAT"), false, true)) {
+        return;
+    }
+
+    QString directoryError;
+    if (!ensureWritableDirectory(previewOutputDir(), &directoryError)) {
+        QMessageBox::warning(
+            this,
+            uiText(QString::fromUtf8("本地缓存目录不可用")),
+            uiText(directoryError));
+        return;
+    }
+
+    const QString suggested = QDir(userExportDirectory()).absoluteFilePath(QStringLiteral("lc_result.dat"));
+    QString datPath = QFileDialog::getSaveFileName(
+        this,
+        uiText(QString::fromUtf8("导出 GeoEast 断层多边形 DAT")),
+        suggested,
+        uiText(QString::fromUtf8("GeoEast 断层多边形 DAT (*.dat);;所有文件 (*.*)")));
+    if (datPath.isEmpty()) {
+        return;
+    }
+    if (QFileInfo(datPath).suffix().isEmpty()) {
+        datPath += QStringLiteral(".dat");
+    }
+    if (!ensureWritableDirectory(QFileInfo(datPath).absolutePath(), &directoryError)) {
+        QMessageBox::warning(
+            this,
+            uiText(QString::fromUtf8("导出目录不可写")),
+            uiText(directoryError));
+        return;
+    }
+
+    pendingGeoEastDatPath_ = QFileInfo(datPath).absoluteFilePath();
+    pendingGeoEastDatSourcePath_ = geoEastDatSourcePath();
+    pendingGeoEastDatObjectName_ = outputName;
+    pendingGeoEastDatFaultPolygonName_ = fpt_ui::normalizedGeoEastFaultPolygonName(
+        QFileInfo(datPath).completeBaseName());
+
+    const QString runner = runnerEdit_->text().trimmed();
+    refreshingGrids_ = false;
+    refreshingOutputs_ = false;
+    exportingOutputView_ = false;
+    exportingGridView_ = false;
+    exportingGeoEastDat_ = true;
+    deletingOutput_ = false;
+    processOutput_.clear();
+
+    QStringList args = commonConnectionArgs();
+    args << "--output" << outputName
+         << "--export-fault-polygons-output" << pendingGeoEastDatSourcePath_;
+    appendStatus(QString::fromUtf8("正在从 BOFaultPolygon/%1 回读并导出 GeoEast DAT...")
+                     .arg(outputName));
+    if (renderViewWidget_) {
+        static_cast<RenderViewWidget*>(renderViewWidget_)->setActivity(
+            QString::fromUtf8("正在回读 GeoEast 最终结果并生成 DAT"));
+    }
+    appendLog("> " + runner + " " + quoteForLog(args));
+
+    QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
+    configureGeoEastEnvironment(environment);
+    process_->setProcessEnvironment(environment);
+    cancelRequested_ = false;
+    setRunning(true);
+    process_->start(runner, args);
+}
+
 void FaultTraceDialog::openGeoEastBasemap() {
     if (!ensureGeoEastConfigReady(QString::fromUtf8("打开工区底图"), false, false)) {
         return;
@@ -4629,8 +4749,13 @@ void FaultTraceDialog::stopProcess() {
         refreshingOutputs_ = false;
         exportingOutputView_ = false;
         exportingGridView_ = false;
+        exportingGeoEastDat_ = false;
         deletingOutput_ = false;
         pendingOutputRestore_.clear();
+        pendingGeoEastDatPath_.clear();
+        pendingGeoEastDatSourcePath_.clear();
+        pendingGeoEastDatObjectName_.clear();
+        pendingGeoEastDatFaultPolygonName_.clear();
         stopButton_->setEnabled(false);
         stopButton_->setText(uiText(QString::fromUtf8("正在停止…")));
         if (stopTraceAction_) {
@@ -4856,14 +4981,108 @@ void FaultTraceDialog::onProcessFinished(int exitCode, QProcess::ExitStatus stat
         refreshingOutputs_ = false;
         exportingOutputView_ = false;
         exportingGridView_ = false;
+        exportingGeoEastDat_ = false;
         deletingOutput_ = false;
         pendingOutputRestore_.clear();
+        pendingGeoEastDatPath_.clear();
+        pendingGeoEastDatSourcePath_.clear();
+        pendingGeoEastDatObjectName_.clear();
+        pendingGeoEastDatFaultPolygonName_.clear();
         if (gridCombo_) gridCombo_->setProperty("fptCatalogLoading", false);
         if (outputCatalogCombo_) outputCatalogCombo_->setProperty("fptCatalogLoading", false);
         appendLog(QString::fromUtf8("当前任务已由用户停止，未执行后续刷新、导出或结果载入。"));
         appendStatus(QString::fromUtf8("任务已停止"));
         if (renderViewWidget_) {
             static_cast<RenderViewWidget*>(renderViewWidget_)->setActivity(QString::fromUtf8("任务已停止"));
+        }
+        return;
+    }
+
+    if (exportingGeoEastDat_) {
+        const QString datPath = pendingGeoEastDatPath_;
+        const QString sourcePath = pendingGeoEastDatSourcePath_;
+        const QString objectName = pendingGeoEastDatObjectName_;
+        const QString faultPolygonName = pendingGeoEastDatFaultPolygonName_;
+        bool exported = false;
+        QString exportError;
+        fpt_ui::GeoEastDatExportStats stats;
+
+        if (exitCode == 0 && status == QProcess::NormalExit) {
+            exported = fpt_ui::exportGeoEastFaultPolygonDat(
+                sourcePath,
+                datPath,
+                faultPolygonName,
+                &stats,
+                &exportError);
+        } else {
+            exportError = QString::fromUtf8(
+                "BO Runner 未能回读 BOFaultPolygon/%1。请确认该结果对象存在于当前项目，并查看运行日志。")
+                              .arg(objectName);
+        }
+
+        exportingGeoEastDat_ = false;
+        pendingGeoEastDatPath_.clear();
+        pendingGeoEastDatSourcePath_.clear();
+        pendingGeoEastDatObjectName_.clear();
+        pendingGeoEastDatFaultPolygonName_.clear();
+
+        if (exported) {
+            const QFileInfo datInfo(datPath);
+            appendLog(QString::fromUtf8(
+                "GeoEast DAT 已导出并通过结构校验：%1\n"
+                "  来源：BOFaultPolygon/%2\n"
+                "  faultPolygonName：%3\n"
+                "  闭合多边形：%4 个\n"
+                "  坐标记录：%5 行\n"
+                "  文件大小：%6 字节\n"
+                "  SHA256：%7\n"
+                "  配套格式定义：%8")
+                          .arg(QDir::toNativeSeparators(datPath), objectName, stats.faultPolygonName)
+                          .arg(stats.polygonCount)
+                          .arg(stats.pointCount)
+                          .arg(datInfo.size())
+                          .arg(stats.sha256)
+                          .arg(QDir::toNativeSeparators(stats.formatDefinitionPath)));
+            if (stats.omittedInteriorRingCount > 0) {
+                appendLog(QString::fromUtf8(
+                    "注意：源数据包含 %1 个内环；GeoEast BOFaultPolygon 不支持洞，DAT 与数据库对象一致，仅保留外环。")
+                              .arg(stats.omittedInteriorRingCount));
+            }
+            appendStatus(QString::fromUtf8("GeoEast DAT 已导出并通过结构校验"));
+            if (renderViewWidget_) {
+                static_cast<RenderViewWidget*>(renderViewWidget_)->setActivity(
+                    QString::fromUtf8("GeoEast DAT 导出完成"));
+            }
+            QString message = QString::fromUtf8(
+                "已按本机 GeoEast default_full.fmt 的官方八列定义导出，并通过自动结构校验。\n\n"
+                "文件：%1\n"
+                "配套格式：%2\n"
+                "来源：BOFaultPolygon/%3\n"
+                "多边形：%4 个\n"
+                "坐标记录：%5 行\n"
+                "faultPolygonName：%6\n\n"
+                "GeoEast 回导时，在格式定义页面点击【打开】，选择上面的配套 .fmt，再点击【导入】。提交前请确认回读数量和显示结果均正常。")
+                                  .arg(QDir::toNativeSeparators(datPath),
+                                       QDir::toNativeSeparators(stats.formatDefinitionPath),
+                                       objectName)
+                                  .arg(stats.polygonCount)
+                                  .arg(stats.pointCount)
+                                  .arg(stats.faultPolygonName);
+            QMessageBox::information(
+                this,
+                uiText(QString::fromUtf8("GeoEast DAT 导出完成")),
+                uiText(message));
+        } else {
+            appendLog(QString::fromUtf8("GeoEast DAT 导出失败：%1").arg(exportError));
+            appendStatus(QString::fromUtf8("GeoEast DAT 导出失败，请查看日志"));
+            if (renderViewWidget_) {
+                static_cast<RenderViewWidget*>(renderViewWidget_)->setActivity(
+                    QString::fromUtf8("GeoEast DAT 导出失败"));
+            }
+            QMessageBox::warning(
+                this,
+                uiText(QString::fromUtf8("GeoEast DAT 导出失败")),
+                uiText(exportError));
         }
         return;
     }
@@ -5129,6 +5348,7 @@ void FaultTraceDialog::onProcessFinished(int exitCode, QProcess::ExitStatus stat
     refreshingOutputs_ = false;
     exportingOutputView_ = false;
     exportingGridView_ = false;
+    exportingGeoEastDat_ = false;
     deletingOutput_ = false;
 }
 
@@ -5141,8 +5361,13 @@ void FaultTraceDialog::onProcessError(QProcess::ProcessError error) {
     refreshingOutputs_ = false;
     exportingOutputView_ = false;
     exportingGridView_ = false;
+    exportingGeoEastDat_ = false;
     deletingOutput_ = false;
     pendingOutputRestore_.clear();
+    pendingGeoEastDatPath_.clear();
+    pendingGeoEastDatSourcePath_.clear();
+    pendingGeoEastDatObjectName_.clear();
+    pendingGeoEastDatFaultPolygonName_.clear();
     if (gridCombo_) gridCombo_->setProperty("fptCatalogLoading", false);
     if (outputCatalogCombo_) outputCatalogCombo_->setProperty("fptCatalogLoading", false);
     appendLog(QString::fromUtf8("进程错误：%1").arg(static_cast<int>(error)));
@@ -5167,6 +5392,9 @@ void FaultTraceDialog::setRunning(bool running) {
     if (exportViewButton_) {
         exportViewButton_->setEnabled(!running);
     }
+    if (exportDatButton_) {
+        exportDatButton_->setEnabled(!running);
+    }
     if (openBasemapButton_) {
         openBasemapButton_->setEnabled(!running);
     }
@@ -5183,7 +5411,7 @@ void FaultTraceDialog::setRunning(bool running) {
         loadSelectedOutputButton_->setEnabled(!running && outputCatalogCombo_ && !outputCatalogCombo_->currentData().toString().isEmpty());
     }
     const bool tracing = running && !refreshingGrids_ && !refreshingOutputs_ &&
-        !exportingOutputView_ && !exportingGridView_ && !deletingOutput_;
+        !exportingOutputView_ && !exportingGridView_ && !exportingGeoEastDat_ && !deletingOutput_;
     runButton_->setEnabled(!running);
     runButton_->setText(tracing ? uiText(QString::fromUtf8("追踪中…"))
                                 : uiText(QString::fromUtf8("开始追踪")));
@@ -5212,6 +5440,9 @@ void FaultTraceDialog::setRunning(bool running) {
     }
     if (exportViewAction_) {
         exportViewAction_->setEnabled(!running);
+    }
+    if (exportDatAction_) {
+        exportDatAction_->setEnabled(!running);
     }
     if (openBasemapAction_) {
         openBasemapAction_->setEnabled(!running);

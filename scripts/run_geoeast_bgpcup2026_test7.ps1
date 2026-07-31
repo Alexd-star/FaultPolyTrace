@@ -13,7 +13,10 @@
     [string]$Runner = $env:FPT_GEOEAST_RUNNER,
     [double]$Percentile = 0.98,
     [double]$MinArea = 120.0,
-    [switch]$NoImportDat
+    [string]$ReviewOutputDir = "",
+    [switch]$NoImportDat,
+    [switch]$BaselineReview,
+    [switch]$WeakContinuityReview
 )
 
 $ErrorActionPreference = "Stop"
@@ -169,12 +172,37 @@ if ([string]::IsNullOrWhiteSpace($Runner) -or !(Test-Path -LiteralPath $Runner))
     throw "Cannot find faultpolytrace_geoeast_runner.exe. Build geoeast_plugin\bo_runner first, or pass -Runner."
 }
 
+if ($BaselineReview -and $WeakContinuityReview) {
+    throw "BaselineReview and WeakContinuityReview cannot be enabled together."
+}
+if ($BaselineReview -and $Output -eq "FaultPolyTrace_Result") {
+    $Output = "FaultPolyTrace_Baseline_Review"
+}
+if ($WeakContinuityReview -and $Output -eq "FaultPolyTrace_Result") {
+    $Output = "FaultPolyTrace_WeakContinuity_Review"
+}
+
+if ($BaselineReview -or $WeakContinuityReview) {
+    if ([string]::IsNullOrWhiteSpace($ReviewOutputDir)) {
+        $repoRoot = Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")
+        $reviewName = if ($WeakContinuityReview) {
+            "geoeast_weak_continuity_review"
+        } else {
+            "geoeast_baseline_review"
+        }
+        $ReviewOutputDir = Join-Path $repoRoot "outputs\evidence\$reviewName"
+    }
+    New-Item -ItemType Directory -Force -Path $ReviewOutputDir | Out-Null
+}
+
 $runnerArgs = @(
     "--db", $Database,
     "--project", $Project,
-    "--user", $User,
-    "--password", $Password
+    "--user", $User
 )
+if (![string]::IsNullOrEmpty($Password)) {
+    $runnerArgs += @("--password", $Password)
+}
 
 if (!$NoImportDat) {
     $runnerArgs += @("--import-geoeast-dat", $OfficialDat, "--overwrite-grid")
@@ -223,12 +251,52 @@ $runnerArgs += @(
     "--min-area", $MinArea.ToString([Globalization.CultureInfo]::InvariantCulture)
 )
 
+if ($WeakContinuityReview) {
+    $runnerArgs += @(
+        "--weak-continuity",
+        "--weak-continuity-output", (Join-Path $ReviewOutputDir "weak_continuity_candidates_geoeast.csv"),
+        "--diagnostics", (Join-Path $ReviewOutputDir "diagnostics.json"),
+        "--transaction-report", (Join-Path $ReviewOutputDir "transaction_readback.json"),
+        "--topology-output", (Join-Path $ReviewOutputDir "topology.csv"),
+        "--preview-grid-output", (Join-Path $ReviewOutputDir "input_grid.txt"),
+        "--preview-polygons-output", (Join-Path $ReviewOutputDir "candidate_polygons.csv"),
+        "--polygon-color", "cyan",
+        "--polygon-linewidth", "1.2"
+    )
+} elseif ($BaselineReview) {
+    $runnerArgs += @(
+        "--weak-continuity-output", (Join-Path $ReviewOutputDir "weak_continuity_candidates_geoeast.csv"),
+        "--diagnostics", (Join-Path $ReviewOutputDir "diagnostics.json"),
+        "--transaction-report", (Join-Path $ReviewOutputDir "transaction_readback.json"),
+        "--topology-output", (Join-Path $ReviewOutputDir "topology.csv"),
+        "--preview-grid-output", (Join-Path $ReviewOutputDir "input_grid.txt"),
+        "--preview-polygons-output", (Join-Path $ReviewOutputDir "baseline_polygons.csv"),
+        "--polygon-color", "yellow",
+        "--polygon-linewidth", "1.2"
+    )
+}
+
 Write-Host "GeoEast root: $GeoEastRoot"
 Write-Host "GeoEastData root: $GeoEastDataRoot"
 Write-Host "Database/project/user: $Database / $Project / $User"
 Write-Host "Runner: $Runner"
+if ($BaselineReview -or $WeakContinuityReview) {
+    Write-Host "Review output: $ReviewOutputDir"
+}
 & $Runner @runnerArgs
 
 if ($LASTEXITCODE -ne 0) {
     throw "GeoEast runner failed with exit code $LASTEXITCODE."
+}
+
+if ($WeakContinuityReview) {
+    $indexScript = Join-Path $PSScriptRoot "生成GeoEast弱连续性复核索引.py"
+    & python $indexScript `
+        --candidates (Join-Path $ReviewOutputDir "weak_continuity_candidates_geoeast.csv") `
+        --output-dir $ReviewOutputDir `
+        --baseline-layer "FaultPolyTrace_Baseline_Review_20260731" `
+        --candidate-layer $Output
+    if ($LASTEXITCODE -ne 0) {
+        throw "GeoEast review index generation failed with exit code $LASTEXITCODE."
+    }
 }

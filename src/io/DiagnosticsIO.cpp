@@ -295,6 +295,38 @@ void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
     out << "    \"maxGapDistance\": " << d.maxGapDistance << ",\n";
     out << "    \"maxGapAngle\": " << d.maxGapAngle << ",\n";
     out << "    \"minGapSupportRatio\": " << d.minGapSupportRatio << ",\n";
+    out << "    \"weakContinuityShadow\": " << (d.weakContinuityShadow ? "true" : "false") << ",\n";
+    out << "    \"weakContinuity\": " << (d.weakContinuity ? "true" : "false") << ",\n";
+    out << "    \"weakContinuitySecondPass\": " << (d.weakContinuitySecondPass ? "true" : "false") << ",\n";
+    out << "    \"weakContinuityFinalObjectPass\": " << (d.weakContinuityFinalObjectPass ? "true" : "false") << ",\n";
+    out << "    \"weakContinuityMaxDistance\": " << d.weakContinuityMaxDistance << ",\n";
+    out << "    \"weakContinuityTangentWindow\": " << d.weakContinuityTangentWindow << ",\n";
+    out << "    \"weakContinuityCorridorRadius\": " << d.weakContinuityCorridorRadius << ",\n";
+    out << "    \"weakContinuityMaxCandidatesPerEndpoint\": " << d.weakContinuityMaxCandidatesPerEndpoint << ",\n";
+    out << "    \"weakContinuityMaxEndpointAngle\": " << d.weakContinuityMaxEndpointAngle << ",\n";
+    out << "    \"weakContinuityMaxWidthRatio\": " << d.weakContinuityMaxWidthRatio << ",\n";
+    out << "    \"weakContinuityMinAttributeRatio\": " << d.weakContinuityMinAttributeRatio << ",\n";
+    out << "    \"weakContinuityReferenceThresholdRatio\": " << d.weakContinuityReferenceThresholdRatio << ",\n";
+    out << "    \"weakContinuityLocalContrastRatio\": " << d.weakContinuityLocalContrastRatio << ",\n";
+    out << "    \"weakContinuityMinSupportRatio\": " << d.weakContinuityMinSupportRatio << ",\n";
+    out << "    \"weakContinuityMinMeanSupport\": " << d.weakContinuityMinMeanSupport << ",\n";
+    out << "    \"weakContinuityMaxUnsupportedRun\": " << d.weakContinuityMaxUnsupportedRun << ",\n";
+    out << "    \"weakContinuityMaxPathLengthRatio\": " << d.weakContinuityMaxPathLengthRatio << ",\n";
+    out << "    \"weakContinuityMaxTurnAngle\": " << d.weakContinuityMaxTurnAngle << ",\n";
+    out << "    \"weakContinuityMinCompetitionMargin\": " << d.weakContinuityMinCompetitionMargin << ",\n";
+    out << "    \"weakContinuityThirdPartySkeletonClearanceRadius\": " << d.weakContinuityThirdPartySkeletonClearanceRadius << ",\n";
+    out << "    \"weakTailCompletionShadow\": " << (d.weakTailCompletionShadow ? "true" : "false") << ",\n";
+    out << "    \"weakTailCompletion\": " << (d.weakTailCompletion ? "true" : "false") << ",\n";
+    out << "    \"weakTailMinCells\": " << d.weakTailMinCells << ",\n";
+    out << "    \"weakTailMaxCells\": " << d.weakTailMaxCells << ",\n";
+    out << "    \"weakTailMinAspect\": " << d.weakTailMinAspect << ",\n";
+    out << "    \"weakTailMinMeanSupportRatio\": " << d.weakTailMinMeanSupportRatio << ",\n";
+    out << "    \"weakTailMinPeakSupportRatio\": " << d.weakTailMinPeakSupportRatio << ",\n";
+    out << "    \"weakTailMaxAlignmentAngle\": " << d.weakTailMaxAlignmentAngle << ",\n";
+    out << "    \"weakTailOwnershipClearanceRadius\": " << d.weakTailOwnershipClearanceRadius << ",\n";
+    out << "    \"weakTailTangentRadius\": " << d.weakTailTangentRadius << ",\n";
+    out << "    \"preserveObservedSkeletonEnvelope\": "
+        << (d.preserveObservedSkeletonEnvelope ? "true" : "false") << ",\n";
     out << "    \"rootAntiMerge\": " << (d.rootAntiMerge ? "true" : "false") << ",\n";
     out << "    \"rootAntiMergeRadius\": " << d.rootAntiMergeRadius << ",\n";
     out << "    \"rootAntiMergeSupportRatio\": " << d.rootAntiMergeSupportRatio << ",\n";
@@ -393,6 +425,45 @@ void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
     out << "    \"weakPathAttributeRejectedFragments\": " << d.weakPathAttributeRejectedFragments << ",\n";
     out << "    \"weakPathShapeRejectedFragments\": " << d.weakPathShapeRejectedFragments << ",\n";
     out << "    \"weakPathDirectionRejectedFragments\": " << d.weakPathDirectionRejectedFragments << "\n";
+    out << "  },\n";
+    out << "  \"weakContinuity\": {\n";
+    out << "    \"endpointCount\": " << d.weakContinuityStats.endpointCount << ",\n";
+    out << "    \"distanceCandidatePairs\": " << d.weakContinuityStats.distanceCandidatePairs << ",\n";
+    out << "    \"directionRejectedPairs\": " << d.weakContinuityStats.directionRejectedPairs << ",\n";
+    out << "    \"widthRejectedPairs\": " << d.weakContinuityStats.widthRejectedPairs << ",\n";
+    out << "    \"sameComponentRejectedPairs\": " << d.weakContinuityStats.sameComponentRejectedPairs << ",\n";
+    out << "    \"preselectedPairs\": " << d.weakContinuityStats.preselectedPairs << ",\n";
+    out << "    \"searchedPaths\": " << d.weakContinuityStats.searchedPaths << ",\n";
+    out << "    \"foundPaths\": " << d.weakContinuityStats.foundPaths << ",\n";
+    out << "    \"noPathRejected\": " << d.weakContinuityStats.noPathRejected << ",\n";
+    out << "    \"attributeRejected\": " << d.weakContinuityStats.attributeRejected << ",\n";
+    out << "    \"unsupportedRunRejected\": " << d.weakContinuityStats.unsupportedRunRejected << ",\n";
+    out << "    \"curvatureRejected\": " << d.weakContinuityStats.curvatureRejected << ",\n";
+    out << "    \"detourRejected\": " << d.weakContinuityStats.detourRejected << ",\n";
+    out << "    \"competitionRejected\": " << d.weakContinuityStats.competitionRejected << ",\n";
+    out << "    \"endpointReuseRejected\": " << d.weakContinuityStats.endpointReuseRejected << ",\n";
+    out << "    \"acceptedConnections\": " << d.weakContinuityStats.acceptedConnections << ",\n";
+    out << "    \"addedPathPixels\": " << d.weakContinuityStats.addedPathPixels << ",\n";
+    out << "    \"protectedFromAntiMergeCells\": "
+        << d.weakContinuityProtectedFromAntiMergeCells << ",\n";
+    out << "    \"finalObjectAcceptedConnections\": "
+        << d.weakContinuityFinalObjectAcceptedConnections << ",\n";
+    out << "    \"finalObjectRejectedConnections\": "
+        << d.weakContinuityFinalObjectRejectedConnections << ",\n";
+    out << "    \"finalObjectAddedEnvelopeCells\": "
+        << d.weakContinuityFinalObjectAddedEnvelopeCells << "\n";
+    out << "  },\n";
+    out << "  \"weakTailCompletion\": {\n";
+    out << "    \"componentCount\": " << d.weakTailStats.componentCount << ",\n";
+    out << "    \"sizeRejected\": " << d.weakTailStats.sizeRejected << ",\n";
+    out << "    \"shapeRejected\": " << d.weakTailStats.shapeRejected << ",\n";
+    out << "    \"attributeRejected\": " << d.weakTailStats.attributeRejected << ",\n";
+    out << "    \"ownershipRejected\": " << d.weakTailStats.ownershipRejected << ",\n";
+    out << "    \"directionRejected\": " << d.weakTailStats.directionRejected << ",\n";
+    out << "    \"acceptedComponents\": " << d.weakTailStats.acceptedComponents << ",\n";
+    out << "    \"acceptedCells\": " << d.weakTailStats.acceptedCells << ",\n";
+    out << "    \"protectedFromAntiMergeCells\": "
+        << d.weakTailProtectedFromAntiMergeCells << "\n";
     out << "  },\n";
     out << "  \"branchAttribution\": {\n";
     out << "    \"branchAttributionJunctionClusters\": " << d.branchAttributionJunctionClusters << ",\n";
@@ -586,6 +657,229 @@ void writeBranchAttributionDifferencesCsv(
             << ","
             << (junction.acceptedDiffersFromLegacy ? 1 : 0)
             << "\n";
+    }
+    output.commit();
+}
+
+void writeWeakContinuityCandidatesCsv(
+    const std::string& path,
+    const std::vector<WeakContinuityCandidate>& candidates) {
+    AtomicOutputFile output(filesystemPath(path), 256 * 1024);
+    std::ostream& out = output.stream();
+    out << std::setprecision(12);
+    out << "candidate_id,stage,accepted,decision,endpoint_a_x,endpoint_a_y,endpoint_b_x,endpoint_b_y,"
+           "endpoint_distance,angle_a,angle_b,width_a,width_b,local_background,minimum_supported_value,"
+           "normalized_cost,support_ratio,mean_support,max_unsupported_run,path_length,path_length_ratio,"
+           "max_turn_angle,competition_margin_a,competition_margin_b,added_path_pixels,added_envelope_cells,"
+           "contacted_object_count,minimum_third_object_clearance,nearby_third_object_count,"
+           "endpoint_branch_id_a,endpoint_branch_id_b,endpoint_junction_distance_a,endpoint_junction_distance_b,"
+           "junction_cluster_id_a,junction_cluster_id_b,junction_arm_count_a,junction_arm_count_b,"
+           "junction_confidence_a,junction_confidence_b,junction_attribution_available_a,"
+           "junction_attribution_available_b,junction_branch_matched_a,junction_branch_matched_b,"
+           "junction_ambiguous_a,junction_ambiguous_b,endpoint_component_holes_a,endpoint_component_holes_b,"
+           "merged_component_holes_after,local_holes_before,local_holes_after,path_grid_xy\n";
+    for (const WeakContinuityCandidate& candidate : candidates) {
+        out << candidate.id << ","
+            << candidate.stage << ","
+            << (candidate.accepted ? 1 : 0) << ","
+            << candidate.decision << ","
+            << candidate.endpointA.x << "," << candidate.endpointA.y << ","
+            << candidate.endpointB.x << "," << candidate.endpointB.y << ","
+            << candidate.endpointDistance << ","
+            << candidate.angleA << "," << candidate.angleB << ","
+            << candidate.widthA << "," << candidate.widthB << ","
+            << candidate.localBackground << ","
+            << candidate.minimumSupportedValue << ","
+            << candidate.normalizedCost << ","
+            << candidate.supportRatio << ","
+            << candidate.meanSupport << ","
+            << candidate.maxUnsupportedRun << ","
+            << candidate.pathLength << ","
+            << candidate.pathLengthRatio << ","
+            << candidate.maxTurnAngleDegrees << ","
+            << candidate.competitionMarginA << ","
+            << candidate.competitionMarginB << ","
+            << candidate.addedPathPixels << ","
+            << candidate.addedEnvelopeCells << ","
+            << candidate.contactedObjectCount << ","
+            << candidate.minimumThirdObjectClearance << ","
+            << candidate.nearbyThirdObjectCount << ","
+            << candidate.endpointBranchIdA << ","
+            << candidate.endpointBranchIdB << ","
+            << candidate.endpointJunctionDistanceA << ","
+            << candidate.endpointJunctionDistanceB << ","
+            << candidate.junctionClusterIdA << ","
+            << candidate.junctionClusterIdB << ","
+            << candidate.junctionArmCountA << ","
+            << candidate.junctionArmCountB << ","
+            << candidate.junctionConfidenceA << ","
+            << candidate.junctionConfidenceB << ","
+            << (candidate.junctionAttributionAvailableA ? 1 : 0) << ","
+            << (candidate.junctionAttributionAvailableB ? 1 : 0) << ","
+            << (candidate.junctionBranchMatchedA ? 1 : 0) << ","
+            << (candidate.junctionBranchMatchedB ? 1 : 0) << ","
+            << (candidate.junctionAmbiguousA ? 1 : 0) << ","
+            << (candidate.junctionAmbiguousB ? 1 : 0) << ","
+            << candidate.endpointComponentHolesA << ","
+            << candidate.endpointComponentHolesB << ","
+            << candidate.mergedComponentHolesAfter << ","
+            << candidate.localHolesBefore << ","
+            << candidate.localHolesAfter << ",";
+        for (std::size_t index = 0; index < candidate.path.size(); ++index) {
+            if (index > 0) {
+                out << ";";
+            }
+            out << candidate.path[index].x << ":" << candidate.path[index].y;
+        }
+        out << "\n";
+    }
+    output.commit();
+}
+
+void writeWeakContinuityCandidatesWorldCsv(
+    const std::string& path,
+    const std::vector<WeakContinuityCandidate>& candidates,
+    const Grid2D& grid) {
+    AtomicOutputFile output(filesystemPath(path), 512 * 1024);
+    std::ostream& out = output.stream();
+    const auto sampleWorldX = [&grid](double gridX) {
+        return grid.worldX(gridX + 0.5);
+    };
+    const auto sampleWorldY = [&grid](double gridY) {
+        return grid.worldY(gridY + 0.5);
+    };
+    out << std::setprecision(12);
+    out << "candidate_id,stage,accepted,decision,"
+           "endpoint_a_grid_x,endpoint_a_grid_y,endpoint_b_grid_x,endpoint_b_grid_y,"
+           "center_grid_x,center_grid_y,"
+           "endpoint_a_world_x,endpoint_a_world_y,endpoint_b_world_x,endpoint_b_world_y,"
+           "center_world_x,center_world_y,"
+           "endpoint_distance,angle_a,angle_b,width_a,width_b,local_background,minimum_supported_value,"
+           "normalized_cost,support_ratio,mean_support,max_unsupported_run,path_length,path_length_ratio,"
+           "max_turn_angle,competition_margin_a,competition_margin_b,added_path_pixels,added_envelope_cells,"
+           "contacted_object_count,minimum_third_object_clearance,nearby_third_object_count,"
+           "endpoint_branch_id_a,endpoint_branch_id_b,endpoint_junction_distance_a,endpoint_junction_distance_b,"
+           "junction_cluster_id_a,junction_cluster_id_b,junction_arm_count_a,junction_arm_count_b,"
+           "junction_confidence_a,junction_confidence_b,junction_attribution_available_a,"
+           "junction_attribution_available_b,junction_branch_matched_a,junction_branch_matched_b,"
+           "junction_ambiguous_a,junction_ambiguous_b,endpoint_component_holes_a,endpoint_component_holes_b,"
+           "merged_component_holes_after,local_holes_before,local_holes_after,path_grid_xy,path_world_xy\n";
+    for (const WeakContinuityCandidate& candidate : candidates) {
+        double centerGridX = 0.5 * (candidate.endpointA.x + candidate.endpointB.x);
+        double centerGridY = 0.5 * (candidate.endpointA.y + candidate.endpointB.y);
+        if (!candidate.path.empty()) {
+            double sumX = 0.0;
+            double sumY = 0.0;
+            for (const SkeletonPoint& point : candidate.path) {
+                sumX += point.x;
+                sumY += point.y;
+            }
+            centerGridX = sumX / static_cast<double>(candidate.path.size());
+            centerGridY = sumY / static_cast<double>(candidate.path.size());
+        }
+
+        out << candidate.id << ","
+            << candidate.stage << ","
+            << (candidate.accepted ? 1 : 0) << ","
+            << candidate.decision << ","
+            << candidate.endpointA.x << "," << candidate.endpointA.y << ","
+            << candidate.endpointB.x << "," << candidate.endpointB.y << ","
+            << centerGridX << "," << centerGridY << ","
+            << sampleWorldX(candidate.endpointA.x) << ","
+            << sampleWorldY(candidate.endpointA.y) << ","
+            << sampleWorldX(candidate.endpointB.x) << ","
+            << sampleWorldY(candidate.endpointB.y) << ","
+            << sampleWorldX(centerGridX) << ","
+            << sampleWorldY(centerGridY) << ","
+            << candidate.endpointDistance << ","
+            << candidate.angleA << "," << candidate.angleB << ","
+            << candidate.widthA << "," << candidate.widthB << ","
+            << candidate.localBackground << ","
+            << candidate.minimumSupportedValue << ","
+            << candidate.normalizedCost << ","
+            << candidate.supportRatio << ","
+            << candidate.meanSupport << ","
+            << candidate.maxUnsupportedRun << ","
+            << candidate.pathLength << ","
+            << candidate.pathLengthRatio << ","
+            << candidate.maxTurnAngleDegrees << ","
+            << candidate.competitionMarginA << ","
+            << candidate.competitionMarginB << ","
+            << candidate.addedPathPixels << ","
+            << candidate.addedEnvelopeCells << ","
+            << candidate.contactedObjectCount << ","
+            << candidate.minimumThirdObjectClearance << ","
+            << candidate.nearbyThirdObjectCount << ","
+            << candidate.endpointBranchIdA << ","
+            << candidate.endpointBranchIdB << ","
+            << candidate.endpointJunctionDistanceA << ","
+            << candidate.endpointJunctionDistanceB << ","
+            << candidate.junctionClusterIdA << ","
+            << candidate.junctionClusterIdB << ","
+            << candidate.junctionArmCountA << ","
+            << candidate.junctionArmCountB << ","
+            << candidate.junctionConfidenceA << ","
+            << candidate.junctionConfidenceB << ","
+            << (candidate.junctionAttributionAvailableA ? 1 : 0) << ","
+            << (candidate.junctionAttributionAvailableB ? 1 : 0) << ","
+            << (candidate.junctionBranchMatchedA ? 1 : 0) << ","
+            << (candidate.junctionBranchMatchedB ? 1 : 0) << ","
+            << (candidate.junctionAmbiguousA ? 1 : 0) << ","
+            << (candidate.junctionAmbiguousB ? 1 : 0) << ","
+            << candidate.endpointComponentHolesA << ","
+            << candidate.endpointComponentHolesB << ","
+            << candidate.mergedComponentHolesAfter << ","
+            << candidate.localHolesBefore << ","
+            << candidate.localHolesAfter << ",";
+        for (std::size_t index = 0; index < candidate.path.size(); ++index) {
+            if (index > 0) {
+                out << ";";
+            }
+            out << candidate.path[index].x << ":" << candidate.path[index].y;
+        }
+        out << ",";
+        for (std::size_t index = 0; index < candidate.path.size(); ++index) {
+            if (index > 0) {
+                out << ";";
+            }
+            out << sampleWorldX(candidate.path[index].x) << ":"
+                << sampleWorldY(candidate.path[index].y);
+        }
+        out << "\n";
+    }
+    output.commit();
+}
+
+void writeWeakTailCandidatesCsv(
+    const std::string& path,
+    const std::vector<WeakTailCandidate>& candidates) {
+    AtomicOutputFile output(filesystemPath(path), 256 * 1024);
+    std::ostream& out = output.stream();
+    out << std::setprecision(12);
+    out << "candidate_id,accepted,decision,cell_count,min_x,min_y,max_x,max_y,"
+           "owner_label,touched_owner_count,span,aspect,mean_value,max_value,"
+           "alignment_angle,cells_grid_xy\n";
+    for (const WeakTailCandidate& candidate : candidates) {
+        out << candidate.id << ","
+            << (candidate.accepted ? 1 : 0) << ","
+            << candidate.decision << ","
+            << candidate.cellCount << ","
+            << candidate.minX << "," << candidate.minY << ","
+            << candidate.maxX << "," << candidate.maxY << ","
+            << candidate.ownerLabel << ","
+            << candidate.touchedOwnerCount << ","
+            << candidate.span << ","
+            << candidate.aspect << ","
+            << candidate.meanValue << ","
+            << candidate.maxValue << ","
+            << candidate.alignmentAngleDegrees << ",";
+        for (std::size_t index = 0; index < candidate.cells.size(); ++index) {
+            if (index > 0) {
+                out << ";";
+            }
+            out << candidate.cells[index].x << ":" << candidate.cells[index].y;
+        }
+        out << "\n";
     }
     output.commit();
 }

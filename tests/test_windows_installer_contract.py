@@ -37,7 +37,7 @@ def test_installer_smoke_test_covers_install_run_identity_and_uninstall():
     for required in (
         "/VERYSILENT",
         "installedIdentity.buildId",
-        "keptPolygonCount -ne 214",
+        "keptPolygonCount -ne 200",
         "topology.openRings",
         "ExpectedCsvSha256",
         "unins000.exe",

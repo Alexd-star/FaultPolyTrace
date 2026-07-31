@@ -22,6 +22,8 @@ faultpolytrace_geoeast_runner.exe
 
 启动器也可以在运行前把用户选择的 DAT 文件导入或覆盖为指定 `BOMapGrid`。
 
+启动器还可以把当前项目中的最终 `BOFaultPolygon` 直接导出为 GeoEast 断层多边形 DAT。它会先回读数据库对象，再按 GeoEast 官方 `default_full.fmt` 八列定义生成 DAT，并在同一目录写出匹配的同名 `.fmt`。该功能与“输入网格 DAT”属于两个方向不同的入口：前者导出结果多边形，后者导入属性网格。
+
 ## 配置方式
 
 - 启动器会在可执行文件旁边保存 `faultpolytrace_launcher.ini`。
@@ -70,3 +72,15 @@ faultpolytrace_geoeast_runner.exe
 4. 检查 `最小面积`、阈值模式和 `ridge-belt` 参数。
 5. 点击 `开始追踪`。
 6. 在日志面板中查看网格统计、拓扑诊断、多边形数量和耗时。
+7. 点击【导出 GeoEast DAT】，按通知保存为 `lc_result.dat`；确认自动结构校验通过后，再在 GeoEast 中回导一次完成最终验收。
+
+## GeoEast DAT 导出规则
+
+- 数据来源：当前项目中所选的 `BOFaultPolygon`，每次导出都重新回读，避免使用陈旧预览缓存。
+- DAT 字段：`faultPolygonName x y connectionFlag faultLevel faultPointType faultPolygonType closeType`。
+- 分段方式：每个外环一个连续 `connectionFlag`，环末重复首点。
+- 配套格式：软件同时生成同名 `.fmt`，内容与本机 GeoEast `default_full.fmt` 一致。回导时在格式定义页面点【打开】选择该文件。
+- 当前语义：`faultLevel=0`、`faultPointType=0`（上盘）、`faultPolygonType=1`（正断层）、`closeType=1`（闭合）。
+- 自动检查：表头、8 列、有限坐标、至少 3 个不同顶点、非零面积、闭合、分段连续、行数及 SHA256。
+- 防假成功：导入后除查看主控列表数量外，还应回读 `BOFaultPolygon` 并确认有效多边形数量一致；只有列表数量而回读为 0 说明字段映射错误。
+- 最终边界：自动检查证明文件符合本机官方格式定义；正式提交前仍应使用 GeoEast【Import Fault Polygons】回导并检查显示一致。
