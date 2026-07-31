@@ -81,8 +81,8 @@ $manifest = [ordered]@{
     launcherSha256 = (Get-FileHash -LiteralPath (Join-Path $runtimeDir "faultpolytrace_launcher.exe") -Algorithm SHA256).Hash
     runnerSha256 = (Get-FileHash -LiteralPath (Join-Path $runtimeDir "faultpolytrace_geoeast_runner.exe") -Algorithm SHA256).Hash
     bootstrapSha256 = (Get-FileHash -LiteralPath (Join-Path $OutputDir "FaultPolyTrace.exe") -Algorithm SHA256).Hash
-    parameterPreset = "防黏连增强"
-    qualityMode = "正式处理"
+    parameterPreset = "recommended-antimerge"
+    qualityMode = "production"
 }
 $manifest | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
 
