@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$OfficialDat = $(if ($env:FPT_OFFICIAL_DAT) { $env:FPT_OFFICIAL_DAT } else { "D:\BaiduNetdiskDownload\BGPCup2025\test.dat" }),
+    [string]$OfficialDat = $env:FPT_OFFICIAL_DAT,
     [string]$OutputDirectory = "",
     [switch]$SkipBuild,
     [switch]$SkipReviewFigures
@@ -11,8 +11,8 @@ if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
     $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
     $OutputDirectory = Join-Path $repoRoot "outputs\evidence\weak_continuity_candidate_$timestamp"
 }
-if (!(Test-Path -LiteralPath $OfficialDat)) {
-    throw "Official DAT not found: $OfficialDat"
+if ([string]::IsNullOrWhiteSpace($OfficialDat) -or !(Test-Path -LiteralPath $OfficialDat)) {
+    throw "Official DAT not found. Use -OfficialDat <test.dat> or set FPT_OFFICIAL_DAT."
 }
 if (!$SkipBuild) {
     & (Join-Path $PSScriptRoot "build.ps1")

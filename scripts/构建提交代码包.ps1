@@ -93,8 +93,21 @@ function Expand-SubmissionTokens {
     param([string]$Root)
     $installerHash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash
     $releaseZipHash = (Get-FileHash -LiteralPath $releaseZip -Algorithm SHA256).Hash
+    $sourcePayloadPrefix = "01_源码\$srcName\"
+    $sourceGuideRelative = "${sourcePayloadPrefix}源码构建与工程说明.md"
+    $portablePayloadPrefix = "02_独立软件\FaultPolyTrace_Portable_$Version\"
+    $pluginPayloadPrefix = "03_GeoEast插件\$pluginName\"
+    $evaluationPayloadPrefix = "06_评测运行程序\$evaluationName\"
     Get-ChildItem -LiteralPath $Root -Recurse -File |
         Where-Object { $_.Extension.ToLowerInvariant() -in @(".md", ".ps1", ".json") } |
+        Where-Object {
+            $relative = $_.FullName.Substring($Root.Length).TrimStart('\')
+            $insideSourcePayload = $relative.StartsWith($sourcePayloadPrefix, [System.StringComparison]::OrdinalIgnoreCase)
+            (!$insideSourcePayload -or $relative.Equals($sourceGuideRelative, [System.StringComparison]::OrdinalIgnoreCase)) -and
+                !$relative.StartsWith($portablePayloadPrefix, [System.StringComparison]::OrdinalIgnoreCase) -and
+                !$relative.StartsWith($pluginPayloadPrefix, [System.StringComparison]::OrdinalIgnoreCase) -and
+                !$relative.StartsWith($evaluationPayloadPrefix, [System.StringComparison]::OrdinalIgnoreCase)
+        } |
         ForEach-Object {
         $text = [System.IO.File]::ReadAllText($_.FullName, [System.Text.Encoding]::UTF8)
         $updated = $text.Replace("{{VERSION}}", $Version).
@@ -235,9 +248,6 @@ New-Item -ItemType Directory -Force -Path $reliabilityTarget | Out-Null
 $latestAcceptance = Get-ChildItem -LiteralPath (Join-Path $repoRoot "examples\outputs") -Directory -Filter "acceptance_*_official_root_antimerge" -ErrorAction SilentlyContinue |
     Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName "参数扰动稳定性\离散分位平台核验.json") -PathType Leaf } |
     Sort-Object LastWriteTime -Descending | Select-Object -First 1
-$latestFullScoreAudit = Get-ChildItem -LiteralPath (Join-Path $repoRoot "examples\outputs") -Directory -Filter "full_score_audit_*" -ErrorAction SilentlyContinue |
-    Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName "赛题满分交付审计报告.md") -PathType Leaf } |
-    Sort-Object LastWriteTime -Descending | Select-Object -First 1
 $latestGeoEastReadback = Get-ChildItem -LiteralPath (Join-Path $repoRoot "outputs\evidence") -Directory -Filter "geoeast_transaction_readback_*" -ErrorAction SilentlyContinue |
     Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName "transaction.json") -PathType Leaf } |
     Sort-Object LastWriteTime -Descending | Select-Object -First 1
@@ -279,10 +289,6 @@ foreach ($item in @(
     @{
         Source = $(if ($latestGeosValidation) { $latestGeosValidation.FullName } else { $null })
         Target = "完整几何GEOS交叉验证.json"
-    },
-    @{
-        Source = $(if ($latestFullScoreAudit) { Join-Path $latestFullScoreAudit.FullName "赛题满分交付审计报告.md" } else { $null })
-        Target = "赛题满分交付审计报告.md"
     }
 )) {
     if ($item.Source -and (Test-Path -LiteralPath $item.Source -PathType Leaf)) {

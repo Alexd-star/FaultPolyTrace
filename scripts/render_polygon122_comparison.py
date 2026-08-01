@@ -29,14 +29,19 @@ from shapely import wkt
 from shapely.geometry import Polygon
 
 
-DEFAULT_DAT = Path(
-    r"D:\BaiduNetdiskDownload\BGPCup2025\赛题7-基于平面断层属性的断层多边形自动追踪\test.dat"
+REPO_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_RUN = (
+    REPO_ROOT
+    / "outputs"
+    / "evidence"
+    / "weak_continuity_candidate_20260731_v12_tail_strict_final"
 )
-DEFAULT_RUN = Path(
-    r"C:\Users\26312\Documents\BGPCup\FaultPolyTrace\outputs\evidence\weak_continuity_candidate_20260731_v12_tail_strict_final"
-)
-DEFAULT_OUT = Path(
-    r"C:\Users\26312\Documents\BGPCup\FaultPolyTrace\outputs\evidence\geoeast_delivery_20260731_v12_and_214\polygon_122_review_cn"
+DEFAULT_OUT = (
+    REPO_ROOT
+    / "outputs"
+    / "evidence"
+    / "geoeast_delivery_20260731_v12_and_214"
+    / "polygon_122_review_cn"
 )
 
 
@@ -473,7 +478,7 @@ def render_hole_detail(out_dir, values, extent, v12, baseline, font_prop, stats)
 
 def main():
     parser = argparse.ArgumentParser(description="生成 polygon 122 与 214 基线的中文高清对比图")
-    parser.add_argument("--dat", type=Path, default=DEFAULT_DAT)
+    parser.add_argument("--dat", type=Path, required=True)
     parser.add_argument("--run-dir", type=Path, default=DEFAULT_RUN)
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT)
     args = parser.parse_args()

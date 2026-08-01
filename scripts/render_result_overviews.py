@@ -20,7 +20,7 @@ from shapely import contains_xy, prepare
 from shapely.ops import unary_union
 
 from render_polygon122_comparison import (
-    DEFAULT_DAT,
+    REPO_ROOT,
     apply_axes,
     configure_chinese_font,
     draw_boundary,
@@ -29,8 +29,8 @@ from render_polygon122_comparison import (
 )
 
 
-DEFAULT_DELIVERY = Path(
-    r"C:\Users\26312\Documents\BGPCup\FaultPolyTrace\outputs\evidence\geoeast_delivery_20260731_v12_and_214"
+DEFAULT_DELIVERY = (
+    REPO_ROOT / "outputs" / "evidence" / "geoeast_delivery_20260731_v12_and_214"
 )
 DEFAULT_RESULT_OUT = DEFAULT_DELIVERY / "result_overviews_highres"
 
@@ -338,7 +338,7 @@ def render_improvement_difference(out_dir, values, extent, baseline, candidate, 
 
 def main():
     parser = argparse.ArgumentParser(description="生成 200 与 214 结果的高清总览图")
-    parser.add_argument("--dat", type=Path, default=DEFAULT_DAT)
+    parser.add_argument("--dat", type=Path, required=True)
     parser.add_argument("--baseline", type=Path, default=DEFAULT_DELIVERY / "post_change_cli_baseline.csv")
     parser.add_argument("--candidate", type=Path, default=DEFAULT_DELIVERY / "post_change_cli_v12.csv")
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_RESULT_OUT)
