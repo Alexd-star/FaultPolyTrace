@@ -14,17 +14,23 @@ def test_one_click_acceptance_exposes_optional_parameter_stability_gate():
 
     assert "[switch]$RunParameterStabilityGate" in text
     assert "参数扰动稳定性验证.py" in text
-    assert "--percentile 0.979" in text
-    assert "--weak-percentile 0.964" in text
-    assert "--percentile 0.981" in text
-    assert "--weak-percentile 0.966" in text
+    assert "Get-StablePercentileProbe" in text
+    assert "stablePercentileLowerInclusive" in text
+    assert "stablePercentileUpperExclusive" in text
+    assert "--percentile $lowerPrimaryArg" in text
+    assert "--weak-percentile $lowerWeakArg" in text
+    assert "--percentile $upperPrimaryArg" in text
+    assert "--weak-percentile $upperWeakArg" in text
     assert "参数扰动稳定性门禁" in text
 
 
 def test_stability_gate_failure_is_not_silently_ignored():
     text = SCRIPT.read_text(encoding="utf-8-sig")
 
-    assert "$stabilityGatePassed = ($LASTEXITCODE -eq 0)" in text
+    assert "$comparisonExitCode = $LASTEXITCODE" in text
+    assert "$stabilityGatePassed = ($comparisonExitCode -eq 0)" in text
+    assert "$stabilityArtifactsPresent" in text
+    assert "$plateauHashStable" in text
     assert "Pass = $stabilityGatePassed" in text
 
 

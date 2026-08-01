@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../core/FaultTracer.h"
+#include "../core/TraceResult.h"
 #include "../core/Topology.h"
 
 #include <string>
@@ -42,6 +42,7 @@ struct RunDiagnostics {
     double multiScaleEvidenceMinimumRidgeResponse = 0.04;
     std::size_t multiScaleEvidenceMaximumSamples = 2000000;
     bool adaptiveBoundaryShadow = false;
+    bool adaptiveBoundaryApply = false;
     double adaptiveBoundaryMaximumDisplacementWorld = 15.0;
     double adaptiveBoundaryMinimumSupportGain = 0.01;
     double adaptiveBoundaryMaximumSupportLossRatio = 0.0;
@@ -176,7 +177,9 @@ struct RunDiagnostics {
     bool multiScaleEvidenceShadowEvaluated = false;
     MultiScaleEvidenceSummary multiScaleEvidenceSummary;
     bool adaptiveBoundaryShadowEvaluated = false;
+    bool adaptiveBoundaryApplied = false;
     AdaptiveBoundarySummary adaptiveBoundarySummary;
+    AdaptiveBoundaryCommitSummary adaptiveBoundaryCommitSummary;
     std::vector<AdaptiveBoundaryEvidence> adaptiveBoundaryEvidence;
     int keptBranches = 0;
     int prunedBranches = 0;
@@ -296,8 +299,13 @@ struct RunDiagnostics {
     int nestedHoleCount = 0;
     int polygonContainmentCount = 0;
     int polygonInteriorOverlapCount = 0;
+    double topologyRingValidationMs = 0.0;
+    double topologySelfIntersectionMs = 0.0;
+    double topologyHoleValidationMs = 0.0;
+    double topologyPairConflictMs = 0.0;
     long long readMs = 0;
     long long traceMs = 0;
+    TraceStageTimings traceStages;
     long long topologyMs = 0;
     long long writeMs = 0;
     long long elapsedMs = 0;

@@ -133,6 +133,26 @@ def decide_promotion(
     bridge_delta = float(candidate.get("low_support_bridge_ratio_proxy", 0.0)) - float(
         baseline.get("low_support_bridge_ratio_proxy", 0.0)
     )
+    bridge_count_available = (
+        "low_support_bridge_cell_count_proxy" in baseline
+        and "low_support_bridge_cell_count_proxy" in candidate
+    )
+    bridge_count_delta = (
+        int(candidate["low_support_bridge_cell_count_proxy"])
+        - int(baseline["low_support_bridge_cell_count_proxy"])
+        if bridge_count_available
+        else 0
+    )
+    bridge_risk_pass = (
+        bridge_count_delta <= 0
+        if bridge_count_available
+        else bridge_delta <= proxy_tolerance
+    )
+    bridge_risk_detail = (
+        f"桥像元变化 {bridge_count_delta}，比例变化 {bridge_delta:.6%}"
+        if bridge_count_available
+        else f"比例变化 {bridge_delta:.6%}"
+    )
     topology_zero = (
         int(candidate["open_rings"]) == 0
         and int(candidate["self_intersections"]) == 0
@@ -147,10 +167,16 @@ def decide_promotion(
     for key, delta in (
         ("background_leakage_ratio_proxy", background_delta),
         ("unsupported_inside_ratio_proxy", unsupported_delta),
-        ("low_support_bridge_ratio_proxy", bridge_delta),
     ):
         if key in baseline and key in candidate:
             strict_improvements.append(delta < -proxy_tolerance)
+    if bridge_count_available:
+        strict_improvements.append(bridge_count_delta < 0)
+    elif (
+        "low_support_bridge_ratio_proxy" in baseline
+        and "low_support_bridge_ratio_proxy" in candidate
+    ):
+        strict_improvements.append(bridge_delta < -proxy_tolerance)
     for key in ("reference_iou", "reference_boundary_f1", "reference_cldice"):
         if key in baseline and key in candidate:
             strict_improvements.append(
@@ -182,12 +208,10 @@ def decide_promotion(
             "多边形内不支撑比例不退化",
             proxy_tolerance,
         ),
-        _optional_lower_is_better_check(
-            baseline,
-            candidate,
-            "low_support_bridge_ratio_proxy",
+        _check(
             "低支撑桥代理指标不退化",
-            proxy_tolerance,
+            bridge_risk_pass,
+            bridge_risk_detail,
         ),
         _optional_higher_is_better_check(
             baseline, candidate, "reference_iou", "参考区域 IoU 不退化", coverage_tolerance
@@ -222,6 +246,7 @@ def decide_promotion(
             "background_leakage_delta_proxy": background_delta,
             "unsupported_inside_delta_proxy": unsupported_delta,
             "low_support_bridge_delta_proxy": bridge_delta,
+            "low_support_bridge_cell_delta_proxy": bridge_count_delta,
             "reference_iou_delta": float(candidate.get("reference_iou", 0.0)) - float(baseline.get("reference_iou", 0.0)),
             "reference_boundary_f1_delta": float(candidate.get("reference_boundary_f1", 0.0)) - float(baseline.get("reference_boundary_f1", 0.0)),
             "reference_cldice_delta": float(candidate.get("reference_cldice", 0.0)) - float(baseline.get("reference_cldice", 0.0)),

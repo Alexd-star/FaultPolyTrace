@@ -24,7 +24,7 @@ def test_shared_parameter_safety_rejects_zero_and_warns_about_conflicting_enhanc
 def test_all_trace_entry_points_apply_parameter_safety_before_starting():
     desktop = read("standalone_app/qt_desktop/FaultPolyTraceWindow.cpp")
     launcher = read("geoeast_plugin/qt_launcher/FaultTraceDialog.cpp")
-    core = read("src/core/FaultTracer.cpp")
+    core = read("src/core/TraceOptionsValidation.cpp")
 
     for source in (desktop, launcher):
         assert "confirmTraceParametersForRun()" in source

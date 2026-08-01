@@ -5,7 +5,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_branch_attribution_is_default_off_shadow_diagnostics():
-    header = (ROOT / "src" / "core" / "FaultTracer.h").read_text(encoding="utf-8")
+    header = (ROOT / "src" / "core" / "TraceOptions.h").read_text(encoding="utf-8")
     implementation = (ROOT / "src" / "core" / "FaultTracer.cpp").read_text(
         encoding="utf-8"
     )
@@ -16,7 +16,7 @@ def test_branch_attribution_is_default_off_shadow_diagnostics():
 
 
 def test_branch_attribution_summary_is_exposed_without_replacing_formal_grouping():
-    header = (ROOT / "src" / "core" / "FaultTracer.h").read_text(encoding="utf-8")
+    header = (ROOT / "src" / "core" / "TraceResult.h").read_text(encoding="utf-8")
     implementation = (ROOT / "src" / "core" / "FaultTracer.cpp").read_text(
         encoding="utf-8"
     )
@@ -147,7 +147,7 @@ def test_cli_can_write_auditable_branch_attribution_difference_csv():
 
 
 def test_candidate_root_grouping_is_default_off_and_only_feeds_root_anti_merge():
-    header = (ROOT / "src" / "core" / "FaultTracer.h").read_text(
+    header = (ROOT / "src" / "core" / "TraceOptions.h").read_text(
         encoding="utf-8"
     )
     implementation = (ROOT / "src" / "core" / "FaultTracer.cpp").read_text(

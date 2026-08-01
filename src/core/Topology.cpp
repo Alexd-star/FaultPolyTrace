@@ -1,14 +1,23 @@
 #include "Topology.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <limits>
+#include <numeric>
 #include <tuple>
 
 namespace fpt {
 namespace {
 
 constexpr double Epsilon = 1e-9;
+
+using TopologyClock = std::chrono::steady_clock;
+
+double elapsedMilliseconds(TopologyClock::time_point start) {
+    return std::chrono::duration<double, std::milli>(
+        TopologyClock::now() - start).count();
+}
 
 struct Bounds {
     double minX = 0.0;
@@ -358,9 +367,15 @@ bool ringHasPointInside(const std::vector<Point>& candidate, const std::vector<P
 }
 
 bool polygonHasPointInside(const Polygon& candidate, const Polygon& container) {
-    return std::any_of(candidate.points.begin(), candidate.points.end(), [&](const Point& point) {
-        return locatePointInPolygonArea(point, container) == PointLocation::inside;
-    });
+    for (const Point& point : candidate.points) {
+        const PointLocation location =
+            locatePointInPolygonArea(point, container);
+        if (location == PointLocation::boundary) {
+            continue;
+        }
+        return location == PointLocation::inside;
+    }
+    return false;
 }
 
 bool validateHoleRelationships(const Polygon& polygon, TopologyDiagnostics& diagnostics) {
@@ -441,13 +456,38 @@ bool ringSelfIntersects(const std::vector<Point>& ring, const Polygon& polygon, 
     }
     bool found = false;
     const std::vector<SegmentRef> segments = buildSegmentsFromRing(ring);
-    for (std::size_t i = 0; i < n; ++i) {
-        const SegmentRef& first = segments[i];
-        for (std::size_t j = i + 1; j < n; ++j) {
-            if (adjacentEdges(i, j, n)) {
+    std::vector<std::size_t> order(n);
+    std::iota(order.begin(), order.end(), 0U);
+    std::stable_sort(
+        order.begin(),
+        order.end(),
+        [&](std::size_t left, std::size_t right) {
+            const Bounds& first = segments[left].bounds;
+            const Bounds& second = segments[right].bounds;
+            return std::tie(first.minX, first.minY, first.maxX,
+                            first.maxY, left) <
+                std::tie(second.minX, second.minY, second.maxX,
+                         second.maxY, right);
+        });
+    std::vector<std::size_t> active;
+    active.reserve(std::min<std::size_t>(n, 256));
+    for (const std::size_t currentIndex : order) {
+        const SegmentRef& current = segments[currentIndex];
+        active.erase(
+            std::remove_if(
+                active.begin(),
+                active.end(),
+                [&](std::size_t activeIndex) {
+                    return segments[activeIndex].bounds.maxX + Epsilon <
+                        current.bounds.minX;
+                }),
+            active.end());
+        for (const std::size_t activeIndex : active) {
+            if (adjacentEdges(activeIndex, currentIndex, n)) {
                 continue;
             }
-            const SegmentRef& second = segments[j];
+            const SegmentRef& first = segments[activeIndex];
+            const SegmentRef& second = current;
             if (!boundsOverlap(first.bounds, second.bounds)) {
                 continue;
             }
@@ -457,12 +497,13 @@ bool ringSelfIntersects(const std::vector<Point>& ring, const Polygon& polygon, 
                     ringIndex == 0 ? "self" : "hole-self",
                     polygon.id,
                     polygon.id,
-                    static_cast<int>(i),
-                    static_cast<int>(j),
+                    static_cast<int>(activeIndex),
+                    static_cast<int>(currentIndex),
                     approximateIntersectionPoint(*first.a, *first.b, *second.a, *second.b)
                 });
             }
         }
+        active.push_back(currentIndex);
     }
     return found;
 }
@@ -553,10 +594,13 @@ PolygonConflictResult polygonConflict(
             }
         }
     }
-    if (!result.boundaryConflict &&
-        (polygonHasPointInside(aPoly, bPoly) || polygonHasPointInside(bPoly, aPoly))) {
+    const bool aInsideB = !result.boundaryConflict &&
+        polygonHasPointInside(aPoly, bPoly);
+    const bool bInsideA = !result.boundaryConflict &&
+        polygonHasPointInside(bPoly, aPoly);
+    if (aInsideB || bInsideA) {
         result.containment = true;
-        const Point representative = polygonHasPointInside(aPoly, bPoly)
+        const Point representative = aInsideB
             ? aPoly.points.front() : bPoly.points.front();
         diagnostics.polygonIntersectionDetails.push_back({
             "polygon-containment",
@@ -592,16 +636,22 @@ TopologyDiagnostics diagnoseTopology(const std::vector<Polygon>& polygons, bool 
             continue;
         }
 
+        TopologyClock::time_point stageStart = TopologyClock::now();
         bool invalid = validateRingBasics(polygon.points, polygon, 0, diagnostics);
         for (std::size_t i = 0; i < polygon.holes.size(); ++i) {
             invalid = validateRingBasics(
                 polygon.holes[i], polygon, static_cast<int>(i + 1), diagnostics) || invalid;
         }
+        diagnostics.ringValidationMs += elapsedMilliseconds(stageStart);
 
         bool selfIntersects = false;
         if (!invalid) {
+            stageStart = TopologyClock::now();
             selfIntersects = polygonSelfIntersects(polygon, diagnostics);
+            diagnostics.selfIntersectionMs += elapsedMilliseconds(stageStart);
+            stageStart = TopologyClock::now();
             invalid = validateHoleRelationships(polygon, diagnostics) || invalid;
+            diagnostics.holeValidationMs += elapsedMilliseconds(stageStart);
         }
         if (selfIntersects) {
             ++diagnostics.selfIntersectingPolygonCount;
@@ -616,6 +666,7 @@ TopologyDiagnostics diagnoseTopology(const std::vector<Polygon>& polygons, bool 
         }
     }
 
+    const TopologyClock::time_point pairStageStart = TopologyClock::now();
     for (std::size_t i = 0; i < polygons.size(); ++i) {
         if ((keptOnly && !polygons[i].kept) || !validPolygons[i]) {
             continue;
@@ -637,6 +688,7 @@ TopologyDiagnostics diagnoseTopology(const std::vector<Polygon>& polygons, bool 
             }
         }
     }
+    diagnostics.pairConflictMs = elapsedMilliseconds(pairStageStart);
     return diagnostics;
 }
 

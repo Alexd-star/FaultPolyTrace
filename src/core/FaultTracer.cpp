@@ -1,16 +1,22 @@
 #include "FaultTracer.h"
 
+#include "FinalBridgeGate.h"
 #include "GridMetric.h"
 #include "PhysicalMorphology.h"
+#include "PolygonVectorizer.h"
 #include "BranchAttribution.h"
 #include "LocalPolygonQuality.h"
 #include "SkeletonGraph.h"
 #include "Topology.h"
+#include "TraceOptionAdapters.h"
+#include "TraceOptionsValidation.h"
+#include "TracePostProcessor.h"
 #include "WeakPathSupport.h"
 #include "WeakContinuityConnector.h"
 #include "WeakExtensionGate.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <limits>
 #include <map>
@@ -22,6 +28,13 @@
 
 namespace fpt {
 namespace {
+
+using TraceClock = std::chrono::steady_clock;
+
+double elapsedMilliseconds(TraceClock::time_point start) {
+    return std::chrono::duration<double, std::milli>(
+        TraceClock::now() - start).count();
+}
 
 struct Cell {
     int x = 0;
@@ -37,16 +50,6 @@ struct OwnershipCell {
 struct BranchGroup {
     int id = 0;
     std::vector<const SkeletonBranch*> branches;
-};
-
-struct ComponentStats {
-    int minX = 0;
-    int minY = 0;
-    int maxX = 0;
-    int maxY = 0;
-    int width = 0;
-    int height = 0;
-    double aspect = 1.0;
 };
 
 constexpr int kWeakPathStableEvidenceMinCells = 64;
@@ -126,42 +129,6 @@ struct GapSupportContext {
     double minSupportRatio = 0.0;
 };
 
-struct Vertex {
-    int x = 0;
-    int y = 0;
-
-    bool operator<(const Vertex& other) const {
-        if (x == other.x) {
-            return y < other.y;
-        }
-        return x < other.x;
-    }
-
-    bool operator==(const Vertex& other) const {
-        return x == other.x && y == other.y;
-    }
-
-    bool operator!=(const Vertex& other) const {
-        return !(*this == other);
-    }
-};
-
-struct Edge {
-    Vertex from;
-    Vertex to;
-};
-
-bool cellSetContains(const std::vector<unsigned char>& mask, int width, int height, int x, int y) {
-    if (x < 0 || y < 0 || x >= width || y >= height) {
-        return false;
-    }
-    return mask[static_cast<std::size_t>(y * width + x)] != 0;
-}
-
-Point toWorldPoint(const Grid2D& grid, const Vertex& vertex) {
-    return {grid.worldX(vertex.x), grid.worldY(vertex.y)};
-}
-
 Point toWorldPoint(const Grid2D& grid, const SkeletonPoint& point) {
     return {grid.worldX(point.x + 0.5), grid.worldY(point.y + 0.5)};
 }
@@ -170,28 +137,6 @@ double pointDistance(const Point& a, const Point& b) {
     const double dx = a.x - b.x;
     const double dy = a.y - b.y;
     return std::sqrt(dx * dx + dy * dy);
-}
-
-double pointSegmentDistanceSquared(const Point& p, const Point& a, const Point& b) {
-    const double ax = a.x;
-    const double ay = a.y;
-    const double bx = b.x;
-    const double by = b.y;
-    const double dx = bx - ax;
-    const double dy = by - ay;
-    const double length2 = dx * dx + dy * dy;
-    if (length2 <= 1e-24) {
-        const double px = p.x - ax;
-        const double py = p.y - ay;
-        return px * px + py * py;
-    }
-    double t = ((p.x - ax) * dx + (p.y - ay) * dy) / length2;
-    t = std::max(0.0, std::min(1.0, t));
-    const double cx = ax + t * dx;
-    const double cy = ay + t * dy;
-    const double px = p.x - cx;
-    const double py = p.y - cy;
-    return px * px + py * py;
 }
 
 bool gapHasAttributeSupport(const SkeletonPoint& a, const SkeletonPoint& b, void* rawContext) {
@@ -945,1257 +890,6 @@ std::vector<unsigned char> localClose(const std::vector<unsigned char>& mask, in
     return localErode(localDilate(mask, width, height, radius), width, height, radius);
 }
 
-double signedPolygonArea(const std::vector<Point>& points) {
-    if (points.size() < 3) {
-        return 0.0;
-    }
-    double sum = 0.0;
-    for (std::size_t i = 0; i < points.size(); ++i) {
-        const Point& a = points[i];
-        const Point& b = points[(i + 1) % points.size()];
-        sum += a.x * b.y - b.x * a.y;
-    }
-    return 0.5 * sum;
-}
-
-bool pointInRing(const Point& point, const std::vector<Point>& ring) {
-    if (ring.size() < 3) {
-        return false;
-    }
-
-    bool inside = false;
-    for (std::size_t i = 0, j = ring.size() - 1; i < ring.size(); j = i++) {
-        const Point& a = ring[i];
-        const Point& b = ring[j];
-        const bool crosses = ((a.y > point.y) != (b.y > point.y)) &&
-            (point.x < (b.x - a.x) * (point.y - a.y) / ((b.y - a.y) + 1e-30) + a.x);
-        if (crosses) {
-            inside = !inside;
-        }
-    }
-    return inside;
-}
-
-double pointToRingDistance(const Point& point, const std::vector<Point>& ring) {
-    if (pointInRing(point, ring)) {
-        return 0.0;
-    }
-    if (ring.size() < 2) {
-        return std::numeric_limits<double>::infinity();
-    }
-
-    double best = std::numeric_limits<double>::infinity();
-    for (std::size_t i = 0; i < ring.size(); ++i) {
-        const Point& a = ring[i];
-        const Point& b = ring[(i + 1) % ring.size()];
-        best = std::min(best, pointSegmentDistanceSquared(point, a, b));
-    }
-    return std::sqrt(best);
-}
-
-bool polygonPreservesCoverage(
-    const Grid2D& grid,
-    const std::vector<Point>& ring,
-    const std::vector<Cell>& cells,
-    double minPreserveValue,
-    double preserveMargin) {
-    if (ring.size() < 3) {
-        return false;
-    }
-    const double margin = std::max(0.0, preserveMargin);
-    int protectedCellCount = 0;
-    for (const Cell& cell : cells) {
-        if (grid.value(cell.x, cell.y) < minPreserveValue) {
-            continue;
-        }
-        ++protectedCellCount;
-        const Point center{
-            grid.worldX(cell.x + 0.5),
-            grid.worldY(cell.y + 0.5)
-        };
-        if (pointToRingDistance(center, ring) > margin) {
-            return false;
-        }
-    }
-    if (protectedCellCount == 0) {
-        return true;
-    }
-    return true;
-}
-
-struct BoundaryRingSet {
-    std::vector<Point> exterior;
-    std::vector<std::vector<Point>> holes;
-};
-
-std::vector<BoundaryRingSet> selectBoundaryRingSets(
-    std::vector<std::vector<Point>> rings,
-    int& suppressedInternalRings) {
-    std::vector<BoundaryRingSet> ringSets;
-    if (rings.empty()) {
-        return ringSets;
-    }
-
-    std::vector<double> areas(rings.size(), 0.0);
-    for (std::size_t i = 0; i < rings.size(); ++i) {
-        areas[i] = std::abs(signedPolygonArea(rings[i]));
-    }
-
-    std::vector<int> parent(rings.size(), -1);
-    std::vector<int> depth(rings.size(), 0);
-    std::vector<unsigned char> valid(rings.size(), 1);
-    for (std::size_t i = 0; i < rings.size(); ++i) {
-        if (rings[i].size() < 3 || areas[i] <= 1e-9) {
-            ++suppressedInternalRings;
-            valid[i] = 0;
-            continue;
-        }
-
-        const Point probe = rings[i].front();
-        double bestParentArea = std::numeric_limits<double>::infinity();
-        for (std::size_t j = 0; j < rings.size(); ++j) {
-            if (i == j || rings[j].size() < 3 || areas[j] <= areas[i]) {
-                continue;
-            }
-            if (pointInRing(probe, rings[j])) {
-                if (areas[j] < bestParentArea) {
-                    bestParentArea = areas[j];
-                    parent[i] = static_cast<int>(j);
-                }
-            }
-        }
-    }
-
-    for (std::size_t i = 0; i < rings.size(); ++i) {
-        if (!valid[i]) {
-            continue;
-        }
-        int cursor = parent[i];
-        while (cursor >= 0) {
-            ++depth[i];
-            cursor = parent[static_cast<std::size_t>(cursor)];
-        }
-    }
-
-    std::vector<int> exteriorSetIndex(rings.size(), -1);
-    for (std::size_t i = 0; i < rings.size(); ++i) {
-        if (!valid[i]) {
-            continue;
-        }
-        if (depth[i] == 0 || (depth[i] % 2) == 0) {
-            exteriorSetIndex[i] = static_cast<int>(ringSets.size());
-            BoundaryRingSet set;
-            set.exterior = std::move(rings[i]);
-            ringSets.push_back(std::move(set));
-        }
-    }
-
-    for (std::size_t i = 0; i < rings.size(); ++i) {
-        if (!valid[i] || (depth[i] % 2) != 1) {
-            continue;
-        }
-        int ancestor = parent[i];
-        while (ancestor >= 0 && (depth[static_cast<std::size_t>(ancestor)] % 2) != 0) {
-            ancestor = parent[static_cast<std::size_t>(ancestor)];
-        }
-        if (ancestor < 0) {
-            ++suppressedInternalRings;
-            continue;
-        }
-        const int setIndex = exteriorSetIndex[static_cast<std::size_t>(ancestor)];
-        if (setIndex < 0 || setIndex >= static_cast<int>(ringSets.size())) {
-            ++suppressedInternalRings;
-            continue;
-        }
-        ringSets[static_cast<std::size_t>(setIndex)].holes.push_back(std::move(rings[i]));
-    }
-
-    return ringSets;
-}
-
-ComponentStats computeComponentStats(const std::vector<Cell>& cells) {
-    ComponentStats stats;
-    if (cells.empty()) {
-        return stats;
-    }
-
-    stats.minX = stats.maxX = cells.front().x;
-    stats.minY = stats.maxY = cells.front().y;
-    for (const Cell& cell : cells) {
-        stats.minX = std::min(stats.minX, cell.x);
-        stats.maxX = std::max(stats.maxX, cell.x);
-        stats.minY = std::min(stats.minY, cell.y);
-        stats.maxY = std::max(stats.maxY, cell.y);
-    }
-    stats.width = stats.maxX - stats.minX + 1;
-    stats.height = stats.maxY - stats.minY + 1;
-    stats.aspect = static_cast<double>(std::max(stats.width, stats.height)) /
-        static_cast<double>(std::max(1, std::min(stats.width, stats.height)));
-    return stats;
-}
-
-bool shouldKeepPolygon(
-    double area,
-    int cellCount,
-    double meanValue,
-    double maxValue,
-    const ComponentStats& stats,
-    const TraceOptions& options,
-    double effectiveThreshold) {
-    if (area >= options.minArea) {
-        return true;
-    }
-    if (!options.adaptiveAreaFilter) {
-        return false;
-    }
-    if (cellCount < options.adaptiveAreaMinCells) {
-        return false;
-    }
-
-    const double meanFloor = std::max(0.0, effectiveThreshold * options.adaptiveAreaMinMeanRatio);
-    const double maxFloor = std::max(0.0, effectiveThreshold * options.adaptiveAreaMinMaxRatio);
-    const bool strongEnough = maxValue >= maxFloor || meanValue >= effectiveThreshold;
-    const bool lineLike = stats.aspect >= options.adaptiveAreaMinAspect ||
-        std::max(stats.width, stats.height) >= options.residualTraceMinLength;
-    return lineLike && strongEnough && meanValue >= meanFloor;
-}
-
-bool finalizeAndAppendPolygon(
-    const Grid2D& grid,
-    const std::vector<Cell>& cells,
-    double sum,
-    double maxValue,
-    std::vector<Point> ring,
-    std::vector<std::vector<Point>> holes,
-    const ComponentStats& stats,
-    const TraceOptions& options,
-    double keepThreshold,
-    TraceResult& result,
-    int& nextId) {
-    const double inputSignedArea = signedPolygonArea(ring);
-    if (std::abs(inputSignedArea) <= 1e-9) {
-        return false;
-    }
-    if (inputSignedArea < 0.0) {
-        std::reverse(ring.begin(), ring.end());
-    }
-
-    Polygon polygon;
-    polygon.id = nextId++;
-    polygon.points = std::move(ring);
-    polygon.holes = std::move(holes);
-    for (std::vector<Point>& hole : polygon.holes) {
-        const double holeSignedArea = signedPolygonArea(hole);
-        if (std::abs(holeSignedArea) <= 1e-9) {
-            hole.clear();
-        } else if (holeSignedArea > 0.0) {
-            std::reverse(hole.begin(), hole.end());
-        }
-    }
-    polygon.holes.erase(
-        std::remove_if(
-            polygon.holes.begin(),
-            polygon.holes.end(),
-            [](const std::vector<Point>& hole) { return hole.size() < 3; }),
-        polygon.holes.end());
-    const double minPreserveValue = std::max(0.0, keepThreshold * options.coveragePreserveMinValueRatio);
-    if (options.simplifyTolerance > 0.0) {
-        std::vector<Point> simplified = simplifyRingDouglasPeucker(polygon.points, options.simplifyTolerance);
-        if (options.preserveCoverageAfterSmoothing &&
-            !polygonPreservesCoverage(grid, simplified, cells, minPreserveValue, options.coveragePreserveMargin)) {
-            Polygon coverageFallback = polygon;
-            if (polygonHasTopologyConflict(coverageFallback, result.polygons, true)) {
-                Polygon topologySafeCandidate = polygon;
-                topologySafeCandidate.points = std::move(simplified);
-                if (!polygonHasTopologyConflict(topologySafeCandidate, result.polygons, true)) {
-                    polygon.points = std::move(topologySafeCandidate.points);
-                    ++result.coveragePreserveTopologyOverridePolygons;
-                } else {
-                    ++result.coveragePreserveSimplifyFallbackPolygons;
-                }
-            } else {
-                ++result.coveragePreserveSimplifyFallbackPolygons;
-            }
-        } else {
-            polygon.points = std::move(simplified);
-        }
-    }
-    if (options.smoothIterations > 0) {
-        std::vector<Point> smoothed = smoothRingChaikin(polygon.points, options.smoothIterations);
-        if (options.preserveCoverageAfterSmoothing &&
-            !polygonPreservesCoverage(grid, smoothed, cells, minPreserveValue, options.coveragePreserveMargin)) {
-            Polygon coverageFallback = polygon;
-            if (polygonHasTopologyConflict(coverageFallback, result.polygons, true)) {
-                Polygon topologySafeCandidate = polygon;
-                topologySafeCandidate.points = std::move(smoothed);
-                if (!polygonHasTopologyConflict(topologySafeCandidate, result.polygons, true)) {
-                    polygon.points = std::move(topologySafeCandidate.points);
-                    ++result.coveragePreserveTopologyOverridePolygons;
-                } else {
-                    ++result.coveragePreserveSmoothFallbackPolygons;
-                }
-            } else {
-                ++result.coveragePreserveSmoothFallbackPolygons;
-            }
-        } else {
-            polygon.points = std::move(smoothed);
-        }
-    }
-    std::vector<std::vector<Point>> topologySafeHoles;
-    topologySafeHoles.reserve(polygon.holes.size());
-    for (std::vector<Point>& hole : polygon.holes) {
-        bool conflict = hole.empty() || !pointInRing(hole.front(), polygon.points) ||
-            ringBoundariesConflict(polygon.points, hole, true);
-        if (!conflict) {
-            for (const std::vector<Point>& accepted : topologySafeHoles) {
-                if (ringBoundariesConflict(accepted, hole, true)) {
-                    conflict = true;
-                    break;
-                }
-            }
-        }
-        if (conflict) {
-            ++result.suppressedInternalRings;
-        } else {
-            topologySafeHoles.push_back(std::move(hole));
-        }
-    }
-    polygon.holes = std::move(topologySafeHoles);
-    polygon.area = polygonArea(polygon.points);
-    polygon.perimeter = polygonPerimeter(polygon.points);
-    for (const std::vector<Point>& hole : polygon.holes) {
-        polygon.area -= polygonArea(hole);
-        polygon.perimeter += polygonPerimeter(hole);
-    }
-    polygon.area = std::max(0.0, polygon.area);
-    polygon.cellCount = static_cast<int>(cells.size());
-    polygon.meanValue = cells.empty() ? 0.0 : sum / static_cast<double>(cells.size());
-    polygon.maxValue = maxValue;
-    polygon.kept = shouldKeepPolygon(
-        polygon.area,
-        polygon.cellCount,
-        polygon.meanValue,
-        polygon.maxValue,
-        stats,
-        options,
-        keepThreshold);
-    result.polygons.push_back(std::move(polygon));
-    return result.polygons.back().kept;
-}
-
-std::vector<Point> removeCollinear(std::vector<Point> points) {
-    if (points.size() < 3) {
-        return points;
-    }
-
-    std::vector<Point> compact;
-    compact.reserve(points.size());
-    for (std::size_t i = 0; i < points.size(); ++i) {
-        const Point& prev = points[(i + points.size() - 1) % points.size()];
-        const Point& current = points[i];
-        const Point& next = points[(i + 1) % points.size()];
-        const double ax = current.x - prev.x;
-        const double ay = current.y - prev.y;
-        const double bx = next.x - current.x;
-        const double by = next.y - current.y;
-        const double crossValue = ax * by - ay * bx;
-        if (std::abs(crossValue) > 1e-12) {
-            compact.push_back(current);
-        }
-    }
-    return compact.size() >= 3 ? compact : points;
-}
-
-std::vector<std::vector<Vertex>> splitSelfTouchingVertexRing(const std::vector<Vertex>& vertices) {
-    std::vector<std::vector<Vertex>> loops;
-    if (vertices.size() < 3) {
-        return loops;
-    }
-
-    std::vector<Vertex> stack;
-    std::map<Vertex, std::size_t> positionByVertex;
-
-    auto pushVertex = [&stack, &positionByVertex](const Vertex& vertex) {
-        positionByVertex[vertex] = stack.size();
-        stack.push_back(vertex);
-    };
-
-    for (std::size_t i = 0; i <= vertices.size(); ++i) {
-        const Vertex vertex = (i == vertices.size()) ? vertices.front() : vertices[i];
-        if (stack.empty()) {
-            pushVertex(vertex);
-            continue;
-        }
-
-        auto repeat = positionByVertex.find(vertex);
-        if (repeat == positionByVertex.end()) {
-            pushVertex(vertex);
-            continue;
-        }
-
-        const std::size_t start = repeat->second;
-        if (stack.size() - start >= 3) {
-            loops.emplace_back(stack.begin() + static_cast<std::ptrdiff_t>(start), stack.end());
-        }
-        for (std::size_t eraseIndex = start + 1; eraseIndex < stack.size(); ++eraseIndex) {
-            positionByVertex.erase(stack[eraseIndex]);
-        }
-        stack.resize(start + 1);
-    }
-
-    if (loops.empty()) {
-        loops.push_back(vertices);
-    }
-    return loops;
-}
-
-std::vector<std::vector<Point>> traceBoundaryRings(const Grid2D& grid, const std::vector<Cell>& cells) {
-    std::vector<unsigned char> componentMask(static_cast<std::size_t>(grid.nx() * grid.ny()), 0);
-    for (const Cell& cell : cells) {
-        componentMask[static_cast<std::size_t>(cell.y * grid.nx() + cell.x)] = 1;
-    }
-
-    std::vector<Edge> edges;
-    edges.reserve(cells.size() * 4);
-    for (const Cell& cell : cells) {
-        const int x = cell.x;
-        const int y = cell.y;
-
-        if (!cellSetContains(componentMask, grid.nx(), grid.ny(), x, y - 1)) {
-            edges.push_back({{x, y}, {x + 1, y}});
-        }
-        if (!cellSetContains(componentMask, grid.nx(), grid.ny(), x + 1, y)) {
-            edges.push_back({{x + 1, y}, {x + 1, y + 1}});
-        }
-        if (!cellSetContains(componentMask, grid.nx(), grid.ny(), x, y + 1)) {
-            edges.push_back({{x + 1, y + 1}, {x, y + 1}});
-        }
-        if (!cellSetContains(componentMask, grid.nx(), grid.ny(), x - 1, y)) {
-            edges.push_back({{x, y + 1}, {x, y}});
-        }
-    }
-
-    std::map<Vertex, std::vector<Vertex>> nextByStart;
-    for (const Edge& edge : edges) {
-        nextByStart[edge.from].push_back(edge.to);
-    }
-    for (auto& item : nextByStart) {
-        std::sort(item.second.begin(), item.second.end(), [](const Vertex& a, const Vertex& b) {
-            if (a.x == b.x) {
-                return a.y < b.y;
-            }
-            return a.x < b.x;
-        });
-    }
-
-    std::vector<std::vector<Point>> rings;
-    while (!nextByStart.empty()) {
-        auto startIt = nextByStart.begin();
-        const Vertex start = startIt->first;
-        Vertex current = start;
-        std::vector<Vertex> ringVertices;
-        ringVertices.push_back(current);
-
-        int guard = 0;
-        const int maxSteps = static_cast<int>(edges.size()) + 4;
-        while (guard++ < maxSteps) {
-            auto it = nextByStart.find(current);
-            if (it == nextByStart.end() || it->second.empty()) {
-                break;
-            }
-
-            const Vertex next = it->second.back();
-            it->second.pop_back();
-            if (it->second.empty()) {
-                nextByStart.erase(it);
-            }
-
-            current = next;
-            if (current == start) {
-                break;
-            }
-            ringVertices.push_back(current);
-        }
-
-        if (current != start || ringVertices.size() < 3) {
-            continue;
-        }
-
-        std::vector<std::vector<Vertex>> simpleVertexLoops = splitSelfTouchingVertexRing(ringVertices);
-        for (const std::vector<Vertex>& vertexLoop : simpleVertexLoops) {
-            std::vector<Point> ring;
-            ring.reserve(vertexLoop.size());
-            for (const Vertex& vertex : vertexLoop) {
-                ring.push_back(toWorldPoint(grid, vertex));
-            }
-            ring = removeCollinear(std::move(ring));
-            if (ring.size() >= 3) {
-                rings.push_back(std::move(ring));
-            }
-        }
-    }
-
-    return rings;
-}
-
-bool pointInPolygonArea(const Point& point, const Polygon& polygon) {
-    if (!pointInRing(point, polygon.points)) {
-        return false;
-    }
-    for (const std::vector<Point>& hole : polygon.holes) {
-        if (pointInRing(point, hole)) {
-            return false;
-        }
-    }
-    return true;
-}
-
-double pointToRingDistance(
-    const Point& point,
-    const std::vector<Point>& ring);
-
-bool cellIntersectsPolygonArea(
-    const Grid2D& grid,
-    int x,
-    int y,
-    const Polygon& polygon) {
-    const double minX = grid.worldX(x);
-    const double maxX = grid.worldX(x + 1);
-    const double minY = grid.worldY(y);
-    const double maxY = grid.worldY(y + 1);
-    const std::vector<Point> cellRing{
-        {minX, minY}, {maxX, minY},
-        {maxX, maxY}, {minX, maxY}
-    };
-    const Point center{
-        grid.worldX(x + 0.5),
-        grid.worldY(y + 0.5)
-    };
-    if (pointInPolygonArea(center, polygon)) {
-        return true;
-    }
-    for (const Point& corner : cellRing) {
-        if (pointInPolygonArea(corner, polygon)) {
-            return true;
-        }
-    }
-    const double halfDiagonal = 0.5 * std::hypot(grid.dx(), grid.dy());
-    if (pointToRingDistance(center, polygon.points) > halfDiagonal + 1e-9) {
-        return false;
-    }
-    if (ringBoundariesConflict(cellRing, polygon.points, false)) {
-        return true;
-    }
-    for (const Point& point : polygon.points) {
-        if (point.x >= minX && point.x <= maxX &&
-            point.y >= minY && point.y <= maxY) {
-            return true;
-        }
-    }
-    return false;
-}
-
-BinaryMask rasterizeKeptPolygonCoverage(
-    const Grid2D& grid,
-    const std::vector<Polygon>& polygons,
-    const BinaryMask* candidateMask) {
-    BinaryMask covered(grid.nx(), grid.ny());
-    for (const Polygon& polygon : polygons) {
-        if (!polygon.kept || polygon.points.size() < 3) {
-            continue;
-        }
-        double minWorldX = polygon.points.front().x;
-        double maxWorldX = polygon.points.front().x;
-        double minWorldY = polygon.points.front().y;
-        double maxWorldY = polygon.points.front().y;
-        for (const Point& point : polygon.points) {
-            minWorldX = std::min(minWorldX, point.x);
-            maxWorldX = std::max(maxWorldX, point.x);
-            minWorldY = std::min(minWorldY, point.y);
-            maxWorldY = std::max(maxWorldY, point.y);
-        }
-        const int minX = std::max(
-            0,
-            static_cast<int>(std::floor(
-                (minWorldX - grid.sx()) / grid.dx() - 0.5)) - 1);
-        const int maxX = std::min(
-            grid.nx() - 1,
-            static_cast<int>(std::ceil(
-                (maxWorldX - grid.sx()) / grid.dx() - 0.5)) + 1);
-        const int minY = std::max(
-            0,
-            static_cast<int>(std::floor(
-                (minWorldY - grid.sy()) / grid.dy() - 0.5)) - 1);
-        const int maxY = std::min(
-            grid.ny() - 1,
-            static_cast<int>(std::ceil(
-                (maxWorldY - grid.sy()) / grid.dy() - 0.5)) + 1);
-        for (int y = minY; y <= maxY; ++y) {
-            for (int x = minX; x <= maxX; ++x) {
-                if (candidateMask && !candidateMask->get(x, y)) {
-                    continue;
-                }
-                if (cellIntersectsPolygonArea(grid, x, y, polygon)) {
-                    covered.set(x, y, true);
-                }
-            }
-        }
-    }
-    return covered;
-}
-
-std::vector<std::vector<Point>> traceSubcellConnectedBoundaryRings(
-    const Grid2D& grid,
-    const std::vector<Cell>& cells,
-    const ComponentStats& stats) {
-    constexpr int kScale = 4;
-    const int sourceWidth = stats.maxX - stats.minX + 1;
-    const int sourceHeight = stats.maxY - stats.minY + 1;
-    GridMetadata metadata;
-    metadata.nx = sourceWidth * kScale;
-    metadata.ny = sourceHeight * kScale;
-    metadata.sx = grid.worldX(stats.minX);
-    metadata.sy = grid.worldY(stats.minY);
-    metadata.dx = grid.dx() / static_cast<double>(kScale);
-    metadata.dy = grid.dy() / static_cast<double>(kScale);
-    Grid2D subcellGrid(metadata);
-
-    std::vector<unsigned char> sourceMembership(
-        static_cast<std::size_t>(grid.nx() * grid.ny()), 0);
-    for (const Cell& cell : cells) {
-        sourceMembership[static_cast<std::size_t>(
-            cell.y * grid.nx() + cell.x)] = 1;
-    }
-    const auto containsSource = [&](int x, int y) {
-        return grid.inBounds(x, y) &&
-            sourceMembership[static_cast<std::size_t>(
-                y * grid.nx() + x)] != 0;
-    };
-
-    std::vector<unsigned char> subcellMembership(
-        static_cast<std::size_t>(metadata.nx * metadata.ny), 0);
-    std::vector<Cell> subcells;
-    subcells.reserve(cells.size() * kScale * kScale + cells.size());
-    const auto addSubcell = [&](int x, int y) {
-        if (x < 0 || y < 0 || x >= metadata.nx || y >= metadata.ny) {
-            return;
-        }
-        const std::size_t index = static_cast<std::size_t>(
-            y * metadata.nx + x);
-        if (!subcellMembership[index]) {
-            subcellMembership[index] = 1;
-            subcells.push_back({x, y});
-        }
-    };
-
-    for (const Cell& cell : cells) {
-        const int baseX = (cell.x - stats.minX) * kScale;
-        const int baseY = (cell.y - stats.minY) * kScale;
-        for (int oy = 0; oy < kScale; ++oy) {
-            for (int ox = 0; ox < kScale; ++ox) {
-                addSubcell(baseX + ox, baseY + oy);
-            }
-        }
-    }
-
-    const auto finiteValue = [&grid](int x, int y) {
-        if (!grid.inBounds(x, y)) {
-            return -std::numeric_limits<double>::infinity();
-        }
-        const double value = grid.value(x, y);
-        return std::isfinite(value)
-            ? value
-            : -std::numeric_limits<double>::infinity();
-    };
-    for (const Cell& cell : cells) {
-        for (const int directionY : {-1, 1}) {
-            const int diagonalX = cell.x + 1;
-            const int diagonalY = cell.y + directionY;
-            if (!containsSource(diagonalX, diagonalY) ||
-                containsSource(cell.x + 1, cell.y) ||
-                containsSource(cell.x, cell.y + directionY)) {
-                continue;
-            }
-            const int baseX = (cell.x - stats.minX) * kScale;
-            const int baseY = (cell.y - stats.minY) * kScale;
-            const int cornerX = baseX + kScale;
-            const int cornerY = baseY + (directionY > 0 ? kScale : 0);
-            const double horizontalValue =
-                finiteValue(cell.x + 1, cell.y);
-            const double verticalValue =
-                finiteValue(cell.x, cell.y + directionY);
-            if (horizontalValue >= verticalValue) {
-                addSubcell(
-                    cornerX,
-                    cornerY + (directionY > 0 ? -1 : 0));
-            } else {
-                addSubcell(
-                    cornerX - 1,
-                    cornerY + (directionY > 0 ? 0 : -1));
-            }
-        }
-    }
-    return traceBoundaryRings(subcellGrid, subcells);
-}
-
-std::vector<Point> convexCellEnvelope(
-    const Grid2D& grid,
-    const std::vector<Cell>& cells) {
-    std::vector<Point> points;
-    points.reserve(cells.size() * 4);
-    for (const Cell& cell : cells) {
-        points.push_back({grid.worldX(cell.x), grid.worldY(cell.y)});
-        points.push_back({grid.worldX(cell.x + 1), grid.worldY(cell.y)});
-        points.push_back({grid.worldX(cell.x + 1), grid.worldY(cell.y + 1)});
-        points.push_back({grid.worldX(cell.x), grid.worldY(cell.y + 1)});
-    }
-    std::sort(points.begin(), points.end(), [](const Point& first, const Point& second) {
-        return std::tie(first.x, first.y) < std::tie(second.x, second.y);
-    });
-    points.erase(
-        std::unique(
-            points.begin(), points.end(),
-            [](const Point& first, const Point& second) {
-                return first.x == second.x && first.y == second.y;
-            }),
-        points.end());
-    if (points.size() < 3) {
-        return points;
-    }
-    const auto cross = [](const Point& origin, const Point& a, const Point& b) {
-        return (a.x - origin.x) * (b.y - origin.y) -
-            (a.y - origin.y) * (b.x - origin.x);
-    };
-    std::vector<Point> hull;
-    hull.reserve(points.size() * 2);
-    for (const Point& point : points) {
-        while (hull.size() >= 2 &&
-               cross(hull[hull.size() - 2], hull.back(), point) <= 0.0) {
-            hull.pop_back();
-        }
-        hull.push_back(point);
-    }
-    const std::size_t lowerSize = hull.size();
-    for (auto iterator = points.rbegin() + 1; iterator != points.rend(); ++iterator) {
-        while (hull.size() > lowerSize &&
-               cross(hull[hull.size() - 2], hull.back(), *iterator) <= 0.0) {
-            hull.pop_back();
-        }
-        hull.push_back(*iterator);
-    }
-    if (hull.size() > 1 &&
-        hull.front().x == hull.back().x &&
-        hull.front().y == hull.back().y) {
-        hull.pop_back();
-    }
-    return hull;
-}
-
-void appendPolygonsFromMask(
-    const Grid2D& grid,
-    const BinaryMask& activeMask,
-    const TraceOptions& options,
-    TraceResult& result,
-    int& nextId) {
-    std::vector<unsigned char> visited(static_cast<std::size_t>(grid.nx() * grid.ny()), 0);
-    const std::vector<unsigned char>& active = activeMask.values();
-
-    auto indexOf = [&grid](int x, int y) {
-        return y * grid.nx() + x;
-    };
-
-    constexpr int offsets[8][2] = {
-        {-1, -1}, {0, -1}, {1, -1},
-        {-1, 0},           {1, 0},
-        {-1, 1},  {0, 1},  {1, 1}
-    };
-
-    for (int y0 = 0; y0 < grid.ny(); ++y0) {
-        for (int x0 = 0; x0 < grid.nx(); ++x0) {
-            const int startIdx = indexOf(x0, y0);
-            if (!active[static_cast<std::size_t>(startIdx)] || visited[static_cast<std::size_t>(startIdx)]) {
-                continue;
-            }
-
-            std::queue<Cell> queue;
-            std::vector<Cell> cells;
-            queue.push({x0, y0});
-            visited[static_cast<std::size_t>(startIdx)] = 1;
-
-            double sum = 0.0;
-            double maxValue = -std::numeric_limits<double>::infinity();
-
-            while (!queue.empty()) {
-                const Cell cell = queue.front();
-                queue.pop();
-                cells.push_back(cell);
-                const double v = grid.value(cell.x, cell.y);
-                sum += v;
-                maxValue = std::max(maxValue, v);
-
-                for (const auto& offset : offsets) {
-                    const int nxCell = cell.x + offset[0];
-                    const int nyCell = cell.y + offset[1];
-                    if (!grid.inBounds(nxCell, nyCell)) {
-                        continue;
-                    }
-                    const int neighborIdx = indexOf(nxCell, nyCell);
-                    const std::size_t pos = static_cast<std::size_t>(neighborIdx);
-                    if (active[pos] && !visited[pos]) {
-                        visited[pos] = 1;
-                        queue.push({nxCell, nyCell});
-                    }
-                }
-            }
-
-            if (static_cast<int>(cells.size()) < options.minCells) {
-                continue;
-            }
-
-            const ComponentStats stats = computeComponentStats(cells);
-            std::vector<BoundaryRingSet> rings = selectBoundaryRingSets(
-                traceBoundaryRings(grid, cells),
-                result.suppressedInternalRings);
-            for (BoundaryRingSet& ring : rings) {
-                finalizeAndAppendPolygon(
-                    grid,
-                    cells,
-                    sum,
-                    maxValue,
-                    std::move(ring.exterior),
-                    std::move(ring.holes),
-                    stats,
-                    options,
-                    result.effectiveThreshold,
-                    result,
-                    nextId);
-            }
-        }
-    }
-}
-
-[[maybe_unused]] void appendPolygonsFromMaskBounds(
-    const Grid2D& grid,
-    const BinaryMask& activeMask,
-    int minX,
-    int minY,
-    int maxX,
-    int maxY,
-    const TraceOptions& options,
-    TraceResult& result,
-    int& nextId) {
-    minX = std::max(0, minX);
-    minY = std::max(0, minY);
-    maxX = std::min(grid.nx() - 1, maxX);
-    maxY = std::min(grid.ny() - 1, maxY);
-    if (minX > maxX || minY > maxY) {
-        return;
-    }
-
-    const int localWidth = maxX - minX + 1;
-    const int localHeight = maxY - minY + 1;
-    std::vector<unsigned char> visited(static_cast<std::size_t>(localWidth * localHeight), 0);
-
-    auto localIndex = [localWidth, minX, minY](int x, int y) {
-        return (y - minY) * localWidth + (x - minX);
-    };
-
-    constexpr int offsets[8][2] = {
-        {-1, -1}, {0, -1}, {1, -1},
-        {-1, 0},           {1, 0},
-        {-1, 1},  {0, 1},  {1, 1}
-    };
-
-    for (int y0 = minY; y0 <= maxY; ++y0) {
-        for (int x0 = minX; x0 <= maxX; ++x0) {
-            const int startIdx = localIndex(x0, y0);
-            if (!activeMask.get(x0, y0) || visited[static_cast<std::size_t>(startIdx)]) {
-                continue;
-            }
-
-            std::queue<Cell> queue;
-            std::vector<Cell> cells;
-            queue.push({x0, y0});
-            visited[static_cast<std::size_t>(startIdx)] = 1;
-
-            double sum = 0.0;
-            double maxValue = -std::numeric_limits<double>::infinity();
-
-            while (!queue.empty()) {
-                const Cell cell = queue.front();
-                queue.pop();
-                cells.push_back(cell);
-                const double v = grid.value(cell.x, cell.y);
-                sum += v;
-                maxValue = std::max(maxValue, v);
-
-                for (const auto& offset : offsets) {
-                    const int nxCell = cell.x + offset[0];
-                    const int nyCell = cell.y + offset[1];
-                    if (nxCell < minX || nyCell < minY || nxCell > maxX || nyCell > maxY) {
-                        continue;
-                    }
-                    if (!grid.inBounds(nxCell, nyCell)) {
-                        continue;
-                    }
-                    const int neighborIdx = localIndex(nxCell, nyCell);
-                    const std::size_t pos = static_cast<std::size_t>(neighborIdx);
-                    if (activeMask.get(nxCell, nyCell) && !visited[pos]) {
-                        visited[pos] = 1;
-                        queue.push({nxCell, nyCell});
-                    }
-                }
-            }
-
-            if (static_cast<int>(cells.size()) < options.minCells) {
-                continue;
-            }
-
-            const ComponentStats stats = computeComponentStats(cells);
-            std::vector<BoundaryRingSet> rings = selectBoundaryRingSets(
-                traceBoundaryRings(grid, cells),
-                result.suppressedInternalRings);
-            for (BoundaryRingSet& ring : rings) {
-                finalizeAndAppendPolygon(
-                    grid,
-                    cells,
-                    sum,
-                    maxValue,
-                    std::move(ring.exterior),
-                    std::move(ring.holes),
-                    stats,
-                    options,
-                    result.effectiveThreshold,
-                    result,
-                    nextId);
-            }
-        }
-    }
-}
-
-void appendPolygonsFromLocalMask(
-    const Grid2D& grid,
-    const std::vector<unsigned char>& active,
-    int minX,
-    int minY,
-    int localWidth,
-    int localHeight,
-    const TraceOptions& options,
-    TraceResult& result,
-    int& nextId,
-    BinaryMask* keptCoverageMask = nullptr) {
-    if (localWidth <= 0 || localHeight <= 0 ||
-        active.size() != static_cast<std::size_t>(localWidth * localHeight)) {
-        return;
-    }
-
-    std::vector<unsigned char> visited(static_cast<std::size_t>(localWidth * localHeight), 0);
-    auto localIndex = [localWidth](int x, int y) {
-        return y * localWidth + x;
-    };
-
-    constexpr int offsets[8][2] = {
-        {-1, -1}, {0, -1}, {1, -1},
-        {-1, 0},           {1, 0},
-        {-1, 1},  {0, 1},  {1, 1}
-    };
-
-    for (int y0 = 0; y0 < localHeight; ++y0) {
-        for (int x0 = 0; x0 < localWidth; ++x0) {
-            const int startIdx = localIndex(x0, y0);
-            if (!active[static_cast<std::size_t>(startIdx)] || visited[static_cast<std::size_t>(startIdx)]) {
-                continue;
-            }
-
-            std::queue<Cell> queue;
-            std::vector<Cell> cells;
-            queue.push({x0, y0});
-            visited[static_cast<std::size_t>(startIdx)] = 1;
-
-            double sum = 0.0;
-            double maxValue = -std::numeric_limits<double>::infinity();
-
-            while (!queue.empty()) {
-                const Cell localCell = queue.front();
-                queue.pop();
-                const int gx = minX + localCell.x;
-                const int gy = minY + localCell.y;
-                if (!grid.inBounds(gx, gy)) {
-                    continue;
-                }
-                cells.push_back({gx, gy});
-                const double v = grid.value(gx, gy);
-                sum += v;
-                maxValue = std::max(maxValue, v);
-
-                for (const auto& offset : offsets) {
-                    const int nxCell = localCell.x + offset[0];
-                    const int nyCell = localCell.y + offset[1];
-                    if (nxCell < 0 || nyCell < 0 || nxCell >= localWidth || nyCell >= localHeight) {
-                        continue;
-                    }
-                    const int neighborIdx = localIndex(nxCell, nyCell);
-                    const std::size_t pos = static_cast<std::size_t>(neighborIdx);
-                    if (active[pos] && !visited[pos]) {
-                        visited[pos] = 1;
-                        queue.push({nxCell, nyCell});
-                    }
-                }
-            }
-
-            if (static_cast<int>(cells.size()) < options.minCells) {
-                continue;
-            }
-
-            const ComponentStats stats = computeComponentStats(cells);
-            std::vector<BoundaryRingSet> rings = selectBoundaryRingSets(
-                traceBoundaryRings(grid, cells),
-                result.suppressedInternalRings);
-            for (BoundaryRingSet& ring : rings) {
-                const bool kept = finalizeAndAppendPolygon(
-                    grid,
-                    cells,
-                    sum,
-                    maxValue,
-                    std::move(ring.exterior),
-                    std::move(ring.holes),
-                    stats,
-                    options,
-                    result.effectiveThreshold,
-                    result,
-                    nextId);
-                if (kept && keptCoverageMask) {
-                    for (const Cell& cell : cells) {
-                        keptCoverageMask->set(cell.x, cell.y, true);
-                    }
-                }
-            }
-        }
-    }
-}
-
-void appendResidualTracePolygons(
-    const Grid2D& grid,
-    const BinaryMask& residualMask,
-    const std::vector<int>& groupOwners,
-    const BinaryMask& alreadyCoveredMask,
-    const BinaryMask& candidateCoveredMask,
-    const TraceOptions& options,
-    TraceResult& result,
-    int& nextId) {
-    if (!options.residualTrace || options.residualPercentile <= 0.0) {
-        return;
-    }
-
-    const BinaryMask coveredBaseMask = candidateCoveredMask.empty() ? alreadyCoveredMask : candidateCoveredMask;
-    const BinaryMask coveredGuardMask = options.residualCoveredGuardRadius > 0
-        ? dilate(coveredBaseMask, options.residualCoveredGuardRadius)
-        : coveredBaseMask;
-    std::vector<unsigned char> candidate(static_cast<std::size_t>(grid.nx() * grid.ny()), 0);
-    for (int y = 0; y < grid.ny(); ++y) {
-        for (int x = 0; x < grid.nx(); ++x) {
-            if (residualMask.get(x, y) && !coveredGuardMask.get(x, y)) {
-                const std::size_t pos = static_cast<std::size_t>(y * grid.nx() + x);
-                const int owner = groupOwners.empty() ? 1 : groupOwners[pos];
-                const bool usable = owner > 0 || (options.residualTraceDetached && owner == -1);
-                if (usable) {
-                    candidate[pos] = 1;
-                }
-            }
-        }
-    }
-
-    std::vector<unsigned char> visited(static_cast<std::size_t>(grid.nx() * grid.ny()), 0);
-    auto indexOf = [&grid](int x, int y) {
-        return y * grid.nx() + x;
-    };
-
-    constexpr int offsets[8][2] = {
-        {-1, -1}, {0, -1}, {1, -1},
-        {-1, 0},           {1, 0},
-        {-1, 1},  {0, 1},  {1, 1}
-    };
-
-    for (int y0 = 0; y0 < grid.ny(); ++y0) {
-        for (int x0 = 0; x0 < grid.nx(); ++x0) {
-            const std::size_t startPos = static_cast<std::size_t>(indexOf(x0, y0));
-            if (!candidate[startPos] || visited[startPos]) {
-                continue;
-            }
-
-            std::queue<Cell> queue;
-            std::vector<Cell> cells;
-            queue.push({x0, y0});
-            visited[startPos] = 1;
-            double sum = 0.0;
-            double maxValue = -std::numeric_limits<double>::infinity();
-            int ownerId = groupOwners.empty() ? 1 : groupOwners[startPos];
-            bool touchesCovered = false;
-
-            while (!queue.empty()) {
-                const Cell cell = queue.front();
-                queue.pop();
-                cells.push_back(cell);
-                const double v = grid.value(cell.x, cell.y);
-                sum += v;
-                maxValue = std::max(maxValue, v);
-
-                for (const auto& offset : offsets) {
-                    const int nxCell = cell.x + offset[0];
-                    const int nyCell = cell.y + offset[1];
-                    if (!grid.inBounds(nxCell, nyCell)) {
-                        continue;
-                    }
-                    if (alreadyCoveredMask.get(nxCell, nyCell)) {
-                        touchesCovered = true;
-                    }
-                    const std::size_t pos = static_cast<std::size_t>(indexOf(nxCell, nyCell));
-                    if (!candidate[pos] || visited[pos]) {
-                        continue;
-                    }
-                    if (!groupOwners.empty() && groupOwners[pos] != ownerId) {
-                        continue;
-                    }
-                    visited[pos] = 1;
-                    queue.push({nxCell, nyCell});
-                }
-            }
-
-            ++result.residualTraceCandidateComponents;
-            const int traceMinimumCells = std::max(
-                options.residualMinCells,
-                options.residualDetachedMinCells);
-            if (static_cast<int>(cells.size()) < traceMinimumCells) {
-                ++result.residualTraceSizeRejectedComponents;
-                continue;
-            }
-            if (options.residualTraceMaxCells > 0 &&
-                static_cast<int>(cells.size()) > options.residualTraceMaxCells) {
-                ++result.residualTraceSizeRejectedComponents;
-                continue;
-            }
-
-            const ComponentStats stats = computeComponentStats(cells);
-            const int longestAxis = std::max(stats.width, stats.height);
-            const double meanValue = cells.empty() ? 0.0 : sum / static_cast<double>(cells.size());
-            const bool lineLike =
-                stats.aspect >= options.residualDetachedMinAspect &&
-                longestAxis >= std::max(
-                    options.residualTraceMinLength,
-                    options.residualDetachedMinLength);
-            const bool strongEnough =
-                maxValue >= result.effectiveThreshold *
-                    options.residualDetachedMinMaxRatio &&
-                meanValue >= result.effectiveThreshold *
-                    options.residualDetachedMinMeanRatio;
-            if (!lineLike) {
-                ++result.residualTraceShapeRejectedComponents;
-                continue;
-            }
-            if (!strongEnough) {
-                ++result.residualTraceAttributeRejectedComponents;
-                continue;
-            }
-            if (!touchesCovered && !options.residualTraceDetached) {
-                ++result.residualTraceDetachedRejectedComponents;
-                continue;
-            }
-
-            const std::size_t polygonCountBefore = result.polygons.size();
-            std::vector<BoundaryRingSet> rings = selectBoundaryRingSets(
-                traceSubcellConnectedBoundaryRings(grid, cells, stats),
-                result.suppressedInternalRings);
-            TraceOptions residualPolygonOptions = options;
-            residualPolygonOptions.simplifyTolerance = 0.0;
-            residualPolygonOptions.smoothIterations = 0;
-            for (BoundaryRingSet& ring : rings) {
-                finalizeAndAppendPolygon(
-                    grid,
-                    cells,
-                    sum,
-                    maxValue,
-                    std::move(ring.exterior),
-                    std::move(ring.holes),
-                    stats,
-                    residualPolygonOptions,
-                    result.effectiveThreshold,
-                    result,
-                    nextId);
-            }
-            bool topologyConflict = false;
-            bool fallbackAccepted = false;
-            if (result.polygons.size() > polygonCountBefore) {
-                for (std::size_t index = polygonCountBefore;
-                     index < result.polygons.size(); ++index) {
-                    if (result.polygons[index].kept &&
-                        polygonHasTopologyConflict(
-                            result.polygons[index], result.polygons, true)) {
-                        topologyConflict = true;
-                        break;
-                    }
-                }
-                if (topologyConflict) {
-                    result.polygons.resize(polygonCountBefore);
-                    nextId = result.polygons.empty()
-                        ? 1
-                        : result.polygons.back().id + 1;
-                }
-                if (topologyConflict) {
-                    std::vector<Point> fallback = convexCellEnvelope(grid, cells);
-                    if (fallback.size() >= 3) {
-                        finalizeAndAppendPolygon(
-                            grid,
-                            cells,
-                            sum,
-                            maxValue,
-                            std::move(fallback),
-                            {},
-                            stats,
-                            residualPolygonOptions,
-                            result.effectiveThreshold,
-                            result,
-                            nextId);
-                        if (result.polygons.size() > polygonCountBefore &&
-                            result.polygons.back().kept &&
-                            polygonHasTopologyConflict(
-                                result.polygons.back(), result.polygons, true)) {
-                            result.polygons.resize(polygonCountBefore);
-                            nextId = result.polygons.empty()
-                                ? 1
-                                : result.polygons.back().id + 1;
-                        } else if (result.polygons.size() > polygonCountBefore) {
-                            fallbackAccepted = true;
-                        }
-                    }
-                }
-            }
-            int keptAdded = 0;
-            for (std::size_t index = polygonCountBefore;
-                 index < result.polygons.size(); ++index) {
-                keptAdded += result.polygons[index].kept ? 1 : 0;
-            }
-            if (keptAdded <= 0) {
-                result.polygons.resize(polygonCountBefore);
-                nextId = result.polygons.empty()
-                    ? 1
-                    : result.polygons.back().id + 1;
-                if (topologyConflict) {
-                    ++result.residualTraceTopologyRejectedComponents;
-                } else {
-                    ++result.residualTraceGeometryRejectedComponents;
-                }
-                continue;
-            }
-            ++result.residualTraceAcceptedComponents;
-            result.residualTraceAcceptedPolygons += keptAdded;
-            result.residualTraceAcceptedCells +=
-                static_cast<int>(cells.size());
-            result.residualTraceFallbackAcceptedComponents +=
-                fallbackAccepted ? 1 : 0;
-        }
-    }
-}
-
 BinaryMask fillResidualAttributesNearActiveBelt(
     const Grid2D& grid,
     const BinaryMask& activeMask,
@@ -2910,117 +1604,6 @@ BinaryMask extendThroughWeakAttributes(
     return out;
 }
 
-LocalPolygonQualityOptions makeLocalPolygonQualityOptions(
-    const TraceOptions& options) {
-    LocalPolygonQualityOptions local;
-    local.widthRatio = options.localQualityWidthRatio;
-    local.minExtraCells = options.localQualityMinExtraCells;
-    local.supportThresholdRatio =
-        options.localQualitySupportThresholdRatio;
-    local.supportBufferCells = options.localQualitySupportBufferCells;
-    local.maxAreaLossRatio = options.localQualityMaxAreaLossRatio;
-    local.maxStrongCoverageLossRatio =
-        options.localQualityMaxStrongCoverageLossRatio;
-    local.maxWeakCoverageLossRatio =
-        options.localQualityMaxWeakCoverageLossRatio;
-    local.maxBackgroundLeakageIncreaseRatio =
-        options.localQualityMaxBackgroundLeakageIncreaseRatio;
-    local.stabilityThresholdDeltaRatio =
-        options.localQualityStabilityThresholdDeltaRatio;
-    local.minStabilityJaccard = options.localQualityMinStabilityJaccard;
-    local.maxCandidatesPerObject =
-        options.localQualityMaxCandidatesPerObject;
-    local.maxTotalCandidates = options.localQualityMaxTotalCandidates;
-    local.maxWindowCells = options.localQualityMaxWindowCells;
-    local.maxObjectCells = options.localQualityMaxObjectCells;
-    local.maxEvidenceRecords = options.localQualityMaxEvidenceRecords;
-    if (options.localPolygonQualityShadow && !options.localPolygonQuality) {
-        // Shadow diagnostics should surface a compact review queue rather
-        // than thousands of pixel-scale bridge fragments. Repair mode keeps
-        // the caller's full budgets because it is evaluated separately.
-        local.minExtraCells = std::max(local.minExtraCells, 24);
-        local.bridgeMinCells = std::max(local.bridgeMinCells, 6);
-        local.maxCandidatesPerObject = std::min<std::size_t>(
-            local.maxCandidatesPerObject, 16);
-        local.maxTotalCandidates = std::min<std::size_t>(
-            local.maxTotalCandidates, 512);
-        local.maxEvidenceRecords = std::min<std::size_t>(
-            local.maxEvidenceRecords, 2048);
-    }
-    return local;
-}
-
-void applyLocalPolygonQualityIfEnabled(
-    const Grid2D& grid,
-    const TraceOptions& options,
-    TraceResult& result) {
-    if (!options.localPolygonQuality && !options.localPolygonQualityShadow) {
-        return;
-    }
-    const LocalPolygonQualityOptions localOptions =
-        makeLocalPolygonQualityOptions(options);
-    std::vector<double> originalAreas;
-    std::vector<int> originalCellCounts;
-    originalAreas.reserve(result.polygons.size());
-    originalCellCounts.reserve(result.polygons.size());
-    for (const Polygon& polygon : result.polygons) {
-        originalAreas.push_back(polygon.area);
-        originalCellCounts.push_back(polygon.cellCount);
-    }
-    LocalPolygonQualityResult localResult = applyLocalPolygonQuality(
-        grid,
-        result.polygons,
-        result.effectiveThreshold,
-        localOptions);
-    result.localPolygonQualityStats = localResult.stats;
-    result.localPolygonQualityEvidence = std::move(localResult.evidence);
-    if (options.localPolygonQualityShadow) {
-        return;
-    }
-    result.polygons = std::move(localResult.polygons);
-    for (std::size_t index = 0; index < result.polygons.size(); ++index) {
-        Polygon& polygon = result.polygons[index];
-        const bool repaired =
-            polygon.area + 1e-9 < originalAreas[index] ||
-            polygon.cellCount < originalCellCounts[index];
-        if (!repaired || !polygon.kept) {
-            continue;
-        }
-        if (polygon.cellCount < options.minCells ||
-            polygon.area < options.minArea) {
-            polygon.kept = false;
-            ++result.localPolygonQualityStats.postRepairFilteredCount;
-        }
-    }
-}
-
-WeakContinuityOptions makeWeakContinuityOptions(const TraceOptions& options) {
-    WeakContinuityOptions continuityOptions;
-    continuityOptions.maxDistance = options.weakContinuityMaxDistance;
-    continuityOptions.tangentWindow = options.weakContinuityTangentWindow;
-    continuityOptions.corridorRadius = options.weakContinuityCorridorRadius;
-    continuityOptions.maxCandidatesPerEndpoint = options.weakContinuityMaxCandidatesPerEndpoint;
-    continuityOptions.maxEndpointAngleDegrees = options.weakContinuityMaxEndpointAngle;
-    continuityOptions.maxWidthRatio = options.weakContinuityMaxWidthRatio;
-    continuityOptions.minAttributeRatio = options.weakContinuityMinAttributeRatio;
-    continuityOptions.localContrastRatio = options.weakContinuityLocalContrastRatio;
-    continuityOptions.minSupportRatio = options.weakContinuityMinSupportRatio;
-    continuityOptions.minMeanSupport = options.weakContinuityMinMeanSupport;
-    continuityOptions.maxUnsupportedRun = options.weakContinuityMaxUnsupportedRun;
-    continuityOptions.maxPathLengthRatio = options.weakContinuityMaxPathLengthRatio;
-    continuityOptions.maxTurnAngleDegrees = options.weakContinuityMaxTurnAngle;
-    continuityOptions.endpointExclusionRadius = options.weakContinuityEndpointExclusionRadius;
-    continuityOptions.thirdPartySkeletonClearanceRadius =
-        options.weakContinuityThirdPartySkeletonClearanceRadius;
-    continuityOptions.minCompetitionMargin = options.weakContinuityMinCompetitionMargin;
-    continuityOptions.usePhysicalMetric = options.weakContinuityUsePhysicalMetric;
-    continuityOptions.useGlobalMatching = options.weakContinuityUseGlobalMatching;
-    continuityOptions.noConnectCost = options.weakContinuityNoConnectCost;
-    continuityOptions.maxExactMatchingEndpoints =
-        options.weakContinuityMaxExactMatchingEndpoints;
-    return continuityOptions;
-}
-
 void accumulateWeakContinuityStats(
     WeakContinuityStats& target,
     const WeakContinuityStats& source) {
@@ -3056,848 +1639,18 @@ void accumulateWeakContinuityStats(
     target.addedPathPixels += source.addedPathPixels;
 }
 
-struct MaskComponentMap {
-    std::vector<int> labels;
-    int count = 0;
-};
-
-MaskComponentMap labelActiveComponents(const BinaryMask& mask) {
-    MaskComponentMap result;
-    const int width = mask.width();
-    const int height = mask.height();
-    result.labels.assign(static_cast<std::size_t>(width * height), 0);
-    constexpr int offsets[8][2] = {
-        {-1, -1}, {0, -1}, {1, -1},
-        {-1, 0},           {1, 0},
-        {-1, 1},  {0, 1},  {1, 1}
-    };
-    auto indexOf = [width](int x, int y) {
-        return y * width + x;
-    };
-    for (int y0 = 0; y0 < height; ++y0) {
-        for (int x0 = 0; x0 < width; ++x0) {
-            const std::size_t start = static_cast<std::size_t>(indexOf(x0, y0));
-            if (!mask.get(x0, y0) || result.labels[start] != 0) {
-                continue;
-            }
-            ++result.count;
-            std::queue<Cell> queue;
-            queue.push({x0, y0});
-            result.labels[start] = result.count;
-            while (!queue.empty()) {
-                const Cell cell = queue.front();
-                queue.pop();
-                for (const auto& offset : offsets) {
-                    const int x = cell.x + offset[0];
-                    const int y = cell.y + offset[1];
-                    if (!mask.inBounds(x, y) || !mask.get(x, y)) {
-                        continue;
-                    }
-                    const std::size_t position =
-                        static_cast<std::size_t>(indexOf(x, y));
-                    if (result.labels[position] != 0) {
-                        continue;
-                    }
-                    result.labels[position] = result.count;
-                    queue.push({x, y});
-                }
-            }
-        }
-    }
-    return result;
-}
-
-int countLocalInactiveHoles(
-    const BinaryMask& mask,
-    int minX,
-    int minY,
-    int maxX,
-    int maxY) {
-    minX = std::max(0, minX);
-    minY = std::max(0, minY);
-    maxX = std::min(mask.width() - 1, maxX);
-    maxY = std::min(mask.height() - 1, maxY);
-    if (minX > maxX || minY > maxY) {
-        return 0;
-    }
-    const int width = maxX - minX + 1;
-    const int height = maxY - minY + 1;
-    std::vector<unsigned char> visited(
-        static_cast<std::size_t>(width * height), 0);
-    constexpr int offsets[4][2] = {
-        {-1, 0}, {1, 0}, {0, -1}, {0, 1}
-    };
-    auto localIndex = [minX, minY, width](int x, int y) {
-        return (y - minY) * width + (x - minX);
-    };
-    int holes = 0;
-    for (int y0 = minY; y0 <= maxY; ++y0) {
-        for (int x0 = minX; x0 <= maxX; ++x0) {
-            const std::size_t start =
-                static_cast<std::size_t>(localIndex(x0, y0));
-            if (mask.get(x0, y0) || visited[start]) {
-                continue;
-            }
-            bool touchesWindowBorder = false;
-            std::queue<Cell> queue;
-            queue.push({x0, y0});
-            visited[start] = 1;
-            while (!queue.empty()) {
-                const Cell cell = queue.front();
-                queue.pop();
-                touchesWindowBorder = touchesWindowBorder ||
-                    cell.x == minX || cell.x == maxX ||
-                    cell.y == minY || cell.y == maxY;
-                for (const auto& offset : offsets) {
-                    const int x = cell.x + offset[0];
-                    const int y = cell.y + offset[1];
-                    if (x < minX || x > maxX || y < minY || y > maxY ||
-                        mask.get(x, y)) {
-                        continue;
-                    }
-                    const std::size_t position =
-                        static_cast<std::size_t>(localIndex(x, y));
-                    if (visited[position]) {
-                        continue;
-                    }
-                    visited[position] = 1;
-                    queue.push({x, y});
-                }
-            }
-            if (!touchesWindowBorder) {
-                ++holes;
-            }
-        }
-    }
-    return holes;
-}
-
-struct EndpointJunctionContext {
-    int branchId = -1;
-    double distanceToJunction = -1.0;
-    int clusterId = -1;
-    int armCount = 0;
-    double confidence = -1.0;
-    bool attributionAvailable = false;
-    bool branchMatched = false;
-    bool ambiguous = false;
-};
-
-using EndpointJunctionContextMap =
-    std::map<std::pair<int, int>, EndpointJunctionContext>;
-
-EndpointJunctionContextMap buildEndpointJunctionContexts(
-    const Grid2D& grid,
-    const SkeletonGraph& graph,
-    double supportThreshold) {
-    std::vector<const SkeletonBranch*> branches;
-    branches.reserve(graph.branches.size());
-    for (const SkeletonBranch& branch : graph.branches) {
-        branches.push_back(&branch);
-    }
-    BranchAttributionOptions attributionOptions;
-    attributionOptions.supportThreshold = supportThreshold;
-    const BranchAttributionSummary attribution =
-        analyzeBranchAttribution(grid, branches, attributionOptions);
-
-    std::map<int, EndpointJunctionContext> attributionByBranch;
-    for (const JunctionAttributionResult& junction : attribution.junctions) {
-        std::set<int> branchIds;
-        std::set<int> matchedBranchIds;
-        for (const BranchAttributionPair& pair : junction.pairs) {
-            branchIds.insert(pair.firstBranchId);
-            branchIds.insert(pair.secondBranchId);
-            matchedBranchIds.insert(pair.firstBranchId);
-            matchedBranchIds.insert(pair.secondBranchId);
-        }
-        branchIds.insert(
-            junction.unmatchedBranchIds.begin(),
-            junction.unmatchedBranchIds.end());
-        for (const int branchId : branchIds) {
-            EndpointJunctionContext context;
-            context.branchId = branchId;
-            context.clusterId = junction.clusterId;
-            context.armCount = static_cast<int>(branchIds.size());
-            context.confidence = junction.confidence;
-            context.attributionAvailable = true;
-            context.branchMatched =
-                matchedBranchIds.find(branchId) != matchedBranchIds.end();
-            context.ambiguous = junction.ambiguous;
-            attributionByBranch[branchId] = context;
-        }
-    }
-
-    EndpointJunctionContextMap contexts;
-    for (const SkeletonBranch& branch : graph.branches) {
-        if (branch.points.size() < 2) {
-            continue;
-        }
-        SkeletonPoint endpoint;
-        bool hasEndpointToJunctionPath = false;
-        if (!branch.startIsJunction && branch.endIsJunction) {
-            endpoint = branch.points.front();
-            hasEndpointToJunctionPath = true;
-        } else if (branch.startIsJunction && !branch.endIsJunction) {
-            endpoint = branch.points.back();
-            hasEndpointToJunctionPath = true;
-        }
-        if (!hasEndpointToJunctionPath) {
-            continue;
-        }
-
-        EndpointJunctionContext context;
-        const auto attributionIt = attributionByBranch.find(branch.id);
-        if (attributionIt != attributionByBranch.end()) {
-            context = attributionIt->second;
-        }
-        context.branchId = branch.id;
-        context.distanceToJunction = 0.0;
-        for (std::size_t index = 1; index < branch.points.size(); ++index) {
-            const SkeletonPoint& previous = branch.points[index - 1];
-            const SkeletonPoint& current = branch.points[index];
-            context.distanceToJunction += std::hypot(
-                static_cast<double>(current.x - previous.x),
-                static_cast<double>(current.y - previous.y));
-        }
-        contexts[{endpoint.x, endpoint.y}] = context;
-    }
-    return contexts;
-}
-
-void assignJunctionContext(
-    const EndpointJunctionContextMap& contexts,
-    const SkeletonPoint& endpoint,
-    bool endpointA,
-    WeakContinuityCandidate& candidate) {
-    const auto it = contexts.find({endpoint.x, endpoint.y});
-    if (it == contexts.end()) {
-        return;
-    }
-    const EndpointJunctionContext& context = it->second;
-    if (endpointA) {
-        candidate.endpointBranchIdA = context.branchId;
-        candidate.endpointJunctionDistanceA = context.distanceToJunction;
-        candidate.junctionClusterIdA = context.clusterId;
-        candidate.junctionArmCountA = context.armCount;
-        candidate.junctionConfidenceA = context.confidence;
-        candidate.junctionAttributionAvailableA = context.attributionAvailable;
-        candidate.junctionBranchMatchedA = context.branchMatched;
-        candidate.junctionAmbiguousA = context.ambiguous;
-    } else {
-        candidate.endpointBranchIdB = context.branchId;
-        candidate.endpointJunctionDistanceB = context.distanceToJunction;
-        candidate.junctionClusterIdB = context.clusterId;
-        candidate.junctionArmCountB = context.armCount;
-        candidate.junctionConfidenceB = context.confidence;
-        candidate.junctionAttributionAvailableB = context.attributionAvailable;
-        candidate.junctionBranchMatchedB = context.branchMatched;
-        candidate.junctionAmbiguousB = context.ambiguous;
-    }
-}
-
-int countComponentHoles(
-    const BinaryMask& mask,
-    const MaskComponentMap& components,
-    int componentLabel) {
-    if (componentLabel <= 0) {
-        return 0;
-    }
-    BinaryMask componentMask(mask.width(), mask.height());
-    int minX = mask.width() - 1;
-    int minY = mask.height() - 1;
-    int maxX = 0;
-    int maxY = 0;
-    bool found = false;
-    for (int y = 0; y < mask.height(); ++y) {
-        for (int x = 0; x < mask.width(); ++x) {
-            const int label = components.labels[static_cast<std::size_t>(
-                y * mask.width() + x)];
-            if (label != componentLabel) {
-                continue;
-            }
-            componentMask.set(x, y, true);
-            minX = std::min(minX, x);
-            minY = std::min(minY, y);
-            maxX = std::max(maxX, x);
-            maxY = std::max(maxY, y);
-            found = true;
-        }
-    }
-    if (!found) {
-        return 0;
-    }
-    return countLocalInactiveHoles(
-        componentMask,
-        minX - 1,
-        minY - 1,
-        maxX + 1,
-        maxY + 1);
-}
-
-bool hasNearbyAttributeSupport(
-    const Grid2D& grid,
-    int x,
-    int y,
-    double minimumValue,
-    int radius) {
-    for (int oy = -radius; oy <= radius; ++oy) {
-        for (int ox = -radius; ox <= radius; ++ox) {
-            const int nx = x + ox;
-            const int ny = y + oy;
-            if (!grid.inBounds(nx, ny)) {
-                continue;
-            }
-            const double value = grid.value(nx, ny);
-            if (std::isfinite(value) && value >= minimumValue) {
-                return true;
-            }
-        }
-    }
-    return false;
-}
-
-BinaryMask applyFinalObjectBridgeGates(
-    const Grid2D& grid,
-    const BinaryMask& activeMask,
-    const SkeletonGraph& finalGraph,
-    double supportThreshold,
-    int junctionInfluenceDistance,
-    int maximumBeltRadius,
-    int supportEnvelopeRadius,
-    WeakContinuityResult& pass,
-    int& acceptedConnections,
-    int& rejectedConnections,
-    int& addedEnvelopeCells) {
-    BinaryMask output = activeMask;
-    acceptedConnections = 0;
-    rejectedConnections = 0;
-    addedEnvelopeCells = 0;
-    const int width = grid.nx();
-    auto indexOf = [width](int x, int y) {
-        return y * width + x;
-    };
-    const EndpointJunctionContextMap junctionContexts =
-        buildEndpointJunctionContexts(grid, finalGraph, supportThreshold);
-    pass.stats.acceptedConnections = 0;
-    pass.stats.addedPathPixels = 0;
-
-    std::vector<std::size_t> candidateOrder;
-    candidateOrder.reserve(pass.candidates.size());
-    for (std::size_t index = 0; index < pass.candidates.size(); ++index) {
-        if (pass.candidates[index].accepted &&
-            pass.candidates[index].path.size() >= 2) {
-            candidateOrder.push_back(index);
-        }
-    }
-    std::sort(
-        candidateOrder.begin(),
-        candidateOrder.end(),
-        [&](std::size_t firstIndex, std::size_t secondIndex) {
-            const WeakContinuityCandidate& first = pass.candidates[firstIndex];
-            const WeakContinuityCandidate& second = pass.candidates[secondIndex];
-            return std::make_tuple(
-                       first.normalizedCost,
-                       -first.supportRatio,
-                       -first.meanSupport,
-                       first.pathLength,
-                       first.id) <
-                std::make_tuple(
-                       second.normalizedCost,
-                       -second.supportRatio,
-                       -second.meanSupport,
-                       second.pathLength,
-                       second.id);
-        });
-
-    for (const std::size_t candidateIndex : candidateOrder) {
-        WeakContinuityCandidate& candidate = pass.candidates[candidateIndex];
-        candidate.accepted = false;
-        candidate.stage = 3;
-        assignJunctionContext(
-            junctionContexts, candidate.endpointA, true, candidate);
-        assignJunctionContext(
-            junctionContexts, candidate.endpointB, false, candidate);
-
-        const auto junctionFailure = [&](bool endpointA) -> const char* {
-            const double distanceToJunction = endpointA
-                ? candidate.endpointJunctionDistanceA
-                : candidate.endpointJunctionDistanceB;
-            if (distanceToJunction < 0.0 ||
-                distanceToJunction > junctionInfluenceDistance) {
-                return nullptr;
-            }
-            const bool available = endpointA
-                ? candidate.junctionAttributionAvailableA
-                : candidate.junctionAttributionAvailableB;
-            const bool matched = endpointA
-                ? candidate.junctionBranchMatchedA
-                : candidate.junctionBranchMatchedB;
-            const bool ambiguous = endpointA
-                ? candidate.junctionAmbiguousA
-                : candidate.junctionAmbiguousB;
-            if (!available) {
-                return "final_bridge_unresolved_near_junction";
-            }
-            if (ambiguous) {
-                return "final_bridge_ambiguous_junction_attribution";
-            }
-            if (!matched) {
-                return "final_bridge_unmatched_junction_branch";
-            }
-            return nullptr;
-        };
-        if (const char* failure = junctionFailure(true)) {
-            candidate.decision = failure;
-            ++rejectedConnections;
-            continue;
-        }
-        if (const char* failure = junctionFailure(false)) {
-            candidate.decision = failure;
-            ++rejectedConnections;
-            continue;
-        }
-
-        const MaskComponentMap currentOwners = labelActiveComponents(output);
-        const int endpointLabelA = currentOwners.labels[static_cast<std::size_t>(
-            indexOf(candidate.endpointA.x, candidate.endpointA.y))];
-        const int endpointLabelB = currentOwners.labels[static_cast<std::size_t>(
-            indexOf(candidate.endpointB.x, candidate.endpointB.y))];
-        if (endpointLabelA <= 0 || endpointLabelB <= 0) {
-            candidate.decision = "final_bridge_missing_object_owner";
-            ++rejectedConnections;
-            continue;
-        }
-        if (endpointLabelA == endpointLabelB) {
-            candidate.decision = "final_bridge_already_connected_by_prior_bridge";
-            ++rejectedConnections;
-            continue;
-        }
-        candidate.endpointComponentHolesA = countComponentHoles(
-            output, currentOwners, endpointLabelA);
-        candidate.endpointComponentHolesB = countComponentHoles(
-            output, currentOwners, endpointLabelB);
-        if (candidate.endpointComponentHolesA > 0 ||
-            candidate.endpointComponentHolesB > 0) {
-            candidate.decision = "final_bridge_endpoint_component_has_internal_hole";
-            ++rejectedConnections;
-            continue;
-        }
-
-        const int beltRadius = std::clamp(
-            static_cast<int>(std::lround(
-                0.5 * (candidate.widthA + candidate.widthB))),
-            1,
-            std::max(1, maximumBeltRadius));
-        const int requiredThirdObjectClearance = beltRadius + 1;
-        const int thirdObjectSearchRadius = requiredThirdObjectClearance + 1;
-        double minimumThirdObjectClearance =
-            std::numeric_limits<double>::infinity();
-        std::set<int> nearbyThirdObjectLabels;
-        for (const SkeletonPoint& point : candidate.path) {
-            for (int oy = -thirdObjectSearchRadius;
-                 oy <= thirdObjectSearchRadius; ++oy) {
-                for (int ox = -thirdObjectSearchRadius;
-                     ox <= thirdObjectSearchRadius; ++ox) {
-                    const int x = point.x + ox;
-                    const int y = point.y + oy;
-                    if (!output.inBounds(x, y)) {
-                        continue;
-                    }
-                    const int label = currentOwners.labels[
-                        static_cast<std::size_t>(indexOf(x, y))];
-                    if (label <= 0 || label == endpointLabelA ||
-                        label == endpointLabelB) {
-                        continue;
-                    }
-                    const double clearance = std::hypot(
-                        static_cast<double>(ox),
-                        static_cast<double>(oy));
-                    if (clearance <= thirdObjectSearchRadius + 1e-9) {
-                        minimumThirdObjectClearance = std::min(
-                            minimumThirdObjectClearance, clearance);
-                        nearbyThirdObjectLabels.insert(label);
-                    }
-                }
-            }
-        }
-        candidate.nearbyThirdObjectCount =
-            static_cast<int>(nearbyThirdObjectLabels.size());
-        if (std::isfinite(minimumThirdObjectClearance)) {
-            candidate.minimumThirdObjectClearance =
-                minimumThirdObjectClearance;
-        }
-        if (minimumThirdObjectClearance <=
-            requiredThirdObjectClearance + 1e-9) {
-            candidate.decision = "final_bridge_insufficient_third_object_clearance";
-            ++rejectedConnections;
-            continue;
-        }
-
-        BinaryMask bridgeMask(grid.nx(), grid.ny());
-        int minX = grid.nx() - 1;
-        int minY = grid.ny() - 1;
-        int maxX = 0;
-        int maxY = 0;
-        for (const SkeletonPoint& point : candidate.path) {
-            minX = std::min(minX, point.x);
-            minY = std::min(minY, point.y);
-            maxX = std::max(maxX, point.x);
-            maxY = std::max(maxY, point.y);
-            for (int oy = -beltRadius; oy <= beltRadius; ++oy) {
-                for (int ox = -beltRadius; ox <= beltRadius; ++ox) {
-                    if (ox * ox + oy * oy > beltRadius * beltRadius) {
-                        continue;
-                    }
-                    const int x = point.x + ox;
-                    const int y = point.y + oy;
-                    if (!grid.inBounds(x, y)) {
-                        continue;
-                    }
-                    if (output.get(x, y) || hasNearbyAttributeSupport(
-                            grid,
-                            x,
-                            y,
-                            candidate.minimumSupportedValue,
-                            std::max(0, supportEnvelopeRadius))) {
-                        bridgeMask.set(x, y, true);
-                    }
-                }
-            }
-            bridgeMask.set(point.x, point.y, true);
-        }
-
-        std::vector<int> contactedLabels;
-        const int contactPadding = beltRadius + 1;
-        minX = std::max(0, minX - contactPadding);
-        minY = std::max(0, minY - contactPadding);
-        maxX = std::min(grid.nx() - 1, maxX + contactPadding);
-        maxY = std::min(grid.ny() - 1, maxY + contactPadding);
-        int addedCells = 0;
-        for (int y = minY; y <= maxY; ++y) {
-            for (int x = minX; x <= maxX; ++x) {
-                if (bridgeMask.get(x, y) && !output.get(x, y)) {
-                    ++addedCells;
-                }
-                if (!bridgeMask.get(x, y)) {
-                    continue;
-                }
-                for (int oy = -1; oy <= 1; ++oy) {
-                    for (int ox = -1; ox <= 1; ++ox) {
-                        const int nx = x + ox;
-                        const int ny = y + oy;
-                        if (!activeMask.inBounds(nx, ny)) {
-                            continue;
-                        }
-                        const int label = currentOwners.labels[static_cast<std::size_t>(
-                            indexOf(nx, ny))];
-                        if (label > 0 &&
-                            std::find(contactedLabels.begin(), contactedLabels.end(), label) ==
-                                contactedLabels.end()) {
-                            contactedLabels.push_back(label);
-                        }
-                    }
-                }
-            }
-        }
-        candidate.contactedObjectCount = static_cast<int>(contactedLabels.size());
-        const bool hasEndpointA =
-            std::find(contactedLabels.begin(), contactedLabels.end(), endpointLabelA) !=
-            contactedLabels.end();
-        const bool hasEndpointB =
-            std::find(contactedLabels.begin(), contactedLabels.end(), endpointLabelB) !=
-            contactedLabels.end();
-        if (contactedLabels.size() != 2 || !hasEndpointA || !hasEndpointB) {
-            candidate.decision = "final_bridge_third_object_or_owner_mismatch";
-            ++rejectedConnections;
-            continue;
-        }
-        if (addedCells <= 0) {
-            candidate.decision = "final_bridge_no_new_envelope";
-            ++rejectedConnections;
-            continue;
-        }
-        const int maximumAddedCells = static_cast<int>(std::ceil(
-            std::max(1.0, candidate.pathLength) *
-            static_cast<double>(2 * beltRadius + 1) * 1.5)) + 8;
-        if (addedCells > maximumAddedCells) {
-            candidate.decision = "final_bridge_envelope_growth_too_large";
-            ++rejectedConnections;
-            continue;
-        }
-
-        const int topologyPadding = beltRadius + 4;
-        const int holesBefore = countLocalInactiveHoles(
-            output,
-            minX - topologyPadding,
-            minY - topologyPadding,
-            maxX + topologyPadding,
-            maxY + topologyPadding);
-        BinaryMask trial = unionMask(output, bridgeMask);
-        const int holesAfter = countLocalInactiveHoles(
-            trial,
-            minX - topologyPadding,
-            minY - topologyPadding,
-            maxX + topologyPadding,
-            maxY + topologyPadding);
-        candidate.localHolesBefore = holesBefore;
-        candidate.localHolesAfter = holesAfter;
-        if (holesAfter > holesBefore) {
-            candidate.decision = "final_bridge_new_internal_hole";
-            ++rejectedConnections;
-            continue;
-        }
-        const MaskComponentMap trialOwners = labelActiveComponents(trial);
-        const int mergedLabel = trialOwners.labels[static_cast<std::size_t>(
-            indexOf(candidate.endpointA.x, candidate.endpointA.y))];
-        candidate.mergedComponentHolesAfter = countComponentHoles(
-            trial, trialOwners, mergedLabel);
-        if (candidate.mergedComponentHolesAfter > 0) {
-            candidate.decision = "final_bridge_merged_component_has_internal_hole";
-            ++rejectedConnections;
-            continue;
-        }
-
-        output = std::move(trial);
-        candidate.addedEnvelopeCells = addedCells;
-        candidate.accepted = true;
-        candidate.decision = "accepted_final_object_bridge";
-        ++acceptedConnections;
-        addedEnvelopeCells += addedCells;
-        ++pass.stats.acceptedConnections;
-        pass.stats.addedPathPixels += candidate.addedPathPixels;
-    }
-    return output;
-}
-
 } // namespace
 
 TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) {
-    if (grid.empty()) {
-        throw std::runtime_error("Cannot trace an empty grid.");
-    }
-    grid.validate();
-    if (std::any_of(
-            grid.values().begin(),
-            grid.values().end(),
-            [](double value) { return !std::isfinite(value); })) {
-        throw std::runtime_error(
-            "Input grid contains a non-finite attribute value.");
-    }
-    if ((options.thresholdMode == ThresholdMode::Percentile ||
-         options.thresholdMode == ThresholdMode::PositivePercentile) &&
-        (!std::isfinite(options.percentile) || options.percentile <= 0.0 || options.percentile >= 1.0)) {
-        throw std::runtime_error("percentile must be greater than 0 and less than 1 in percentile modes.");
-    }
-    if (!std::isfinite(options.threshold)) {
-        throw std::runtime_error("threshold must be finite.");
-    }
-    if (!std::isfinite(options.minArea) || options.minArea < 0.0) {
-        throw std::runtime_error("minArea must be finite and non-negative.");
-    }
-    if (options.minCells < 1) {
-        throw std::runtime_error("minCells must be at least 1.");
-    }
-    if (options.openRadius < 0 || options.closeRadius < 0) {
-        throw std::runtime_error("Morphology radii must be non-negative.");
-    }
-    if (!std::isfinite(options.physicalCloseRadiusWorld) ||
-        options.physicalCloseRadiusWorld < 0.0) {
-        throw std::runtime_error(
-            "physicalCloseRadiusWorld must be finite and non-negative.");
-    }
-    if (options.weakPercentile < 0.0 || options.weakPercentile >= 1.0) {
-        throw std::runtime_error("weakPercentile must be 0 or between 0 and 1.");
-    }
-    if (options.weakConnectRadius < 0) {
-        throw std::runtime_error("weakConnectRadius must be non-negative.");
-    }
-    if (!std::isfinite(options.weakContinuityNoConnectCost) ||
-        options.weakContinuityNoConnectCost < 0.0 ||
-        options.weakContinuityMaxExactMatchingEndpoints < 2) {
-        throw std::runtime_error(
-            "Weak continuity global matching options are invalid.");
-    }
-    if (!std::isfinite(options.weakPathSupportRatio) ||
-        options.weakPathSupportRatio < 0.0 ||
-        options.weakPathSupportRatio > 1.0) {
-        throw std::runtime_error("weakPathSupportRatio must be between 0 and 1.");
-    }
-    if (options.weakPathMaxUnsupportedRun < 0) {
-        throw std::runtime_error("weakPathMaxUnsupportedRun must be non-negative.");
-    }
-    if (options.localPolygonQuality || options.localPolygonQualityShadow) {
-        validateLocalPolygonQualityOptions(
-            makeLocalPolygonQualityOptions(options));
-    }
-    if (options.residualPercentile < 0.0 || options.residualPercentile >= 1.0) {
-        throw std::runtime_error("residualPercentile must be 0 or between 0 and 1.");
-    }
-    if (options.beltRadius < 1) {
-        throw std::runtime_error("beltRadius must be at least 1.");
-    }
-    if (options.postBeltCloseRadius < 0) {
-        throw std::runtime_error("postBeltCloseRadius must be non-negative.");
-    }
-    if (options.attributeEnvelopeRadius < 0) {
-        throw std::runtime_error("attributeEnvelopeRadius must be non-negative.");
-    }
-    if (options.residualFillRadius < 0) {
-        throw std::runtime_error("residualFillRadius must be non-negative.");
-    }
-    if (options.residualEdgeFillRadius < 0) {
-        throw std::runtime_error("residualEdgeFillRadius must be non-negative.");
-    }
-    if (options.residualEdgeFillMinValueRatio < 0.0) {
-        throw std::runtime_error("residualEdgeFillMinValueRatio must be non-negative.");
-    }
-    if (options.residualEdgeFillMaxPatchSpan < 1) {
-        throw std::runtime_error("residualEdgeFillMaxPatchSpan must be at least 1.");
-    }
-    if (options.residualMinCells < 1) {
-        throw std::runtime_error("residualMinCells must be at least 1.");
-    }
-    if (options.residualTraceMaxCells < 0) {
-        throw std::runtime_error("residualTraceMaxCells must be non-negative.");
-    }
-    if (options.residualCoveredGuardRadius < 0) {
-        throw std::runtime_error("residualCoveredGuardRadius must be non-negative.");
-    }
-    if (options.residualDetachedMinCells < 1 || options.residualDetachedMinLength < 1) {
-        throw std::runtime_error("residual detached trace minimums must be positive.");
-    }
-    if (options.minBranchLength < 1) {
-        throw std::runtime_error("minBranchLength must be at least 1.");
-    }
-    if (options.minJunctionBranchLength < 1) {
-        throw std::runtime_error("minJunctionBranchLength must be at least 1.");
-    }
-    if (options.maxGapDistance < 0) {
-        throw std::runtime_error("maxGapDistance must be non-negative.");
-    }
-    if (options.maxGapAngle < 0.0 || options.maxGapAngle > 180.0) {
-        throw std::runtime_error("maxGapAngle must be between 0 and 180 degrees.");
-    }
-    if (options.weakContinuity || options.weakContinuityShadow) {
-        WeakContinuityOptions continuityOptions;
-        continuityOptions.maxDistance = options.weakContinuityMaxDistance;
-        continuityOptions.tangentWindow = options.weakContinuityTangentWindow;
-        continuityOptions.corridorRadius = options.weakContinuityCorridorRadius;
-        continuityOptions.maxCandidatesPerEndpoint = options.weakContinuityMaxCandidatesPerEndpoint;
-        continuityOptions.maxEndpointAngleDegrees = options.weakContinuityMaxEndpointAngle;
-        continuityOptions.maxWidthRatio = options.weakContinuityMaxWidthRatio;
-        continuityOptions.minAttributeRatio = options.weakContinuityMinAttributeRatio;
-        continuityOptions.localContrastRatio = options.weakContinuityLocalContrastRatio;
-        continuityOptions.minSupportRatio = options.weakContinuityMinSupportRatio;
-        continuityOptions.minMeanSupport = options.weakContinuityMinMeanSupport;
-        continuityOptions.maxUnsupportedRun = options.weakContinuityMaxUnsupportedRun;
-        continuityOptions.maxPathLengthRatio = options.weakContinuityMaxPathLengthRatio;
-        continuityOptions.maxTurnAngleDegrees = options.weakContinuityMaxTurnAngle;
-        continuityOptions.endpointExclusionRadius = options.weakContinuityEndpointExclusionRadius;
-        continuityOptions.thirdPartySkeletonClearanceRadius =
-            options.weakContinuityThirdPartySkeletonClearanceRadius;
-        continuityOptions.minCompetitionMargin = options.weakContinuityMinCompetitionMargin;
-        validateWeakContinuityOptions(continuityOptions);
-        if (options.weakContinuityReferenceThresholdRatio <= 0.0 ||
-            options.weakContinuityReferenceThresholdRatio > 1.0) {
-            throw std::runtime_error(
-                "weakContinuityReferenceThresholdRatio must be in (0,1].");
-        }
-    }
-    if (options.weakTailCompletion || options.weakTailCompletionShadow) {
-        WeakTailOptions tailOptions;
-        tailOptions.minCells = options.weakTailMinCells;
-        tailOptions.maxCells = options.weakTailMaxCells;
-        tailOptions.minAspect = options.weakTailMinAspect;
-        tailOptions.minMeanSupportRatio = options.weakTailMinMeanSupportRatio;
-        tailOptions.minPeakSupportRatio = options.weakTailMinPeakSupportRatio;
-        tailOptions.maxAlignmentAngleDegrees = options.weakTailMaxAlignmentAngle;
-        tailOptions.ownershipClearanceRadius = options.weakTailOwnershipClearanceRadius;
-        tailOptions.tangentRadius = options.weakTailTangentRadius;
-        validateWeakTailOptions(tailOptions);
-    }
-    if (options.weakContinuityFinalObjectPass &&
-        (options.traceMode != TraceMode::RidgeBelt ||
-         options.separateBranchBelts)) {
-        throw std::runtime_error(
-            "weakContinuityFinalObjectPass requires RidgeBelt mode with "
-            "separateBranchBelts disabled.");
-    }
-    if (options.rootAntiMergeRadius < 0) {
-        throw std::runtime_error("rootAntiMergeRadius must be non-negative.");
-    }
-    if (options.rootAntiMergeSupportRatio < 0.0 || options.rootAntiMergeSupportRatio > 1.0) {
-        throw std::runtime_error("rootAntiMergeSupportRatio must be between 0 and 1.");
-    }
-    if (options.rootAntiMergeMaxBridgeValue < 0.0) {
-        throw std::runtime_error("rootAntiMergeMaxBridgeValue must be non-negative.");
-    }
-    if (options.rootAntiMergeMinPartCells < 0) {
-        throw std::runtime_error("rootAntiMergeMinPartCells must be non-negative.");
-    }
-    if (options.rootAntiMergeMinPartRatio < 0.0 || options.rootAntiMergeMinPartRatio > 0.5) {
-        throw std::runtime_error("rootAntiMergeMinPartRatio must be between 0 and 0.5.");
-    }
-    if (options.rootAntiMergeWeakGuardThreshold < 0.0) {
-        throw std::runtime_error("rootAntiMergeWeakGuardThreshold must be non-negative.");
-    }
-    if (options.rootAntiMergeWeakGuardRadius < 0) {
-        throw std::runtime_error("rootAntiMergeWeakGuardRadius must be non-negative.");
-    }
-    if (options.localAntiMergeLowThreshold < 0.0) {
-        throw std::runtime_error("localAntiMergeLowThreshold must be non-negative.");
-    }
-    if (options.localAntiMergeBridgeRadius < 0) {
-        throw std::runtime_error("localAntiMergeBridgeRadius must be non-negative.");
-    }
-    if (options.localAntiMergeMinPartCells < 1) {
-        throw std::runtime_error("localAntiMergeMinPartCells must be at least 1.");
-    }
-    if (options.localAntiMergeMinPartRatio < 0.0 || options.localAntiMergeMinPartRatio > 0.5) {
-        throw std::runtime_error("localAntiMergeMinPartRatio must be between 0 and 0.5.");
-    }
-    if (options.localAntiMergeMinBridgeCells < 1) {
-        throw std::runtime_error("localAntiMergeMinBridgeCells must be at least 1.");
-    }
-    if (options.localAntiMergeMinLowRatio < 0.0 || options.localAntiMergeMinLowRatio > 1.0) {
-        throw std::runtime_error("localAntiMergeMinLowRatio must be between 0 and 1.");
-    }
-    if (options.simplifyTolerance < 0.0) {
-        throw std::runtime_error("simplifyTolerance must be non-negative.");
-    }
-    if (options.smoothIterations < 0 || options.smoothIterations > 5) {
-        throw std::runtime_error("smoothIterations must be between 0 and 5.");
-    }
-    if (options.branchAttributionCandidateGroups &&
-        options.traceMode != TraceMode::RidgeBelt) {
-        throw std::runtime_error(
-            "branchAttributionCandidateGroups requires RidgeBelt trace mode.");
-    }
-    if (options.branchAttributionCandidateGroups &&
-        !options.rootAntiMerge) {
-        throw std::runtime_error(
-            "branchAttributionCandidateGroups requires rootAntiMerge.");
-    }
-    if (options.branchAttributionCandidateGroups &&
-        options.separateBranchBelts) {
-        throw std::runtime_error(
-            "branchAttributionCandidateGroups requires separateBranchBelts=false.");
-    }
-
+    const TraceClock::time_point totalStart = TraceClock::now();
+    TraceResult result;
+    TraceClock::time_point stageStart = TraceClock::now();
+    validateTraceRequest(grid, options);
+    result.stageTimings.validationMs = elapsedMilliseconds(stageStart);
     const int nx = grid.nx();
     const int ny = grid.ny();
-    constexpr std::size_t kNoAreaFilterMaxGridCells = 250000;
-    const std::size_t gridCellCount = static_cast<std::size_t>(nx) * static_cast<std::size_t>(ny);
-    if (options.minArea == 0.0 && gridCellCount > kNoAreaFilterMaxGridCells) {
-        throw std::runtime_error(
-            "minArea=0 is disabled for large grids because retaining every fragment can exhaust processing and display resources. Use a small positive minimum area.");
-    }
-    constexpr std::size_t kCombinedOptionalEnhancementsMaxGridCells = 250000;
-    if (gridCellCount > kCombinedOptionalEnhancementsMaxGridCells &&
-        options.rootAntiMerge && options.localAntiMerge && options.residualTrace) {
-        throw std::runtime_error(
-            "rootAntiMerge, localAntiMerge, and residualTrace cannot all be enabled on a large grid. Run the recommended root anti-merge baseline first, then evaluate one optional enhancement at a time.");
-    }
 
+    stageStart = TraceClock::now();
     SegmentationOptions segmentationOptions;
     segmentationOptions.thresholdMode = options.thresholdMode;
     segmentationOptions.threshold = options.threshold;
@@ -3906,7 +1659,6 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
     segmentationOptions.closeRadius = options.closeRadius;
     SegmentationResult segmentation = segmentFaultAttributes(grid, segmentationOptions);
 
-    TraceResult result;
     result.effectiveThreshold = segmentation.effectiveThreshold;
     result.primaryThresholdInfo = segmentation.thresholdInfo;
     const auto percentileInfo = [&](double percentile) {
@@ -3924,6 +1676,9 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
     const double residualSupportThreshold =
         result.residualThresholdInfo.threshold;
     const double weakSupportThreshold = result.weakThresholdInfo.threshold;
+    result.stageTimings.segmentationMs = elapsedMilliseconds(stageStart);
+
+    stageStart = TraceClock::now();
     BinaryMask activeMask = segmentation.mask;
     BinaryMask acceptedWeakContinuityPathMask(nx, ny);
     BinaryMask acceptedWeakTailMask(nx, ny);
@@ -4044,6 +1799,9 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
             }
         }
     }
+    result.stageTimings.preprocessingMs = elapsedMilliseconds(stageStart);
+
+    const TraceClock::time_point ridgeStageStart = TraceClock::now();
     if (options.traceMode == TraceMode::RidgeBelt) {
         BinaryMask skeleton = skeletonizeZhangSuen(activeMask);
         SkeletonGraph graph = buildSkeletonGraph(skeleton);
@@ -4123,19 +1881,8 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
         }
         if (options.weakTailCompletion || options.weakTailCompletionShadow ||
             options.weakTailEndpointPortShadow) {
-            WeakTailOptions tailOptions;
-            tailOptions.minCells = options.weakTailMinCells;
-            tailOptions.maxCells = options.weakTailMaxCells;
-            tailOptions.minAspect = options.weakTailMinAspect;
-            tailOptions.minMeanSupportRatio = options.weakTailMinMeanSupportRatio;
-            tailOptions.minPeakSupportRatio = options.weakTailMinPeakSupportRatio;
-            tailOptions.maxAlignmentAngleDegrees = options.weakTailMaxAlignmentAngle;
-            tailOptions.ownershipClearanceRadius = options.weakTailOwnershipClearanceRadius;
-            tailOptions.tangentRadius = options.weakTailTangentRadius;
-            tailOptions.requireEndpointPortOwnership =
-                options.weakTailEndpointPortOwnership;
-            tailOptions.junctionClearanceRadius =
-                options.weakTailJunctionClearanceRadius;
+            const WeakTailOptions tailOptions = makeWeakTailOptions(
+                options, options.weakTailEndpointPortOwnership);
             WeakTailResult tails = restoreSupportedWeakTails(
                 grid,
                 connectedSkeleton,
@@ -4149,8 +1896,8 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
                     result.weakTailEndpointPortShadowStats = result.weakTailStats;
                     result.weakTailEndpointPortCandidates = result.weakTailCandidates;
                 } else {
-                    WeakTailOptions strictOptions = tailOptions;
-                    strictOptions.requireEndpointPortOwnership = true;
+                    const WeakTailOptions strictOptions =
+                        makeWeakTailOptions(options, true);
                     WeakTailResult strictTails = restoreSupportedWeakTails(
                         grid,
                         connectedSkeleton,
@@ -4273,6 +2020,9 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
                     grid, keptBranchRefs, graphV2, attributionOptions);
             result.skeletonGraphV2AttributionShadowEvaluated = true;
         }
+        result.stageTimings.ridgeTracingMs =
+            elapsedMilliseconds(ridgeStageStart);
+        const TraceClock::time_point beltStageStart = TraceClock::now();
         int nextId = 1;
         if (options.separateBranchBelts) {
             const int ownershipRadius = options.beltRadius + options.postBeltCloseRadius + options.attributeEnvelopeRadius + 3;
@@ -4357,10 +2107,19 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
                     nextId);
             }
             result.activeCellCount = branchMask.countActive();
-            applyLocalPolygonQualityIfEnabled(grid, options, result);
+            result.stageTimings.beltAndAntiMergeMs =
+                elapsedMilliseconds(beltStageStart);
+            result.stageTimings.beltConstructionMs =
+                result.stageTimings.beltAndAntiMergeMs;
+            const TraceClock::time_point postStageStart = TraceClock::now();
+            applyTracePostProcessing(grid, attributeMask, options, result);
+            result.stageTimings.postProcessingMs =
+                elapsedMilliseconds(postStageStart);
+            result.stageTimings.totalMs = elapsedMilliseconds(totalStart);
             return result;
         }
 
+        const TraceClock::time_point beltConstructionStart = TraceClock::now();
         activeMask = bufferMask(branchMask, options.beltRadius);
         if (options.attributeConstrainedBelt) {
             BinaryMask envelopeSeedMask = attributeMask;
@@ -4397,6 +2156,9 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
             residualMask,
             options,
             result);
+        result.stageTimings.beltConstructionMs =
+            elapsedMilliseconds(beltConstructionStart);
+        const TraceClock::time_point rootAntiMergeStart = TraceClock::now();
         if (options.rootAntiMerge && !keptBranchRefs.empty()) {
             const int ownershipRadius = options.beltRadius + options.postBeltCloseRadius + options.attributeEnvelopeRadius + 3;
             std::vector<BranchGroup> branchGroups;
@@ -4495,6 +2257,9 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
                 result.weakContinuityProtectedFromAntiMergeCells +
                 result.weakTailProtectedFromAntiMergeCells;
         }
+        result.stageTimings.rootAntiMergeMs =
+            elapsedMilliseconds(rootAntiMergeStart);
+        const TraceClock::time_point localAntiMergeStart = TraceClock::now();
         if (options.localAntiMerge) {
             LocalAntiMergeValidationStats validationStats;
             const BinaryMask cutMask = buildLocalAntiMergeCutMask(
@@ -4515,6 +2280,10 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
                 }
             }
         }
+        result.stageTimings.localAntiMergeMs =
+            elapsedMilliseconds(localAntiMergeStart);
+        const TraceClock::time_point finalWeakContinuityStart =
+            TraceClock::now();
         if (options.weakContinuityFinalObjectPass) {
             WeakContinuityOptions finalPassOptions =
                 makeWeakContinuityOptions(options);
@@ -4545,12 +2314,16 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
             finalPassOptions.minCompetitionMargin =
                 std::max(finalPassOptions.minCompetitionMargin, 0.18);
 
+            TraceClock::time_point finalSubstageStart = TraceClock::now();
             const BinaryMask finalSkeleton = skeletonizeZhangSuen(activeMask);
             const SkeletonGraph finalGraph = buildSkeletonGraph(finalSkeleton);
+            result.stageTimings.finalWeakGraphMs =
+                elapsedMilliseconds(finalSubstageStart);
             const double finalSupportThreshold = std::max(
                 residualSupportThreshold,
                 result.effectiveThreshold *
                     options.weakContinuityReferenceThresholdRatio);
+            finalSubstageStart = TraceClock::now();
             WeakContinuityResult finalPass = connectWeakContinuityPaths(
                 grid,
                 finalSkeleton,
@@ -4559,6 +2332,8 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
                 finalSupportThreshold,
                 finalPassOptions,
                 &activeMask);
+            result.stageTimings.finalWeakSearchMs =
+                elapsedMilliseconds(finalSubstageStart);
             int nextCandidateId = 1;
             for (const WeakContinuityCandidate& candidate :
                  result.weakContinuityCandidates) {
@@ -4568,18 +2343,39 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
                 candidate.id = nextCandidateId++;
                 candidate.stage = 3;
             }
-            activeMask = applyFinalObjectBridgeGates(
+            finalSubstageStart = TraceClock::now();
+            FinalBridgeGateOptions finalGateOptions;
+            finalGateOptions.supportThreshold = finalSupportThreshold;
+            finalGateOptions.junctionInfluenceDistance =
+                std::max(2, finalPassOptions.tangentWindow * 3);
+            finalGateOptions.maximumBeltRadius = options.beltRadius;
+            finalGateOptions.supportEnvelopeRadius =
+                options.attributeEnvelopeRadius;
+            FinalBridgeGateResult finalGate = fpt::applyFinalObjectBridgeGates(
                 grid,
                 activeMask,
                 finalGraph,
-                finalSupportThreshold,
-                std::max(2, finalPassOptions.tangentWindow * 3),
-                options.beltRadius,
-                options.attributeEnvelopeRadius,
                 finalPass,
-                result.weakContinuityFinalObjectAcceptedConnections,
-                result.weakContinuityFinalObjectRejectedConnections,
-                result.weakContinuityFinalObjectAddedEnvelopeCells);
+                finalGateOptions);
+            activeMask = std::move(finalGate.mask);
+            result.weakContinuityFinalObjectAcceptedConnections =
+                finalGate.acceptedConnections;
+            result.weakContinuityFinalObjectRejectedConnections =
+                finalGate.rejectedConnections;
+            result.weakContinuityFinalObjectAddedEnvelopeCells =
+                finalGate.addedEnvelopeCells;
+            result.stageTimings.finalWeakGateContextMs =
+                finalGate.timings.contextBuildMs;
+            result.stageTimings.finalWeakGateOwnershipMs =
+                finalGate.timings.ownershipInitializationMs;
+            result.stageTimings.finalWeakGateComponentHoleMs =
+                finalGate.timings.componentHoleCheckMs;
+            result.stageTimings.finalWeakGateEnvelopeMs =
+                finalGate.timings.envelopeBuildMs;
+            result.stageTimings.finalWeakGateTopologyMs =
+                finalGate.timings.localTopologyCheckMs;
+            result.stageTimings.finalWeakGateMs =
+                elapsedMilliseconds(finalSubstageStart);
             accumulateWeakContinuityStats(
                 result.weakContinuityStats,
                 finalPass.stats);
@@ -4587,8 +2383,16 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
                 result.weakContinuityCandidates.push_back(std::move(candidate));
             }
         }
+        result.stageTimings.finalWeakContinuityMs =
+            elapsedMilliseconds(finalWeakContinuityStart);
+        result.stageTimings.beltAndAntiMergeMs =
+            elapsedMilliseconds(beltStageStart);
+    } else {
+        result.stageTimings.ridgeTracingMs =
+            elapsedMilliseconds(ridgeStageStart);
     }
 
+    const TraceClock::time_point vectorizationStageStart = TraceClock::now();
     int nextId = 1;
     result.activeCellCount = activeMask.countActive();
     appendPolygonsFromMask(grid, activeMask, options, result, nextId);
@@ -4606,46 +2410,13 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
             result,
             nextId);
     }
-    applyLocalPolygonQualityIfEnabled(grid, options, result);
-
-    if (options.multiScaleEvidenceShadow || options.adaptiveBoundaryShadow) {
-        MultiScaleEvidenceOptions evidenceOptions;
-        evidenceOptions.minimumConfidence =
-            options.multiScaleEvidenceMinimumConfidence;
-        evidenceOptions.minimumRidgeResponse =
-            options.multiScaleEvidenceMinimumRidgeResponse;
-        evidenceOptions.maximumSamples = options.multiScaleEvidenceMaximumSamples;
-        MultiScaleEvidenceResult evidence = computeMultiScaleEvidence(
-            grid, &attributeMask, evidenceOptions);
-        if (options.traceMode == TraceMode::RidgeBelt) {
-            const BinaryMask shadowSkeleton = skeletonizeZhangSuen(attributeMask);
-            evaluateMultiScaleEvidenceAgainstSkeleton(
-                grid, shadowSkeleton, 35.0, evidence);
-        }
-        result.multiScaleEvidenceShadowEvaluated = true;
-        result.multiScaleEvidenceSummary = evidence.summary;
-        if (options.adaptiveBoundaryShadow) {
-            AdaptiveBoundaryOptions boundaryOptions;
-            boundaryOptions.maximumDisplacementWorld =
-                options.adaptiveBoundaryMaximumDisplacementWorld;
-            boundaryOptions.supportThreshold = result.effectiveThreshold;
-            boundaryOptions.minimumSupportGain =
-                options.adaptiveBoundaryMinimumSupportGain;
-            boundaryOptions.maximumSupportLossRatio =
-                options.adaptiveBoundaryMaximumSupportLossRatio;
-            boundaryOptions.maximumBackgroundLeakageIncreaseRatio =
-                options.adaptiveBoundaryMaximumLeakageIncreaseRatio;
-            boundaryOptions.maximumPolygons =
-                options.adaptiveBoundaryMaximumPolygons;
-            boundaryOptions.maximumVerticesPerPolygon =
-                options.adaptiveBoundaryMaximumVerticesPerPolygon;
-            AdaptiveBoundaryResult boundary = evaluateAdaptiveBoundaries(
-                grid, attributeMask, result.polygons, &evidence, boundaryOptions);
-            result.adaptiveBoundaryShadowEvaluated = true;
-            result.adaptiveBoundarySummary = boundary.summary;
-            result.adaptiveBoundaryEvidence = std::move(boundary.evidence);
-        }
-    }
+    result.stageTimings.vectorizationMs =
+        elapsedMilliseconds(vectorizationStageStart);
+    const TraceClock::time_point postStageStart = TraceClock::now();
+    applyTracePostProcessing(grid, attributeMask, options, result);
+    result.stageTimings.postProcessingMs =
+        elapsedMilliseconds(postStageStart);
+    result.stageTimings.totalMs = elapsedMilliseconds(totalStart);
 
     return result;
 }

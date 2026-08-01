@@ -2,7 +2,7 @@
 
 #include "../core/Grid2D.h"
 #include "../core/Polygon.h"
-#include "../core/FaultTracer.h"
+#include "../core/TraceResult.h"
 
 #include <string>
 #include <vector>

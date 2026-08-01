@@ -100,6 +100,7 @@ struct CliOptions {
     double multiScaleEvidenceMinimumRidgeResponse = 0.04;
     std::size_t multiScaleEvidenceMaximumSamples = 2000000;
     bool adaptiveBoundaryShadow = false;
+    bool adaptiveBoundaryApply = false;
     double adaptiveBoundaryMaximumDisplacementWorld = 15.0;
     double adaptiveBoundaryMinimumSupportGain = 0.01;
     double adaptiveBoundaryMaximumSupportLossRatio = 0.0;
@@ -253,6 +254,7 @@ void printUsage() {
         << "  --multi-scale-min-ridge-response <v> Minimum auxiliary ridge response. Default: 0.04\n"
         << "  --multi-scale-max-samples <n> Maximum auxiliary evidence samples. Default: 2000000\n"
         << "  --adaptive-boundary-shadow Evaluate bounded local boundary candidates without changing output\n"
+        << "  --adaptive-boundary-apply Apply only globally valid boundary candidates (experimental; default: off)\n"
         << "  --adaptive-boundary-max-displacement <v> Maximum boundary displacement in world units. Default: 15\n"
         << "  --adaptive-boundary-min-support-gain <v> Minimum local support gain. Default: 0.01\n"
         << "  --adaptive-boundary-max-support-loss <v> Maximum supported-cell loss ratio. Default: 0\n"
@@ -825,6 +827,10 @@ CliOptions parseArgs(int argc, char** argv) {
             options.adaptiveBoundaryShadow = true;
         } else if (arg == "--no-adaptive-boundary-shadow") {
             options.adaptiveBoundaryShadow = false;
+        } else if (arg == "--adaptive-boundary-apply") {
+            options.adaptiveBoundaryApply = true;
+        } else if (arg == "--no-adaptive-boundary-apply") {
+            options.adaptiveBoundaryApply = false;
         } else if (arg == "--adaptive-boundary-max-displacement") {
             options.adaptiveBoundaryMaximumDisplacementWorld = std::stod(requireValue(arg));
         } else if (arg == "--adaptive-boundary-min-support-gain") {
@@ -1137,6 +1143,7 @@ int main(int argc, char** argv) {
         traceOptions.multiScaleEvidenceMaximumSamples =
             cli.multiScaleEvidenceMaximumSamples;
         traceOptions.adaptiveBoundaryShadow = cli.adaptiveBoundaryShadow;
+        traceOptions.adaptiveBoundaryApply = cli.adaptiveBoundaryApply;
         traceOptions.adaptiveBoundaryMaximumDisplacementWorld =
             cli.adaptiveBoundaryMaximumDisplacementWorld;
         traceOptions.adaptiveBoundaryMinimumSupportGain =
@@ -1362,6 +1369,7 @@ int main(int argc, char** argv) {
         diagnostics.multiScaleEvidenceMaximumSamples =
             cli.multiScaleEvidenceMaximumSamples;
         diagnostics.adaptiveBoundaryShadow = cli.adaptiveBoundaryShadow;
+        diagnostics.adaptiveBoundaryApply = cli.adaptiveBoundaryApply;
         diagnostics.adaptiveBoundaryMaximumDisplacementWorld =
             cli.adaptiveBoundaryMaximumDisplacementWorld;
         diagnostics.adaptiveBoundaryMinimumSupportGain =
@@ -1535,8 +1543,12 @@ int main(int argc, char** argv) {
             result.multiScaleEvidenceSummary;
         diagnostics.adaptiveBoundaryShadowEvaluated =
             result.adaptiveBoundaryShadowEvaluated;
+        diagnostics.adaptiveBoundaryApplied =
+            result.adaptiveBoundaryApplied;
         diagnostics.adaptiveBoundarySummary =
             result.adaptiveBoundarySummary;
+        diagnostics.adaptiveBoundaryCommitSummary =
+            result.adaptiveBoundaryCommitSummary;
         diagnostics.adaptiveBoundaryEvidence =
             result.adaptiveBoundaryEvidence;
         diagnostics.keptBranches = result.keptBranches;
@@ -1734,8 +1746,13 @@ int main(int argc, char** argv) {
         diagnostics.nestedHoleCount = topology.nestedHoleCount;
         diagnostics.polygonContainmentCount = topology.polygonContainmentCount;
         diagnostics.polygonInteriorOverlapCount = topology.polygonInteriorOverlapCount;
+        diagnostics.topologyRingValidationMs = topology.ringValidationMs;
+        diagnostics.topologySelfIntersectionMs = topology.selfIntersectionMs;
+        diagnostics.topologyHoleValidationMs = topology.holeValidationMs;
+        diagnostics.topologyPairConflictMs = topology.pairConflictMs;
         diagnostics.readMs = std::chrono::duration_cast<std::chrono::milliseconds>(afterRead - start).count();
         diagnostics.traceMs = std::chrono::duration_cast<std::chrono::milliseconds>(afterTrace - afterRead).count();
+        diagnostics.traceStages = result.stageTimings;
         diagnostics.topologyMs = std::chrono::duration_cast<std::chrono::milliseconds>(afterTopology - afterTrace).count();
         diagnostics.writeMs = std::chrono::duration_cast<std::chrono::milliseconds>(afterWrites - afterTopology).count();
         diagnostics.elapsedMs = elapsedMs;

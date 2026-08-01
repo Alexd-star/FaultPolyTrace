@@ -1,4 +1,5 @@
 #include "../src/core/AdaptiveBoundary.h"
+#include "../src/core/PolygonQualityMetrics.h"
 
 #include <iostream>
 #include <stdexcept>
@@ -72,11 +73,49 @@ void testRasterBudgetForcesReviewInsteadOfAcceptance() {
             "A budget-limited candidate must never be automatically accepted.");
 }
 
+void requireRasterMatchesCellPredicate(
+    const fpt::Grid2D& grid,
+    const fpt::Polygon& polygon) {
+    const fpt::PolygonCellCoverage coverage =
+        fpt::rasterizePolygonCellCoverage(grid, polygon, grid.size());
+    require(!coverage.budgetExceeded,
+            "A full-grid raster budget must cover the complete test polygon.");
+    for (int y = 0; y < grid.ny(); ++y) {
+        for (int x = 0; x < grid.nx(); ++x) {
+            const bool expected =
+                fpt::cellIntersectsPolygonArea(grid, x, y, polygon);
+            require(coverage.get(x, y) == expected,
+                    "Indexed polygon rasterization must match the reference cell predicate.");
+        }
+    }
+}
+
+void testIndexedRasterizationPreservesCoverageSemantics() {
+    fpt::Grid2D grid = makeGrid();
+    requireRasterMatchesCellPredicate(grid, makeSquare());
+
+    fpt::Polygon diagonal;
+    diagonal.id = 2;
+    diagonal.kept = true;
+    diagonal.points = {
+        {2.0, 3.0}, {16.0, 15.0},
+        {15.0, 17.0}, {1.0, 5.0}};
+    requireRasterMatchesCellPredicate(grid, diagonal);
+
+    fpt::Polygon withHole = makeSquare();
+    withHole.id = 3;
+    withHole.holes.push_back({
+        {7.0, 7.0}, {9.0, 7.0},
+        {9.0, 9.0}, {7.0, 9.0}});
+    requireRasterMatchesCellPredicate(grid, withHole);
+}
+
 } // namespace
 
 int main() {
     testSupportMaskIsAuthoritative();
     testRasterBudgetForcesReviewInsteadOfAcceptance();
+    testIndexedRasterizationPreservesCoverageSemantics();
     std::cout << "Adaptive boundary tests passed.\n";
     return 0;
 }

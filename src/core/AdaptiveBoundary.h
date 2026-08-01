@@ -22,10 +22,13 @@ struct AdaptiveBoundaryOptions {
     double maximumDisplacementWorld = 15.0;
     double searchStepWorld = 0.0;
     double supportThreshold = 0.0;
+    double weakSupportThreshold = 0.0;
     double minimumSupportGain = 0.01;
     double maximumSupportLossRatio = 0.0;
+    double maximumWeakSupportLossRatio = 0.0;
     double maximumBackgroundLeakageIncreaseRatio = 0.0;
     double maximumAreaChangeRatio = 0.08;
+    double maximumRoughnessIncreaseRatio = 0.0;
     double offsetRegularization = 0.35;
     int localRadiusCells = 1;
     std::size_t maximumVerticesPerPolygon = 4096;
@@ -43,8 +46,13 @@ struct AdaptiveBoundaryEvidence {
     double supportGainRatio = 0.0;
     double boundaryScoreGain = 0.0;
     double supportLossRatio = 0.0;
+    double weakSupportGainRatio = 0.0;
+    double weakSupportLossRatio = 0.0;
     double backgroundLeakageIncreaseRatio = 0.0;
     double areaChangeRatio = 0.0;
+    double originalRoughness = 0.0;
+    double candidateRoughness = 0.0;
+    double roughnessChangeRatio = 0.0;
     std::size_t rasterCellsEvaluated = 0;
     bool candidateFinite = true;
     bool candidateChanged = false;
@@ -67,6 +75,7 @@ struct AdaptiveBoundarySummary {
     std::size_t rasterCellsEvaluated = 0;
     double maximumDisplacementWorld = 0.0;
     double meanSupportGainRatio = 0.0;
+    double meanWeakSupportGainRatio = 0.0;
     double meanBoundaryScoreGain = 0.0;
     double meanBackgroundLeakageIncreaseRatio = 0.0;
 };
@@ -76,6 +85,19 @@ struct AdaptiveBoundaryResult {
     std::vector<AdaptiveBoundaryEvidence> evidence;
 };
 
+struct AdaptiveBoundaryCommitSummary {
+    int attemptedCandidates = 0;
+    int committedCandidates = 0;
+    int missingPolygonCandidates = 0;
+    int globalConflictRejectedCandidates = 0;
+    bool batchRolledBack = false;
+};
+
+struct AdaptiveBoundaryCommitResult {
+    std::vector<Polygon> polygons;
+    AdaptiveBoundaryCommitSummary summary;
+};
+
 void validateAdaptiveBoundaryOptions(const AdaptiveBoundaryOptions& options);
 
 AdaptiveBoundaryResult evaluateAdaptiveBoundaries(
@@ -83,7 +105,12 @@ AdaptiveBoundaryResult evaluateAdaptiveBoundaries(
     const BinaryMask& supportMask,
     const std::vector<Polygon>& polygons,
     const MultiScaleEvidenceResult* auxiliaryEvidence,
-    const AdaptiveBoundaryOptions& options);
+    const AdaptiveBoundaryOptions& options,
+    const BinaryMask* weakSupportMask = nullptr);
+
+AdaptiveBoundaryCommitResult commitAdaptiveBoundaryCandidates(
+    const std::vector<Polygon>& polygons,
+    const std::vector<AdaptiveBoundaryEvidence>& evidence);
 
 inline const char* adaptiveBoundaryDecisionName(AdaptiveBoundaryDecision decision) {
     switch (decision) {

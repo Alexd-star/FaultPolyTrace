@@ -1,0 +1,161 @@
+#pragma once
+
+#include "Segmentation.h"
+
+#include <cstddef>
+
+namespace fpt {
+
+enum class TraceMode {
+    Region,
+    RidgeBelt
+};
+
+struct TraceOptions {
+    TraceMode traceMode = TraceMode::Region;
+    ThresholdMode thresholdMode = ThresholdMode::Fixed;
+    double threshold = 0.5;
+    double percentile = 0.90;
+    double minArea = 0.0;
+    int minCells = 1;
+    int openRadius = 0;
+    int closeRadius = 0;
+    bool physicalMorphologyShadow = false;
+    double physicalCloseRadiusWorld = 0.0;
+    double weakPercentile = 0.0;
+    int weakConnectRadius = 0;
+    int maxWeakComponentCells = 20000;
+    double minWeakComponentAspect = 3.0;
+    bool weakPathGate = false;
+    bool weakExtensionLayeredShadow = false;
+    bool weakExtensionLayeredGate = false;
+    double weakPathSupportRatio = 0.50;
+    int weakPathMaxUnsupportedRun = 3;
+    bool branchAttributionShadow = false;
+    bool branchAttributionCandidateGroups = false;
+    bool skeletonGraphV2Shadow = false;
+    bool skeletonGraphV2AttributionShadow = false;
+    bool multiScaleEvidenceShadow = false;
+    double multiScaleEvidenceMinimumConfidence = 0.18;
+    double multiScaleEvidenceMinimumRidgeResponse = 0.04;
+    std::size_t multiScaleEvidenceMaximumSamples = 2000000;
+    bool adaptiveBoundaryShadow = false;
+    bool adaptiveBoundaryApply = false;
+    double adaptiveBoundaryMaximumDisplacementWorld = 15.0;
+    double adaptiveBoundaryMinimumSupportGain = 0.01;
+    double adaptiveBoundaryMaximumSupportLossRatio = 0.0;
+    double adaptiveBoundaryMaximumLeakageIncreaseRatio = 0.0;
+    std::size_t adaptiveBoundaryMaximumPolygons = 512;
+    std::size_t adaptiveBoundaryMaximumVerticesPerPolygon = 4096;
+    bool localPolygonQualityShadow = false;
+    bool localPolygonQuality = false;
+    double localQualityWidthRatio = 2.4;
+    int localQualityMinExtraCells = 8;
+    double localQualitySupportThresholdRatio = 0.70;
+    int localQualitySupportBufferCells = 1;
+    double localQualityMaxAreaLossRatio = 0.18;
+    double localQualityMaxStrongCoverageLossRatio = 0.0;
+    double localQualityMaxWeakCoverageLossRatio = 0.0;
+    double localQualityMaxBackgroundLeakageIncreaseRatio = 0.0;
+    double localQualityStabilityThresholdDeltaRatio = 0.02;
+    double localQualityMinStabilityJaccard = 0.90;
+    std::size_t localQualityMaxCandidatesPerObject = 64;
+    std::size_t localQualityMaxTotalCandidates = 4096;
+    std::size_t localQualityMaxWindowCells = 65536;
+    std::size_t localQualityMaxObjectCells = 2000000;
+    std::size_t localQualityMaxEvidenceRecords = 4096;
+    int beltRadius = 2;
+    int postBeltCloseRadius = 1;
+    bool attributeConstrainedBelt = false;
+    int attributeEnvelopeRadius = 1;
+    int minBranchLength = 4;
+    int minJunctionBranchLength = 4;
+    double minJunctionBranchMean = 1.0;
+    int maxGapDistance = 0;
+    double maxGapAngle = 35.0;
+    double minGapSupportRatio = 0.25;
+    bool weakContinuityShadow = false;
+    bool weakContinuity = false;
+    bool weakContinuitySecondPass = false;
+    bool weakContinuityFinalObjectPass = false;
+    int weakContinuityMaxDistance = 42;
+    int weakContinuityTangentWindow = 8;
+    int weakContinuityCorridorRadius = 8;
+    int weakContinuityMaxCandidatesPerEndpoint = 4;
+    double weakContinuityMaxEndpointAngle = 42.0;
+    double weakContinuityMaxWidthRatio = 2.5;
+    double weakContinuityMinAttributeRatio = 0.45;
+    double weakContinuityReferenceThresholdRatio = 0.70;
+    double weakContinuityLocalContrastRatio = 0.15;
+    double weakContinuityMinSupportRatio = 0.65;
+    double weakContinuityMinMeanSupport = 0.28;
+    int weakContinuityMaxUnsupportedRun = 5;
+    double weakContinuityMaxPathLengthRatio = 1.45;
+    double weakContinuityMaxTurnAngle = 50.0;
+    int weakContinuityEndpointExclusionRadius = 2;
+    int weakContinuityThirdPartySkeletonClearanceRadius = 2;
+    double weakContinuityMinCompetitionMargin = 0.18;
+    bool weakContinuityUsePhysicalMetric = false;
+    bool weakContinuityUseGlobalMatching = false;
+    double weakContinuityNoConnectCost = 2.0;
+    int weakContinuityMaxExactMatchingEndpoints = 20;
+    bool weakTailCompletionShadow = false;
+    bool weakTailCompletion = false;
+    bool weakTailEndpointPortShadow = false;
+    bool weakTailEndpointPortOwnership = false;
+    int weakTailMinCells = 6;
+    int weakTailMaxCells = 64;
+    double weakTailMinAspect = 5.0;
+    double weakTailMinMeanSupportRatio = 0.75;
+    double weakTailMinPeakSupportRatio = 0.90;
+    double weakTailMaxAlignmentAngle = 35.0;
+    int weakTailOwnershipClearanceRadius = 2;
+    int weakTailTangentRadius = 12;
+    int weakTailJunctionClearanceRadius = 2;
+    bool preserveObservedSkeletonEnvelope = false;
+    bool separateBranchBelts = false;
+    bool rootAntiMerge = false;
+    int rootAntiMergeRadius = 1;
+    double rootAntiMergeSupportRatio = 0.25;
+    double rootAntiMergeMaxBridgeValue = 1e-12;
+    int rootAntiMergeMinPartCells = 0;
+    double rootAntiMergeMinPartRatio = 0.12;
+    double rootAntiMergeWeakGuardThreshold = 0.66;
+    int rootAntiMergeWeakGuardRadius = 0;
+    bool localAntiMerge = false;
+    double localAntiMergeLowThreshold = 0.05;
+    int localAntiMergeBridgeRadius = 2;
+    int localAntiMergeMinPartCells = 80;
+    double localAntiMergeMinPartRatio = 0.08;
+    int localAntiMergeMinBridgeCells = 6;
+    double localAntiMergeMinLowRatio = 0.55;
+    bool adaptiveAreaFilter = true;
+    int adaptiveAreaMinCells = 4;
+    double adaptiveAreaMinAspect = 2.0;
+    double adaptiveAreaMinMeanRatio = 0.55;
+    double adaptiveAreaMinMaxRatio = 0.90;
+    bool residualAttributeFill = true;
+    bool residualTrace = false;
+    double residualPercentile = 0.955;
+    int residualFillRadius = 2;
+    int residualEdgeFillRadius = 2;
+    double residualEdgeFillMinValueRatio = 0.97;
+    int residualEdgeFillMaxPatchSpan = 5;
+    int residualMinCells = 2;
+    int residualTraceMinLength = 6;
+    int residualTraceMaxCells = 160;
+    int residualCoveredGuardRadius = 0;
+    bool residualTraceDetached = true;
+    int residualDetachedMinCells = 8;
+    int residualDetachedMinLength = 10;
+    double residualDetachedMinAspect = 3.0;
+    double residualDetachedMinMeanRatio = 0.70;
+    double residualDetachedMinMaxRatio = 0.92;
+    double simplifyTolerance = 0.0;
+    int smoothIterations = 0;
+    bool preserveCoverageAfterSmoothing = true;
+    double coveragePreserveMargin = 0.0;
+    double coveragePreserveMinValueRatio = 0.70;
+};
+
+} // namespace fpt

@@ -308,6 +308,8 @@ void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
         << d.multiScaleEvidenceMaximumSamples << ",\n";
     out << "    \"adaptiveBoundaryShadow\": "
         << (d.adaptiveBoundaryShadow ? "true" : "false") << ",\n";
+    out << "    \"adaptiveBoundaryApply\": "
+        << (d.adaptiveBoundaryApply ? "true" : "false") << ",\n";
     out << "    \"adaptiveBoundaryMaximumDisplacementWorld\": "
         << d.adaptiveBoundaryMaximumDisplacementWorld << ",\n";
     out << "    \"adaptiveBoundaryMinimumSupportGain\": "
@@ -552,6 +554,19 @@ void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
     out << "  \"adaptiveBoundaryShadow\": {\n";
     out << "    \"evaluated\": "
         << (d.adaptiveBoundaryShadowEvaluated ? "true" : "false") << ",\n";
+    out << "    \"applied\": "
+        << (d.adaptiveBoundaryApplied ? "true" : "false") << ",\n";
+    out << "    \"commitAttemptedCandidates\": "
+        << d.adaptiveBoundaryCommitSummary.attemptedCandidates << ",\n";
+    out << "    \"commitCommittedCandidates\": "
+        << d.adaptiveBoundaryCommitSummary.committedCandidates << ",\n";
+    out << "    \"commitMissingPolygonCandidates\": "
+        << d.adaptiveBoundaryCommitSummary.missingPolygonCandidates << ",\n";
+    out << "    \"commitGlobalConflictRejectedCandidates\": "
+        << d.adaptiveBoundaryCommitSummary.globalConflictRejectedCandidates << ",\n";
+    out << "    \"commitBatchRolledBack\": "
+        << (d.adaptiveBoundaryCommitSummary.batchRolledBack ? "true" : "false")
+        << ",\n";
     out << "    \"polygonsEvaluated\": " << d.adaptiveBoundarySummary.polygonsEvaluated << ",\n";
     out << "    \"noChange\": " << d.adaptiveBoundarySummary.noChange << ",\n";
     out << "    \"acceptedCandidates\": " << d.adaptiveBoundarySummary.acceptedCandidates << ",\n";
@@ -568,6 +583,8 @@ void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
         << d.adaptiveBoundarySummary.maximumDisplacementWorld << ",\n";
     out << "    \"meanSupportGainRatio\": "
         << d.adaptiveBoundarySummary.meanSupportGainRatio << ",\n";
+    out << "    \"meanWeakSupportGainRatio\": "
+        << d.adaptiveBoundarySummary.meanWeakSupportGainRatio << ",\n";
     out << "    \"meanBoundaryScoreGain\": "
         << d.adaptiveBoundarySummary.meanBoundaryScoreGain << ",\n";
     out << "    \"meanBackgroundLeakageIncreaseRatio\": "
@@ -583,9 +600,16 @@ void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
             << ", \"supportGainRatio\": " << evidence.supportGainRatio
             << ", \"boundaryScoreGain\": " << evidence.boundaryScoreGain
             << ", \"supportLossRatio\": " << evidence.supportLossRatio
+            << ", \"weakSupportGainRatio\": "
+            << evidence.weakSupportGainRatio
+            << ", \"weakSupportLossRatio\": "
+            << evidence.weakSupportLossRatio
             << ", \"backgroundLeakageIncreaseRatio\": "
             << evidence.backgroundLeakageIncreaseRatio
             << ", \"areaChangeRatio\": " << evidence.areaChangeRatio
+            << ", \"originalRoughness\": " << evidence.originalRoughness
+            << ", \"candidateRoughness\": " << evidence.candidateRoughness
+            << ", \"roughnessChangeRatio\": " << evidence.roughnessChangeRatio
             << ", \"topologyValid\": " << (evidence.topologyValid ? "true" : "false")
             << ", \"rasterBudgetExceeded\": "
             << (evidence.rasterBudgetExceeded ? "true" : "false") << "}";
@@ -833,6 +857,40 @@ void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
     out << "  \"timing\": {\n";
     out << "    \"readMs\": " << d.readMs << ",\n";
     out << "    \"traceMs\": " << d.traceMs << ",\n";
+    out << "    \"validationMs\": " << d.traceStages.validationMs << ",\n";
+    out << "    \"segmentationMs\": " << d.traceStages.segmentationMs << ",\n";
+    out << "    \"preprocessingMs\": " << d.traceStages.preprocessingMs << ",\n";
+    out << "    \"ridgeTracingMs\": " << d.traceStages.ridgeTracingMs << ",\n";
+    out << "    \"beltAndAntiMergeMs\": " << d.traceStages.beltAndAntiMergeMs << ",\n";
+    out << "    \"beltConstructionMs\": " << d.traceStages.beltConstructionMs << ",\n";
+    out << "    \"rootAntiMergeMs\": " << d.traceStages.rootAntiMergeMs << ",\n";
+    out << "    \"localAntiMergeMs\": " << d.traceStages.localAntiMergeMs << ",\n";
+    out << "    \"finalWeakContinuityMs\": "
+        << d.traceStages.finalWeakContinuityMs << ",\n";
+    out << "    \"finalWeakGraphMs\": " << d.traceStages.finalWeakGraphMs << ",\n";
+    out << "    \"finalWeakSearchMs\": " << d.traceStages.finalWeakSearchMs << ",\n";
+    out << "    \"finalWeakGateMs\": " << d.traceStages.finalWeakGateMs << ",\n";
+    out << "    \"finalWeakGateContextMs\": "
+        << d.traceStages.finalWeakGateContextMs << ",\n";
+    out << "    \"finalWeakGateOwnershipMs\": "
+        << d.traceStages.finalWeakGateOwnershipMs << ",\n";
+    out << "    \"finalWeakGateComponentHoleMs\": "
+        << d.traceStages.finalWeakGateComponentHoleMs << ",\n";
+    out << "    \"finalWeakGateEnvelopeMs\": "
+        << d.traceStages.finalWeakGateEnvelopeMs << ",\n";
+    out << "    \"finalWeakGateTopologyMs\": "
+        << d.traceStages.finalWeakGateTopologyMs << ",\n";
+    out << "    \"vectorizationMs\": " << d.traceStages.vectorizationMs << ",\n";
+    out << "    \"postProcessingMs\": " << d.traceStages.postProcessingMs << ",\n";
+    out << "    \"coreTotalMs\": " << d.traceStages.totalMs << ",\n";
+    out << "    \"topologyRingValidationMs\": "
+        << d.topologyRingValidationMs << ",\n";
+    out << "    \"topologySelfIntersectionMs\": "
+        << d.topologySelfIntersectionMs << ",\n";
+    out << "    \"topologyHoleValidationMs\": "
+        << d.topologyHoleValidationMs << ",\n";
+    out << "    \"topologyPairConflictMs\": "
+        << d.topologyPairConflictMs << ",\n";
     out << "    \"topologyMs\": " << d.topologyMs << ",\n";
     out << "    \"writeMs\": " << d.writeMs << ",\n";
     out << "    \"elapsedMs\": " << d.elapsedMs << "\n";

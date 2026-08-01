@@ -7,6 +7,9 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $testBuildDir = Join-Path $repoRoot "build\tests"
 New-Item -ItemType Directory -Force -Path $testBuildDir | Out-Null
+$objectBuildDir = Join-Path $testBuildDir "objects"
+New-Item -ItemType Directory -Force -Path $objectBuildDir | Out-Null
+$objectCache = @{}
 
 $commonFlags = @(
     "-std=c++17",
@@ -16,6 +19,32 @@ $commonFlags = @(
     "-pedantic"
 )
 
+function Get-CppObject {
+    param([string]$Source)
+
+    $resolved = (Resolve-Path -LiteralPath $Source).Path
+    if ($objectCache.ContainsKey($resolved)) {
+        return $objectCache[$resolved]
+    }
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($resolved.ToLowerInvariant())
+        $hash = ([System.BitConverter]::ToString($sha256.ComputeHash($bytes))).Replace("-", "").Substring(0, 12)
+    } finally {
+        $sha256.Dispose()
+    }
+    $baseName = [System.IO.Path]::GetFileNameWithoutExtension($resolved) -replace '[^A-Za-z0-9_.-]', '_'
+    $object = Join-Path $objectBuildDir "$baseName-$hash.o"
+    $compilerOutput = @(& $Compiler @commonFlags "-c" $resolved "-o" $object 2>&1)
+    if ($LASTEXITCODE -ne 0) {
+        $compilerOutput | ForEach-Object { Write-Host $_ }
+        throw "Failed to compile C++ source: $resolved"
+    }
+    $compilerOutput | ForEach-Object { Write-Host $_ }
+    $objectCache[$resolved] = $object
+    return $object
+}
+
 function Invoke-CppTest {
     param(
         [string]$Name,
@@ -23,8 +52,8 @@ function Invoke-CppTest {
     )
 
     $exe = Join-Path $testBuildDir "$Name.exe"
-    $compileArgs = $commonFlags + $Sources + @("-o", $exe)
-    & $Compiler @compileArgs
+    $objects = @($Sources | ForEach-Object { Get-CppObject -Source $_ })
+    & $Compiler @objects "-o" $exe
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to compile C++ test: $Name"
     }
@@ -95,6 +124,7 @@ Invoke-CppTest -Name "test_adaptive_boundary" -Sources @(
     (Join-Path $repoRoot "src\core\Grid2D.cpp"),
     (Join-Path $repoRoot "src\core\MultiScaleEvidence.cpp"),
     (Join-Path $repoRoot "src\core\Polygon.cpp"),
+    (Join-Path $repoRoot "src\core\PolygonQualityMetrics.cpp"),
     (Join-Path $repoRoot "src\core\Topology.cpp")
 )
 
@@ -104,12 +134,18 @@ Invoke-CppTest -Name "test_residual_trace" -Sources @(
     (Join-Path $repoRoot "src\core\BinaryMask.cpp"),
     (Join-Path $repoRoot "src\core\BranchAttribution.cpp"),
     (Join-Path $repoRoot "src\core\FaultTracer.cpp"),
+    (Join-Path $repoRoot "src\core\FinalBridgeGate.cpp"),
+    (Join-Path $repoRoot "src\core\TraceOptionAdapters.cpp"),
+    (Join-Path $repoRoot "src\core\TraceOptionsValidation.cpp"),
+    (Join-Path $repoRoot "src\core\TracePostProcessor.cpp"),
     (Join-Path $repoRoot "src\core\Grid2D.cpp"),
     (Join-Path $repoRoot "src\core\GridMetric.cpp"),
     (Join-Path $repoRoot "src\core\LocalPolygonQuality.cpp"),
     (Join-Path $repoRoot "src\core\MultiScaleEvidence.cpp"),
     (Join-Path $repoRoot "src\core\PhysicalMorphology.cpp"),
     (Join-Path $repoRoot "src\core\Polygon.cpp"),
+    (Join-Path $repoRoot "src\core\PolygonQualityMetrics.cpp"),
+    (Join-Path $repoRoot "src\core\PolygonVectorizer.cpp"),
     (Join-Path $repoRoot "src\core\Segmentation.cpp"),
     (Join-Path $repoRoot "src\core\SkeletonGraph.cpp"),
     (Join-Path $repoRoot "src\core\SkeletonGraphV2.cpp"),
@@ -127,6 +163,14 @@ Invoke-CppTest -Name "test_weak_continuity_connector" -Sources @(
     (Join-Path $repoRoot "src\core\Grid2D.cpp"),
     (Join-Path $repoRoot "src\core\SkeletonGraph.cpp"),
     (Join-Path $repoRoot "src\core\WeakContinuityConnector.cpp")
+)
+
+Invoke-CppTest -Name "test_final_bridge_gate" -Sources @(
+    (Join-Path $repoRoot "tests_cpp\test_final_bridge_gate.cpp"),
+    (Join-Path $repoRoot "src\core\BinaryMask.cpp"),
+    (Join-Path $repoRoot "src\core\BranchAttribution.cpp"),
+    (Join-Path $repoRoot "src\core\FinalBridgeGate.cpp"),
+    (Join-Path $repoRoot "src\core\Grid2D.cpp")
 )
 
 Invoke-CppTest -Name "test_weak_tail_restorer" -Sources @(
@@ -156,12 +200,18 @@ Invoke-CppTest -Name "test_weak_path_support_integration" -Sources @(
     (Join-Path $repoRoot "src\core\MultiScaleEvidence.cpp"),
     (Join-Path $repoRoot "src\core\PhysicalMorphology.cpp"),
     (Join-Path $repoRoot "src\core\Polygon.cpp"),
+    (Join-Path $repoRoot "src\core\PolygonQualityMetrics.cpp"),
+    (Join-Path $repoRoot "src\core\PolygonVectorizer.cpp"),
     (Join-Path $repoRoot "src\core\Segmentation.cpp"),
     (Join-Path $repoRoot "src\core\SkeletonGraph.cpp"),
     (Join-Path $repoRoot "src\core\SkeletonGraphV2.cpp"),
     (Join-Path $repoRoot "src\core\SkeletonGraphV2Attribution.cpp"),
     (Join-Path $repoRoot "src\core\Topology.cpp"),
     (Join-Path $repoRoot "src\core\FaultTracer.cpp"),
+    (Join-Path $repoRoot "src\core\FinalBridgeGate.cpp"),
+    (Join-Path $repoRoot "src\core\TraceOptionAdapters.cpp"),
+    (Join-Path $repoRoot "src\core\TraceOptionsValidation.cpp"),
+    (Join-Path $repoRoot "src\core\TracePostProcessor.cpp"),
     (Join-Path $repoRoot "src\core\WeakPathSupport.cpp")
     (Join-Path $repoRoot "src\core\WeakContinuityConnector.cpp")
     (Join-Path $repoRoot "src\core\WeakExtensionGate.cpp")
@@ -182,12 +232,18 @@ Invoke-CppTest -Name "test_local_polygon_quality" -Sources @(
     (Join-Path $repoRoot "src\core\BinaryMask.cpp"),
     (Join-Path $repoRoot "src\core\BranchAttribution.cpp"),
     (Join-Path $repoRoot "src\core\FaultTracer.cpp"),
+    (Join-Path $repoRoot "src\core\FinalBridgeGate.cpp"),
+    (Join-Path $repoRoot "src\core\TraceOptionAdapters.cpp"),
+    (Join-Path $repoRoot "src\core\TraceOptionsValidation.cpp"),
+    (Join-Path $repoRoot "src\core\TracePostProcessor.cpp"),
     (Join-Path $repoRoot "src\core\Grid2D.cpp"),
     (Join-Path $repoRoot "src\core\GridMetric.cpp"),
     (Join-Path $repoRoot "src\core\LocalPolygonQuality.cpp"),
     (Join-Path $repoRoot "src\core\MultiScaleEvidence.cpp"),
     (Join-Path $repoRoot "src\core\PhysicalMorphology.cpp"),
     (Join-Path $repoRoot "src\core\Polygon.cpp"),
+    (Join-Path $repoRoot "src\core\PolygonQualityMetrics.cpp"),
+    (Join-Path $repoRoot "src\core\PolygonVectorizer.cpp"),
     (Join-Path $repoRoot "src\core\Segmentation.cpp"),
     (Join-Path $repoRoot "src\core\SkeletonGraph.cpp"),
     (Join-Path $repoRoot "src\core\SkeletonGraphV2.cpp"),

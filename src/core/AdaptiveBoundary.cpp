@@ -1,11 +1,14 @@
 #include "AdaptiveBoundary.h"
 
+#include "PolygonQualityMetrics.h"
 #include "Topology.h"
 
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <numeric>
 #include <stdexcept>
+#include <unordered_map>
 
 namespace fpt {
 namespace {
@@ -21,35 +24,6 @@ double signedArea(const std::vector<Point>& ring) {
         sum += a.x * b.y - b.x * a.y;
     }
     return 0.5 * sum;
-}
-
-bool pointInRing(const Point& point, const std::vector<Point>& ring) {
-    if (ring.size() < 3) {
-        return false;
-    }
-    bool inside = false;
-    for (std::size_t i = 0, j = ring.size() - 1; i < ring.size(); j = i++) {
-        const Point& a = ring[i];
-        const Point& b = ring[j];
-        if (((a.y > point.y) != (b.y > point.y)) &&
-            point.x < (b.x - a.x) * (point.y - a.y) /
-                ((b.y - a.y) + 1e-30) + a.x) {
-            inside = !inside;
-        }
-    }
-    return inside;
-}
-
-bool pointInPolygon(const Point& point, const Polygon& polygon) {
-    if (!pointInRing(point, polygon.points)) {
-        return false;
-    }
-    for (const std::vector<Point>& hole : polygon.holes) {
-        if (pointInRing(point, hole)) {
-            return false;
-        }
-    }
-    return true;
 }
 
 bool supportedAtWorld(
@@ -105,68 +79,6 @@ double boundaryTransitionScore(
     return samples > 0 ? score / static_cast<double>(samples) : 0.0;
 }
 
-struct RasterStats {
-    int inside = 0;
-    int supported = 0;
-    int background = 0;
-    std::size_t evaluated = 0;
-    bool budgetExceeded = false;
-};
-
-RasterStats rasterStats(
-    const Grid2D& grid,
-    const BinaryMask& supportMask,
-    const Polygon& polygon,
-    double threshold,
-    std::size_t budget) {
-    RasterStats result;
-    if (polygon.points.size() < 3 || budget == 0) {
-        return result;
-    }
-    double minX = polygon.points.front().x;
-    double maxX = minX;
-    double minY = polygon.points.front().y;
-    double maxY = minY;
-    for (const Point& point : polygon.points) {
-        minX = std::min(minX, point.x);
-        maxX = std::max(maxX, point.x);
-        minY = std::min(minY, point.y);
-        maxY = std::max(maxY, point.y);
-    }
-    const int firstX = std::max(0, static_cast<int>(std::floor(
-        (minX - grid.sx()) / grid.dx())) - 1);
-    const int lastX = std::min(grid.nx() - 1, static_cast<int>(std::ceil(
-        (maxX - grid.sx()) / grid.dx())) + 1);
-    const int firstY = std::max(0, static_cast<int>(std::floor(
-        (minY - grid.sy()) / grid.dy())) - 1);
-    const int lastY = std::min(grid.ny() - 1, static_cast<int>(std::ceil(
-        (maxY - grid.sy()) / grid.dy())) + 1);
-    for (int y = firstY; y <= lastY; ++y) {
-        for (int x = firstX; x <= lastX; ++x) {
-            if (result.evaluated >= budget) {
-                result.budgetExceeded = true;
-                return result;
-            }
-            ++result.evaluated;
-            const Point center{
-                grid.worldX(static_cast<double>(x) + 0.5),
-                grid.worldY(static_cast<double>(y) + 0.5)};
-            if (!pointInPolygon(center, polygon)) {
-                continue;
-            }
-            ++result.inside;
-            const double value = grid.value(x, y);
-            if (std::isfinite(value) && supportMask.get(x, y) &&
-                value >= threshold) {
-                ++result.supported;
-            } else {
-                ++result.background;
-            }
-        }
-    }
-    return result;
-}
-
 struct EvidenceConfidenceIndex {
     int width = 0;
     int height = 0;
@@ -218,12 +130,16 @@ AdaptiveBoundaryEvidence evaluateOne(
     const Polygon& polygon,
     const std::vector<Polygon>& allPolygons,
     const EvidenceConfidenceIndex& auxiliaryEvidence,
-    const AdaptiveBoundaryOptions& options) {
+    const AdaptiveBoundaryOptions& options,
+    const BinaryMask* weakSupportMask) {
     AdaptiveBoundaryEvidence evidence;
     evidence.polygonId = polygon.id;
     evidence.candidate = polygon;
-    evidence.originalArea = std::abs(signedArea(polygon.points));
+    Polygon originalGeometry = polygon;
+    refreshPolygonGeometry(originalGeometry);
+    evidence.originalArea = originalGeometry.area;
     evidence.candidateArea = evidence.originalArea;
+    evidence.originalRoughness = polygonBoundaryRoughness(polygon);
     if (polygon.points.size() < 3) {
         evidence.decision = AdaptiveBoundaryDecision::Rejected;
         evidence.reason = "ring_too_short";
@@ -326,7 +242,17 @@ AdaptiveBoundaryEvidence evaluateOne(
             static_cast<double>(scoreGainCount);
     }
     evidence.candidateChanged = evidence.movedVertices > 0;
-    evidence.candidateArea = std::abs(signedArea(evidence.candidate.points));
+    refreshPolygonGeometry(evidence.candidate);
+    evidence.candidateArea = evidence.candidate.area;
+    evidence.candidateRoughness =
+        polygonBoundaryRoughness(evidence.candidate);
+    if (evidence.originalRoughness > 1e-18) {
+        evidence.roughnessChangeRatio =
+            (evidence.candidateRoughness - evidence.originalRoughness) /
+            evidence.originalRoughness;
+    } else if (evidence.candidateRoughness > 1e-18) {
+        evidence.roughnessChangeRatio = 1.0;
+    }
     for (const Point& point : evidence.candidate.points) {
         evidence.candidateFinite = evidence.candidateFinite &&
             std::isfinite(point.x) && std::isfinite(point.y);
@@ -363,13 +289,24 @@ AdaptiveBoundaryEvidence evaluateOne(
         evidence.reason = "topology_conflict";
         return evidence;
     }
-    const RasterStats original = rasterStats(
-        grid, supportMask, polygon, options.supportThreshold,
-        options.maximumRasterCellsPerPolygon);
-    const RasterStats candidate = rasterStats(
-        grid, supportMask, evidence.candidate, options.supportThreshold,
-        options.maximumRasterCellsPerPolygon);
-    evidence.rasterCellsEvaluated = original.evaluated + candidate.evaluated;
+    const BinaryMask& weakMask = weakSupportMask
+        ? *weakSupportMask
+        : supportMask;
+    const double weakThreshold = options.weakSupportThreshold > 0.0
+        ? options.weakSupportThreshold
+        : options.supportThreshold;
+    const PolygonDualSupportQuality original =
+        measurePolygonDualSupportQuality(
+            grid, supportMask, weakMask, polygon,
+            options.supportThreshold, weakThreshold,
+            options.maximumRasterCellsPerPolygon);
+    const PolygonDualSupportQuality candidate =
+        measurePolygonDualSupportQuality(
+            grid, supportMask, weakMask, evidence.candidate,
+            options.supportThreshold, weakThreshold,
+            options.maximumRasterCellsPerPolygon);
+    evidence.rasterCellsEvaluated =
+        original.evaluatedCells + candidate.evaluatedCells;
     evidence.rasterBudgetExceeded =
         original.budgetExceeded || candidate.budgetExceeded;
     if (evidence.rasterBudgetExceeded) {
@@ -377,16 +314,34 @@ AdaptiveBoundaryEvidence evaluateOne(
         evidence.reason = "raster_budget";
         return evidence;
     }
-    if (original.inside > 0) {
-        evidence.supportGainRatio = static_cast<double>(candidate.supported - original.supported) /
-            static_cast<double>(std::max(1, original.supported));
-        evidence.supportLossRatio = static_cast<double>(std::max(0, original.supported - candidate.supported)) /
-            static_cast<double>(original.supported > 0 ? original.supported : 1);
+    if (original.insideCells > 0) {
+        evidence.supportGainRatio = static_cast<double>(
+            candidate.strongSupportedCells - original.strongSupportedCells) /
+            static_cast<double>(std::max(1, original.strongSupportedCells));
+        evidence.supportLossRatio = static_cast<double>(std::max(
+            0,
+            original.strongSupportedCells -
+                candidate.strongSupportedCells)) /
+            static_cast<double>(
+                original.strongSupportedCells > 0
+                    ? original.strongSupportedCells
+                    : 1);
     }
-    if (candidate.inside > 0) {
+    if (candidate.insideCells > 0) {
         evidence.backgroundLeakageIncreaseRatio = static_cast<double>(
-            std::max(0, candidate.background - original.background)) /
-            static_cast<double>(candidate.inside);
+            std::max(
+                0,
+                candidate.backgroundCells - original.backgroundCells)) /
+            static_cast<double>(candidate.insideCells);
+    }
+    if (original.weakSupportedCells > 0) {
+        evidence.weakSupportGainRatio = static_cast<double>(
+            candidate.weakSupportedCells - original.weakSupportedCells) /
+            static_cast<double>(original.weakSupportedCells);
+        evidence.weakSupportLossRatio = static_cast<double>(std::max(
+            0,
+            original.weakSupportedCells - candidate.weakSupportedCells)) /
+            static_cast<double>(original.weakSupportedCells);
     }
     if (evidence.areaChangeRatio > options.maximumAreaChangeRatio) {
         evidence.decision = AdaptiveBoundaryDecision::Rejected;
@@ -394,10 +349,18 @@ AdaptiveBoundaryEvidence evaluateOne(
     } else if (evidence.supportLossRatio > options.maximumSupportLossRatio) {
         evidence.decision = AdaptiveBoundaryDecision::Rejected;
         evidence.reason = "support_loss";
+    } else if (evidence.weakSupportLossRatio >
+               options.maximumWeakSupportLossRatio) {
+        evidence.decision = AdaptiveBoundaryDecision::Rejected;
+        evidence.reason = "weak_support_loss";
     } else if (evidence.backgroundLeakageIncreaseRatio >
                options.maximumBackgroundLeakageIncreaseRatio) {
         evidence.decision = AdaptiveBoundaryDecision::Rejected;
         evidence.reason = "background_leakage";
+    } else if (evidence.roughnessChangeRatio >
+               options.maximumRoughnessIncreaseRatio) {
+        evidence.decision = AdaptiveBoundaryDecision::Rejected;
+        evidence.reason = "roughness_increase";
     } else if (evidence.boundaryScoreGain > options.minimumSupportGain) {
         evidence.decision = AdaptiveBoundaryDecision::AcceptedCandidate;
         evidence.reason = "bounded_transition_gain";
@@ -415,16 +378,24 @@ void validateAdaptiveBoundaryOptions(const AdaptiveBoundaryOptions& options) {
         options.maximumDisplacementWorld < 0.0 ||
         !std::isfinite(options.searchStepWorld) || options.searchStepWorld < 0.0 ||
         !std::isfinite(options.supportThreshold) ||
+        !std::isfinite(options.weakSupportThreshold) ||
+        options.weakSupportThreshold < 0.0 ||
         !std::isfinite(options.minimumSupportGain) ||
         options.minimumSupportGain < 0.0 || options.minimumSupportGain > 1.0 ||
         !std::isfinite(options.maximumSupportLossRatio) ||
         options.maximumSupportLossRatio < 0.0 || options.maximumSupportLossRatio > 1.0 ||
+        !std::isfinite(options.maximumWeakSupportLossRatio) ||
+        options.maximumWeakSupportLossRatio < 0.0 ||
+        options.maximumWeakSupportLossRatio > 1.0 ||
         !std::isfinite(options.maximumBackgroundLeakageIncreaseRatio) ||
         options.maximumBackgroundLeakageIncreaseRatio < 0.0 ||
         options.maximumBackgroundLeakageIncreaseRatio > 1.0 ||
         !std::isfinite(options.maximumAreaChangeRatio) ||
         options.maximumAreaChangeRatio < 0.0 ||
         options.maximumAreaChangeRatio > 1.0 ||
+        !std::isfinite(options.maximumRoughnessIncreaseRatio) ||
+        options.maximumRoughnessIncreaseRatio < 0.0 ||
+        options.maximumRoughnessIncreaseRatio > 1.0 ||
         !std::isfinite(options.offsetRegularization) ||
         options.offsetRegularization < 0.0 ||
         options.offsetRegularization > 1.0) {
@@ -441,10 +412,17 @@ AdaptiveBoundaryResult evaluateAdaptiveBoundaries(
     const BinaryMask& supportMask,
     const std::vector<Polygon>& polygons,
     const MultiScaleEvidenceResult* auxiliaryEvidence,
-    const AdaptiveBoundaryOptions& options) {
+    const AdaptiveBoundaryOptions& options,
+    const BinaryMask* weakSupportMask) {
     validateAdaptiveBoundaryOptions(options);
     if (supportMask.width() != grid.nx() || supportMask.height() != grid.ny()) {
         throw std::runtime_error("Adaptive boundary support mask dimensions must match the grid.");
+    }
+    if (weakSupportMask &&
+        (weakSupportMask->width() != grid.nx() ||
+         weakSupportMask->height() != grid.ny())) {
+        throw std::runtime_error(
+            "Adaptive boundary weak-support mask dimensions must match the grid.");
     }
     AdaptiveBoundaryResult result;
     const EvidenceConfidenceIndex evidenceIndex = buildEvidenceConfidenceIndex(
@@ -464,18 +442,20 @@ AdaptiveBoundaryResult evaluateAdaptiveBoundaries(
     }
     result.evidence.reserve(keptIndices.size());
     double gainSum = 0.0;
+    double weakGainSum = 0.0;
     double boundaryGainSum = 0.0;
     double leakageSum = 0.0;
     for (const std::size_t index : keptIndices) {
         AdaptiveBoundaryEvidence evidence = evaluateOne(
             grid, supportMask, polygons[index], polygons,
-            evidenceIndex, options);
+            evidenceIndex, options, weakSupportMask);
         ++result.summary.polygonsEvaluated;
         result.summary.movedVertices += evidence.movedVertices;
         result.summary.maximumDisplacementWorld = std::max(
             result.summary.maximumDisplacementWorld,
             evidence.maximumDisplacementWorld);
         gainSum += evidence.supportGainRatio;
+        weakGainSum += evidence.weakSupportGainRatio;
         boundaryGainSum += evidence.boundaryScoreGain;
         leakageSum += evidence.backgroundLeakageIncreaseRatio;
         result.summary.rasterCellsEvaluated += evidence.rasterCellsEvaluated;
@@ -501,10 +481,80 @@ AdaptiveBoundaryResult evaluateAdaptiveBoundaries(
     if (result.summary.polygonsEvaluated > 0) {
         result.summary.meanSupportGainRatio = gainSum /
             static_cast<double>(result.summary.polygonsEvaluated);
+        result.summary.meanWeakSupportGainRatio = weakGainSum /
+            static_cast<double>(result.summary.polygonsEvaluated);
         result.summary.meanBoundaryScoreGain = boundaryGainSum /
             static_cast<double>(result.summary.polygonsEvaluated);
         result.summary.meanBackgroundLeakageIncreaseRatio = leakageSum /
             static_cast<double>(result.summary.polygonsEvaluated);
+    }
+    return result;
+}
+
+AdaptiveBoundaryCommitResult commitAdaptiveBoundaryCandidates(
+    const std::vector<Polygon>& polygons,
+    const std::vector<AdaptiveBoundaryEvidence>& evidence) {
+    AdaptiveBoundaryCommitResult result;
+    result.polygons = polygons;
+
+    std::unordered_map<int, std::size_t> indexById;
+    indexById.reserve(result.polygons.size());
+    for (std::size_t index = 0; index < result.polygons.size(); ++index) {
+        indexById.emplace(result.polygons[index].id, index);
+    }
+
+    std::vector<std::size_t> order;
+    order.reserve(evidence.size());
+    for (std::size_t index = 0; index < evidence.size(); ++index) {
+        if (evidence[index].decision ==
+            AdaptiveBoundaryDecision::AcceptedCandidate) {
+            order.push_back(index);
+        }
+    }
+    std::stable_sort(
+        order.begin(),
+        order.end(),
+        [&](std::size_t left, std::size_t right) {
+            const AdaptiveBoundaryEvidence& first = evidence[left];
+            const AdaptiveBoundaryEvidence& second = evidence[right];
+            if (std::abs(first.boundaryScoreGain -
+                         second.boundaryScoreGain) > 1e-12) {
+                return first.boundaryScoreGain > second.boundaryScoreGain;
+            }
+            if (std::abs(first.roughnessChangeRatio -
+                         second.roughnessChangeRatio) > 1e-12) {
+                return first.roughnessChangeRatio <
+                    second.roughnessChangeRatio;
+            }
+            return first.polygonId < second.polygonId;
+        });
+
+    for (const std::size_t evidenceIndex : order) {
+        ++result.summary.attemptedCandidates;
+        const AdaptiveBoundaryEvidence& candidateEvidence =
+            evidence[evidenceIndex];
+        const auto found = indexById.find(candidateEvidence.polygonId);
+        if (found == indexById.end()) {
+            ++result.summary.missingPolygonCandidates;
+            continue;
+        }
+        Polygon candidate = candidateEvidence.candidate;
+        candidate.kept = result.polygons[found->second].kept;
+        refreshPolygonGeometry(candidate);
+        if (polygonHasTopologyConflict(candidate, result.polygons, true)) {
+            ++result.summary.globalConflictRejectedCandidates;
+            continue;
+        }
+        result.polygons[found->second] = std::move(candidate);
+        ++result.summary.committedCandidates;
+    }
+
+    const TopologyDiagnostics topology =
+        diagnoseTopology(result.polygons, true);
+    if (!topologyIsValid(topology)) {
+        result.polygons = polygons;
+        result.summary.committedCandidates = 0;
+        result.summary.batchRolledBack = true;
     }
     return result;
 }

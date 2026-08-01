@@ -24,15 +24,23 @@ struct Pixel {
     }
 };
 
-std::vector<Pixel> neighbors8(const BinaryMask& mask, int x, int y) {
-    std::vector<Pixel> out;
+struct NeighborPixels {
+    Pixel values[8];
+    int count = 0;
+
+    const Pixel* begin() const { return values; }
+    const Pixel* end() const { return values + count; }
+};
+
+NeighborPixels neighbors8(const BinaryMask& mask, int x, int y) {
+    NeighborPixels out;
     for (int yy = y - 1; yy <= y + 1; ++yy) {
         for (int xx = x - 1; xx <= x + 1; ++xx) {
             if (xx == x && yy == y) {
                 continue;
             }
             if (mask.get(xx, yy)) {
-                out.push_back({xx, yy});
+                out.values[out.count++] = {xx, yy};
             }
         }
     }
@@ -99,31 +107,66 @@ void drawLine(BinaryMask& mask, const SkeletonPoint& a, const SkeletonPoint& b) 
 
 SkeletonGraph buildSkeletonGraph(const BinaryMask& skeleton) {
     SkeletonGraph graph;
-    std::set<Pixel> nodes;
+    const int width = skeleton.width();
+    const int height = skeleton.height();
+    auto position = [width](int x, int y) {
+        return static_cast<std::size_t>(y * width + x);
+    };
+    std::vector<unsigned char> nodeTypes(
+        static_cast<std::size_t>(width * height), 0);
+    std::vector<Pixel> nodes;
 
-    for (int y = 0; y < skeleton.height(); ++y) {
-        for (int x = 0; x < skeleton.width(); ++x) {
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
             if (!skeleton.get(x, y)) {
                 continue;
             }
-            const int degree = static_cast<int>(neighbors8(skeleton, x, y).size());
+            const int degree = neighbors8(skeleton, x, y).count;
             if (degree == 1) {
                 graph.endpoints.push_back({x, y});
-                nodes.insert({x, y});
+                nodeTypes[position(x, y)] = 1;
+                nodes.push_back({x, y});
             } else if (degree != 2) {
                 graph.junctions.push_back({x, y});
-                nodes.insert({x, y});
+                nodeTypes[position(x, y)] = 2;
+                nodes.push_back({x, y});
             }
         }
     }
+    std::sort(nodes.begin(), nodes.end());
 
-    std::set<std::pair<Pixel, Pixel>> visitedEdges;
+    std::vector<unsigned char> visitedEdges(
+        static_cast<std::size_t>(width * height), 0);
+    auto directionIndex = [](const Pixel& a, const Pixel& b) {
+        int index = 0;
+        for (int yy = -1; yy <= 1; ++yy) {
+            for (int xx = -1; xx <= 1; ++xx) {
+                if (xx == 0 && yy == 0) {
+                    continue;
+                }
+                if (a.x + xx == b.x && a.y + yy == b.y) {
+                    return index;
+                }
+                ++index;
+            }
+        }
+        return -1;
+    };
     auto markVisited = [&](const Pixel& a, const Pixel& b) {
-        visitedEdges.insert({a, b});
-        visitedEdges.insert({b, a});
+        const int direction = directionIndex(a, b);
+        if (direction < 0) {
+            return;
+        }
+        visitedEdges[position(a.x, a.y)] |=
+            static_cast<unsigned char>(1U << direction);
+        visitedEdges[position(b.x, b.y)] |=
+            static_cast<unsigned char>(1U << (7 - direction));
     };
     auto wasVisited = [&](const Pixel& a, const Pixel& b) {
-        return visitedEdges.find({a, b}) != visitedEdges.end();
+        const int direction = directionIndex(a, b);
+        return direction >= 0 &&
+            (visitedEdges[position(a.x, a.y)] &
+             static_cast<unsigned char>(1U << direction)) != 0;
     };
 
     int nextBranchId = 1;
@@ -135,9 +178,7 @@ SkeletonGraph buildSkeletonGraph(const BinaryMask& skeleton) {
 
             SkeletonBranch branch;
             branch.id = nextBranchId++;
-            branch.startIsJunction = std::find_if(graph.junctions.begin(), graph.junctions.end(), [&](const SkeletonPoint& p) {
-                return p.x == node.x && p.y == node.y;
-            }) != graph.junctions.end();
+            branch.startIsJunction = nodeTypes[position(node.x, node.y)] == 2;
             branch.points.push_back(toPoint(node));
 
             Pixel previous = node;
@@ -146,28 +187,31 @@ SkeletonGraph buildSkeletonGraph(const BinaryMask& skeleton) {
 
             while (true) {
                 branch.points.push_back(toPoint(current));
-                if (nodes.find(current) != nodes.end()) {
-                    branch.endIsJunction = std::find_if(graph.junctions.begin(), graph.junctions.end(), [&](const SkeletonPoint& p) {
-                        return p.x == current.x && p.y == current.y;
-                    }) != graph.junctions.end();
+                const unsigned char currentNodeType =
+                    nodeTypes[position(current.x, current.y)];
+                if (currentNodeType != 0) {
+                    branch.endIsJunction = currentNodeType == 2;
                     break;
                 }
 
-                std::vector<Pixel> nextCandidates = neighbors8(skeleton, current.x, current.y);
-                nextCandidates.erase(std::remove(nextCandidates.begin(), nextCandidates.end(), previous), nextCandidates.end());
-                if (nextCandidates.empty()) {
-                    break;
-                }
-
-                Pixel next = nextCandidates.front();
+                const NeighborPixels nextCandidates =
+                    neighbors8(skeleton, current.x, current.y);
+                Pixel next;
+                bool hasNext = false;
                 for (const Pixel& candidate : nextCandidates) {
+                    if (candidate == previous) {
+                        continue;
+                    }
+                    if (!hasNext) {
+                        next = candidate;
+                        hasNext = true;
+                    }
                     if (!wasVisited(current, candidate)) {
                         next = candidate;
                         break;
                     }
                 }
-
-                if (wasVisited(current, next)) {
+                if (!hasNext || wasVisited(current, next)) {
                     break;
                 }
                 previous = current;
@@ -183,27 +227,37 @@ SkeletonGraph buildSkeletonGraph(const BinaryMask& skeleton) {
 
     // Closed loops have no endpoints or junctions. Preserve them as one branch.
     if (nodes.empty()) {
-        std::set<Pixel> visited;
-        for (int y = 0; y < skeleton.height(); ++y) {
-            for (int x = 0; x < skeleton.width(); ++x) {
+        std::vector<unsigned char> visited(
+            static_cast<std::size_t>(width * height), 0);
+        for (int y = 0; y < height; ++y) {
+            for (int x = 0; x < width; ++x) {
                 Pixel start{x, y};
-                if (!skeleton.get(x, y) || visited.find(start) != visited.end()) {
+                if (!skeleton.get(x, y) || visited[position(x, y)] != 0) {
                     continue;
                 }
                 SkeletonBranch branch;
                 branch.id = nextBranchId++;
                 Pixel previous{-999999, -999999};
                 Pixel current = start;
-                while (visited.find(current) == visited.end()) {
-                    visited.insert(current);
+                while (visited[position(current.x, current.y)] == 0) {
+                    visited[position(current.x, current.y)] = 1;
                     branch.points.push_back(toPoint(current));
-                    std::vector<Pixel> candidates = neighbors8(skeleton, current.x, current.y);
-                    candidates.erase(std::remove(candidates.begin(), candidates.end(), previous), candidates.end());
-                    if (candidates.empty()) {
+                    const NeighborPixels candidates =
+                        neighbors8(skeleton, current.x, current.y);
+                    Pixel next;
+                    bool hasNext = false;
+                    for (const Pixel& candidate : candidates) {
+                        if (!(candidate == previous)) {
+                            next = candidate;
+                            hasNext = true;
+                            break;
+                        }
+                    }
+                    if (!hasNext) {
                         break;
                     }
                     previous = current;
-                    current = candidates.front();
+                    current = next;
                 }
                 if (branch.points.size() >= 2) {
                     graph.branches.push_back(std::move(branch));

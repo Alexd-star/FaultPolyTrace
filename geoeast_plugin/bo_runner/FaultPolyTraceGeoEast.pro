@@ -45,6 +45,10 @@ SOURCES += \
     ../../src/core/BinaryMask.cpp \
     ../../src/core/BranchAttribution.cpp \
     ../../src/core/FaultTracer.cpp \
+    ../../src/core/FinalBridgeGate.cpp \
+    ../../src/core/TraceOptionAdapters.cpp \
+    ../../src/core/TraceOptionsValidation.cpp \
+    ../../src/core/TracePostProcessor.cpp \
     ../../src/core/LocalPolygonQuality.cpp \
     ../../src/core/MultiScaleEvidence.cpp \
     ../../src/core/WeakPathSupport.cpp \
@@ -54,6 +58,8 @@ SOURCES += \
     ../../src/core/Grid2D.cpp \
     ../../src/core/GridMetric.cpp \
     ../../src/core/PhysicalMorphology.cpp \
+    ../../src/core/PolygonVectorizer.cpp \
+    ../../src/core/PolygonQualityMetrics.cpp \
     ../../src/io/AsciiGridIO.cpp \
     ../../src/io/DiagnosticsIO.cpp \
     ../../src/core/Polygon.cpp \
@@ -70,6 +76,12 @@ HEADERS += \
     ../../src/core/BinaryMask.h \
     ../../src/core/BranchAttribution.h \
     ../../src/core/FaultTracer.h \
+    ../../src/core/FinalBridgeGate.h \
+    ../../src/core/TraceOptionAdapters.h \
+    ../../src/core/TraceOptions.h \
+    ../../src/core/TraceOptionsValidation.h \
+    ../../src/core/TracePostProcessor.h \
+    ../../src/core/TraceResult.h \
     ../../src/core/LocalPolygonQuality.h \
     ../../src/core/MultiScaleEvidence.h \
     ../../src/core/WeakPathSupport.h \
@@ -79,6 +91,8 @@ HEADERS += \
     ../../src/core/Grid2D.h \
     ../../src/core/GridMetric.h \
     ../../src/core/PhysicalMorphology.h \
+    ../../src/core/PolygonVectorizer.h \
+    ../../src/core/PolygonQualityMetrics.h \
     ../../src/io/AsciiGridIO.h \
     ../../src/io/DiagnosticsIO.h \
     ../../src/core/Polygon.h \

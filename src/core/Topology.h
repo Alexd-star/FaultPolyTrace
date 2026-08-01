@@ -29,6 +29,10 @@ struct TopologyDiagnostics {
     int nestedHoleCount = 0;
     int polygonContainmentCount = 0;
     int polygonInteriorOverlapCount = 0;
+    double ringValidationMs = 0.0;
+    double selfIntersectionMs = 0.0;
+    double holeValidationMs = 0.0;
+    double pairConflictMs = 0.0;
     std::vector<int> openRingPolygonIds;
     std::vector<int> selfIntersectingPolygonIds;
     std::vector<int> invalidPolygonIds;

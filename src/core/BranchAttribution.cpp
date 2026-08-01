@@ -1,6 +1,7 @@
 #include "BranchAttribution.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <cmath>
 #include <functional>
 #include <limits>
@@ -270,6 +271,12 @@ public:
 private:
     std::vector<int> parent_;
 };
+
+std::uint64_t gridPointKey(int x, int y) {
+    return
+        (static_cast<std::uint64_t>(static_cast<std::uint32_t>(x)) << 32U) |
+        static_cast<std::uint32_t>(y);
+}
 
 class LegacyDisjointSet {
 public:
@@ -1186,23 +1193,30 @@ BranchAttributionSummary analyzeBranchAttribution(
         return summary;
     }
     DisjointSet clusters(static_cast<int>(rawEnds.size()));
-    for (std::size_t first = 0; first < rawEnds.size(); ++first) {
-        for (std::size_t second = first + 1;
-             second < rawEnds.size();
-             ++second) {
-            const int dx = std::abs(
-                rawEnds[first].junction.x -
-                rawEnds[second].junction.x);
-            const int dy = std::abs(
-                rawEnds[first].junction.y -
-                rawEnds[second].junction.y);
-            if (std::max(dx, dy) <=
-                options.junctionClusterRadius) {
-                clusters.unite(
-                    static_cast<int>(first),
-                    static_cast<int>(second));
+    std::unordered_map<std::uint64_t, std::vector<std::size_t>>
+        endsByJunctionPoint;
+    endsByJunctionPoint.reserve(rawEnds.size() * 2);
+    for (std::size_t second = 0; second < rawEnds.size(); ++second) {
+        const SkeletonPoint& point = rawEnds[second].junction;
+        for (int oy = -options.junctionClusterRadius;
+             oy <= options.junctionClusterRadius;
+             ++oy) {
+            for (int ox = -options.junctionClusterRadius;
+                 ox <= options.junctionClusterRadius;
+                 ++ox) {
+                const auto nearby = endsByJunctionPoint.find(
+                    gridPointKey(point.x + ox, point.y + oy));
+                if (nearby == endsByJunctionPoint.end()) {
+                    continue;
+                }
+                for (const std::size_t first : nearby->second) {
+                    clusters.unite(
+                        static_cast<int>(first),
+                        static_cast<int>(second));
+                }
             }
         }
+        endsByJunctionPoint[gridPointKey(point.x, point.y)].push_back(second);
     }
 
     std::vector<std::vector<std::size_t>> grouped;

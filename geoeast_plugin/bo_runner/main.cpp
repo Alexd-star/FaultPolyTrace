@@ -182,6 +182,7 @@ void printUsage() {
         << "  --skeleton-graph-v2-attribution-shadow | --no-skeleton-graph-v2-attribution-shadow\n"
         << "  --multi-scale-evidence-shadow | --no-multi-scale-evidence-shadow\n"
         << "  --adaptive-boundary-shadow | --no-adaptive-boundary-shadow\n"
+        << "  --adaptive-boundary-apply | --no-adaptive-boundary-apply\n"
         << "  --local-polygon-quality | --no-local-polygon-quality\n"
         << "  --belt-radius <count>\n"
         << "  --post-belt-close-radius <count>\n"
@@ -500,40 +501,14 @@ Options parseArgs(int argc, char** argv) {
     options.outputName = "FaultPolyTrace_Result";
     options.trace.traceMode = fpt::TraceMode::RidgeBelt;
     options.trace.thresholdMode = fpt::ThresholdMode::Percentile;
-    options.trace.percentile = 0.98;
-    options.trace.closeRadius = 1;
-    options.trace.weakPercentile = 0.965;
-    options.trace.weakConnectRadius = 1;
     options.trace.maxWeakComponentCells = 20000;
     options.trace.minWeakComponentAspect = 3.0;
-    options.trace.beltRadius = 3;
-    options.trace.postBeltCloseRadius = 1;
-    options.trace.attributeConstrainedBelt = true;
-    options.trace.attributeEnvelopeRadius = 1;
-    options.trace.minBranchLength = 4;
-    options.trace.minJunctionBranchLength = 2;
-    options.trace.minJunctionBranchMean = 0.94;
-    options.trace.maxGapDistance = 12;
-    options.trace.maxGapAngle = 55.0;
-    options.trace.minGapSupportRatio = 0.25;
     options.trace.weakContinuity = false;
     options.trace.weakContinuitySecondPass = false;
     options.trace.weakContinuityFinalObjectPass = true;
     options.trace.weakTailCompletion = true;
     options.trace.preserveObservedSkeletonEnvelope = true;
-    options.trace.rootAntiMerge = true;
     options.trace.residualAttributeFill = true;
-    options.trace.residualTrace = false;
-    options.trace.residualPercentile = 0.955;
-    options.trace.residualFillRadius = 4;
-    options.trace.residualEdgeFillRadius = 2;
-    options.trace.residualMinCells = 2;
-    options.trace.residualTraceMinLength = 6;
-    options.trace.residualTraceMaxCells = 80;
-    options.trace.residualCoveredGuardRadius = 0;
-    options.trace.minArea = 120.0;
-    options.trace.simplifyTolerance = 2.0;
-    options.trace.smoothIterations = 1;
 
     if (argc == 1) {
         throw std::runtime_error("No command-line arguments supplied. Use --help to view GeoEast runner usage.");
@@ -686,6 +661,10 @@ Options parseArgs(int argc, char** argv) {
             options.trace.adaptiveBoundaryShadow = true;
         } else if (arg == "--no-adaptive-boundary-shadow") {
             options.trace.adaptiveBoundaryShadow = false;
+        } else if (arg == "--adaptive-boundary-apply") {
+            options.trace.adaptiveBoundaryApply = true;
+        } else if (arg == "--no-adaptive-boundary-apply") {
+            options.trace.adaptiveBoundaryApply = false;
         } else if (arg == "--adaptive-boundary-max-displacement") {
             options.trace.adaptiveBoundaryMaximumDisplacementWorld =
                 std::stod(requireValue(arg));
@@ -1594,6 +1573,8 @@ int main(int argc, char** argv) {
                 options.trace.multiScaleEvidenceMaximumSamples;
             diagnostics.adaptiveBoundaryShadow =
                 options.trace.adaptiveBoundaryShadow;
+            diagnostics.adaptiveBoundaryApply =
+                options.trace.adaptiveBoundaryApply;
             diagnostics.adaptiveBoundaryMaximumDisplacementWorld =
                 options.trace.adaptiveBoundaryMaximumDisplacementWorld;
             diagnostics.adaptiveBoundaryMinimumSupportGain =
@@ -1800,8 +1781,12 @@ int main(int argc, char** argv) {
                 result.multiScaleEvidenceSummary;
             diagnostics.adaptiveBoundaryShadowEvaluated =
                 result.adaptiveBoundaryShadowEvaluated;
+            diagnostics.adaptiveBoundaryApplied =
+                result.adaptiveBoundaryApplied;
             diagnostics.adaptiveBoundarySummary =
                 result.adaptiveBoundarySummary;
+            diagnostics.adaptiveBoundaryCommitSummary =
+                result.adaptiveBoundaryCommitSummary;
             diagnostics.adaptiveBoundaryEvidence =
                 result.adaptiveBoundaryEvidence;
             diagnostics.keptBranches = result.keptBranches;
@@ -1908,8 +1893,13 @@ int main(int argc, char** argv) {
             diagnostics.nestedHoleCount = topology.nestedHoleCount;
             diagnostics.polygonContainmentCount = topology.polygonContainmentCount;
             diagnostics.polygonInteriorOverlapCount = topology.polygonInteriorOverlapCount;
+            diagnostics.topologyRingValidationMs = topology.ringValidationMs;
+            diagnostics.topologySelfIntersectionMs = topology.selfIntersectionMs;
+            diagnostics.topologyHoleValidationMs = topology.holeValidationMs;
+            diagnostics.topologyPairConflictMs = topology.pairConflictMs;
             diagnostics.elapsedMs = static_cast<int>(std::min<long long>(
                 elapsedMs, std::numeric_limits<int>::max()));
+            diagnostics.traceStages = result.stageTimings;
             fpt::writeDiagnosticsJson(options.diagnosticsOutputPath, diagnostics);
         }
 

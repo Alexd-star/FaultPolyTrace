@@ -9,36 +9,20 @@ $exe = Join-Path $repoRoot "build\faultpolytrace.exe"
 if (!(Test-Path -LiteralPath $OfficialDat)) { throw "Official test data not found: $OfficialDat" }
 if (!(Test-Path -LiteralPath $exe)) { throw "FaultPolyTrace CLI not found: $exe" }
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
-    $OutputRoot = Join-Path $repoRoot "outputs\development_20260730\adaptive_boundary_promotion"
+    $OutputRoot = Join-Path $repoRoot "outputs\development\adaptive_boundary_promotion"
 }
 New-Item -ItemType Directory -Force -Path $OutputRoot | Out-Null
 
 $common = @(
-    "--input", $OfficialDat, "--input-format", "geoeast-dat",
-    "--trace-mode", "ridge-belt", "--threshold-mode", "percentile", "--percentile", "0.98",
-    "--close-radius", "1", "--weak-percentile", "0.965", "--weak-connect-radius", "1",
-    "--max-weak-component-cells", "20000", "--min-weak-component-aspect", "3",
-    "--belt-radius", "3", "--attribute-constrained-belt", "--attribute-envelope-radius", "1",
-    "--post-belt-close-radius", "1", "--min-branch-length", "4",
-    "--min-junction-branch-length", "2", "--min-junction-branch-mean", "0.94",
-    "--max-gap-distance", "12", "--max-gap-angle", "55", "--min-gap-support-ratio", "0.25",
-    "--no-separate-branch-belts", "--root-anti-merge",
-    "--root-anti-merge-support-ratio", "0.25", "--root-anti-merge-min-part-cells", "0",
-    "--root-anti-merge-min-part-ratio", "0.12", "--root-anti-merge-weak-guard-threshold", "0.66",
-    "--root-anti-merge-weak-guard-radius", "0", "--residual-percentile", "0.955",
-    "--residual-fill-radius", "4", "--residual-edge-fill-radius", "2",
-    "--residual-edge-fill-min-value-ratio", "0.97", "--residual-edge-fill-max-patch-span", "5",
-    "--residual-min-cells", "2", "--residual-trace-min-length", "6",
-    "--residual-trace-max-cells", "80", "--residual-covered-guard-radius", "0",
-    "--no-residual-trace", "--min-area", "120", "--simplify-tolerance", "2", "--smooth-iterations", "1",
-    "--no-branch-attribution-shadow", "--no-weak-path-gate"
+    "--input", $OfficialDat,
+    "--input-format", "geoeast-dat"
 )
 
 $baseline = Join-Path $OutputRoot "baseline.csv"
 $candidate = Join-Path $OutputRoot "adaptive_boundary_candidate.csv"
-& $exe @common "--no-local-polygon-quality-shadow" "--no-local-polygon-quality" "--output" $baseline
+& $exe @common "--no-adaptive-boundary-apply" "--output" $baseline
 if ($LASTEXITCODE -ne 0) { throw "Adaptive-boundary baseline failed." }
-& $exe @common "--no-local-polygon-quality-shadow" "--local-polygon-quality" "--output" $candidate
+& $exe @common "--adaptive-boundary-apply" "--output" $candidate
 if ($LASTEXITCODE -ne 0) { throw "Adaptive-boundary candidate failed." }
 
 $gate = Join-Path $OutputRoot "promotion_gate"
@@ -59,10 +43,11 @@ $gateResult = Get-Content -LiteralPath (Join-Path $gate "冲顶实验晋级验�
     }
     candidate = [ordered]@{
         keptPolygons = $candidateDiag.results.keptPolygonCount
-        detected = $candidateDiag.localPolygonQuality.detected
-        accepted = $candidateDiag.localPolygonQuality.accepted
-        review = $candidateDiag.localPolygonQuality.review
-        rejected = $candidateDiag.localPolygonQuality.rejected
+        evaluated = $candidateDiag.adaptiveBoundaryShadow.polygonsEvaluated
+        accepted = $candidateDiag.adaptiveBoundaryShadow.acceptedCandidates
+        committed = $candidateDiag.adaptiveBoundaryShadow.commitCommittedCandidates
+        rejected = $candidateDiag.adaptiveBoundaryShadow.rejectedCandidates
+        rolledBack = $candidateDiag.adaptiveBoundaryShadow.commitBatchRolledBack
         sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $candidate).Hash
     }
     promoted = [bool]$gateResult.decision.pass

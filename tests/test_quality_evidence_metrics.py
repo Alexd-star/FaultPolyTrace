@@ -53,6 +53,7 @@ def _promotion_record(**overrides):
         "background_leakage_ratio_proxy": 0.08,
         "unsupported_inside_ratio_proxy": 0.12,
         "low_support_bridge_ratio_proxy": 0.01,
+        "low_support_bridge_cell_count_proxy": 10,
         "kept_polygons": 214,
         "open_rings": 0,
         "self_intersections": 0,
@@ -97,6 +98,28 @@ def test_promotion_accepts_proxy_improvement_when_other_gates_pass():
     assert decision["summary"]["background_leakage_delta_proxy"] < 0.0
     assert decision["summary"]["unsupported_inside_delta_proxy"] < 0.0
     assert decision["summary"]["low_support_bridge_delta_proxy"] < 0.0
+
+
+def test_promotion_uses_bridge_cell_count_when_area_cleanup_raises_ratio():
+    baseline = _promotion_record(
+        low_support_bridge_cell_count_proxy=20,
+        low_support_bridge_ratio_proxy=0.0100,
+    )
+    candidate = _promotion_record(
+        strong_coverage=0.99850,
+        low_support_bridge_cell_count_proxy=19,
+        low_support_bridge_ratio_proxy=0.0101,
+    )
+
+    decision = decide_promotion(baseline, candidate)
+
+    assert decision["pass"] is True
+    bridge_check = next(
+        item for item in decision["checks"]
+        if item["name"] == "低支撑桥代理指标不退化"
+    )
+    assert bridge_check["pass"] is True
+    assert decision["summary"]["low_support_bridge_cell_delta_proxy"] == -1
 
 
 def test_reference_quality_is_perfect_for_identical_masks():
