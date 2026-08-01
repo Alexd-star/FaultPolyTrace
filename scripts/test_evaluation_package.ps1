@@ -41,6 +41,8 @@ if (!$SkipLaunch) {
     }
     $oldConfig = $env:FPT_CONFIG_ROOT
     $testConfig = Join-Path ([System.IO.Path]::GetTempPath()) ("FPT_eval_" + [guid]::NewGuid().ToString("N"))
+    $bootstrapProcess = $null
+    $newProcess = $null
     New-Item -ItemType Directory -Force -Path $testConfig | Out-Null
     try {
         $env:FPT_CONFIG_ROOT = $testConfig
@@ -50,20 +52,42 @@ if (!$SkipLaunch) {
         if (!$bootstrapProcess.HasExited -or $bootstrapProcess.ExitCode -ne 0) {
             throw "FAIL：顶层启动器未正常退出。"
         }
-        $newProcess = $null
         $deadline = (Get-Date).AddSeconds(15)
         do {
             Start-Sleep -Milliseconds 250
             $newProcess = Get-Process -Name "faultpolytrace_launcher" -ErrorAction SilentlyContinue | Select-Object -First 1
         } while (!$newProcess -and (Get-Date) -lt $deadline)
         if (!$newProcess) { throw "FAIL：顶层启动器未拉起内部 Qt Launcher。" }
-        $actualPath = $newProcess.Path
+        $actualPath = $null
+        $pathDeadline = (Get-Date).AddSeconds(5)
+        do {
+            try {
+                $newProcess.Refresh()
+                $actualPath = $newProcess.Path
+                if ([string]::IsNullOrWhiteSpace($actualPath)) {
+                    $actualPath = $newProcess.MainModule.FileName
+                }
+            } catch {
+                $actualPath = $null
+            }
+            if ([string]::IsNullOrWhiteSpace($actualPath)) {
+                Start-Sleep -Milliseconds 100
+            }
+        } while ([string]::IsNullOrWhiteSpace($actualPath) -and (Get-Date) -lt $pathDeadline)
+        if ([string]::IsNullOrWhiteSpace($actualPath)) {
+            throw "FAIL：已拉起内部 Qt Launcher，但无法读取其可执行文件路径。"
+        }
         if (![string]::Equals($actualPath, $launcher, [System.StringComparison]::OrdinalIgnoreCase)) {
             throw "FAIL：启动了错误位置的 Launcher：$actualPath"
         }
-        Stop-Process -Id $newProcess.Id -Force
-        $newProcess.WaitForExit(5000) | Out-Null
     } finally {
+        if ($newProcess) {
+            Stop-Process -Id $newProcess.Id -Force -ErrorAction SilentlyContinue
+            $newProcess.WaitForExit(5000) | Out-Null
+        }
+        if ($bootstrapProcess -and !$bootstrapProcess.HasExited) {
+            Stop-Process -Id $bootstrapProcess.Id -Force -ErrorAction SilentlyContinue
+        }
         $env:FPT_CONFIG_ROOT = $oldConfig
         if (Test-Path -LiteralPath $testConfig) { Remove-Item -LiteralPath $testConfig -Recurse -Force }
     }
