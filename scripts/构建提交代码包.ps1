@@ -24,6 +24,7 @@ $releaseDir = Join-Path $releaseRoot "FaultPolyTrace_$Version"
 $releaseZip = Join-Path $releaseRoot "FaultPolyTrace_$Version.zip"
 $installer = Join-Path $releaseRoot "installer\FaultPolyTrace_Setup_v$plain.exe"
 $templateRoot = Join-Path $repoRoot "packaging\submission"
+$Destination = [System.IO.Path]::GetFullPath($Destination)
 
 foreach ($required in @($releaseDir, $releaseZip, $installer, $templateRoot)) {
     if (!(Test-Path -LiteralPath $required)) {
@@ -102,8 +103,10 @@ function Expand-SubmissionTokens {
             Replace("{{GIT_HEAD}}", $gitHead).
             Replace("{{INSTALLER_SHA256}}", $installerHash).
             Replace("{{RELEASE_ZIP_SHA256}}", $releaseZipHash)
-        $withBom = $_.Extension.Equals(".ps1", [System.StringComparison]::OrdinalIgnoreCase)
-        [System.IO.File]::WriteAllText($_.FullName, $updated, (New-Object System.Text.UTF8Encoding($withBom)))
+        if (![string]::Equals($updated, $text, [System.StringComparison]::Ordinal)) {
+            $withBom = $_.Extension.Equals(".ps1", [System.StringComparison]::OrdinalIgnoreCase)
+            [System.IO.File]::WriteAllText($_.FullName, $updated, (New-Object System.Text.UTF8Encoding($withBom)))
+        }
         }
 }
 
