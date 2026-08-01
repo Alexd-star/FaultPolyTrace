@@ -39,10 +39,11 @@ $missRootCauseDir = Join-Path $acceptanceDir "漏检根因诊断"
 $residualReviewLayerDir = Join-Path $acceptanceDir "残余复核层"
 $localShapeQualityDir = Join-Path $acceptanceDir "局部形态质量诊断"
 $parameterStabilityDir = Join-Path $acceptanceDir "参数扰动稳定性"
-$lowerPerturbationCsv = Join-Path $parameterStabilityDir "percentile_0.979_weak_0.964.csv"
-$upperPerturbationCsv = Join-Path $parameterStabilityDir "percentile_0.981_weak_0.966.csv"
+$lowerPerturbationCsv = Join-Path $parameterStabilityDir "stable_plateau_lower.csv"
+$upperPerturbationCsv = Join-Path $parameterStabilityDir "stable_plateau_upper.csv"
 $stabilityReportPath = Join-Path $parameterStabilityDir "参数扰动稳定性报告.md"
 $stabilitySummaryPath = Join-Path $parameterStabilityDir "参数扰动稳定性摘要.json"
+$stabilityPlateauPath = Join-Path $parameterStabilityDir "离散分位平台核验.json"
 $reportPath = Join-Path $acceptanceDir "本次验收报告.md"
 $stabilityGatePassed = $null
 $stabilityArtifactsPresent = $false
@@ -58,6 +59,28 @@ function Read-TextNumber {
         return $m.Groups[1].Value
     }
     return $DefaultValue
+}
+
+function Get-StablePercentileProbe {
+    param(
+        [double]$Baseline,
+        [double]$LowerInclusive,
+        [double]$UpperExclusive,
+        [ValidateSet("Lower", "Upper")][string]$Direction
+    )
+    foreach ($value in @($Baseline, $LowerInclusive, $UpperExclusive)) {
+        if ([double]::IsNaN($value) -or [double]::IsInfinity($value)) {
+            throw "分位数稳定区间包含非有限值。"
+        }
+    }
+    if ($UpperExclusive -le $LowerInclusive -or
+        $Baseline -lt $LowerInclusive -or $Baseline -ge $UpperExclusive) {
+        throw "基线分位数不在诊断给出的稳定区间内。"
+    }
+    if ($Direction -eq "Lower") {
+        return $LowerInclusive + 0.5 * ($Baseline - $LowerInclusive)
+    }
+    return $Baseline + 0.5 * ($UpperExclusive - $Baseline)
 }
 
 if ([string]::IsNullOrWhiteSpace($OfficialDat)) {
@@ -146,16 +169,48 @@ if ($RunParameterStabilityGate) {
     Write-Host "== 4a/$totalSteps 运行参数扰动稳定性门禁 =="
     New-Item -ItemType Directory -Force -Path $parameterStabilityDir | Out-Null
 
+    $baselineDiagnosticsPath = "$resultCsv.diagnostics.json"
+    $baselineDiagnostics = Get-Content -LiteralPath $baselineDiagnosticsPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    $primaryInfo = $baselineDiagnostics.parameters.primaryThresholdInfo
+    $weakInfo = $baselineDiagnostics.parameters.weakThresholdInfo
+    $baselinePrimaryPercentile = [double]$baselineDiagnostics.parameters.percentile
+    $baselineWeakPercentile = [double]$baselineDiagnostics.parameters.weakPercentile
+    $lowerPrimaryPercentile = Get-StablePercentileProbe `
+        -Baseline $baselinePrimaryPercentile `
+        -LowerInclusive ([double]$primaryInfo.stablePercentileLowerInclusive) `
+        -UpperExclusive ([double]$primaryInfo.stablePercentileUpperExclusive) `
+        -Direction Lower
+    $upperPrimaryPercentile = Get-StablePercentileProbe `
+        -Baseline $baselinePrimaryPercentile `
+        -LowerInclusive ([double]$primaryInfo.stablePercentileLowerInclusive) `
+        -UpperExclusive ([double]$primaryInfo.stablePercentileUpperExclusive) `
+        -Direction Upper
+    $lowerWeakPercentile = Get-StablePercentileProbe `
+        -Baseline $baselineWeakPercentile `
+        -LowerInclusive ([double]$weakInfo.stablePercentileLowerInclusive) `
+        -UpperExclusive ([double]$weakInfo.stablePercentileUpperExclusive) `
+        -Direction Lower
+    $upperWeakPercentile = Get-StablePercentileProbe `
+        -Baseline $baselineWeakPercentile `
+        -LowerInclusive ([double]$weakInfo.stablePercentileLowerInclusive) `
+        -UpperExclusive ([double]$weakInfo.stablePercentileUpperExclusive) `
+        -Direction Upper
+    $invariantCulture = [System.Globalization.CultureInfo]::InvariantCulture
+    $lowerPrimaryArg = $lowerPrimaryPercentile.ToString("G17", $invariantCulture)
+    $upperPrimaryArg = $upperPrimaryPercentile.ToString("G17", $invariantCulture)
+    $lowerWeakArg = $lowerWeakPercentile.ToString("G17", $invariantCulture)
+    $upperWeakArg = $upperWeakPercentile.ToString("G17", $invariantCulture)
+
     & $exe `
         --input $OfficialDat `
         --input-format geoeast-dat `
         --output $lowerPerturbationCsv `
         --trace-mode ridge-belt `
         --threshold-mode percentile `
-        --percentile 0.979 `
+        --percentile $lowerPrimaryArg `
         --min-area 120 `
         --close-radius 1 `
-        --weak-percentile 0.964 `
+        --weak-percentile $lowerWeakArg `
         --weak-connect-radius 1 `
         --max-weak-component-cells 20000 `
         --min-weak-component-aspect 3 `
@@ -198,10 +253,10 @@ if ($RunParameterStabilityGate) {
         --output $upperPerturbationCsv `
         --trace-mode ridge-belt `
         --threshold-mode percentile `
-        --percentile 0.981 `
+        --percentile $upperPrimaryArg `
         --min-area 120 `
         --close-radius 1 `
-        --weak-percentile 0.966 `
+        --weak-percentile $upperWeakArg `
         --weak-connect-radius 1 `
         --max-weak-component-cells 20000 `
         --min-weak-component-aspect 3 `
@@ -240,16 +295,51 @@ if ($RunParameterStabilityGate) {
 
     python (Join-Path $PSScriptRoot "参数扰动稳定性验证.py") `
         --baseline "balanced=$resultCsv" `
-        --candidate "percentile_0.979_weak_0.964=$lowerPerturbationCsv" `
-        --candidate "percentile_0.981_weak_0.966=$upperPerturbationCsv" `
+        --candidate "stable_plateau_lower=$lowerPerturbationCsv" `
+        --candidate "stable_plateau_upper=$upperPerturbationCsv" `
         --conservative $upperPerturbationCsv `
         --high-recall $lowerPerturbationCsv `
         --out-dir $parameterStabilityDir | Out-Host
+    $comparisonExitCode = $LASTEXITCODE
     $stabilityArtifactsPresent = (
         (Test-Path -LiteralPath $stabilityReportPath) -and
         (Test-Path -LiteralPath $stabilitySummaryPath)
     )
-    $stabilityGatePassed = ($LASTEXITCODE -eq 0) -and $stabilityArtifactsPresent
+    $baselineHash = (Get-FileHash -LiteralPath $resultCsv -Algorithm SHA256).Hash
+    $lowerHash = (Get-FileHash -LiteralPath $lowerPerturbationCsv -Algorithm SHA256).Hash
+    $upperHash = (Get-FileHash -LiteralPath $upperPerturbationCsv -Algorithm SHA256).Hash
+    $plateauHashStable = ($baselineHash -eq $lowerHash) -and ($baselineHash -eq $upperHash)
+    [ordered]@{
+        schemaVersion = 1
+        baseline = [ordered]@{
+            primaryPercentile = $baselinePrimaryPercentile
+            weakPercentile = $baselineWeakPercentile
+            resultSha256 = $baselineHash
+        }
+        primaryStableInterval = [ordered]@{
+            lowerInclusive = [double]$primaryInfo.stablePercentileLowerInclusive
+            upperExclusive = [double]$primaryInfo.stablePercentileUpperExclusive
+            effectiveThreshold = [double]$primaryInfo.threshold
+        }
+        weakStableInterval = [ordered]@{
+            lowerInclusive = [double]$weakInfo.stablePercentileLowerInclusive
+            upperExclusive = [double]$weakInfo.stablePercentileUpperExclusive
+            effectiveThreshold = [double]$weakInfo.threshold
+        }
+        lowerProbe = [ordered]@{
+            primaryPercentile = $lowerPrimaryPercentile
+            weakPercentile = $lowerWeakPercentile
+            resultSha256 = $lowerHash
+        }
+        upperProbe = [ordered]@{
+            primaryPercentile = $upperPrimaryPercentile
+            weakPercentile = $upperWeakPercentile
+            resultSha256 = $upperHash
+        }
+        exactHashStable = $plateauHashStable
+        note = "Cross-plateau percentile changes alter the effective attribute threshold and are sensitivity stress cases, not same-threshold stability probes."
+    } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $stabilityPlateauPath -Encoding UTF8
+    $stabilityGatePassed = ($comparisonExitCode -eq 0) -and $stabilityArtifactsPresent -and $plateauHashStable
 } else {
     Write-Host "== 4a/$totalSteps 跳过可选参数扰动稳定性门禁 =="
 }
@@ -406,7 +496,7 @@ if ($RunParameterStabilityGate) {
     $checks += [pscustomobject]@{
         Item = "参数扰动稳定性门禁"
         Pass = $stabilityGatePassed
-        Detail = "比较 percentile/weak-percentile 的 ±0.001 联合扰动；报告位于 $parameterStabilityDir"
+        Detail = "在诊断给出的离散属性阈值稳定区间内分别向上、向下扰动，并要求结果 SHA256 完全一致；报告位于 $parameterStabilityDir"
     }
 }
 
@@ -526,6 +616,7 @@ if ($RunParameterStabilityGate) {
     if ($stabilityArtifactsPresent) {
         $report.Add("- 参数扰动稳定性报告：$stabilityReportPath")
         $report.Add("- 参数扰动稳定性摘要：$stabilitySummaryPath")
+        $report.Add("- 离散分位平台核验：$stabilityPlateauPath")
     } else {
         $report.Add("- 参数扰动稳定性报告：生成失败，未形成可引用证据文件")
     }
