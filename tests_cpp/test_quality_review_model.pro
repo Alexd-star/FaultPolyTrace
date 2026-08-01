@@ -9,7 +9,10 @@ TARGET = test_quality_review_model
 
 SOURCES += \
     test_quality_review_model.cpp \
-    ../src/ui/QualityReviewModel.cpp
+    ../src/ui/QualityReviewModel.cpp \
+    ../src/ui/TraceParameterModel.cpp
 
 HEADERS += \
-    ../src/ui/QualityReviewModel.h
+    ../src/ui/QualityReviewModel.h \
+    ../src/ui/TraceParameterModel.h \
+    ../src/core/ProductDefaults.h

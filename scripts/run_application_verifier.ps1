@@ -1,6 +1,7 @@
 param(
     [string]$OfficialDat = $(if ($env:FPT_OFFICIAL_DAT) { $env:FPT_OFFICIAL_DAT } else { "" }),
-    [string]$Executable = ""
+    [string]$Executable = "",
+    [string]$ExpectedSha256 = "2911D696F880E1173F6633E6B8A4587316FDC7DFA19109CE8EB28083A076ED3A"
 )
 
 $ErrorActionPreference = "Stop"
@@ -31,6 +32,8 @@ if (!(Test-Path -LiteralPath $OfficialDat)) { throw "Official test data not foun
 
 $targetName = Split-Path -Leaf $Executable
 $logsRoot = Join-Path $env:USERPROFILE "AppVerifierLogs"
+$exportXml = Join-Path $outputRoot "application_verifier_log.xml"
+$startedAt = Get-Date
 $before = @{}
 if (Test-Path -LiteralPath $logsRoot) {
     Get-ChildItem -LiteralPath $logsRoot -File | ForEach-Object { $before[$_.FullName] = $_.LastWriteTimeUtc }
@@ -39,27 +42,55 @@ try {
     & $appVerifier /verify $targetName
     if ($LASTEXITCODE -ne 0) { throw "Cannot enable Application Verifier Basics." }
     $output = Join-Path $outputRoot "verified_result.csv"
-    & $Executable --input $OfficialDat --input-format geoeast-dat --output $output `
-        --trace-mode ridge-belt --threshold-mode percentile --percentile 0.98 `
-        --min-area 120 --root-anti-merge --no-residual-trace
+    $runLog = Join-Path $outputRoot "verified_run.log"
+    & $Executable --input $OfficialDat --input-format geoeast-dat --output $output *> $runLog
     $targetExit = $LASTEXITCODE
+    & $appVerifier -export log -for $targetName -with "To=$exportXml"
+    if ($LASTEXITCODE -ne 0 -or !(Test-Path -LiteralPath $exportXml)) {
+        throw "Application Verifier log export failed."
+    }
 } finally {
     & $appVerifier /n $targetName
 }
 if ($targetExit -ne 0) { throw "Application Verifier target run failed with exit code $targetExit." }
+$actualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $output).Hash
+if (![string]::IsNullOrWhiteSpace($ExpectedSha256) -and $actualHash -ne $ExpectedSha256) {
+    throw "Application Verifier result hash mismatch. Expected $ExpectedSha256, actual $actualHash"
+}
+[xml]$verifierXml = Get-Content -Raw -LiteralPath $exportXml
+$verifierEntries = @($verifierXml.SelectNodes('//*[local-name()="logSession"]/*'))
+if ($verifierEntries.Count -ne 0) {
+    throw "Application Verifier reported $($verifierEntries.Count) verifier log entrie(s). See $exportXml"
+}
 $newLogs = @()
 if (Test-Path -LiteralPath $logsRoot) {
     $newLogs = @(Get-ChildItem -LiteralPath $logsRoot -File | Where-Object {
         !$before.ContainsKey($_.FullName) -or $_.LastWriteTimeUtc -gt $before[$_.FullName]
     } | Select-Object -ExpandProperty FullName)
 }
+$logDetails = @($newLogs | ForEach-Object {
+    $file = Get-Item -LiteralPath $_
+    [ordered]@{
+        path = $file.FullName
+        length = $file.Length
+        sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $file.FullName).Hash
+    }
+})
 [ordered]@{
     status = "PASS"
     layers = "Basics"
     target = $Executable
     targetExitCode = $targetExit
-    verifierLogFiles = $newLogs
-    note = "Application Verifier is runtime coverage based; this report applies to the exercised CLI path."
+    resultSha256 = $actualHash
+    expectedSha256 = $ExpectedSha256
+    keptPolygonCount = 200
+    verifierLogFiles = $logDetails
+    verifierXml = $exportXml
+    verifierXmlSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $exportXml).Hash
+    verifierEntryCount = $verifierEntries.Count
+    runLog = $runLog
+    startedAt = $startedAt.ToString("o")
+    note = "Application Verifier is runtime-coverage based; this report applies to the official-data default CLI path. The output hash is locked to the released 200-polygon baseline."
     checkedAt = (Get-Date).ToString("o")
 } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $outputRoot "application_verifier_report.json") -Encoding UTF8
 

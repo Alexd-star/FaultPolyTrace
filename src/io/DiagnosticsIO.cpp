@@ -255,19 +255,71 @@ void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
     out << "    \"threshold\": " << d.threshold << ",\n";
     out << "    \"percentile\": " << d.percentile << ",\n";
     out << "    \"effectiveThreshold\": " << d.effectiveThreshold << ",\n";
+    const auto writeThresholdInfo = [&](const char* name,
+                                        const PercentileThresholdInfo& info,
+                                        bool trailingComma) {
+        out << "    \"" << name << "\": {"
+            << "\"threshold\": " << info.threshold
+            << ", \"stablePercentileLowerInclusive\": "
+            << info.stablePercentileLowerInclusive
+            << ", \"stablePercentileUpperExclusive\": "
+            << info.stablePercentileUpperExclusive
+            << ", \"sampleCount\": " << info.sampleCount
+            << ", \"equalValueCount\": " << info.equalValueCount
+            << ", \"percentileBased\": "
+            << (info.percentileBased ? "true" : "false") << "}"
+            << (trailingComma ? "," : "") << "\n";
+    };
+    writeThresholdInfo("primaryThresholdInfo", d.primaryThresholdInfo, true);
+    writeThresholdInfo("weakThresholdInfo", d.weakThresholdInfo, true);
+    writeThresholdInfo("residualThresholdInfo", d.residualThresholdInfo, true);
     out << "    \"minArea\": " << d.minArea << ",\n";
     out << "    \"minCells\": " << d.minCells << ",\n";
     out << "    \"openRadius\": " << d.openRadius << ",\n";
     out << "    \"closeRadius\": " << d.closeRadius << ",\n";
+    out << "    \"physicalMorphologyShadow\": "
+        << (d.physicalMorphologyShadow ? "true" : "false") << ",\n";
+    out << "    \"physicalCloseRadiusWorld\": "
+        << d.physicalCloseRadiusWorld << ",\n";
     out << "    \"weakPercentile\": " << d.weakPercentile << ",\n";
     out << "    \"weakConnectRadius\": " << d.weakConnectRadius << ",\n";
     out << "    \"maxWeakComponentCells\": " << d.maxWeakComponentCells << ",\n";
     out << "    \"minWeakComponentAspect\": " << d.minWeakComponentAspect << ",\n";
     out << "    \"weakPathGate\": " << (d.weakPathGate ? "true" : "false") << ",\n";
+    out << "    \"weakExtensionLayeredShadow\": "
+        << (d.weakExtensionLayeredShadow ? "true" : "false") << ",\n";
+    out << "    \"weakExtensionLayeredGate\": "
+        << (d.weakExtensionLayeredGate ? "true" : "false") << ",\n";
     out << "    \"weakPathSupportRatio\": " << d.weakPathSupportRatio << ",\n";
     out << "    \"weakPathMaxUnsupportedRun\": " << d.weakPathMaxUnsupportedRun << ",\n";
     out << "    \"branchAttributionShadow\": " << (d.branchAttributionShadow ? "true" : "false") << ",\n";
     out << "    \"branchAttributionCandidateGroups\": " << (d.branchAttributionCandidateGroups ? "true" : "false") << ",\n";
+    out << "    \"skeletonGraphV2Shadow\": "
+        << (d.skeletonGraphV2Shadow ? "true" : "false") << ",\n";
+    out << "    \"skeletonGraphV2AttributionShadow\": "
+        << (d.skeletonGraphV2AttributionShadow ? "true" : "false") << ",\n";
+    out << "    \"multiScaleEvidenceShadow\": "
+        << (d.multiScaleEvidenceShadow ? "true" : "false") << ",\n";
+    out << "    \"multiScaleEvidenceMinimumConfidence\": "
+        << d.multiScaleEvidenceMinimumConfidence << ",\n";
+    out << "    \"multiScaleEvidenceMinimumRidgeResponse\": "
+        << d.multiScaleEvidenceMinimumRidgeResponse << ",\n";
+    out << "    \"multiScaleEvidenceMaximumSamples\": "
+        << d.multiScaleEvidenceMaximumSamples << ",\n";
+    out << "    \"adaptiveBoundaryShadow\": "
+        << (d.adaptiveBoundaryShadow ? "true" : "false") << ",\n";
+    out << "    \"adaptiveBoundaryMaximumDisplacementWorld\": "
+        << d.adaptiveBoundaryMaximumDisplacementWorld << ",\n";
+    out << "    \"adaptiveBoundaryMinimumSupportGain\": "
+        << d.adaptiveBoundaryMinimumSupportGain << ",\n";
+    out << "    \"adaptiveBoundaryMaximumSupportLossRatio\": "
+        << d.adaptiveBoundaryMaximumSupportLossRatio << ",\n";
+    out << "    \"adaptiveBoundaryMaximumLeakageIncreaseRatio\": "
+        << d.adaptiveBoundaryMaximumLeakageIncreaseRatio << ",\n";
+    out << "    \"adaptiveBoundaryMaximumPolygons\": "
+        << d.adaptiveBoundaryMaximumPolygons << ",\n";
+    out << "    \"adaptiveBoundaryMaximumVerticesPerPolygon\": "
+        << d.adaptiveBoundaryMaximumVerticesPerPolygon << ",\n";
     out << "    \"localPolygonQualityShadow\": " << (d.localPolygonQualityShadow ? "true" : "false") << ",\n";
     out << "    \"localPolygonQuality\": " << (d.localPolygonQuality ? "true" : "false") << ",\n";
     out << "    \"localQualityWidthRatio\": " << d.localQualityWidthRatio << ",\n";
@@ -315,8 +367,20 @@ void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
     out << "    \"weakContinuityMaxTurnAngle\": " << d.weakContinuityMaxTurnAngle << ",\n";
     out << "    \"weakContinuityMinCompetitionMargin\": " << d.weakContinuityMinCompetitionMargin << ",\n";
     out << "    \"weakContinuityThirdPartySkeletonClearanceRadius\": " << d.weakContinuityThirdPartySkeletonClearanceRadius << ",\n";
+    out << "    \"weakContinuityUsePhysicalMetric\": "
+        << (d.weakContinuityUsePhysicalMetric ? "true" : "false") << ",\n";
+    out << "    \"weakContinuityUseGlobalMatching\": "
+        << (d.weakContinuityUseGlobalMatching ? "true" : "false") << ",\n";
+    out << "    \"weakContinuityNoConnectCost\": "
+        << d.weakContinuityNoConnectCost << ",\n";
+    out << "    \"weakContinuityMaxExactMatchingEndpoints\": "
+        << d.weakContinuityMaxExactMatchingEndpoints << ",\n";
     out << "    \"weakTailCompletionShadow\": " << (d.weakTailCompletionShadow ? "true" : "false") << ",\n";
     out << "    \"weakTailCompletion\": " << (d.weakTailCompletion ? "true" : "false") << ",\n";
+    out << "    \"weakTailEndpointPortShadow\": "
+        << (d.weakTailEndpointPortShadow ? "true" : "false") << ",\n";
+    out << "    \"weakTailEndpointPortOwnership\": "
+        << (d.weakTailEndpointPortOwnership ? "true" : "false") << ",\n";
     out << "    \"weakTailMinCells\": " << d.weakTailMinCells << ",\n";
     out << "    \"weakTailMaxCells\": " << d.weakTailMaxCells << ",\n";
     out << "    \"weakTailMinAspect\": " << d.weakTailMinAspect << ",\n";
@@ -325,6 +389,8 @@ void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
     out << "    \"weakTailMaxAlignmentAngle\": " << d.weakTailMaxAlignmentAngle << ",\n";
     out << "    \"weakTailOwnershipClearanceRadius\": " << d.weakTailOwnershipClearanceRadius << ",\n";
     out << "    \"weakTailTangentRadius\": " << d.weakTailTangentRadius << ",\n";
+    out << "    \"weakTailJunctionClearanceRadius\": "
+        << d.weakTailJunctionClearanceRadius << ",\n";
     out << "    \"preserveObservedSkeletonEnvelope\": "
         << (d.preserveObservedSkeletonEnvelope ? "true" : "false") << ",\n";
     out << "    \"rootAntiMerge\": " << (d.rootAntiMerge ? "true" : "false") << ",\n";
@@ -380,6 +446,16 @@ void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
     out << "    \"suppressedInternalRings\": " << d.suppressedInternalRings << ",\n";
     out << "    \"elapsedMs\": " << d.elapsedMs << "\n";
     out << "  },\n";
+    out << "  \"physicalMorphologyShadow\": {\n";
+    out << "    \"evaluated\": "
+        << (d.physicalMorphologyShadowEvaluated ? "true" : "false") << ",\n";
+    out << "    \"radiusWorld\": " << d.physicalMorphologyRadiusWorld << ",\n";
+    out << "    \"legacyCells\": " << d.physicalMorphologyLegacyCells << ",\n";
+    out << "    \"candidateCells\": " << d.physicalMorphologyCandidateCells << ",\n";
+    out << "    \"addedCells\": " << d.physicalMorphologyAddedCells << ",\n";
+    out << "    \"removedCells\": " << d.physicalMorphologyRemovedCells << ",\n";
+    out << "    \"jaccard\": " << d.physicalMorphologyJaccard << "\n";
+    out << "  },\n";
     out << "  \"skeleton\": {\n";
     out << "    \"endpoints\": " << d.skeletonEndpoints << ",\n";
     out << "    \"junctions\": " << d.skeletonJunctions << ",\n";
@@ -387,6 +463,55 @@ void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
     out << "    \"keptBranches\": " << d.keptBranches << ",\n";
     out << "    \"prunedBranches\": " << d.prunedBranches << ",\n";
     out << "    \"connectedGaps\": " << d.connectedGaps << ",\n";
+    out << "    \"graphV2Shadow\": {\n";
+    out << "      \"evaluated\": "
+        << (d.skeletonGraphV2ShadowEvaluated ? "true" : "false") << ",\n";
+    out << "      \"skeletonPixels\": " << d.skeletonGraphV2Stats.skeletonPixels << ",\n";
+    out << "      \"endpointPixels\": " << d.skeletonGraphV2Stats.endpointPixels << ",\n";
+    out << "      \"rawJunctionPixels\": " << d.skeletonGraphV2Stats.rawJunctionPixels << ",\n";
+    out << "      \"junctionClusters\": " << d.skeletonGraphV2Stats.junctionClusters << ",\n";
+    out << "      \"isolatedPixels\": " << d.skeletonGraphV2Stats.isolatedPixels << ",\n";
+    out << "      \"loopNodes\": " << d.skeletonGraphV2Stats.loopNodes << ",\n";
+    out << "      \"branches\": " << d.skeletonGraphV2Stats.branches << ",\n";
+    out << "      \"ports\": " << d.skeletonGraphV2Stats.ports << ",\n";
+    out << "      \"halfEdges\": " << d.skeletonGraphV2Stats.halfEdges << ",\n";
+    out << "      \"ambiguousPortAttachments\": "
+        << d.skeletonGraphV2Stats.ambiguousPortAttachments << ",\n";
+    out << "      \"syntheticEndpointNodes\": "
+        << d.skeletonGraphV2Stats.syntheticEndpointNodes << "\n";
+    out << "    },\n";
+    out << "    \"graphV2AttributionShadow\": {\n";
+    out << "      \"evaluated\": "
+        << (d.skeletonGraphV2AttributionShadowEvaluated ? "true" : "false") << ",\n";
+    out << "      \"legacyBranchCount\": "
+        << d.skeletonGraphV2Attribution.legacyBranchCount << ",\n";
+    out << "      \"v2BranchCount\": "
+        << d.skeletonGraphV2Attribution.v2BranchCount << ",\n";
+    out << "      \"legacyJunctionClusters\": "
+        << d.skeletonGraphV2Attribution.legacyJunctionClusters << ",\n";
+    out << "      \"v2JunctionClusters\": "
+        << d.skeletonGraphV2Attribution.v2JunctionClusters << ",\n";
+    out << "      \"matchedJunctionClusters\": "
+        << d.skeletonGraphV2Attribution.matchedJunctionClusters << ",\n";
+    out << "      \"equivalentMatchedJunctionClusters\": "
+        << d.skeletonGraphV2Attribution.equivalentMatchedJunctionClusters << ",\n";
+    out << "      \"differingMatchedJunctionClusters\": "
+        << d.skeletonGraphV2Attribution.differingMatchedJunctionClusters << ",\n";
+    out << "      \"legacyOnlyJunctionClusters\": "
+        << d.skeletonGraphV2Attribution.legacyOnlyJunctionClusters << ",\n";
+    out << "      \"v2OnlyJunctionClusters\": "
+        << d.skeletonGraphV2Attribution.v2OnlyJunctionClusters << ",\n";
+    out << "      \"ambiguityImprovedJunctionClusters\": "
+        << d.skeletonGraphV2Attribution.ambiguityImprovedJunctionClusters << ",\n";
+    out << "      \"ambiguityRegressedJunctionClusters\": "
+        << d.skeletonGraphV2Attribution.ambiguityRegressedJunctionClusters << ",\n";
+    out << "      \"v2AmbiguousPortAttachments\": "
+        << d.skeletonGraphV2Attribution.v2AmbiguousPortAttachments << ",\n";
+    out << "      \"meanMatchedCenterDistanceCells\": "
+        << d.skeletonGraphV2Attribution.meanMatchedCenterDistanceCells << ",\n";
+    out << "      \"maximumMatchedCenterDistanceCells\": "
+        << d.skeletonGraphV2Attribution.maximumMatchedCenterDistanceCells << "\n";
+    out << "    },\n";
     out << "    \"rootAntiMergeCandidateCutCells\": " << d.rootAntiMergeCandidateCutCells << ",\n";
     out << "    \"rootAntiMergeCutCells\": " << d.rootAntiMergeCutCells << ",\n";
     out << "    \"rootAntiMergeRejectedCutCells\": " << d.rootAntiMergeRejectedCutCells << ",\n";
@@ -405,6 +530,85 @@ void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
     out << "    \"coveragePreserveSimplifyFallbackPolygons\": " << d.coveragePreserveSimplifyFallbackPolygons << ",\n";
     out << "    \"coveragePreserveSmoothFallbackPolygons\": " << d.coveragePreserveSmoothFallbackPolygons << ",\n";
     out << "    \"coveragePreserveTopologyOverridePolygons\": " << d.coveragePreserveTopologyOverridePolygons << "\n";
+    out << "  },\n";
+    out << "  \"multiScaleEvidenceShadow\": {\n";
+    out << "    \"evaluated\": "
+        << (d.multiScaleEvidenceShadowEvaluated ? "true" : "false") << ",\n";
+    out << "    \"targetCells\": " << d.multiScaleEvidenceSummary.targetCells << ",\n";
+    out << "    \"evaluatedCells\": " << d.multiScaleEvidenceSummary.evaluatedCells << ",\n";
+    out << "    \"finiteCells\": " << d.multiScaleEvidenceSummary.finiteCells << ",\n";
+    out << "    \"confidentCells\": " << d.multiScaleEvidenceSummary.confidentCells << ",\n";
+    out << "    \"truncatedCells\": " << d.multiScaleEvidenceSummary.truncatedCells << ",\n";
+    out << "    \"invalidNeighborhoods\": " << d.multiScaleEvidenceSummary.invalidNeighborhoods << ",\n";
+    out << "    \"meanRidgeResponse\": " << d.multiScaleEvidenceSummary.meanRidgeResponse << ",\n";
+    out << "    \"meanConfidence\": " << d.multiScaleEvidenceSummary.meanConfidence << ",\n";
+    out << "    \"maximumRidgeResponse\": " << d.multiScaleEvidenceSummary.maximumRidgeResponse << ",\n";
+    out << "    \"skeletonCellsEvaluated\": " << d.multiScaleEvidenceSummary.skeletonCellsEvaluated << ",\n";
+    out << "    \"skeletonOrientationAgreementCells\": "
+        << d.multiScaleEvidenceSummary.skeletonOrientationAgreementCells << ",\n";
+    out << "    \"meanSkeletonOrientationAngle\": "
+        << d.multiScaleEvidenceSummary.meanSkeletonOrientationAngle << "\n";
+    out << "  },\n";
+    out << "  \"adaptiveBoundaryShadow\": {\n";
+    out << "    \"evaluated\": "
+        << (d.adaptiveBoundaryShadowEvaluated ? "true" : "false") << ",\n";
+    out << "    \"polygonsEvaluated\": " << d.adaptiveBoundarySummary.polygonsEvaluated << ",\n";
+    out << "    \"noChange\": " << d.adaptiveBoundarySummary.noChange << ",\n";
+    out << "    \"acceptedCandidates\": " << d.adaptiveBoundarySummary.acceptedCandidates << ",\n";
+    out << "    \"reviewCandidates\": " << d.adaptiveBoundarySummary.reviewCandidates << ",\n";
+    out << "    \"rejectedCandidates\": " << d.adaptiveBoundarySummary.rejectedCandidates << ",\n";
+    out << "    \"topologyRejectedCandidates\": "
+        << d.adaptiveBoundarySummary.topologyRejectedCandidates << ",\n";
+    out << "    \"rasterBudgetReviewCandidates\": "
+        << d.adaptiveBoundarySummary.rasterBudgetReviewCandidates << ",\n";
+    out << "    \"movedVertices\": " << d.adaptiveBoundarySummary.movedVertices << ",\n";
+    out << "    \"truncatedPolygons\": " << d.adaptiveBoundarySummary.truncatedPolygons << ",\n";
+    out << "    \"rasterCellsEvaluated\": " << d.adaptiveBoundarySummary.rasterCellsEvaluated << ",\n";
+    out << "    \"maximumDisplacementWorld\": "
+        << d.adaptiveBoundarySummary.maximumDisplacementWorld << ",\n";
+    out << "    \"meanSupportGainRatio\": "
+        << d.adaptiveBoundarySummary.meanSupportGainRatio << ",\n";
+    out << "    \"meanBoundaryScoreGain\": "
+        << d.adaptiveBoundarySummary.meanBoundaryScoreGain << ",\n";
+    out << "    \"meanBackgroundLeakageIncreaseRatio\": "
+        << d.adaptiveBoundarySummary.meanBackgroundLeakageIncreaseRatio << ",\n";
+    out << "    \"evidence\": [\n";
+    for (std::size_t index = 0; index < d.adaptiveBoundaryEvidence.size(); ++index) {
+        const AdaptiveBoundaryEvidence& evidence = d.adaptiveBoundaryEvidence[index];
+        out << "      {\"polygonId\": " << evidence.polygonId
+            << ", \"decision\": \"" << adaptiveBoundaryDecisionName(evidence.decision)
+            << "\", \"reason\": \"" << escapeJson(evidence.reason)
+            << "\", \"movedVertices\": " << evidence.movedVertices
+            << ", \"maximumDisplacementWorld\": " << evidence.maximumDisplacementWorld
+            << ", \"supportGainRatio\": " << evidence.supportGainRatio
+            << ", \"boundaryScoreGain\": " << evidence.boundaryScoreGain
+            << ", \"supportLossRatio\": " << evidence.supportLossRatio
+            << ", \"backgroundLeakageIncreaseRatio\": "
+            << evidence.backgroundLeakageIncreaseRatio
+            << ", \"areaChangeRatio\": " << evidence.areaChangeRatio
+            << ", \"topologyValid\": " << (evidence.topologyValid ? "true" : "false")
+            << ", \"rasterBudgetExceeded\": "
+            << (evidence.rasterBudgetExceeded ? "true" : "false") << "}";
+        if (index + 1 < d.adaptiveBoundaryEvidence.size()) {
+            out << ",";
+        }
+        out << "\n";
+    }
+    out << "    ]\n";
+    out << "  },\n";
+    out << "  \"residualTrace\": {\n";
+    out << "    \"effectiveThreshold\": " << d.residualTraceEffectiveThreshold << ",\n";
+    out << "    \"candidateComponents\": " << d.residualTraceCandidateComponents << ",\n";
+    out << "    \"sizeRejectedComponents\": " << d.residualTraceSizeRejectedComponents << ",\n";
+    out << "    \"shapeRejectedComponents\": " << d.residualTraceShapeRejectedComponents << ",\n";
+    out << "    \"attributeRejectedComponents\": " << d.residualTraceAttributeRejectedComponents << ",\n";
+    out << "    \"detachedRejectedComponents\": " << d.residualTraceDetachedRejectedComponents << ",\n";
+    out << "    \"geometryRejectedComponents\": " << d.residualTraceGeometryRejectedComponents << ",\n";
+    out << "    \"topologyRejectedComponents\": " << d.residualTraceTopologyRejectedComponents << ",\n";
+    out << "    \"fallbackAcceptedComponents\": " << d.residualTraceFallbackAcceptedComponents << ",\n";
+    out << "    \"acceptedComponents\": " << d.residualTraceAcceptedComponents << ",\n";
+    out << "    \"acceptedPolygons\": " << d.residualTraceAcceptedPolygons << ",\n";
+    out << "    \"acceptedCells\": " << d.residualTraceAcceptedCells << "\n";
     out << "  },\n";
     out << "  \"weakPath\": {\n";
     out << "    \"weakPathCandidateCells\": " << d.weakPathCandidateCells << ",\n";
@@ -426,6 +630,29 @@ void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
     out << "    \"weakPathShapeRejectedFragments\": " << d.weakPathShapeRejectedFragments << ",\n";
     out << "    \"weakPathDirectionRejectedFragments\": " << d.weakPathDirectionRejectedFragments << "\n";
     out << "  },\n";
+    out << "  \"weakExtensionLayered\": {\n";
+    out << "    \"evaluated\": "
+        << (d.weakExtensionLayeredShadowEvaluated ? "true" : "false") << ",\n";
+    out << "    \"componentCount\": " << d.weakExtensionComponentCount << ",\n";
+    out << "    \"legacyAcceptedComponents\": "
+        << d.weakExtensionLegacyAcceptedComponents << ",\n";
+    out << "    \"layeredAcceptedComponents\": "
+        << d.weakExtensionLayeredAcceptedComponents << ",\n";
+    out << "    \"layeredRejectedComponents\": "
+        << d.weakExtensionLayeredRejectedComponents << ",\n";
+    out << "    \"ownerRejectedComponents\": "
+        << d.weakExtensionLayeredOwnerRejectedComponents << ",\n";
+    out << "    \"sizeRejectedComponents\": "
+        << d.weakExtensionLayeredSizeRejectedComponents << ",\n";
+    out << "    \"shapeRejectedComponents\": "
+        << d.weakExtensionLayeredShapeRejectedComponents << ",\n";
+    out << "    \"supportRejectedComponents\": "
+        << d.weakExtensionLayeredSupportRejectedComponents << ",\n";
+    out << "    \"widthRejectedComponents\": "
+        << d.weakExtensionLayeredWidthRejectedComponents << ",\n";
+    out << "    \"legacyOnlyCells\": " << d.weakExtensionLegacyOnlyCells << ",\n";
+    out << "    \"layeredOnlyCells\": " << d.weakExtensionLayeredOnlyCells << "\n";
+    out << "  },\n";
     out << "  \"weakContinuity\": {\n";
     out << "    \"endpointCount\": " << d.weakContinuityStats.endpointCount << ",\n";
     out << "    \"distanceCandidatePairs\": " << d.weakContinuityStats.distanceCandidatePairs << ",\n";
@@ -436,6 +663,8 @@ void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
     out << "    \"searchedPaths\": " << d.weakContinuityStats.searchedPaths << ",\n";
     out << "    \"foundPaths\": " << d.weakContinuityStats.foundPaths << ",\n";
     out << "    \"noPathRejected\": " << d.weakContinuityStats.noPathRejected << ",\n";
+    out << "    \"invalidBackgroundRejected\": " << d.weakContinuityStats.invalidBackgroundRejected << ",\n";
+    out << "    \"noEvaluatedSupportRejected\": " << d.weakContinuityStats.noEvaluatedSupportRejected << ",\n";
     out << "    \"attributeRejected\": " << d.weakContinuityStats.attributeRejected << ",\n";
     out << "    \"unsupportedRunRejected\": " << d.weakContinuityStats.unsupportedRunRejected << ",\n";
     out << "    \"curvatureRejected\": " << d.weakContinuityStats.curvatureRejected << ",\n";
@@ -443,6 +672,23 @@ void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
     out << "    \"competitionRejected\": " << d.weakContinuityStats.competitionRejected << ",\n";
     out << "    \"endpointReuseRejected\": " << d.weakContinuityStats.endpointReuseRejected << ",\n";
     out << "    \"acceptedConnections\": " << d.weakContinuityStats.acceptedConnections << ",\n";
+    out << "    \"globalMatchingComponents\": "
+        << d.weakContinuityStats.globalMatchingComponents << ",\n";
+    out << "    \"globalMatchingExactComponents\": "
+        << d.weakContinuityStats.globalMatchingExactComponents << ",\n";
+    out << "    \"globalMatchingFallbackComponents\": "
+        << d.weakContinuityStats.globalMatchingFallbackComponents << ",\n";
+    out << "    \"globalMatchingNoConnectEndpoints\": "
+        << d.weakContinuityStats.globalMatchingNoConnectEndpoints << ",\n";
+    out << "    \"spatialConflictPairs\": "
+        << d.weakContinuityStats.spatialConflictPairs << ",\n";
+    out << "    \"spatialConflictRejected\": "
+        << d.weakContinuityStats.spatialConflictRejected << ",\n";
+    out << "    \"finiteBackgroundSamples\": " << d.weakContinuityStats.finiteBackgroundSamples << ",\n";
+    out << "    \"invalidBackgroundSamples\": " << d.weakContinuityStats.invalidBackgroundSamples << ",\n";
+    out << "    \"evaluatedSupportPixels\": " << d.weakContinuityStats.evaluatedSupportPixels << ",\n";
+    out << "    \"excludedSkeletonSupportPixels\": " << d.weakContinuityStats.excludedSkeletonSupportPixels << ",\n";
+    out << "    \"invalidPathSamples\": " << d.weakContinuityStats.invalidPathSamples << ",\n";
     out << "    \"addedPathPixels\": " << d.weakContinuityStats.addedPathPixels << ",\n";
     out << "    \"protectedFromAntiMergeCells\": "
         << d.weakContinuityProtectedFromAntiMergeCells << ",\n";
@@ -459,11 +705,34 @@ void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
     out << "    \"shapeRejected\": " << d.weakTailStats.shapeRejected << ",\n";
     out << "    \"attributeRejected\": " << d.weakTailStats.attributeRejected << ",\n";
     out << "    \"ownershipRejected\": " << d.weakTailStats.ownershipRejected << ",\n";
+    out << "    \"directContactRejected\": " << d.weakTailStats.directContactRejected << ",\n";
+    out << "    \"endpointPortRejected\": " << d.weakTailStats.endpointPortRejected << ",\n";
+    out << "    \"junctionGuardRejected\": " << d.weakTailStats.junctionGuardRejected << ",\n";
     out << "    \"directionRejected\": " << d.weakTailStats.directionRejected << ",\n";
     out << "    \"acceptedComponents\": " << d.weakTailStats.acceptedComponents << ",\n";
     out << "    \"acceptedCells\": " << d.weakTailStats.acceptedCells << ",\n";
     out << "    \"protectedFromAntiMergeCells\": "
         << d.weakTailProtectedFromAntiMergeCells << "\n";
+    out << "  },\n";
+    out << "  \"weakTailEndpointPortShadow\": {\n";
+    out << "    \"evaluated\": "
+        << (d.weakTailEndpointPortShadowEvaluated ? "true" : "false") << ",\n";
+    out << "    \"componentCount\": "
+        << d.weakTailEndpointPortShadowStats.componentCount << ",\n";
+    out << "    \"directContactRejected\": "
+        << d.weakTailEndpointPortShadowStats.directContactRejected << ",\n";
+    out << "    \"endpointPortRejected\": "
+        << d.weakTailEndpointPortShadowStats.endpointPortRejected << ",\n";
+    out << "    \"junctionGuardRejected\": "
+        << d.weakTailEndpointPortShadowStats.junctionGuardRejected << ",\n";
+    out << "    \"ownershipRejected\": "
+        << d.weakTailEndpointPortShadowStats.ownershipRejected << ",\n";
+    out << "    \"directionRejected\": "
+        << d.weakTailEndpointPortShadowStats.directionRejected << ",\n";
+    out << "    \"acceptedComponents\": "
+        << d.weakTailEndpointPortShadowStats.acceptedComponents << ",\n";
+    out << "    \"acceptedCells\": "
+        << d.weakTailEndpointPortShadowStats.acceptedCells << "\n";
     out << "  },\n";
     out << "  \"branchAttribution\": {\n";
     out << "    \"branchAttributionJunctionClusters\": " << d.branchAttributionJunctionClusters << ",\n";
@@ -550,7 +819,16 @@ void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
     out << "  \"topology\": {\n";
     out << "    \"openRings\": " << d.openRingCount << ",\n";
     out << "    \"selfIntersectingPolygons\": " << d.selfIntersectingPolygonCount << ",\n";
-    out << "    \"polygonIntersections\": " << d.polygonIntersectionCount << "\n";
+    out << "    \"polygonIntersections\": " << d.polygonIntersectionCount << ",\n";
+    out << "    \"invalidPolygons\": " << d.invalidPolygonCount << ",\n";
+    out << "    \"nonFiniteCoordinates\": " << d.nonFiniteCoordinateCount << ",\n";
+    out << "    \"zeroLengthEdges\": " << d.zeroLengthEdgeCount << ",\n";
+    out << "    \"duplicateVertexRings\": " << d.duplicateVertexRingCount << ",\n";
+    out << "    \"degenerateRings\": " << d.degenerateRingCount << ",\n";
+    out << "    \"holesOutsideShell\": " << d.holeOutsideShellCount << ",\n";
+    out << "    \"nestedHoles\": " << d.nestedHoleCount << ",\n";
+    out << "    \"polygonContainments\": " << d.polygonContainmentCount << ",\n";
+    out << "    \"polygonInteriorOverlaps\": " << d.polygonInteriorOverlapCount << "\n";
     out << "  },\n";
     out << "  \"timing\": {\n";
     out << "    \"readMs\": " << d.readMs << ",\n";
@@ -578,6 +856,15 @@ void writeTopologyDetailsCsv(const std::string& path, const TopologyDiagnostics&
             << detail.point.y << "\n";
     }
     for (const SegmentIntersectionDetail& detail : diagnostics.polygonIntersectionDetails) {
+        out << detail.type << ","
+            << detail.polygonAId << ","
+            << detail.polygonBId << ","
+            << detail.edgeA << ","
+            << detail.edgeB << ","
+            << detail.point.x << ","
+            << detail.point.y << "\n";
+    }
+    for (const SegmentIntersectionDetail& detail : diagnostics.geometryValidityDetails) {
         out << detail.type << ","
             << detail.polygonAId << ","
             << detail.polygonBId << ","
@@ -667,11 +954,13 @@ void writeWeakContinuityCandidatesCsv(
     AtomicOutputFile output(filesystemPath(path), 256 * 1024);
     std::ostream& out = output.stream();
     out << std::setprecision(12);
-    out << "candidate_id,stage,accepted,decision,endpoint_a_x,endpoint_a_y,endpoint_b_x,endpoint_b_y,"
-           "endpoint_distance,angle_a,angle_b,width_a,width_b,local_background,minimum_supported_value,"
+    out << "candidate_id,stage,accepted,selected_by_global_matching,decision,endpoint_a_x,endpoint_a_y,endpoint_b_x,endpoint_b_y,"
+           "endpoint_distance,endpoint_distance_world,angle_a,angle_b,width_a,width_b,local_background,minimum_supported_value,"
            "normalized_cost,support_ratio,mean_support,max_unsupported_run,path_length,path_length_ratio,"
+           "finite_background_samples,invalid_background_samples,evaluated_support_pixels,"
+           "excluded_skeleton_support_pixels,invalid_path_samples,"
            "max_turn_angle,competition_margin_a,competition_margin_b,added_path_pixels,added_envelope_cells,"
-           "contacted_object_count,minimum_third_object_clearance,nearby_third_object_count,"
+           "contacted_object_count,minimum_third_object_clearance,nearby_third_object_count,spatial_conflict_count,"
            "endpoint_branch_id_a,endpoint_branch_id_b,endpoint_junction_distance_a,endpoint_junction_distance_b,"
            "junction_cluster_id_a,junction_cluster_id_b,junction_arm_count_a,junction_arm_count_b,"
            "junction_confidence_a,junction_confidence_b,junction_attribution_available_a,"
@@ -682,10 +971,12 @@ void writeWeakContinuityCandidatesCsv(
         out << candidate.id << ","
             << candidate.stage << ","
             << (candidate.accepted ? 1 : 0) << ","
+            << (candidate.selectedByGlobalMatching ? 1 : 0) << ","
             << candidate.decision << ","
             << candidate.endpointA.x << "," << candidate.endpointA.y << ","
             << candidate.endpointB.x << "," << candidate.endpointB.y << ","
             << candidate.endpointDistance << ","
+            << candidate.endpointDistanceWorld << ","
             << candidate.angleA << "," << candidate.angleB << ","
             << candidate.widthA << "," << candidate.widthB << ","
             << candidate.localBackground << ","
@@ -696,6 +987,11 @@ void writeWeakContinuityCandidatesCsv(
             << candidate.maxUnsupportedRun << ","
             << candidate.pathLength << ","
             << candidate.pathLengthRatio << ","
+            << candidate.finiteBackgroundSamples << ","
+            << candidate.invalidBackgroundSamples << ","
+            << candidate.evaluatedSupportPixels << ","
+            << candidate.excludedSkeletonSupportPixels << ","
+            << candidate.invalidPathSamples << ","
             << candidate.maxTurnAngleDegrees << ","
             << candidate.competitionMarginA << ","
             << candidate.competitionMarginB << ","
@@ -704,6 +1000,7 @@ void writeWeakContinuityCandidatesCsv(
             << candidate.contactedObjectCount << ","
             << candidate.minimumThirdObjectClearance << ","
             << candidate.nearbyThirdObjectCount << ","
+            << candidate.spatialConflictCount << ","
             << candidate.endpointBranchIdA << ","
             << candidate.endpointBranchIdB << ","
             << candidate.endpointJunctionDistanceA << ","
@@ -743,21 +1040,23 @@ void writeWeakContinuityCandidatesWorldCsv(
     AtomicOutputFile output(filesystemPath(path), 512 * 1024);
     std::ostream& out = output.stream();
     const auto sampleWorldX = [&grid](double gridX) {
-        return grid.worldX(gridX + 0.5);
+        return grid.sx() + (gridX + 0.5) * grid.dx();
     };
     const auto sampleWorldY = [&grid](double gridY) {
-        return grid.worldY(gridY + 0.5);
+        return grid.sy() + (gridY + 0.5) * grid.dy();
     };
     out << std::setprecision(12);
-    out << "candidate_id,stage,accepted,decision,"
+    out << "candidate_id,stage,accepted,selected_by_global_matching,decision,"
            "endpoint_a_grid_x,endpoint_a_grid_y,endpoint_b_grid_x,endpoint_b_grid_y,"
            "center_grid_x,center_grid_y,"
            "endpoint_a_world_x,endpoint_a_world_y,endpoint_b_world_x,endpoint_b_world_y,"
            "center_world_x,center_world_y,"
-           "endpoint_distance,angle_a,angle_b,width_a,width_b,local_background,minimum_supported_value,"
+           "endpoint_distance,endpoint_distance_world,angle_a,angle_b,width_a,width_b,local_background,minimum_supported_value,"
            "normalized_cost,support_ratio,mean_support,max_unsupported_run,path_length,path_length_ratio,"
+           "finite_background_samples,invalid_background_samples,evaluated_support_pixels,"
+           "excluded_skeleton_support_pixels,invalid_path_samples,"
            "max_turn_angle,competition_margin_a,competition_margin_b,added_path_pixels,added_envelope_cells,"
-           "contacted_object_count,minimum_third_object_clearance,nearby_third_object_count,"
+           "contacted_object_count,minimum_third_object_clearance,nearby_third_object_count,spatial_conflict_count,"
            "endpoint_branch_id_a,endpoint_branch_id_b,endpoint_junction_distance_a,endpoint_junction_distance_b,"
            "junction_cluster_id_a,junction_cluster_id_b,junction_arm_count_a,junction_arm_count_b,"
            "junction_confidence_a,junction_confidence_b,junction_attribution_available_a,"
@@ -781,6 +1080,7 @@ void writeWeakContinuityCandidatesWorldCsv(
         out << candidate.id << ","
             << candidate.stage << ","
             << (candidate.accepted ? 1 : 0) << ","
+            << (candidate.selectedByGlobalMatching ? 1 : 0) << ","
             << candidate.decision << ","
             << candidate.endpointA.x << "," << candidate.endpointA.y << ","
             << candidate.endpointB.x << "," << candidate.endpointB.y << ","
@@ -792,6 +1092,7 @@ void writeWeakContinuityCandidatesWorldCsv(
             << sampleWorldX(centerGridX) << ","
             << sampleWorldY(centerGridY) << ","
             << candidate.endpointDistance << ","
+            << candidate.endpointDistanceWorld << ","
             << candidate.angleA << "," << candidate.angleB << ","
             << candidate.widthA << "," << candidate.widthB << ","
             << candidate.localBackground << ","
@@ -802,6 +1103,11 @@ void writeWeakContinuityCandidatesWorldCsv(
             << candidate.maxUnsupportedRun << ","
             << candidate.pathLength << ","
             << candidate.pathLengthRatio << ","
+            << candidate.finiteBackgroundSamples << ","
+            << candidate.invalidBackgroundSamples << ","
+            << candidate.evaluatedSupportPixels << ","
+            << candidate.excludedSkeletonSupportPixels << ","
+            << candidate.invalidPathSamples << ","
             << candidate.maxTurnAngleDegrees << ","
             << candidate.competitionMarginA << ","
             << candidate.competitionMarginB << ","
@@ -810,6 +1116,7 @@ void writeWeakContinuityCandidatesWorldCsv(
             << candidate.contactedObjectCount << ","
             << candidate.minimumThirdObjectClearance << ","
             << candidate.nearbyThirdObjectCount << ","
+            << candidate.spatialConflictCount << ","
             << candidate.endpointBranchIdA << ","
             << candidate.endpointBranchIdB << ","
             << candidate.endpointJunctionDistanceA << ","
@@ -857,7 +1164,9 @@ void writeWeakTailCandidatesCsv(
     std::ostream& out = output.stream();
     out << std::setprecision(12);
     out << "candidate_id,accepted,decision,cell_count,min_x,min_y,max_x,max_y,"
-           "owner_label,touched_owner_count,span,aspect,mean_value,max_value,"
+           "owner_label,touched_owner_count,direct_owner_count,direct_contact_count,"
+           "endpoint_port_count,endpoint_x,endpoint_y,intersects_junction_guard,"
+           "span,aspect,mean_value,max_value,"
            "alignment_angle,cells_grid_xy\n";
     for (const WeakTailCandidate& candidate : candidates) {
         out << candidate.id << ","
@@ -868,6 +1177,12 @@ void writeWeakTailCandidatesCsv(
             << candidate.maxX << "," << candidate.maxY << ","
             << candidate.ownerLabel << ","
             << candidate.touchedOwnerCount << ","
+            << candidate.directOwnerCount << ","
+            << candidate.directContactCount << ","
+            << candidate.endpointPortCount << ","
+            << candidate.endpointX << ","
+            << candidate.endpointY << ","
+            << (candidate.intersectsJunctionGuard ? 1 : 0) << ","
             << candidate.span << ","
             << candidate.aspect << ","
             << candidate.meanValue << ","
@@ -880,6 +1195,33 @@ void writeWeakTailCandidatesCsv(
             out << candidate.cells[index].x << ":" << candidate.cells[index].y;
         }
         out << "\n";
+    }
+    output.commit();
+}
+
+void writeWeakExtensionGateEvidenceCsv(
+    const std::string& path,
+    const std::vector<WeakExtensionGateEvidence>& evidence) {
+    AtomicOutputFile output(filesystemPath(path), 256 * 1024);
+    std::ostream& out = output.stream();
+    out << std::setprecision(12);
+    out << "component_id,accepted,decision,small_component,cell_count,owner_count,"
+           "finite_value_count,invalid_value_count,physical_span,physical_aspect,"
+           "estimated_width_world,support_ratio,mean_support\n";
+    for (const WeakExtensionGateEvidence& item : evidence) {
+        out << item.id << ","
+            << (item.accepted ? 1 : 0) << ","
+            << item.decision << ","
+            << (item.smallComponent ? 1 : 0) << ","
+            << item.cellCount << ","
+            << item.ownerCount << ","
+            << item.finiteValueCount << ","
+            << item.invalidValueCount << ","
+            << item.physicalSpan << ","
+            << item.physicalAspect << ","
+            << item.estimatedWidthWorld << ","
+            << item.supportRatio << ","
+            << item.meanSupport << "\n";
     }
     output.commit();
 }

@@ -2,7 +2,9 @@
 #include "AtomicOutputFile.h"
 
 #include <algorithm>
+#include <cerrno>
 #include <cctype>
+#include <climits>
 #include <cmath>
 #include <cstdlib>
 #include <fstream>
@@ -311,38 +313,67 @@ bool parseGeoEastDatSample(const std::string& textLine, int& line, int& cmp, dou
     const char* cursor = textLine.c_str();
     char* end = nullptr;
 
-    line = static_cast<int>(std::strtol(cursor, &end, 10));
-    if (end == cursor) {
+    errno = 0;
+    const long parsedLine = std::strtol(cursor, &end, 10);
+    if (end == cursor || errno == ERANGE || parsedLine < INT_MIN || parsedLine > INT_MAX) {
         return false;
     }
+    line = static_cast<int>(parsedLine);
     cursor = end;
 
-    cmp = static_cast<int>(std::strtol(cursor, &end, 10));
-    if (end == cursor) {
+    errno = 0;
+    const long parsedCmp = std::strtol(cursor, &end, 10);
+    if (end == cursor || errno == ERANGE || parsedCmp < INT_MIN || parsedCmp > INT_MAX) {
         return false;
     }
+    cmp = static_cast<int>(parsedCmp);
     cursor = end;
 
+    errno = 0;
     x = std::strtod(cursor, &end);
-    if (end == cursor) {
+    if (end == cursor || errno == ERANGE || !std::isfinite(x)) {
         return false;
     }
     cursor = end;
 
+    errno = 0;
     y = std::strtod(cursor, &end);
-    if (end == cursor) {
+    if (end == cursor || errno == ERANGE || !std::isfinite(y)) {
         return false;
     }
     cursor = end;
 
+    errno = 0;
     value = std::strtod(cursor, &end);
-    return end != cursor;
+    if (end == cursor || errno == ERANGE || !std::isfinite(value)) {
+        return false;
+    }
+    cursor = end;
+    while (*cursor != '\0' && std::isspace(static_cast<unsigned char>(*cursor))) {
+        ++cursor;
+    }
+    return *cursor == '\0';
 }
 
 template <typename Map>
-void rememberCoordinate(Map& coordinateByKey, std::vector<int>& keys, int key, double coordinate) {
-    if (coordinateByKey.emplace(key, coordinate).second) {
+void rememberCoordinate(
+    Map& coordinateByKey,
+    std::vector<int>& keys,
+    int key,
+    double coordinate,
+    const char* axisName) {
+    const auto inserted = coordinateByKey.emplace(key, coordinate);
+    if (inserted.second) {
         keys.push_back(key);
+        return;
+    }
+    const double scale = std::max(
+        1.0,
+        std::max(std::abs(inserted.first->second), std::abs(coordinate)));
+    if (std::abs(inserted.first->second - coordinate) > 1e-9 * scale) {
+        throw std::runtime_error(
+            std::string("GeoEast DAT contains inconsistent ") + axisName +
+            " coordinates for index " + std::to_string(key) + ".");
     }
 }
 
@@ -383,8 +414,11 @@ Grid2D readGeoEastDatGrid(const std::string& path) {
     cmpKeys.reserve(4096);
 
     std::string textLine;
+    std::size_t lineNumber = 0;
     while (std::getline(in, textLine)) {
-        if (textLine.empty() || textLine[0] == '#') {
+        ++lineNumber;
+        const std::size_t firstNonSpace = textLine.find_first_not_of(" \t\r\n");
+        if (firstNonSpace == std::string::npos || textLine[firstNonSpace] == '#') {
             continue;
         }
 
@@ -394,11 +428,13 @@ Grid2D readGeoEastDatGrid(const std::string& path) {
         double y = 0.0;
         double value = 0.0;
         if (!parseGeoEastDatSample(textLine, line, cmp, x, y, value)) {
-            continue;
+            throw std::runtime_error(
+                "Invalid GeoEast DAT sample at line " +
+                std::to_string(lineNumber) + ".");
         }
         samples.push_back({line, cmp, value});
-        rememberCoordinate(lineToX, lineKeys, line, x);
-        rememberCoordinate(cmpToY, cmpKeys, cmp, y);
+        rememberCoordinate(lineToX, lineKeys, line, x, "X");
+        rememberCoordinate(cmpToY, cmpKeys, cmp, y, "Y");
     }
 
     if (samples.empty()) {
@@ -410,6 +446,14 @@ Grid2D readGeoEastDatGrid(const std::string& path) {
 
     const int nx = static_cast<int>(lineKeys.size());
     const int ny = static_cast<int>(cmpKeys.size());
+    const std::size_t expectedSamples =
+        static_cast<std::size_t>(nx) * static_cast<std::size_t>(ny);
+    if (samples.size() != expectedSamples) {
+        throw std::runtime_error(
+            "GeoEast DAT grid is incomplete: expected " +
+            std::to_string(expectedSamples) + " samples, got " +
+            std::to_string(samples.size()) + ".");
+    }
     GridMetadata metadata;
     metadata.nx = nx;
     metadata.ny = ny;
@@ -439,8 +483,19 @@ Grid2D readGeoEastDatGrid(const std::string& path) {
 
     Grid2D grid(metadata);
     std::fill(grid.values().begin(), grid.values().end(), 0.0);
+    std::vector<unsigned char> seenSamples(grid.size(), 0);
     for (const Sample& sample : samples) {
-        grid.value(lineIndex.at(sample.line), cmpIndex.at(sample.cmp)) = sample.value;
+        const int xIndex = lineIndex.at(sample.line);
+        const int yIndex = cmpIndex.at(sample.cmp);
+        const std::size_t flatIndex =
+            static_cast<std::size_t>(yIndex) * static_cast<std::size_t>(nx) +
+            static_cast<std::size_t>(xIndex);
+        if (seenSamples[flatIndex] != 0) {
+            throw std::runtime_error(
+                "GeoEast DAT grid contains a duplicate Line/CMP sample.");
+        }
+        seenSamples[flatIndex] = 1;
+        grid.value(xIndex, yIndex) = sample.value;
     }
     return grid;
 }
@@ -467,6 +522,10 @@ Grid2D readAsciiGrid(const std::string& path) {
         for (int x = 0; x < metadata.nx; ++x) {
             if (!(in >> grid.value(x, y))) {
                 throw std::runtime_error("Grid file ended before all values were read.");
+            }
+            if (!std::isfinite(grid.value(x, y))) {
+                throw std::runtime_error(
+                    "Grid file contains a non-finite attribute value.");
             }
         }
     }

@@ -29,6 +29,9 @@ QStringList presetKeys() {
 TraceParameters presetParameters(const QString& canonicalPresetName) {
     TraceParameters p;
     const QString key = canonicalPresetName.trimmed();
+    if (key != QString::fromUtf8("防黏连增强")) {
+        p.rootAntiMerge = false;
+    }
     if (key == QString::fromUtf8("全覆盖优先")) {
         p.percentile = 0.975;
         p.weakPercentile = 0.955;

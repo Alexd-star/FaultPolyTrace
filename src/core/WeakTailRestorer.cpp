@@ -4,6 +4,7 @@
 #include <array>
 #include <cmath>
 #include <limits>
+#include <map>
 #include <queue>
 #include <set>
 #include <stdexcept>
@@ -118,11 +119,16 @@ std::vector<int> labelComponents(const BinaryMask& mask) {
 
 void validateWeakTailOptions(const WeakTailOptions& options) {
     if (options.minCells < 1 || options.maxCells < options.minCells ||
+        !std::isfinite(options.minAspect) ||
+        !std::isfinite(options.minMeanSupportRatio) ||
+        !std::isfinite(options.minPeakSupportRatio) ||
+        !std::isfinite(options.maxAlignmentAngleDegrees) ||
         options.minAspect < 1.0 || options.minMeanSupportRatio < 0.0 ||
         options.minPeakSupportRatio < 0.0 ||
         options.maxAlignmentAngleDegrees < 0.0 ||
         options.maxAlignmentAngleDegrees > 90.0 ||
         options.ownershipClearanceRadius < 1 || options.tangentRadius < 1 ||
+        options.junctionClearanceRadius < 0 ||
         options.maxEvidenceRecords < 1) {
         throw std::runtime_error("Weak tail restoration options are out of range.");
     }
@@ -149,6 +155,45 @@ WeakTailResult restoreSupportedWeakTails(
     const int width = grid.nx();
     const int height = grid.ny();
     const std::vector<int> ownerLabels = labelComponents(keptSkeleton);
+    const SkeletonGraph keptGraph = buildSkeletonGraph(keptSkeleton);
+    std::vector<int> endpointByPixel(static_cast<std::size_t>(width * height), 0);
+    std::map<int, std::vector<SkeletonPoint>> endpointTangents;
+    for (std::size_t index = 0; index < keptGraph.endpoints.size(); ++index) {
+        const SkeletonPoint& endpoint = keptGraph.endpoints[index];
+        endpointByPixel[static_cast<std::size_t>(endpoint.y * width + endpoint.x)] =
+            static_cast<int>(index + 1);
+    }
+    for (const SkeletonBranch& branch : keptGraph.branches) {
+        if (branch.points.size() < 2) {
+            continue;
+        }
+        const SkeletonPoint& first = branch.points.front();
+        const int firstId = endpointByPixel[static_cast<std::size_t>(
+            first.y * width + first.x)];
+        if (firstId > 0) {
+            const std::size_t count = std::min<std::size_t>(
+                branch.points.size(), static_cast<std::size_t>(options.tangentRadius + 1));
+            endpointTangents[firstId] = std::vector<SkeletonPoint>(
+                branch.points.begin(), branch.points.begin() + static_cast<std::ptrdiff_t>(count));
+        }
+        const SkeletonPoint& last = branch.points.back();
+        const int lastId = endpointByPixel[static_cast<std::size_t>(
+            last.y * width + last.x)];
+        if (lastId > 0) {
+            const std::size_t count = std::min<std::size_t>(
+                branch.points.size(), static_cast<std::size_t>(options.tangentRadius + 1));
+            endpointTangents[lastId] = std::vector<SkeletonPoint>(
+                branch.points.rbegin(),
+                branch.points.rbegin() + static_cast<std::ptrdiff_t>(count));
+        }
+    }
+    BinaryMask junctionMask(width, height);
+    for (const SkeletonPoint& junction : keptGraph.junctions) {
+        junctionMask.set(junction.x, junction.y, true);
+    }
+    const BinaryMask junctionGuard = options.junctionClearanceRadius > 0
+        ? dilate(junctionMask, options.junctionClearanceRadius)
+        : junctionMask;
     std::vector<unsigned char> visited(static_cast<std::size_t>(width * height), 0);
     auto indexOf = [width](int x, int y) { return y * width + x; };
 
@@ -240,8 +285,53 @@ WeakTailResult restoreSupportedWeakTails(
                 candidate.ownerLabel = *touchedOwners.begin();
             }
 
+            std::set<int> directOwners;
+            std::set<int> directContacts;
+            std::set<int> endpointPorts;
+            for (const SkeletonPoint& point : candidate.cells) {
+                candidate.intersectsJunctionGuard =
+                    candidate.intersectsJunctionGuard || junctionGuard.get(point.x, point.y);
+                for (int oy = -1; oy <= 1; ++oy) {
+                    for (int ox = -1; ox <= 1; ++ox) {
+                        if (ox == 0 && oy == 0) {
+                            continue;
+                        }
+                        const int nx = point.x + ox;
+                        const int ny = point.y + oy;
+                        if (!keptSkeleton.inBounds(nx, ny) ||
+                            !keptSkeleton.get(nx, ny)) {
+                            continue;
+                        }
+                        const int contactIndex = indexOf(nx, ny);
+                        directContacts.insert(contactIndex);
+                        const int owner = ownerLabels[static_cast<std::size_t>(contactIndex)];
+                        if (owner > 0) {
+                            directOwners.insert(owner);
+                        }
+                        const int endpointId = endpointByPixel[static_cast<std::size_t>(contactIndex)];
+                        if (endpointId > 0) {
+                            endpointPorts.insert(endpointId);
+                        }
+                    }
+                }
+            }
+            candidate.directContactCount = static_cast<int>(directContacts.size());
+            candidate.directOwnerCount = static_cast<int>(directOwners.size());
+            candidate.endpointPortCount = static_cast<int>(endpointPorts.size());
+            if (endpointPorts.size() == 1) {
+                const SkeletonPoint& endpoint = keptGraph.endpoints[
+                    static_cast<std::size_t>(*endpointPorts.begin() - 1)];
+                candidate.endpointX = endpoint.x;
+                candidate.endpointY = endpoint.y;
+            }
+
             std::vector<SkeletonPoint> localOwnerPoints;
-            if (candidate.ownerLabel > 0) {
+            if (options.requireEndpointPortOwnership && endpointPorts.size() == 1) {
+                const auto tangent = endpointTangents.find(*endpointPorts.begin());
+                if (tangent != endpointTangents.end()) {
+                    localOwnerPoints = tangent->second;
+                }
+            } else if (candidate.ownerLabel > 0) {
                 const int minX = std::max(0, candidate.minX - options.tangentRadius);
                 const int maxX = std::min(width - 1, candidate.maxX + options.tangentRadius);
                 const int minY = std::max(0, candidate.minY - options.tangentRadius);
@@ -272,6 +362,19 @@ WeakTailResult restoreSupportedWeakTails(
                        candidate.maxValue < supportThreshold * options.minPeakSupportRatio) {
                 candidate.decision = "insufficient_attribute_support";
                 ++result.stats.attributeRejected;
+            } else if (options.requireEndpointPortOwnership &&
+                       (candidate.directContactCount == 0 ||
+                        candidate.directOwnerCount != 1)) {
+                candidate.decision = "missing_or_ambiguous_direct_contact";
+                ++result.stats.directContactRejected;
+            } else if (options.requireEndpointPortOwnership &&
+                       candidate.endpointPortCount != 1) {
+                candidate.decision = "not_attached_to_unique_endpoint_port";
+                ++result.stats.endpointPortRejected;
+            } else if (options.requireEndpointPortOwnership &&
+                       candidate.intersectsJunctionGuard) {
+                candidate.decision = "junction_guard_conflict";
+                ++result.stats.junctionGuardRejected;
             } else if (candidate.touchedOwnerCount != 1) {
                 candidate.decision = "ambiguous_or_detached_owner";
                 ++result.stats.ownershipRejected;

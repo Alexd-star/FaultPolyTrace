@@ -508,6 +508,7 @@ def test_candidate_root_grouping_requires_root_anti_merge(
             "--output",
             str(output),
             "--branch-attribution-candidate-groups",
+            "--no-root-anti-merge",
         ],
         cwd=ROOT,
         capture_output=True,

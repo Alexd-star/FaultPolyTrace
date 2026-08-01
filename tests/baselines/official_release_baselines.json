@@ -1,0 +1,42 @@
+{
+  "format": "FaultPolyTrace.ReleaseBaselines",
+  "schemaVersion": 1,
+  "sourceCommit": "f290f7ef79ab39ea1bec833b3c7d318e117f5005",
+  "input": {
+    "logicalName": "BGPCup2025/test.dat",
+    "sha256": "21AB29456CE19B05CFC5646A1BD67BBA579FF65E30ECA99C3D39DC3C8BFFC07B",
+    "nx": 1501,
+    "ny": 701,
+    "dx": 10.0,
+    "dy": 10.0
+  },
+  "baselines": {
+    "released214": {
+      "role": "stable rollback baseline",
+      "candidatePolygonCount": 232,
+      "keptPolygonCount": 214,
+      "cliCsvSha256": "A2A9644692B1E6635B152823CAE192C9C6EF19320AB5EF4273D5B2DB90638ECF",
+      "geoeastReadbackCount": 214,
+      "geoeastReadbackSha256": "618AE599869109BA1B1D9E5F650A48F328E724C6F34F988502BD6666B6B7CB94"
+    },
+    "candidateV12_200": {
+      "role": "current default candidate and rollback target",
+      "candidatePolygonCount": 212,
+      "keptPolygonCount": 200,
+      "cliCsvSha256": "50B0EA63A705072E8B0A4F6F66915A49E909C96DFF8588F6FCED42C3AAD65AC1",
+      "canonicalKeptCsvSha256": "2911D696F880E1173F6633E6B8A4587316FDC7DFA19109CE8EB28083A076ED3A",
+      "geoeastReadbackCount": 200,
+      "geoeastReadbackSha256": "02415E30ED33E9A1DE591043A13507A0B4D75543D8758562AD3DE4B58B4C71E4"
+    }
+  },
+  "promotionPolicy": {
+    "disabledFeatureMustPreserveBaseline": true,
+    "requiredOpenRings": 0,
+    "requiredSelfIntersections": 0,
+    "requiredPolygonConflicts": 0,
+    "requireDeterministicOutput": true,
+    "requireOfficialFullImageReview": true,
+    "requireTwentyFourTileReview": true,
+    "requireGeoEastReadback": true
+  }
+}

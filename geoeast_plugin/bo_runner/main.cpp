@@ -2,6 +2,7 @@
 #include "StagedCommit.h"
 
 #include "../../src/core/FaultTracer.h"
+#include "../../src/core/ProductDefaults.h"
 #include "../../src/core/Topology.h"
 #include "../../src/io/AsciiGridIO.h"
 #include "../../src/io/AtomicOutputFile.h"
@@ -10,6 +11,7 @@
 #include <chrono>
 #include <array>
 #include <cctype>
+#include <cstdint>
 #include <cstdlib>
 #include <exception>
 #include <fstream>
@@ -21,6 +23,7 @@
 #include <algorithm>
 #include <cmath>
 #include <string>
+#include <sstream>
 #include <vector>
 
 #include "boproject.h"
@@ -52,6 +55,7 @@ struct Options {
     std::string importFaultPolygonsCsvPath;
     bool listGrids = false;
     bool listFaultPolygons = false;
+    bool inspectFaultPolygon = false;
     bool validateGridOnly = false;
     bool overwriteGrid = false;
     bool deleteGrid = false;
@@ -81,6 +85,14 @@ bool parseTailContinuationOption(
         options.trace.weakTailCompletionShadow = true;
     } else if (arg == "--no-weak-tail-completion-shadow") {
         options.trace.weakTailCompletionShadow = false;
+    } else if (arg == "--weak-tail-endpoint-port-shadow") {
+        options.trace.weakTailEndpointPortShadow = true;
+    } else if (arg == "--no-weak-tail-endpoint-port-shadow") {
+        options.trace.weakTailEndpointPortShadow = false;
+    } else if (arg == "--weak-tail-endpoint-port-ownership") {
+        options.trace.weakTailEndpointPortOwnership = true;
+    } else if (arg == "--no-weak-tail-endpoint-port-ownership") {
+        options.trace.weakTailEndpointPortOwnership = false;
     } else if (arg == "--weak-tail-min-cells") {
         options.trace.weakTailMinCells = std::stoi(requireValue(arg));
     } else if (arg == "--weak-tail-max-cells") {
@@ -97,6 +109,8 @@ bool parseTailContinuationOption(
         options.trace.weakTailOwnershipClearanceRadius = std::stoi(requireValue(arg));
     } else if (arg == "--weak-tail-tangent-radius") {
         options.trace.weakTailTangentRadius = std::stoi(requireValue(arg));
+    } else if (arg == "--weak-tail-junction-clearance") {
+        options.trace.weakTailJunctionClearanceRadius = std::stoi(requireValue(arg));
     } else if (arg == "--preserve-observed-skeleton-envelope") {
         options.trace.preserveObservedSkeletonEnvelope = true;
     } else if (arg == "--no-preserve-observed-skeleton-envelope") {
@@ -154,12 +168,20 @@ void printUsage() {
         << "  --min-cells <count>\n"
         << "  --open-radius <count>\n"
         << "  --close-radius <count>\n"
+        << "  --physical-morphology-shadow | --no-physical-morphology-shadow\n"
+        << "  --physical-close-radius-world <value>\n"
         << "  --weak-percentile <0-1>\n"
         << "  --weak-connect-radius <count>\n"
         << "  --max-weak-component-cells <count>\n"
         << "  --min-weak-component-aspect <value>\n"
         << "  --weak-path-gate | --no-weak-path-gate\n"
+        << "  --weak-extension-layered-shadow | --no-weak-extension-layered-shadow\n"
+        << "  --weak-extension-layered-gate | --no-weak-extension-layered-gate\n"
         << "  --branch-attribution-shadow | --no-branch-attribution-shadow\n"
+        << "  --skeleton-graph-v2-shadow | --no-skeleton-graph-v2-shadow\n"
+        << "  --skeleton-graph-v2-attribution-shadow | --no-skeleton-graph-v2-attribution-shadow\n"
+        << "  --multi-scale-evidence-shadow | --no-multi-scale-evidence-shadow\n"
+        << "  --adaptive-boundary-shadow | --no-adaptive-boundary-shadow\n"
         << "  --local-polygon-quality | --no-local-polygon-quality\n"
         << "  --belt-radius <count>\n"
         << "  --post-belt-close-radius <count>\n"
@@ -196,9 +218,15 @@ void printUsage() {
         << "  --weak-continuity-max-turn-angle <degrees>\n"
         << "  --weak-continuity-min-competition-margin <value>\n"
         << "  --weak-continuity-third-party-clearance <count>\n"
+        << "  --weak-continuity-physical-metric | --no-weak-continuity-physical-metric\n"
+        << "  --weak-continuity-global-matching | --no-weak-continuity-global-matching\n"
+        << "  --weak-continuity-no-connect-cost <value>\n"
+        << "  --weak-continuity-max-exact-endpoints <count>\n"
         << "  --weak-continuity-output <csv>\n"
         << "  --weak-tail-completion | --no-weak-tail-completion\n"
         << "  --weak-tail-completion-shadow | --no-weak-tail-completion-shadow\n"
+        << "  --weak-tail-endpoint-port-shadow | --no-weak-tail-endpoint-port-shadow\n"
+        << "  --weak-tail-endpoint-port-ownership | --no-weak-tail-endpoint-port-ownership\n"
         << "  --weak-tail-min-cells <count>\n"
         << "  --weak-tail-max-cells <count>\n"
         << "  --weak-tail-min-aspect <value>\n"
@@ -207,6 +235,7 @@ void printUsage() {
         << "  --weak-tail-max-alignment-angle <degrees>\n"
         << "  --weak-tail-owner-clearance <count>\n"
         << "  --weak-tail-tangent-radius <count>\n"
+        << "  --weak-tail-junction-clearance <count>\n"
         << "  --preserve-observed-skeleton-envelope\n"
         << "  --no-preserve-observed-skeleton-envelope\n"
         << "  --separate-branch-belts\n"
@@ -258,6 +287,7 @@ void printUsage() {
         << "  --topology-output <csv>\n"
         << "  --diagnostics <json>\n"
         << "  --transaction-report <json>\n"
+        << "  --inspect-fault-polygon (requires --output)\n"
         << "  --view-grid-output <txt>\n"
         << "  --view-polygons-output <csv>\n"
         << "  --export-fault-polygons-output <csv>\n"
@@ -309,6 +339,117 @@ fpt_geoeast::FaultPolygonStyle parsePolygonColor(
     return style;
 }
 
+bool parsePostProcessingOption(
+    const std::string& arg,
+    int& index,
+    int argc,
+    char** argv,
+    Options& options) {
+    auto requireValue = [&](const std::string& name) -> std::string {
+        if (index + 1 >= argc) {
+            throw std::runtime_error("Missing value for " + name);
+        }
+        return argv[++index];
+    };
+    if (arg == "--separate-branch-belts") {
+        options.trace.separateBranchBelts = true;
+    } else if (arg == "--no-separate-branch-belts") {
+        options.trace.separateBranchBelts = false;
+    } else if (arg == "--root-anti-merge") {
+        options.trace.rootAntiMerge = true;
+    } else if (arg == "--no-root-anti-merge") {
+        options.trace.rootAntiMerge = false;
+    } else if (arg == "--root-anti-merge-radius") {
+        options.trace.rootAntiMergeRadius = std::stoi(requireValue(arg));
+    } else if (arg == "--root-anti-merge-support-ratio") {
+        options.trace.rootAntiMergeSupportRatio = std::stod(requireValue(arg));
+    } else if (arg == "--root-anti-merge-max-bridge-value") {
+        options.trace.rootAntiMergeMaxBridgeValue = std::stod(requireValue(arg));
+    } else if (arg == "--root-anti-merge-min-part-cells") {
+        options.trace.rootAntiMergeMinPartCells = std::stoi(requireValue(arg));
+    } else if (arg == "--root-anti-merge-min-part-ratio") {
+        options.trace.rootAntiMergeMinPartRatio = std::stod(requireValue(arg));
+    } else if (arg == "--root-anti-merge-weak-guard-threshold") {
+        options.trace.rootAntiMergeWeakGuardThreshold = std::stod(requireValue(arg));
+    } else if (arg == "--root-anti-merge-weak-guard-radius") {
+        options.trace.rootAntiMergeWeakGuardRadius = std::stoi(requireValue(arg));
+    } else if (arg == "--local-anti-merge") {
+        options.trace.localAntiMerge = true;
+    } else if (arg == "--no-local-anti-merge") {
+        options.trace.localAntiMerge = false;
+    } else if (arg == "--local-anti-merge-low-threshold") {
+        options.trace.localAntiMergeLowThreshold = std::stod(requireValue(arg));
+    } else if (arg == "--local-anti-merge-bridge-radius") {
+        options.trace.localAntiMergeBridgeRadius = std::stoi(requireValue(arg));
+    } else if (arg == "--local-anti-merge-min-part-cells") {
+        options.trace.localAntiMergeMinPartCells = std::stoi(requireValue(arg));
+    } else if (arg == "--local-anti-merge-min-part-ratio") {
+        options.trace.localAntiMergeMinPartRatio = std::stod(requireValue(arg));
+    } else if (arg == "--local-anti-merge-min-bridge-cells") {
+        options.trace.localAntiMergeMinBridgeCells = std::stoi(requireValue(arg));
+    } else if (arg == "--local-anti-merge-min-low-ratio") {
+        options.trace.localAntiMergeMinLowRatio = std::stod(requireValue(arg));
+    } else if (arg == "--no-adaptive-area-filter") {
+        options.trace.adaptiveAreaFilter = false;
+    } else if (arg == "--adaptive-area-min-cells") {
+        options.trace.adaptiveAreaMinCells = std::stoi(requireValue(arg));
+    } else if (arg == "--adaptive-area-min-aspect") {
+        options.trace.adaptiveAreaMinAspect = std::stod(requireValue(arg));
+    } else if (arg == "--adaptive-area-min-mean-ratio") {
+        options.trace.adaptiveAreaMinMeanRatio = std::stod(requireValue(arg));
+    } else if (arg == "--adaptive-area-min-max-ratio") {
+        options.trace.adaptiveAreaMinMaxRatio = std::stod(requireValue(arg));
+    } else if (arg == "--no-residual-fill") {
+        options.trace.residualAttributeFill = false;
+    } else if (arg == "--residual-trace") {
+        options.trace.residualTrace = true;
+    } else if (arg == "--no-residual-trace") {
+        options.trace.residualTrace = false;
+    } else if (arg == "--residual-percentile") {
+        options.trace.residualPercentile = std::stod(requireValue(arg));
+    } else if (arg == "--residual-fill-radius") {
+        options.trace.residualFillRadius = std::stoi(requireValue(arg));
+    } else if (arg == "--residual-edge-fill-radius") {
+        options.trace.residualEdgeFillRadius = std::stoi(requireValue(arg));
+    } else if (arg == "--residual-edge-fill-min-value-ratio") {
+        options.trace.residualEdgeFillMinValueRatio = std::stod(requireValue(arg));
+    } else if (arg == "--residual-edge-fill-max-patch-span") {
+        options.trace.residualEdgeFillMaxPatchSpan = std::stoi(requireValue(arg));
+    } else if (arg == "--residual-min-cells") {
+        options.trace.residualMinCells = std::stoi(requireValue(arg));
+    } else if (arg == "--residual-trace-min-length") {
+        options.trace.residualTraceMinLength = std::stoi(requireValue(arg));
+    } else if (arg == "--residual-trace-max-cells") {
+        options.trace.residualTraceMaxCells = std::stoi(requireValue(arg));
+    } else if (arg == "--residual-covered-guard-radius") {
+        options.trace.residualCoveredGuardRadius = std::stoi(requireValue(arg));
+    } else if (arg == "--no-residual-detached-trace") {
+        options.trace.residualTraceDetached = false;
+    } else if (arg == "--residual-detached-min-cells") {
+        options.trace.residualDetachedMinCells = std::stoi(requireValue(arg));
+    } else if (arg == "--residual-detached-min-length") {
+        options.trace.residualDetachedMinLength = std::stoi(requireValue(arg));
+    } else if (arg == "--residual-detached-min-aspect") {
+        options.trace.residualDetachedMinAspect = std::stod(requireValue(arg));
+    } else if (arg == "--residual-detached-min-mean-ratio") {
+        options.trace.residualDetachedMinMeanRatio = std::stod(requireValue(arg));
+    } else if (arg == "--residual-detached-min-max-ratio") {
+        options.trace.residualDetachedMinMaxRatio = std::stod(requireValue(arg));
+    } else if (arg == "--simplify-tolerance") {
+        options.trace.simplifyTolerance = std::stod(requireValue(arg));
+    } else if (arg == "--smooth-iterations") {
+        options.trace.smoothIterations = std::stoi(requireValue(arg));
+    } else if (arg == "--polygon-color") {
+        options.polygonStyle = parsePolygonColor(
+            requireValue(arg), options.polygonStyle);
+    } else if (arg == "--polygon-linewidth") {
+        options.polygonStyle.lineWidth = std::stod(requireValue(arg));
+    } else {
+        return false;
+    }
+    return true;
+}
+
 void debugLog(const std::string& message) {
 #ifdef _WIN32
     OutputDebugStringA((message + "\n").c_str());
@@ -336,6 +477,12 @@ void validateGeoEastEnvironment() {
 
 Options parseArgs(int argc, char** argv) {
     Options options;
+    fpt::product_defaults::applyVisibleProductionDefaults(options.trace);
+    options.trace.traceMode = fpt::TraceMode::RidgeBelt;
+    options.trace.thresholdMode = fpt::ThresholdMode::Percentile;
+    options.trace.weakContinuityFinalObjectPass = true;
+    options.trace.weakTailCompletion = true;
+    options.trace.preserveObservedSkeletonEnvelope = true;
     auto envOrEmpty = [](const char* name) -> std::string {
         const char* value = std::getenv(name);
         return value && *value ? value : "";
@@ -402,6 +549,13 @@ Options parseArgs(int argc, char** argv) {
             continue;
         }
         if (parseTailContinuationOption(arg, i, argc, argv, options)) {
+            continue;
+        }
+        if (parsePostProcessingOption(arg, i, argc, argv, options)) {
+            continue;
+        }
+        if (arg == "--inspect-fault-polygon") {
+            options.inspectFaultPolygon = true;
             continue;
         }
         auto requireValue = [&](const std::string& name) -> std::string {
@@ -477,6 +631,12 @@ Options parseArgs(int argc, char** argv) {
             options.trace.openRadius = std::stoi(requireValue(arg));
         } else if (arg == "--close-radius") {
             options.trace.closeRadius = std::stoi(requireValue(arg));
+        } else if (arg == "--physical-morphology-shadow") {
+            options.trace.physicalMorphologyShadow = true;
+        } else if (arg == "--no-physical-morphology-shadow") {
+            options.trace.physicalMorphologyShadow = false;
+        } else if (arg == "--physical-close-radius-world") {
+            options.trace.physicalCloseRadiusWorld = std::stod(requireValue(arg));
         } else if (arg == "--weak-percentile") {
             options.trace.weakPercentile = std::stod(requireValue(arg));
         } else if (arg == "--weak-connect-radius") {
@@ -489,10 +649,61 @@ Options parseArgs(int argc, char** argv) {
             options.trace.weakPathGate = true;
         } else if (arg == "--no-weak-path-gate") {
             options.trace.weakPathGate = false;
+        } else if (arg == "--weak-extension-layered-shadow") {
+            options.trace.weakExtensionLayeredShadow = true;
+        } else if (arg == "--no-weak-extension-layered-shadow") {
+            options.trace.weakExtensionLayeredShadow = false;
+        } else if (arg == "--weak-extension-layered-gate") {
+            options.trace.weakExtensionLayeredGate = true;
+        } else if (arg == "--no-weak-extension-layered-gate") {
+            options.trace.weakExtensionLayeredGate = false;
         } else if (arg == "--branch-attribution-shadow") {
             options.trace.branchAttributionShadow = true;
         } else if (arg == "--no-branch-attribution-shadow") {
             options.trace.branchAttributionShadow = false;
+        } else if (arg == "--skeleton-graph-v2-shadow") {
+            options.trace.skeletonGraphV2Shadow = true;
+        } else if (arg == "--no-skeleton-graph-v2-shadow") {
+            options.trace.skeletonGraphV2Shadow = false;
+        } else if (arg == "--skeleton-graph-v2-attribution-shadow") {
+            options.trace.skeletonGraphV2AttributionShadow = true;
+        } else if (arg == "--no-skeleton-graph-v2-attribution-shadow") {
+            options.trace.skeletonGraphV2AttributionShadow = false;
+        } else if (arg == "--multi-scale-evidence-shadow") {
+            options.trace.multiScaleEvidenceShadow = true;
+        } else if (arg == "--no-multi-scale-evidence-shadow") {
+            options.trace.multiScaleEvidenceShadow = false;
+        } else if (arg == "--multi-scale-min-confidence") {
+            options.trace.multiScaleEvidenceMinimumConfidence =
+                std::stod(requireValue(arg));
+        } else if (arg == "--multi-scale-min-ridge-response") {
+            options.trace.multiScaleEvidenceMinimumRidgeResponse =
+                std::stod(requireValue(arg));
+        } else if (arg == "--multi-scale-max-samples") {
+            options.trace.multiScaleEvidenceMaximumSamples =
+                static_cast<std::size_t>(std::stoull(requireValue(arg)));
+        } else if (arg == "--adaptive-boundary-shadow") {
+            options.trace.adaptiveBoundaryShadow = true;
+        } else if (arg == "--no-adaptive-boundary-shadow") {
+            options.trace.adaptiveBoundaryShadow = false;
+        } else if (arg == "--adaptive-boundary-max-displacement") {
+            options.trace.adaptiveBoundaryMaximumDisplacementWorld =
+                std::stod(requireValue(arg));
+        } else if (arg == "--adaptive-boundary-min-support-gain") {
+            options.trace.adaptiveBoundaryMinimumSupportGain =
+                std::stod(requireValue(arg));
+        } else if (arg == "--adaptive-boundary-max-support-loss") {
+            options.trace.adaptiveBoundaryMaximumSupportLossRatio =
+                std::stod(requireValue(arg));
+        } else if (arg == "--adaptive-boundary-max-leakage-increase") {
+            options.trace.adaptiveBoundaryMaximumLeakageIncreaseRatio =
+                std::stod(requireValue(arg));
+        } else if (arg == "--adaptive-boundary-max-polygons") {
+            options.trace.adaptiveBoundaryMaximumPolygons =
+                static_cast<std::size_t>(std::stoull(requireValue(arg)));
+        } else if (arg == "--adaptive-boundary-max-vertices") {
+            options.trace.adaptiveBoundaryMaximumVerticesPerPolygon =
+                static_cast<std::size_t>(std::stoull(requireValue(arg)));
         } else if (arg == "--local-polygon-quality-shadow") {
             options.trace.localPolygonQualityShadow = true;
         } else if (arg == "--no-local-polygon-quality-shadow") {
@@ -569,102 +780,23 @@ Options parseArgs(int argc, char** argv) {
             options.trace.weakContinuityMaxTurnAngle = std::stod(requireValue(arg));
         } else if (arg == "--weak-continuity-min-competition-margin") {
             options.trace.weakContinuityMinCompetitionMargin = std::stod(requireValue(arg));
+        } else if (arg == "--weak-continuity-physical-metric") {
+            options.trace.weakContinuityUsePhysicalMetric = true;
+        } else if (arg == "--no-weak-continuity-physical-metric") {
+            options.trace.weakContinuityUsePhysicalMetric = false;
+        } else if (arg == "--weak-continuity-global-matching") {
+            options.trace.weakContinuityUseGlobalMatching = true;
+        } else if (arg == "--no-weak-continuity-global-matching") {
+            options.trace.weakContinuityUseGlobalMatching = false;
+        } else if (arg == "--weak-continuity-no-connect-cost") {
+            options.trace.weakContinuityNoConnectCost = std::stod(requireValue(arg));
+        } else if (arg == "--weak-continuity-max-exact-endpoints") {
+            options.trace.weakContinuityMaxExactMatchingEndpoints =
+                std::stoi(requireValue(arg));
         } else if (arg == "--weak-continuity-third-party-clearance") {
             options.trace.weakContinuityThirdPartySkeletonClearanceRadius = std::stoi(requireValue(arg));
         } else if (arg == "--weak-continuity-output") {
             options.weakContinuityOutputPath = requireValue(arg);
-        } else if (arg == "--separate-branch-belts") {
-            options.trace.separateBranchBelts = true;
-        } else if (arg == "--no-separate-branch-belts") {
-            options.trace.separateBranchBelts = false;
-        } else if (arg == "--root-anti-merge") {
-            options.trace.rootAntiMerge = true;
-        } else if (arg == "--no-root-anti-merge") {
-            options.trace.rootAntiMerge = false;
-        } else if (arg == "--root-anti-merge-radius") {
-            options.trace.rootAntiMergeRadius = std::stoi(requireValue(arg));
-        } else if (arg == "--root-anti-merge-support-ratio") {
-            options.trace.rootAntiMergeSupportRatio = std::stod(requireValue(arg));
-        } else if (arg == "--root-anti-merge-max-bridge-value") {
-            options.trace.rootAntiMergeMaxBridgeValue = std::stod(requireValue(arg));
-        } else if (arg == "--root-anti-merge-min-part-cells") {
-            options.trace.rootAntiMergeMinPartCells = std::stoi(requireValue(arg));
-        } else if (arg == "--root-anti-merge-min-part-ratio") {
-            options.trace.rootAntiMergeMinPartRatio = std::stod(requireValue(arg));
-        } else if (arg == "--root-anti-merge-weak-guard-threshold") {
-            options.trace.rootAntiMergeWeakGuardThreshold = std::stod(requireValue(arg));
-        } else if (arg == "--root-anti-merge-weak-guard-radius") {
-            options.trace.rootAntiMergeWeakGuardRadius = std::stoi(requireValue(arg));
-        } else if (arg == "--local-anti-merge") {
-            options.trace.localAntiMerge = true;
-        } else if (arg == "--no-local-anti-merge") {
-            options.trace.localAntiMerge = false;
-        } else if (arg == "--local-anti-merge-low-threshold") {
-            options.trace.localAntiMergeLowThreshold = std::stod(requireValue(arg));
-        } else if (arg == "--local-anti-merge-bridge-radius") {
-            options.trace.localAntiMergeBridgeRadius = std::stoi(requireValue(arg));
-        } else if (arg == "--local-anti-merge-min-part-cells") {
-            options.trace.localAntiMergeMinPartCells = std::stoi(requireValue(arg));
-        } else if (arg == "--local-anti-merge-min-part-ratio") {
-            options.trace.localAntiMergeMinPartRatio = std::stod(requireValue(arg));
-        } else if (arg == "--local-anti-merge-min-bridge-cells") {
-            options.trace.localAntiMergeMinBridgeCells = std::stoi(requireValue(arg));
-        } else if (arg == "--local-anti-merge-min-low-ratio") {
-            options.trace.localAntiMergeMinLowRatio = std::stod(requireValue(arg));
-        } else if (arg == "--no-adaptive-area-filter") {
-            options.trace.adaptiveAreaFilter = false;
-        } else if (arg == "--adaptive-area-min-cells") {
-            options.trace.adaptiveAreaMinCells = std::stoi(requireValue(arg));
-        } else if (arg == "--adaptive-area-min-aspect") {
-            options.trace.adaptiveAreaMinAspect = std::stod(requireValue(arg));
-        } else if (arg == "--adaptive-area-min-mean-ratio") {
-            options.trace.adaptiveAreaMinMeanRatio = std::stod(requireValue(arg));
-        } else if (arg == "--adaptive-area-min-max-ratio") {
-            options.trace.adaptiveAreaMinMaxRatio = std::stod(requireValue(arg));
-        } else if (arg == "--no-residual-fill") {
-            options.trace.residualAttributeFill = false;
-        } else if (arg == "--residual-trace") {
-            options.trace.residualTrace = true;
-        } else if (arg == "--no-residual-trace") {
-            options.trace.residualTrace = false;
-        } else if (arg == "--residual-percentile") {
-            options.trace.residualPercentile = std::stod(requireValue(arg));
-        } else if (arg == "--residual-fill-radius") {
-            options.trace.residualFillRadius = std::stoi(requireValue(arg));
-        } else if (arg == "--residual-edge-fill-radius") {
-            options.trace.residualEdgeFillRadius = std::stoi(requireValue(arg));
-        } else if (arg == "--residual-edge-fill-min-value-ratio") {
-            options.trace.residualEdgeFillMinValueRatio = std::stod(requireValue(arg));
-        } else if (arg == "--residual-edge-fill-max-patch-span") {
-            options.trace.residualEdgeFillMaxPatchSpan = std::stoi(requireValue(arg));
-        } else if (arg == "--residual-min-cells") {
-            options.trace.residualMinCells = std::stoi(requireValue(arg));
-        } else if (arg == "--residual-trace-min-length") {
-            options.trace.residualTraceMinLength = std::stoi(requireValue(arg));
-        } else if (arg == "--residual-trace-max-cells") {
-            options.trace.residualTraceMaxCells = std::stoi(requireValue(arg));
-        } else if (arg == "--residual-covered-guard-radius") {
-            options.trace.residualCoveredGuardRadius = std::stoi(requireValue(arg));
-        } else if (arg == "--no-residual-detached-trace") {
-            options.trace.residualTraceDetached = false;
-        } else if (arg == "--residual-detached-min-cells") {
-            options.trace.residualDetachedMinCells = std::stoi(requireValue(arg));
-        } else if (arg == "--residual-detached-min-length") {
-            options.trace.residualDetachedMinLength = std::stoi(requireValue(arg));
-        } else if (arg == "--residual-detached-min-aspect") {
-            options.trace.residualDetachedMinAspect = std::stod(requireValue(arg));
-        } else if (arg == "--residual-detached-min-mean-ratio") {
-            options.trace.residualDetachedMinMeanRatio = std::stod(requireValue(arg));
-        } else if (arg == "--residual-detached-min-max-ratio") {
-            options.trace.residualDetachedMinMaxRatio = std::stod(requireValue(arg));
-        } else if (arg == "--simplify-tolerance") {
-            options.trace.simplifyTolerance = std::stod(requireValue(arg));
-        } else if (arg == "--smooth-iterations") {
-            options.trace.smoothIterations = std::stoi(requireValue(arg));
-        } else if (arg == "--polygon-color") {
-            options.polygonStyle = parsePolygonColor(requireValue(arg), options.polygonStyle);
-        } else if (arg == "--polygon-linewidth") {
-            options.polygonStyle.lineWidth = std::stod(requireValue(arg));
         } else if (arg == "--help" || arg == "-h") {
             printUsage();
             std::exit(0);
@@ -677,15 +809,23 @@ Options parseArgs(int argc, char** argv) {
         throw std::runtime_error("Missing required GeoEast connection or data arguments.");
     }
     if (!options.listGrids && !options.listFaultPolygons &&
+        !options.inspectFaultPolygon &&
         options.exportFaultPolygonsOutputPath.empty() &&
         options.importFaultPolygonsCsvPath.empty() &&
         !options.deleteOutput && options.gridName.empty()) {
         throw std::runtime_error("Missing --grid. Use --list-grids to inspect available BOMapGrid objects.");
     }
-    if (!options.listGrids && !options.listFaultPolygons && options.exportFaultPolygonsOutputPath.empty() && !options.importGeoEastDatPath.empty() && options.outputName.empty()) {
+    if (!options.listGrids && !options.listFaultPolygons &&
+        !options.inspectFaultPolygon &&
+        options.exportFaultPolygonsOutputPath.empty() &&
+        !options.importGeoEastDatPath.empty() && options.outputName.empty()) {
         throw std::runtime_error("Missing --output for imported GeoEast DAT.");
     }
-    if (!options.listGrids && !options.listFaultPolygons && options.exportFaultPolygonsOutputPath.empty() && !options.deleteGrid && !options.deleteOutput && options.importGeoEastDatPath.empty() && !options.validateGridOnly && options.outputName.empty()) {
+    if (!options.listGrids && !options.listFaultPolygons &&
+        !options.inspectFaultPolygon &&
+        options.exportFaultPolygonsOutputPath.empty() && !options.deleteGrid &&
+        !options.deleteOutput && options.importGeoEastDatPath.empty() &&
+        !options.validateGridOnly && options.outputName.empty()) {
         throw std::runtime_error("Missing --output. Use --list-grids to inspect available BOMapGrid objects.");
     }
     if (options.deleteGrid && options.gridName.empty()) {
@@ -696,6 +836,9 @@ Options parseArgs(int argc, char** argv) {
     }
     if (!options.exportFaultPolygonsOutputPath.empty() && options.outputName.empty()) {
         throw std::runtime_error("Missing --output for --export-fault-polygons-output.");
+    }
+    if (options.inspectFaultPolygon && options.outputName.empty()) {
+        throw std::runtime_error("Missing --output for --inspect-fault-polygon.");
     }
     if (!options.importFaultPolygonsCsvPath.empty() && options.outputName.empty()) {
         throw std::runtime_error("Missing --output for --import-fault-polygons-csv.");
@@ -774,70 +917,217 @@ void writePreviewGrid(const std::string& path, const fpt::Grid2D& grid) {
     output.commit();
 }
 
-void verifyFaultPolygonRoundTrip(
-    const fpt_geoeast::GeoEastProjectPtr& project,
-    const std::string& outputName,
-    const std::vector<fpt::Polygon>& source) {
-    std::vector<const fpt::Polygon*> expected;
-    for (const fpt::Polygon& polygon : source) {
-        if (polygon.kept && polygon.points.size() >= 3) {
-            expected.push_back(&polygon);
+using QuantizedPoint = std::array<std::int64_t, 2>;
+using CanonicalRing = std::vector<QuantizedPoint>;
+
+struct FaultPolygonRoundTripReport {
+    bool completed = false;
+    bool geometryVerified = false;
+    bool topologyVerified = false;
+    bool styleVerified = false;
+    bool storageVerified = false;
+    std::size_t expectedPolygonCount = 0;
+    std::size_t actualPolygonCount = 0;
+    std::size_t expectedVertexCount = 0;
+    std::size_t actualVertexCount = 0;
+    std::size_t sourceInteriorRingCount = 0;
+    std::string expectedGeometryHash;
+    std::string actualGeometryHash;
+    fpt_geoeast::FaultPolygonStorageSummary storage;
+};
+
+CanonicalRing rotateRing(const CanonicalRing& ring, std::size_t start) {
+    CanonicalRing rotated;
+    rotated.reserve(ring.size());
+    for (std::size_t offset = 0; offset < ring.size(); ++offset) {
+        rotated.push_back(ring[(start + offset) % ring.size()]);
+    }
+    return rotated;
+}
+
+CanonicalRing minimumRingRotation(const CanonicalRing& ring) {
+    if (ring.empty()) {
+        return {};
+    }
+    const QuantizedPoint minimumPoint =
+        *std::min_element(ring.begin(), ring.end());
+    CanonicalRing best;
+    bool initialized = false;
+    for (std::size_t index = 0; index < ring.size(); ++index) {
+        if (ring[index] != minimumPoint) {
+            continue;
+        }
+        CanonicalRing candidate = rotateRing(ring, index);
+        if (!initialized || candidate < best) {
+            best = std::move(candidate);
+            initialized = true;
         }
     }
+    return best;
+}
+
+CanonicalRing canonicalizeRing(const std::vector<fpt::Point>& points) {
+    constexpr long double coordinateScale = 1000000.0L;
+    CanonicalRing ring;
+    ring.reserve(points.size());
+    for (const fpt::Point& point : points) {
+        if (!std::isfinite(point.x) || !std::isfinite(point.y)) {
+            throw std::runtime_error(
+                "GeoEast round-trip source contains a non-finite coordinate.");
+        }
+        const long double scaledX = static_cast<long double>(point.x) * coordinateScale;
+        const long double scaledY = static_cast<long double>(point.y) * coordinateScale;
+        const long double limit = static_cast<long double>(
+            std::numeric_limits<std::int64_t>::max());
+        if (std::abs(scaledX) > limit || std::abs(scaledY) > limit) {
+            throw std::runtime_error(
+                "GeoEast round-trip coordinate exceeds the canonicalization range.");
+        }
+        ring.push_back({
+            static_cast<std::int64_t>(std::llround(scaledX)),
+            static_cast<std::int64_t>(std::llround(scaledY))});
+    }
+    if (ring.size() >= 2 && ring.front() == ring.back()) {
+        ring.pop_back();
+    }
+    CanonicalRing forward = minimumRingRotation(ring);
+    std::reverse(ring.begin(), ring.end());
+    CanonicalRing reverse = minimumRingRotation(ring);
+    return reverse < forward ? reverse : forward;
+}
+
+std::vector<CanonicalRing> canonicalizeGeometry(
+    const std::vector<fpt::Polygon>& polygons,
+    bool keptOnly,
+    std::size_t& vertexCount) {
+    std::vector<CanonicalRing> rings;
+    vertexCount = 0;
+    for (const fpt::Polygon& polygon : polygons) {
+        if (keptOnly && !polygon.kept) {
+            continue;
+        }
+        if (polygon.points.size() < 3) {
+            continue;
+        }
+        CanonicalRing ring = canonicalizeRing(polygon.points);
+        vertexCount += ring.size();
+        rings.push_back(std::move(ring));
+    }
+    std::sort(rings.begin(), rings.end());
+    return rings;
+}
+
+void fnvAdd(std::uint64_t& hash, std::uint64_t value) {
+    constexpr std::uint64_t prime = 1099511628211ULL;
+    for (int byte = 0; byte < 8; ++byte) {
+        hash ^= (value >> (byte * 8)) & 0xffULL;
+        hash *= prime;
+    }
+}
+
+std::string canonicalGeometryHash(const std::vector<CanonicalRing>& rings) {
+    std::uint64_t hash = 1469598103934665603ULL;
+    fnvAdd(hash, static_cast<std::uint64_t>(rings.size()));
+    for (const CanonicalRing& ring : rings) {
+        fnvAdd(hash, static_cast<std::uint64_t>(ring.size()));
+        for (const QuantizedPoint& point : ring) {
+            fnvAdd(hash, static_cast<std::uint64_t>(point[0]));
+            fnvAdd(hash, static_cast<std::uint64_t>(point[1]));
+        }
+    }
+    std::ostringstream text;
+    text << std::uppercase << std::hex << std::setw(16) << std::setfill('0') << hash;
+    return text.str();
+}
+
+bool equalStyle(
+    const fpt_geoeast::FaultPolygonStyle& left,
+    const fpt_geoeast::FaultPolygonStyle& right) {
+    return left.red == right.red &&
+           left.green == right.green &&
+           left.blue == right.blue &&
+           std::abs(left.lineWidth - right.lineWidth) <= 1e-12;
+}
+
+FaultPolygonRoundTripReport verifyFaultPolygonRoundTrip(
+    const fpt_geoeast::GeoEastProjectPtr& project,
+    const std::string& outputName,
+    const std::vector<fpt::Polygon>& source,
+    const fpt_geoeast::FaultPolygonStyle& expectedStyle) {
+    FaultPolygonRoundTripReport report;
+    for (const fpt::Polygon& polygon : source) {
+        if (polygon.kept && polygon.points.size() >= 3) {
+            ++report.expectedPolygonCount;
+            report.sourceInteriorRingCount += polygon.holes.size();
+        }
+    }
+
     const std::vector<fpt::Polygon> actual =
         fpt_geoeast::readFaultPolygons(project, outputName);
-    if (actual.size() != expected.size()) {
+    report.actualPolygonCount = actual.size();
+    if (actual.size() != report.expectedPolygonCount) {
         throw std::runtime_error(
             "GeoEast round-trip polygon count mismatch: expected " +
-            std::to_string(expected.size()) + ", got " +
+            std::to_string(report.expectedPolygonCount) + ", got " +
             std::to_string(actual.size()));
     }
 
-    auto signature = [](const std::vector<fpt::Point>& points) {
-        double minX = std::numeric_limits<double>::max();
-        double minY = std::numeric_limits<double>::max();
-        double maxX = -std::numeric_limits<double>::max();
-        double maxY = -std::numeric_limits<double>::max();
-        for (const fpt::Point& point : points) {
-            minX = std::min(minX, point.x);
-            minY = std::min(minY, point.y);
-            maxX = std::max(maxX, point.x);
-            maxY = std::max(maxY, point.y);
-        }
-        return std::array<double, 6>{
-            minX,
-            minY,
-            maxX,
-            maxY,
-            fpt::polygonArea(points),
-            static_cast<double>(points.size())};
-    };
-    std::vector<std::array<double, 6>> expectedSignatures;
-    std::vector<std::array<double, 6>> actualSignatures;
-    expectedSignatures.reserve(expected.size());
-    actualSignatures.reserve(actual.size());
-    for (const fpt::Polygon* polygon : expected) {
-        expectedSignatures.push_back(signature(polygon->points));
+    const std::vector<CanonicalRing> expectedGeometry =
+        canonicalizeGeometry(source, true, report.expectedVertexCount);
+    const std::vector<CanonicalRing> actualGeometry =
+        canonicalizeGeometry(actual, false, report.actualVertexCount);
+    report.expectedGeometryHash = canonicalGeometryHash(expectedGeometry);
+    report.actualGeometryHash = canonicalGeometryHash(actualGeometry);
+    if (expectedGeometry != actualGeometry) {
+        throw std::runtime_error(
+            "GeoEast round-trip exterior coordinates differ after canonicalization: expected hash " +
+            report.expectedGeometryHash + ", got " + report.actualGeometryHash + ".");
     }
-    for (const fpt::Polygon& polygon : actual) {
-        actualSignatures.push_back(signature(polygon.points));
-    }
-    std::sort(expectedSignatures.begin(), expectedSignatures.end());
-    std::sort(actualSignatures.begin(), actualSignatures.end());
+    report.geometryVerified = true;
 
-    constexpr double tolerance = 1e-7;
-    for (std::size_t index = 0; index < expectedSignatures.size(); ++index) {
-        for (std::size_t field = 0; field < expectedSignatures[index].size(); ++field) {
-            const double scale = std::max(1.0, std::abs(expectedSignatures[index][field]));
-            if (std::abs(expectedSignatures[index][field] - actualSignatures[index][field]) > tolerance * scale) {
-                throw std::runtime_error(
-                    "GeoEast round-trip geometry signature mismatch at polygon " +
-                    std::to_string(index + 1));
-            }
-        }
+    const fpt::TopologyDiagnostics topology = fpt::diagnoseTopology(actual, false);
+    if (!fpt::topologyIsValid(topology)) {
+        throw std::runtime_error(
+            "GeoEast round-trip geometry failed complete topology validation.");
     }
-    std::cout << "GeoEast exterior-ring round-trip verified: " << actual.size()
-              << " closed polygons; bounds, exterior areas, and vertex counts preserved.\n";
+    report.topologyVerified = true;
+
+    report.storage = fpt_geoeast::inspectFaultPolygonStorage(project, outputName);
+    const bool countConsistent =
+        report.storage.headerSegmentCount == static_cast<int>(report.storage.segmentCount) &&
+        report.storage.segmentCount == report.expectedPolygonCount;
+    const bool idsConsistent =
+        report.storage.uniqueSegmentIdCount == report.storage.segmentCount &&
+        report.storage.uniquePrimaryKeyCount == report.storage.segmentCount &&
+        report.storage.duplicateSegmentIdCount == 0 &&
+        report.storage.duplicatePrimaryKeyCount == 0;
+    if (!countConsistent || !idsConsistent ||
+        report.storage.openSegmentCount != 0 ||
+        report.storage.invalidSegmentCount != 0) {
+        throw std::runtime_error(
+            "GeoEast round-trip storage metadata is inconsistent or contains open/invalid segments.");
+    }
+    report.storageVerified = true;
+
+    if (!equalStyle(expectedStyle, report.storage.style)) {
+        throw std::runtime_error("GeoEast round-trip polygon style mismatch.");
+    }
+    report.styleVerified = true;
+    report.completed = true;
+
+    std::cout << "GeoEast round-trip verified: " << report.actualPolygonCount
+              << " closed exterior rings, " << report.actualVertexCount
+              << " vertices, geometry hash " << report.actualGeometryHash
+              << ", topology/style/storage valid.\n";
+    if (report.sourceInteriorRingCount > 0) {
+        std::cout << "GeoEast interior-ring policy: "
+                  << fpt_geoeast::faultPolygonInteriorRingPolicyName(
+                         fpt_geoeast::FaultPolygonInteriorRingPolicy::
+                             OmitUnsupportedInteriorRings)
+                  << "; omitted " << report.sourceInteriorRingCount
+                  << " unsupported interior ring(s).\n";
+    }
+    return report;
 }
 
 std::string makeStagingName(
@@ -882,7 +1172,9 @@ void writeStagedCommitReport(
     const std::string& targetName,
     const std::string& stagingName,
     bool previousObjectExisted,
-    const fpt_geoeast::StagedCommitResult& result) {
+    const fpt_geoeast::StagedCommitResult& result,
+    const FaultPolygonRoundTripReport& stagingVerification,
+    const FaultPolygonRoundTripReport& targetVerification) {
     if (path.empty()) {
         return;
     }
@@ -890,7 +1182,7 @@ void writeStagedCommitReport(
     std::ostream& out = output.stream();
     out << "{\n"
         << "  \"format\": \"FaultPolyTrace.GeoEastStagedCommit\",\n"
-        << "  \"schemaVersion\": 1,\n"
+        << "  \"schemaVersion\": 2,\n"
         << "  \"mode\": \"application_staged_commit\",\n"
         << "  \"targetName\": \"" << jsonEscape(targetName) << "\",\n"
         << "  \"stagingName\": \"" << jsonEscape(stagingName) << "\",\n"
@@ -902,6 +1194,51 @@ void writeStagedCommitReport(
         << "  \"stagingCleanupSucceeded\": " << (result.stagingCleanupSucceeded ? "true" : "false") << ",\n"
         << "  \"committed\": " << (result.committed ? "true" : "false") << ",\n"
         << "  \"success\": " << (result.success() ? "true" : "false") << ",\n"
+        << "  \"interiorRingPolicy\": \""
+        << fpt_geoeast::faultPolygonInteriorRingPolicyName(
+               fpt_geoeast::FaultPolygonInteriorRingPolicy::
+                   OmitUnsupportedInteriorRings)
+        << "\",\n"
+        << "  \"sourceInteriorRingCount\": "
+        << std::max(stagingVerification.sourceInteriorRingCount,
+                    targetVerification.sourceInteriorRingCount) << ",\n"
+        << "  \"stagingReadback\": {\n"
+        << "    \"completed\": " << (stagingVerification.completed ? "true" : "false") << ",\n"
+        << "    \"expectedPolygonCount\": " << stagingVerification.expectedPolygonCount << ",\n"
+        << "    \"actualPolygonCount\": " << stagingVerification.actualPolygonCount << ",\n"
+        << "    \"expectedGeometryHash\": \""
+        << jsonEscape(stagingVerification.expectedGeometryHash) << "\",\n"
+        << "    \"actualGeometryHash\": \""
+        << jsonEscape(stagingVerification.actualGeometryHash) << "\"\n"
+        << "  },\n"
+        << "  \"targetReadback\": {\n"
+        << "    \"completed\": " << (targetVerification.completed ? "true" : "false") << ",\n"
+        << "    \"geometryVerified\": " << (targetVerification.geometryVerified ? "true" : "false") << ",\n"
+        << "    \"topologyVerified\": " << (targetVerification.topologyVerified ? "true" : "false") << ",\n"
+        << "    \"styleVerified\": " << (targetVerification.styleVerified ? "true" : "false") << ",\n"
+        << "    \"storageVerified\": " << (targetVerification.storageVerified ? "true" : "false") << ",\n"
+        << "    \"expectedPolygonCount\": " << targetVerification.expectedPolygonCount << ",\n"
+        << "    \"actualPolygonCount\": " << targetVerification.actualPolygonCount << ",\n"
+        << "    \"expectedVertexCount\": " << targetVerification.expectedVertexCount << ",\n"
+        << "    \"actualVertexCount\": " << targetVerification.actualVertexCount << ",\n"
+        << "    \"expectedGeometryHash\": \""
+        << jsonEscape(targetVerification.expectedGeometryHash) << "\",\n"
+        << "    \"actualGeometryHash\": \""
+        << jsonEscape(targetVerification.actualGeometryHash) << "\",\n"
+        << "    \"headerSegmentCount\": " << targetVerification.storage.headerSegmentCount << ",\n"
+        << "    \"storedSegmentCount\": " << targetVerification.storage.segmentCount << ",\n"
+        << "    \"closedSegmentCount\": " << targetVerification.storage.closedSegmentCount << ",\n"
+        << "    \"openSegmentCount\": " << targetVerification.storage.openSegmentCount << ",\n"
+        << "    \"invalidSegmentCount\": " << targetVerification.storage.invalidSegmentCount << ",\n"
+        << "    \"pointCount\": " << targetVerification.storage.pointCount << ",\n"
+        << "    \"uniqueSegmentIdCount\": " << targetVerification.storage.uniqueSegmentIdCount << ",\n"
+        << "    \"uniqueCombinedIdCount\": " << targetVerification.storage.uniqueCombinedIdCount << ",\n"
+        << "    \"uniquePrimaryKeyCount\": " << targetVerification.storage.uniquePrimaryKeyCount << ",\n"
+        << "    \"style\": {\"red\": " << targetVerification.storage.style.red
+        << ", \"green\": " << targetVerification.storage.style.green
+        << ", \"blue\": " << targetVerification.storage.style.blue
+        << ", \"lineWidth\": " << targetVerification.storage.style.lineWidth << "}\n"
+        << "  },\n"
         << "  \"failureMessage\": \"" << jsonEscape(result.failureMessage) << "\",\n"
         << "  \"rollbackFailureMessage\": \"" << jsonEscape(result.rollbackFailureMessage) << "\",\n"
         << "  \"cleanupFailureMessage\": \"" << jsonEscape(result.cleanupFailureMessage) << "\"\n"
@@ -924,25 +1261,30 @@ fpt_geoeast::StagedCommitResult commitFaultPolygonsWithReadback(
         previousStyle = fpt_geoeast::readFaultPolygonStyle(project, outputName);
     }
     const std::string stagingName = makeStagingName(project);
+    FaultPolygonRoundTripReport stagingVerification;
+    FaultPolygonRoundTripReport targetVerification;
 
     fpt_geoeast::StagedCommitOperations operations;
     operations.writeStaging = [&](const std::string& name) {
         fpt_geoeast::writeFaultPolygons(project, name, polygons, true, style);
     };
     operations.verifyStaging = [&](const std::string& name) {
-        verifyFaultPolygonRoundTrip(project, name, polygons);
+        stagingVerification = verifyFaultPolygonRoundTrip(
+            project, name, polygons, style);
     };
     operations.replaceTarget = [&](const std::string& name) {
         fpt_geoeast::writeFaultPolygons(project, name, polygons, true, style);
     };
     operations.verifyTarget = [&](const std::string& name) {
-        verifyFaultPolygonRoundTrip(project, name, polygons);
+        targetVerification = verifyFaultPolygonRoundTrip(
+            project, name, polygons, style);
     };
     operations.rollbackTarget = [&](const std::string& name) {
         if (previousExists) {
             fpt_geoeast::writeFaultPolygons(
                 project, name, previousPolygons, true, previousStyle);
-            verifyFaultPolygonRoundTrip(project, name, previousPolygons);
+            verifyFaultPolygonRoundTrip(
+                project, name, previousPolygons, previousStyle);
         } else if (fpt_geoeast::faultPolygonsExist(project, name)) {
             fpt_geoeast::deleteFaultPolygons(project, name);
         }
@@ -956,7 +1298,13 @@ fpt_geoeast::StagedCommitResult commitFaultPolygonsWithReadback(
     const fpt_geoeast::StagedCommitResult result =
         fpt_geoeast::runStagedCommit(outputName, stagingName, operations);
     writeStagedCommitReport(
-        reportPath, outputName, stagingName, previousExists, result);
+        reportPath,
+        outputName,
+        stagingName,
+        previousExists,
+        result,
+        stagingVerification,
+        targetVerification);
     if (!result.success()) {
         std::string message = "GeoEast staged commit failed: " + result.failureMessage;
         if (result.rollbackPerformed && !result.rollbackSucceeded) {
@@ -1019,6 +1367,29 @@ int main(int argc, char** argv) {
             return 0;
         }
 
+        if (options.inspectFaultPolygon) {
+            const fpt_geoeast::FaultPolygonStorageSummary summary =
+                fpt_geoeast::inspectFaultPolygonStorage(project, options.outputName);
+            std::cout << "BOFaultPolygon storage: " << options.outputName << "\n"
+                      << "  header segments: " << summary.headerSegmentCount << "\n"
+                      << "  stored segments: " << summary.segmentCount << "\n"
+                      << "  closed/open/invalid: " << summary.closedSegmentCount
+                      << "/" << summary.openSegmentCount
+                      << "/" << summary.invalidSegmentCount << "\n"
+                      << "  points: " << summary.pointCount << "\n"
+                      << "  unique segment/combined/pk IDs: "
+                      << summary.uniqueSegmentIdCount << "/"
+                      << summary.uniqueCombinedIdCount << "/"
+                      << summary.uniquePrimaryKeyCount << "\n"
+                      << "  duplicate segment/pk IDs: "
+                      << summary.duplicateSegmentIdCount << "/"
+                      << summary.duplicatePrimaryKeyCount << "\n"
+                      << "  style RGB/width: " << summary.style.red << ","
+                      << summary.style.green << "," << summary.style.blue
+                      << "/" << summary.style.lineWidth << "\n";
+            return 0;
+        }
+
         if (options.deleteGrid) {
             debugLog("Deleting BOMapGrid: " + options.gridName);
             fpt_geoeast::deleteMapGrid(project, options.gridName);
@@ -1069,16 +1440,18 @@ int main(int argc, char** argv) {
             }
             const fpt::TopologyDiagnostics topology =
                 fpt::diagnoseTopology(polygons, true);
-            if (topology.openRingCount != 0 ||
-                topology.selfIntersectingPolygonCount != 0 ||
-                topology.polygonIntersectionCount != 0) {
+            if (!fpt::topologyIsValid(topology)) {
                 throw std::runtime_error(
                     "Imported polygon CSV failed topology validation: open=" +
                     std::to_string(topology.openRingCount) +
                     ", self-intersection=" +
                     std::to_string(topology.selfIntersectingPolygonCount) +
                     ", polygon-intersection=" +
-                    std::to_string(topology.polygonIntersectionCount) + ".");
+                    std::to_string(topology.polygonIntersectionCount) +
+                    ", invalid-polygon=" +
+                    std::to_string(topology.invalidPolygonCount) +
+                    ", containment=" +
+                    std::to_string(topology.polygonContainmentCount) + ".");
             }
             if (!options.topologyOutputPath.empty()) {
                 fpt::writeTopologyDetailsCsv(options.topologyOutputPath, topology);
@@ -1184,19 +1557,55 @@ int main(int argc, char** argv) {
             diagnostics.threshold = options.trace.threshold;
             diagnostics.percentile = options.trace.percentile;
             diagnostics.effectiveThreshold = result.effectiveThreshold;
+            diagnostics.primaryThresholdInfo = result.primaryThresholdInfo;
+            diagnostics.weakThresholdInfo = result.weakThresholdInfo;
+            diagnostics.residualThresholdInfo = result.residualThresholdInfo;
             diagnostics.minArea = options.trace.minArea;
             diagnostics.minCells = options.trace.minCells;
             diagnostics.openRadius = options.trace.openRadius;
             diagnostics.closeRadius = options.trace.closeRadius;
+            diagnostics.physicalMorphologyShadow =
+                options.trace.physicalMorphologyShadow;
+            diagnostics.physicalCloseRadiusWorld =
+                options.trace.physicalCloseRadiusWorld;
             diagnostics.weakPercentile = options.trace.weakPercentile;
             diagnostics.weakConnectRadius = options.trace.weakConnectRadius;
             diagnostics.maxWeakComponentCells = options.trace.maxWeakComponentCells;
             diagnostics.minWeakComponentAspect = options.trace.minWeakComponentAspect;
             diagnostics.weakPathGate = options.trace.weakPathGate;
+            diagnostics.weakExtensionLayeredShadow =
+                options.trace.weakExtensionLayeredShadow;
+            diagnostics.weakExtensionLayeredGate =
+                options.trace.weakExtensionLayeredGate;
             diagnostics.weakPathSupportRatio = options.trace.weakPathSupportRatio;
             diagnostics.weakPathMaxUnsupportedRun = options.trace.weakPathMaxUnsupportedRun;
             diagnostics.branchAttributionShadow = options.trace.branchAttributionShadow;
             diagnostics.branchAttributionCandidateGroups = options.trace.branchAttributionCandidateGroups;
+            diagnostics.skeletonGraphV2Shadow = options.trace.skeletonGraphV2Shadow;
+            diagnostics.skeletonGraphV2AttributionShadow =
+                options.trace.skeletonGraphV2AttributionShadow;
+            diagnostics.multiScaleEvidenceShadow =
+                options.trace.multiScaleEvidenceShadow;
+            diagnostics.multiScaleEvidenceMinimumConfidence =
+                options.trace.multiScaleEvidenceMinimumConfidence;
+            diagnostics.multiScaleEvidenceMinimumRidgeResponse =
+                options.trace.multiScaleEvidenceMinimumRidgeResponse;
+            diagnostics.multiScaleEvidenceMaximumSamples =
+                options.trace.multiScaleEvidenceMaximumSamples;
+            diagnostics.adaptiveBoundaryShadow =
+                options.trace.adaptiveBoundaryShadow;
+            diagnostics.adaptiveBoundaryMaximumDisplacementWorld =
+                options.trace.adaptiveBoundaryMaximumDisplacementWorld;
+            diagnostics.adaptiveBoundaryMinimumSupportGain =
+                options.trace.adaptiveBoundaryMinimumSupportGain;
+            diagnostics.adaptiveBoundaryMaximumSupportLossRatio =
+                options.trace.adaptiveBoundaryMaximumSupportLossRatio;
+            diagnostics.adaptiveBoundaryMaximumLeakageIncreaseRatio =
+                options.trace.adaptiveBoundaryMaximumLeakageIncreaseRatio;
+            diagnostics.adaptiveBoundaryMaximumPolygons =
+                options.trace.adaptiveBoundaryMaximumPolygons;
+            diagnostics.adaptiveBoundaryMaximumVerticesPerPolygon =
+                options.trace.adaptiveBoundaryMaximumVerticesPerPolygon;
             diagnostics.localPolygonQualityShadow = options.trace.localPolygonQualityShadow;
             diagnostics.localPolygonQuality = options.trace.localPolygonQuality;
             diagnostics.localQualityWidthRatio = options.trace.localQualityWidthRatio;
@@ -1268,10 +1677,22 @@ int main(int argc, char** argv) {
             diagnostics.weakContinuityMaxTurnAngle = options.trace.weakContinuityMaxTurnAngle;
             diagnostics.weakContinuityMinCompetitionMargin =
                 options.trace.weakContinuityMinCompetitionMargin;
+            diagnostics.weakContinuityUsePhysicalMetric =
+                options.trace.weakContinuityUsePhysicalMetric;
+            diagnostics.weakContinuityUseGlobalMatching =
+                options.trace.weakContinuityUseGlobalMatching;
+            diagnostics.weakContinuityNoConnectCost =
+                options.trace.weakContinuityNoConnectCost;
+            diagnostics.weakContinuityMaxExactMatchingEndpoints =
+                options.trace.weakContinuityMaxExactMatchingEndpoints;
             diagnostics.weakContinuityThirdPartySkeletonClearanceRadius =
                 options.trace.weakContinuityThirdPartySkeletonClearanceRadius;
             diagnostics.weakTailCompletionShadow = options.trace.weakTailCompletionShadow;
             diagnostics.weakTailCompletion = options.trace.weakTailCompletion;
+            diagnostics.weakTailEndpointPortShadow =
+                options.trace.weakTailEndpointPortShadow;
+            diagnostics.weakTailEndpointPortOwnership =
+                options.trace.weakTailEndpointPortOwnership;
             diagnostics.weakTailMinCells = options.trace.weakTailMinCells;
             diagnostics.weakTailMaxCells = options.trace.weakTailMaxCells;
             diagnostics.weakTailMinAspect = options.trace.weakTailMinAspect;
@@ -1284,6 +1705,8 @@ int main(int argc, char** argv) {
             diagnostics.weakTailOwnershipClearanceRadius =
                 options.trace.weakTailOwnershipClearanceRadius;
             diagnostics.weakTailTangentRadius = options.trace.weakTailTangentRadius;
+            diagnostics.weakTailJunctionClearanceRadius =
+                options.trace.weakTailJunctionClearanceRadius;
             diagnostics.preserveObservedSkeletonEnvelope =
                 options.trace.preserveObservedSkeletonEnvelope;
             diagnostics.rootAntiMerge = options.trace.rootAntiMerge;
@@ -1345,14 +1768,69 @@ int main(int argc, char** argv) {
             diagnostics.gridNx = grid.nx();
             diagnostics.gridNy = grid.ny();
             diagnostics.activeCellCount = result.activeCellCount;
+            diagnostics.physicalMorphologyShadowEvaluated =
+                result.physicalMorphologyShadowEvaluated;
+            diagnostics.physicalMorphologyRadiusWorld =
+                result.physicalMorphologyRadiusWorld;
+            diagnostics.physicalMorphologyLegacyCells =
+                result.physicalMorphologyLegacyCells;
+            diagnostics.physicalMorphologyCandidateCells =
+                result.physicalMorphologyCandidateCells;
+            diagnostics.physicalMorphologyAddedCells =
+                result.physicalMorphologyAddedCells;
+            diagnostics.physicalMorphologyRemovedCells =
+                result.physicalMorphologyRemovedCells;
+            diagnostics.physicalMorphologyJaccard =
+                result.physicalMorphologyJaccard;
             diagnostics.polygonCount = static_cast<int>(result.polygons.size());
             diagnostics.keptPolygonCount = kept;
             diagnostics.skeletonEndpoints = result.skeletonEndpoints;
             diagnostics.skeletonJunctions = result.skeletonJunctions;
             diagnostics.skeletonBranches = result.skeletonBranches;
+            diagnostics.skeletonGraphV2ShadowEvaluated =
+                result.skeletonGraphV2ShadowEvaluated;
+            diagnostics.skeletonGraphV2Stats = result.skeletonGraphV2Stats;
+            diagnostics.skeletonGraphV2AttributionShadowEvaluated =
+                result.skeletonGraphV2AttributionShadowEvaluated;
+            diagnostics.skeletonGraphV2Attribution =
+                result.skeletonGraphV2Attribution;
+            diagnostics.multiScaleEvidenceShadowEvaluated =
+                result.multiScaleEvidenceShadowEvaluated;
+            diagnostics.multiScaleEvidenceSummary =
+                result.multiScaleEvidenceSummary;
+            diagnostics.adaptiveBoundaryShadowEvaluated =
+                result.adaptiveBoundaryShadowEvaluated;
+            diagnostics.adaptiveBoundarySummary =
+                result.adaptiveBoundarySummary;
+            diagnostics.adaptiveBoundaryEvidence =
+                result.adaptiveBoundaryEvidence;
             diagnostics.keptBranches = result.keptBranches;
             diagnostics.prunedBranches = result.prunedBranches;
             diagnostics.connectedGaps = result.connectedGaps;
+            diagnostics.weakExtensionLayeredShadowEvaluated =
+                result.weakExtensionLayeredShadowEvaluated;
+            diagnostics.weakExtensionComponentCount =
+                result.weakExtensionComponentCount;
+            diagnostics.weakExtensionLegacyAcceptedComponents =
+                result.weakExtensionLegacyAcceptedComponents;
+            diagnostics.weakExtensionLayeredAcceptedComponents =
+                result.weakExtensionLayeredAcceptedComponents;
+            diagnostics.weakExtensionLayeredRejectedComponents =
+                result.weakExtensionLayeredRejectedComponents;
+            diagnostics.weakExtensionLayeredOwnerRejectedComponents =
+                result.weakExtensionLayeredOwnerRejectedComponents;
+            diagnostics.weakExtensionLayeredSizeRejectedComponents =
+                result.weakExtensionLayeredSizeRejectedComponents;
+            diagnostics.weakExtensionLayeredShapeRejectedComponents =
+                result.weakExtensionLayeredShapeRejectedComponents;
+            diagnostics.weakExtensionLayeredSupportRejectedComponents =
+                result.weakExtensionLayeredSupportRejectedComponents;
+            diagnostics.weakExtensionLayeredWidthRejectedComponents =
+                result.weakExtensionLayeredWidthRejectedComponents;
+            diagnostics.weakExtensionLegacyOnlyCells =
+                result.weakExtensionLegacyOnlyCells;
+            diagnostics.weakExtensionLayeredOnlyCells =
+                result.weakExtensionLayeredOnlyCells;
             diagnostics.weakContinuityStats = result.weakContinuityStats;
             diagnostics.weakContinuityProtectedFromAntiMergeCells =
                 result.weakContinuityProtectedFromAntiMergeCells;
@@ -1363,6 +1841,10 @@ int main(int argc, char** argv) {
             diagnostics.weakContinuityFinalObjectAddedEnvelopeCells =
                 result.weakContinuityFinalObjectAddedEnvelopeCells;
             diagnostics.weakTailStats = result.weakTailStats;
+            diagnostics.weakTailEndpointPortShadowEvaluated =
+                result.weakTailEndpointPortShadowEvaluated;
+            diagnostics.weakTailEndpointPortShadowStats =
+                result.weakTailEndpointPortShadowStats;
             diagnostics.weakTailProtectedFromAntiMergeCells =
                 result.weakTailProtectedFromAntiMergeCells;
             diagnostics.rootAntiMergeCandidateCutCells =
@@ -1381,6 +1863,30 @@ int main(int argc, char** argv) {
             diagnostics.residualFillAddedCells = result.residualFillAddedCells;
             diagnostics.residualFillRejectedComponents =
                 result.residualFillRejectedComponents;
+            diagnostics.residualTraceEffectiveThreshold =
+                result.residualTraceEffectiveThreshold;
+            diagnostics.residualTraceCandidateComponents =
+                result.residualTraceCandidateComponents;
+            diagnostics.residualTraceSizeRejectedComponents =
+                result.residualTraceSizeRejectedComponents;
+            diagnostics.residualTraceShapeRejectedComponents =
+                result.residualTraceShapeRejectedComponents;
+            diagnostics.residualTraceAttributeRejectedComponents =
+                result.residualTraceAttributeRejectedComponents;
+            diagnostics.residualTraceDetachedRejectedComponents =
+                result.residualTraceDetachedRejectedComponents;
+            diagnostics.residualTraceGeometryRejectedComponents =
+                result.residualTraceGeometryRejectedComponents;
+            diagnostics.residualTraceTopologyRejectedComponents =
+                result.residualTraceTopologyRejectedComponents;
+            diagnostics.residualTraceFallbackAcceptedComponents =
+                result.residualTraceFallbackAcceptedComponents;
+            diagnostics.residualTraceAcceptedComponents =
+                result.residualTraceAcceptedComponents;
+            diagnostics.residualTraceAcceptedPolygons =
+                result.residualTraceAcceptedPolygons;
+            diagnostics.residualTraceAcceptedCells =
+                result.residualTraceAcceptedCells;
             diagnostics.localQualityDetectedCount = result.localPolygonQualityStats.detectedCount;
             diagnostics.localQualityAcceptedCount = result.localPolygonQualityStats.acceptedCount;
             diagnostics.localQualityReviewCount = result.localPolygonQualityStats.reviewCount;
@@ -1393,6 +1899,15 @@ int main(int argc, char** argv) {
             diagnostics.openRingCount = topology.openRingCount;
             diagnostics.selfIntersectingPolygonCount = topology.selfIntersectingPolygonCount;
             diagnostics.polygonIntersectionCount = topology.polygonIntersectionCount;
+            diagnostics.invalidPolygonCount = topology.invalidPolygonCount;
+            diagnostics.nonFiniteCoordinateCount = topology.nonFiniteCoordinateCount;
+            diagnostics.zeroLengthEdgeCount = topology.zeroLengthEdgeCount;
+            diagnostics.duplicateVertexRingCount = topology.duplicateVertexRingCount;
+            diagnostics.degenerateRingCount = topology.degenerateRingCount;
+            diagnostics.holeOutsideShellCount = topology.holeOutsideShellCount;
+            diagnostics.nestedHoleCount = topology.nestedHoleCount;
+            diagnostics.polygonContainmentCount = topology.polygonContainmentCount;
+            diagnostics.polygonInteriorOverlapCount = topology.polygonInteriorOverlapCount;
             diagnostics.elapsedMs = static_cast<int>(std::min<long long>(
                 elapsedMs, std::numeric_limits<int>::max()));
             fpt::writeDiagnosticsJson(options.diagnosticsOutputPath, diagnostics);
@@ -1402,15 +1917,39 @@ int main(int argc, char** argv) {
         std::cout << "Grid: " << grid.nx() << " x " << grid.ny() << "\n";
         std::cout << "Effective threshold: " << result.effectiveThreshold << "\n";
         std::cout << "Active cells: " << result.activeCellCount << "\n";
+        if (result.physicalMorphologyShadowEvaluated) {
+            std::cout << "Physical morphology shadow legacy/candidate/added/removed/Jaccard: "
+                      << result.physicalMorphologyLegacyCells << "/"
+                      << result.physicalMorphologyCandidateCells << "/"
+                      << result.physicalMorphologyAddedCells << "/"
+                      << result.physicalMorphologyRemovedCells << "/"
+                      << result.physicalMorphologyJaccard << "\n";
+        }
         std::cout << "Skeleton endpoints: " << result.skeletonEndpoints << "\n";
         std::cout << "Skeleton junctions: " << result.skeletonJunctions << "\n";
         std::cout << "Skeleton branches: " << result.skeletonBranches << "\n";
+        if (result.skeletonGraphV2ShadowEvaluated) {
+            std::cout << "SkeletonGraphV2 raw junctions/clusters/branches/ports/half-edges: "
+                      << result.skeletonGraphV2Stats.rawJunctionPixels << "/"
+                      << result.skeletonGraphV2Stats.junctionClusters << "/"
+                      << result.skeletonGraphV2Stats.branches << "/"
+                      << result.skeletonGraphV2Stats.ports << "/"
+                      << result.skeletonGraphV2Stats.halfEdges << "\n";
+        }
         std::cout << "Connected gaps: " << result.connectedGaps << "\n";
         std::cout << "Kept branches: " << result.keptBranches << "\n";
         std::cout << "Pruned branches: " << result.prunedBranches << "\n";
         std::cout << "Residual fill candidate cells: " << result.residualFillCandidateCells << "\n";
         std::cout << "Residual fill added cells: " << result.residualFillAddedCells << "\n";
         std::cout << "Residual fill rejected components: " << result.residualFillRejectedComponents << "\n";
+        if (options.trace.residualTrace) {
+            std::cout << "Residual trace candidate/accepted components: "
+                      << result.residualTraceCandidateComponents << "/"
+                      << result.residualTraceAcceptedComponents << "\n";
+            std::cout << "Residual trace accepted polygons/cells: "
+                      << result.residualTraceAcceptedPolygons << "/"
+                      << result.residualTraceAcceptedCells << "\n";
+        }
         if (options.trace.weakContinuity ||
             options.trace.weakContinuityFinalObjectPass) {
             std::cout << "Weak continuity protected anti-merge cells: "
@@ -1454,6 +1993,10 @@ int main(int argc, char** argv) {
         std::cout << "Topology open rings: " << topology.openRingCount << "\n";
         std::cout << "Topology self-intersections: " << topology.selfIntersectingPolygonCount << "\n";
         std::cout << "Topology polygon intersections: " << topology.polygonIntersectionCount << "\n";
+        std::cout << "Topology invalid polygons: " << topology.invalidPolygonCount << "\n";
+        std::cout << "Topology containments/interior overlaps: "
+                  << topology.polygonContainmentCount << "/"
+                  << topology.polygonInteriorOverlapCount << "\n";
         if (!options.topologyOutputPath.empty()) {
             std::cout << "Topology details: " << options.topologyOutputPath << "\n";
         }

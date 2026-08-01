@@ -1,7 +1,7 @@
 ﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
-    从干净 Git 提交和统一 V1.1.0 构建产物生成正式竞赛代码提交包。
+    从干净 Git 提交和统一 V1.1.1 构建产物生成正式竞赛代码提交包。
 
 .DESCRIPTION
     源码只通过 git archive 导出跟踪文件，避免把 outputs、缓存、编译产物、
@@ -10,7 +10,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Version = "v1.1.0",
+    [string]$Version = "v1.1.1",
     [Parameter(Mandatory = $true)][string]$Destination,
     [switch]$KeepExisting,
     [switch]$AllowDirty

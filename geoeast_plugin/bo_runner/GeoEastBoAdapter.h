@@ -20,6 +20,28 @@ struct FaultPolygonStyle {
     double lineWidth = 0.025;
 };
 
+// GeoEast's BOFaultPolygon schema stores closed line segments, but it has no
+// field that identifies a segment as an interior ring.  FaultPolyTrace keeps
+// holes in CSV/WKT and deliberately writes only exterior rings to GeoEast.
+enum class FaultPolygonInteriorRingPolicy {
+    OmitUnsupportedInteriorRings
+};
+
+struct FaultPolygonStorageSummary {
+    int headerSegmentCount = 0;
+    std::size_t segmentCount = 0;
+    std::size_t closedSegmentCount = 0;
+    std::size_t openSegmentCount = 0;
+    std::size_t invalidSegmentCount = 0;
+    std::size_t pointCount = 0;
+    std::size_t uniqueSegmentIdCount = 0;
+    std::size_t uniqueCombinedIdCount = 0;
+    std::size_t uniquePrimaryKeyCount = 0;
+    std::size_t duplicateSegmentIdCount = 0;
+    std::size_t duplicatePrimaryKeyCount = 0;
+    FaultPolygonStyle style;
+};
+
 std::vector<std::string> listMapGrids(const GeoEastProjectPtr& project);
 
 std::vector<std::string> listFaultPolygons(const GeoEastProjectPtr& project);
@@ -35,6 +57,13 @@ std::vector<fpt::Polygon> readFaultPolygons(const GeoEastProjectPtr& project, co
 FaultPolygonStyle readFaultPolygonStyle(
     const GeoEastProjectPtr& project,
     const std::string& outputName);
+
+FaultPolygonStorageSummary inspectFaultPolygonStorage(
+    const GeoEastProjectPtr& project,
+    const std::string& outputName);
+
+const char* faultPolygonInteriorRingPolicyName(
+    FaultPolygonInteriorRingPolicy policy);
 
 void validateMapGrid(const GeoEastProjectPtr& project, const std::string& gridName);
 

@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
+#include <tuple>
 
 namespace fpt {
 namespace {
@@ -19,6 +21,18 @@ struct SegmentRef {
     const Point* a = nullptr;
     const Point* b = nullptr;
     Bounds bounds;
+};
+
+enum class PointLocation {
+    outside,
+    inside,
+    boundary
+};
+
+struct PolygonConflictResult {
+    bool boundaryConflict = false;
+    bool properBoundaryCrossing = false;
+    bool containment = false;
 };
 
 Bounds makeBounds(const Point& a, const Point& b) {
@@ -116,6 +130,15 @@ bool segmentsCrossOrOverlap(const Point& a, const Point& b, const Point& c, cons
     return collinearSegmentsOverlapInLine(a, b, c, d);
 }
 
+bool segmentsProperlyCross(const Point& a, const Point& b, const Point& c, const Point& d) {
+    const double o1 = orient(a, b, c);
+    const double o2 = orient(a, b, d);
+    const double o3 = orient(c, d, a);
+    const double o4 = orient(c, d, b);
+    return ((o1 > Epsilon && o2 < -Epsilon) || (o1 < -Epsilon && o2 > Epsilon)) &&
+        ((o3 > Epsilon && o4 < -Epsilon) || (o3 < -Epsilon && o4 > Epsilon));
+}
+
 bool segmentsIntersect(const Point& a, const Point& b, const Point& c, const Point& d) {
     const double o1 = orient(a, b, c);
     const double o2 = orient(a, b, d);
@@ -184,6 +207,193 @@ bool adjacentEdges(std::size_t edgeA, std::size_t edgeB, std::size_t edgeCount) 
 bool samePoint(const Point& first, const Point& second) {
     return std::abs(first.x - second.x) <= Epsilon &&
         std::abs(first.y - second.y) <= Epsilon;
+}
+
+void addValidityDetail(
+    TopologyDiagnostics& diagnostics,
+    const std::string& type,
+    int polygonId,
+    int ringIndex,
+    int vertexIndex,
+    const Point& point) {
+    diagnostics.geometryValidityDetails.push_back({
+        type, polygonId, polygonId, ringIndex, vertexIndex, point
+    });
+}
+
+bool validateRingBasics(
+    const std::vector<Point>& ring,
+    const Polygon& polygon,
+    int ringIndex,
+    TopologyDiagnostics& diagnostics) {
+    bool invalid = false;
+    if (ring.size() < 3) {
+        ++diagnostics.openRingCount;
+        diagnostics.openRingPolygonIds.push_back(polygon.id);
+        addValidityDetail(diagnostics, "ring-too-short", polygon.id, ringIndex,
+                          static_cast<int>(ring.size()), {});
+        return true;
+    }
+
+    bool hasNonFinite = false;
+    std::vector<std::tuple<double, double, std::size_t>> orderedVertices;
+    orderedVertices.reserve(ring.size());
+    for (std::size_t i = 0; i < ring.size(); ++i) {
+        const Point& point = ring[i];
+        if (!std::isfinite(point.x) || !std::isfinite(point.y)) {
+            hasNonFinite = true;
+            invalid = true;
+            ++diagnostics.nonFiniteCoordinateCount;
+            addValidityDetail(diagnostics, "non-finite-coordinate", polygon.id,
+                              ringIndex, static_cast<int>(i), point);
+            continue;
+        }
+        orderedVertices.emplace_back(point.x, point.y, i);
+    }
+
+    bool duplicateVertex = false;
+    for (std::size_t i = 0; i < ring.size(); ++i) {
+        const std::size_t next = (i + 1) % ring.size();
+        if (std::isfinite(ring[i].x) && std::isfinite(ring[i].y) &&
+            std::isfinite(ring[next].x) && std::isfinite(ring[next].y) &&
+            samePoint(ring[i], ring[next])) {
+            invalid = true;
+            duplicateVertex = true;
+            ++diagnostics.zeroLengthEdgeCount;
+            addValidityDetail(diagnostics, "zero-length-edge", polygon.id,
+                              ringIndex, static_cast<int>(i), ring[i]);
+        }
+    }
+
+    std::sort(orderedVertices.begin(), orderedVertices.end());
+    for (std::size_t i = 1; i < orderedVertices.size(); ++i) {
+        const Point previous{std::get<0>(orderedVertices[i - 1]),
+                             std::get<1>(orderedVertices[i - 1])};
+        const Point current{std::get<0>(orderedVertices[i]),
+                            std::get<1>(orderedVertices[i])};
+        if (samePoint(previous, current)) {
+            duplicateVertex = true;
+            invalid = true;
+            addValidityDetail(
+                diagnostics, "duplicate-ring-vertex", polygon.id, ringIndex,
+                static_cast<int>(std::get<2>(orderedVertices[i])), current);
+            break;
+        }
+    }
+    if (duplicateVertex) {
+        ++diagnostics.duplicateVertexRingCount;
+    }
+
+    if (!hasNonFinite) {
+        double minX = ring.front().x;
+        double maxX = ring.front().x;
+        double minY = ring.front().y;
+        double maxY = ring.front().y;
+        for (const Point& point : ring) {
+            minX = std::min(minX, point.x);
+            maxX = std::max(maxX, point.x);
+            minY = std::min(minY, point.y);
+            maxY = std::max(maxY, point.y);
+        }
+        const double scale = std::max({1.0, maxX - minX, maxY - minY});
+        const double areaTolerance = 1e-12 * scale * scale;
+        if (polygonArea(ring) <= areaTolerance) {
+            invalid = true;
+            ++diagnostics.degenerateRingCount;
+            addValidityDetail(diagnostics, "zero-area-ring", polygon.id,
+                              ringIndex, -1, ring.front());
+        }
+    }
+    return invalid;
+}
+
+PointLocation locatePointInRing(const Point& point, const std::vector<Point>& ring) {
+    if (ring.size() < 3 || !std::isfinite(point.x) || !std::isfinite(point.y)) {
+        return PointLocation::outside;
+    }
+    bool inside = false;
+    for (std::size_t i = 0, j = ring.size() - 1; i < ring.size(); j = i++) {
+        const Point& a = ring[j];
+        const Point& b = ring[i];
+        if (!std::isfinite(a.x) || !std::isfinite(a.y) ||
+            !std::isfinite(b.x) || !std::isfinite(b.y)) {
+            return PointLocation::outside;
+        }
+        if (onSegment(a, b, point)) {
+            return PointLocation::boundary;
+        }
+        const bool crossesScanline = (a.y > point.y) != (b.y > point.y);
+        if (crossesScanline) {
+            const double intersectionX =
+                a.x + (point.y - a.y) * (b.x - a.x) / (b.y - a.y);
+            if (intersectionX > point.x) {
+                inside = !inside;
+            }
+        }
+    }
+    return inside ? PointLocation::inside : PointLocation::outside;
+}
+
+PointLocation locatePointInPolygonArea(const Point& point, const Polygon& polygon) {
+    const PointLocation shell = locatePointInRing(point, polygon.points);
+    if (shell != PointLocation::inside) {
+        return shell;
+    }
+    for (const std::vector<Point>& hole : polygon.holes) {
+        const PointLocation location = locatePointInRing(point, hole);
+        if (location == PointLocation::boundary) {
+            return PointLocation::boundary;
+        }
+        if (location == PointLocation::inside) {
+            return PointLocation::outside;
+        }
+    }
+    return PointLocation::inside;
+}
+
+bool ringHasPointInside(const std::vector<Point>& candidate, const std::vector<Point>& container) {
+    return std::any_of(candidate.begin(), candidate.end(), [&](const Point& point) {
+        return locatePointInRing(point, container) == PointLocation::inside;
+    });
+}
+
+bool polygonHasPointInside(const Polygon& candidate, const Polygon& container) {
+    return std::any_of(candidate.points.begin(), candidate.points.end(), [&](const Point& point) {
+        return locatePointInPolygonArea(point, container) == PointLocation::inside;
+    });
+}
+
+bool validateHoleRelationships(const Polygon& polygon, TopologyDiagnostics& diagnostics) {
+    bool invalid = false;
+    for (std::size_t i = 0; i < polygon.holes.size(); ++i) {
+        const std::vector<Point>& hole = polygon.holes[i];
+        bool hasInteriorPoint = false;
+        bool hasExteriorPoint = false;
+        for (const Point& point : hole) {
+            const PointLocation location = locatePointInRing(point, polygon.points);
+            hasInteriorPoint = hasInteriorPoint || location == PointLocation::inside;
+            hasExteriorPoint = hasExteriorPoint || location == PointLocation::outside;
+        }
+        if (hasExteriorPoint || !hasInteriorPoint) {
+            invalid = true;
+            ++diagnostics.holeOutsideShellCount;
+            addValidityDetail(diagnostics, "hole-outside-shell", polygon.id,
+                              static_cast<int>(i + 1), -1,
+                              hole.empty() ? Point{} : hole.front());
+        }
+
+        for (std::size_t j = i + 1; j < polygon.holes.size(); ++j) {
+            if (ringHasPointInside(hole, polygon.holes[j]) ||
+                ringHasPointInside(polygon.holes[j], hole)) {
+                invalid = true;
+                ++diagnostics.nestedHoleCount;
+                addValidityDetail(diagnostics, "nested-holes", polygon.id,
+                                  static_cast<int>(i + 1), static_cast<int>(j + 1),
+                                  hole.empty() ? Point{} : hole.front());
+            }
+        }
+    }
+    return invalid;
 }
 
 bool ringBoundaryConflict(
@@ -308,14 +518,17 @@ bool polygonSelfIntersects(const Polygon& polygon, TopologyDiagnostics& diagnost
     return found;
 }
 
-bool polygonsIntersect(const Polygon& aPoly, const Polygon& bPoly, TopologyDiagnostics& diagnostics) {
+PolygonConflictResult polygonConflict(
+    const Polygon& aPoly,
+    const Polygon& bPoly,
+    TopologyDiagnostics& diagnostics) {
+    PolygonConflictResult result;
     if (aPoly.points.empty() || bPoly.points.empty()) {
-        return false;
+        return result;
     }
     if (!boundsOverlap(polygonBounds(aPoly), polygonBounds(bPoly))) {
-        return false;
+        return result;
     }
-    bool found = false;
     const std::vector<SegmentRef> aSegments = buildSegments(aPoly);
     const std::vector<SegmentRef> bSegments = buildSegments(bPoly);
     for (std::size_t i = 0; i < aSegments.size(); ++i) {
@@ -326,9 +539,11 @@ bool polygonsIntersect(const Polygon& aPoly, const Polygon& bPoly, TopologyDiagn
                 continue;
             }
             if (segmentsCrossOrOverlap(*a.a, *a.b, *b.a, *b.b)) {
-                found = true;
+                result.boundaryConflict = true;
+                result.properBoundaryCrossing = result.properBoundaryCrossing ||
+                    segmentsProperlyCross(*a.a, *a.b, *b.a, *b.b);
                 diagnostics.polygonIntersectionDetails.push_back({
-                    "polygon",
+                    "polygon-boundary-conflict",
                     aPoly.id,
                     bPoly.id,
                     static_cast<int>(i),
@@ -338,7 +553,21 @@ bool polygonsIntersect(const Polygon& aPoly, const Polygon& bPoly, TopologyDiagn
             }
         }
     }
-    return found;
+    if (!result.boundaryConflict &&
+        (polygonHasPointInside(aPoly, bPoly) || polygonHasPointInside(bPoly, aPoly))) {
+        result.containment = true;
+        const Point representative = polygonHasPointInside(aPoly, bPoly)
+            ? aPoly.points.front() : bPoly.points.front();
+        diagnostics.polygonIntersectionDetails.push_back({
+            "polygon-containment",
+            aPoly.id,
+            bPoly.id,
+            -1,
+            -1,
+            representative
+        });
+    }
+    return result;
 }
 
 } // namespace
@@ -356,52 +585,78 @@ TopologyDiagnostics diagnoseTopology(const std::vector<Polygon>& polygons) {
 
 TopologyDiagnostics diagnoseTopology(const std::vector<Polygon>& polygons, bool keptOnly) {
     TopologyDiagnostics diagnostics;
-    for (const Polygon& polygon : polygons) {
+    std::vector<bool> validPolygons(polygons.size(), false);
+    for (std::size_t polygonIndex = 0; polygonIndex < polygons.size(); ++polygonIndex) {
+        const Polygon& polygon = polygons[polygonIndex];
         if (keptOnly && !polygon.kept) {
             continue;
         }
-        if (polygon.points.size() < 3) {
-            ++diagnostics.openRingCount;
-            diagnostics.openRingPolygonIds.push_back(polygon.id);
-            continue;
+
+        bool invalid = validateRingBasics(polygon.points, polygon, 0, diagnostics);
+        for (std::size_t i = 0; i < polygon.holes.size(); ++i) {
+            invalid = validateRingBasics(
+                polygon.holes[i], polygon, static_cast<int>(i + 1), diagnostics) || invalid;
         }
-        // Internal polygon representation omits the duplicated final vertex. It is considered closed
-        // when it has at least three vertices and is consumed with modulo edge indexing.
-        if (polygonSelfIntersects(polygon, diagnostics)) {
+
+        bool selfIntersects = false;
+        if (!invalid) {
+            selfIntersects = polygonSelfIntersects(polygon, diagnostics);
+            invalid = validateHoleRelationships(polygon, diagnostics) || invalid;
+        }
+        if (selfIntersects) {
             ++diagnostics.selfIntersectingPolygonCount;
             diagnostics.selfIntersectingPolygonIds.push_back(polygon.id);
+            invalid = true;
+        }
+        if (invalid) {
+            ++diagnostics.invalidPolygonCount;
+            diagnostics.invalidPolygonIds.push_back(polygon.id);
+        } else {
+            validPolygons[polygonIndex] = true;
         }
     }
 
     for (std::size_t i = 0; i < polygons.size(); ++i) {
-        if (keptOnly && !polygons[i].kept) {
+        if ((keptOnly && !polygons[i].kept) || !validPolygons[i]) {
             continue;
         }
         for (std::size_t j = i + 1; j < polygons.size(); ++j) {
-            if (keptOnly && !polygons[j].kept) {
+            if ((keptOnly && !polygons[j].kept) || !validPolygons[j]) {
                 continue;
             }
-            if (polygonsIntersect(polygons[i], polygons[j], diagnostics)) {
+            const PolygonConflictResult conflict =
+                polygonConflict(polygons[i], polygons[j], diagnostics);
+            if (conflict.boundaryConflict || conflict.containment) {
                 ++diagnostics.polygonIntersectionCount;
+            }
+            if (conflict.containment) {
+                ++diagnostics.polygonContainmentCount;
+            }
+            if (conflict.properBoundaryCrossing || conflict.containment) {
+                ++diagnostics.polygonInteriorOverlapCount;
             }
         }
     }
     return diagnostics;
 }
 
+bool topologyIsValid(const TopologyDiagnostics& diagnostics) {
+    return diagnostics.invalidPolygonCount == 0 &&
+        diagnostics.openRingCount == 0 &&
+        diagnostics.selfIntersectingPolygonCount == 0 &&
+        diagnostics.polygonIntersectionCount == 0;
+}
+
 bool polygonHasTopologyConflict(
     const Polygon& candidate,
     const std::vector<Polygon>& polygons,
     bool keptOnly) {
-    if (candidate.points.size() < 3) {
+    const TopologyDiagnostics candidateDiagnostics = diagnoseTopology({candidate}, false);
+    if (!topologyIsValid(candidateDiagnostics)) {
         return true;
     }
 
     TopologyDiagnostics diagnostics;
-    if (polygonSelfIntersects(candidate, diagnostics)) {
-        return true;
-    }
-
     for (const Polygon& polygon : polygons) {
         if (polygon.id == candidate.id) {
             continue;
@@ -412,7 +667,8 @@ bool polygonHasTopologyConflict(
         if (polygon.points.size() < 3) {
             continue;
         }
-        if (polygonsIntersect(candidate, polygon, diagnostics)) {
+        const PolygonConflictResult conflict = polygonConflict(candidate, polygon, diagnostics);
+        if (conflict.boundaryConflict || conflict.containment) {
             return true;
         }
     }

@@ -1,10 +1,15 @@
 #pragma once
 
 #include "BranchAttribution.h"
+#include "AdaptiveBoundary.h"
 #include "LocalPolygonQuality.h"
+#include "MultiScaleEvidence.h"
 #include "Polygon.h"
 #include "Segmentation.h"
+#include "SkeletonGraphV2.h"
+#include "SkeletonGraphV2Attribution.h"
 #include "WeakContinuityConnector.h"
+#include "WeakExtensionGate.h"
 #include "WeakTailRestorer.h"
 
 #include <cstddef>
@@ -26,15 +31,32 @@ struct TraceOptions {
     int minCells = 1;
     int openRadius = 0;
     int closeRadius = 0;
+    bool physicalMorphologyShadow = false;
+    double physicalCloseRadiusWorld = 0.0;
     double weakPercentile = 0.0;
     int weakConnectRadius = 0;
     int maxWeakComponentCells = 20000;
     double minWeakComponentAspect = 3.0;
     bool weakPathGate = false;
+    bool weakExtensionLayeredShadow = false;
+    bool weakExtensionLayeredGate = false;
     double weakPathSupportRatio = 0.50;
     int weakPathMaxUnsupportedRun = 3;
     bool branchAttributionShadow = false;
     bool branchAttributionCandidateGroups = false;
+    bool skeletonGraphV2Shadow = false;
+    bool skeletonGraphV2AttributionShadow = false;
+    bool multiScaleEvidenceShadow = false;
+    double multiScaleEvidenceMinimumConfidence = 0.18;
+    double multiScaleEvidenceMinimumRidgeResponse = 0.04;
+    std::size_t multiScaleEvidenceMaximumSamples = 2000000;
+    bool adaptiveBoundaryShadow = false;
+    double adaptiveBoundaryMaximumDisplacementWorld = 15.0;
+    double adaptiveBoundaryMinimumSupportGain = 0.01;
+    double adaptiveBoundaryMaximumSupportLossRatio = 0.0;
+    double adaptiveBoundaryMaximumLeakageIncreaseRatio = 0.0;
+    std::size_t adaptiveBoundaryMaximumPolygons = 512;
+    std::size_t adaptiveBoundaryMaximumVerticesPerPolygon = 4096;
     bool localPolygonQualityShadow = false;
     bool localPolygonQuality = false;
     double localQualityWidthRatio = 2.4;
@@ -83,8 +105,14 @@ struct TraceOptions {
     int weakContinuityEndpointExclusionRadius = 2;
     int weakContinuityThirdPartySkeletonClearanceRadius = 2;
     double weakContinuityMinCompetitionMargin = 0.18;
+    bool weakContinuityUsePhysicalMetric = false;
+    bool weakContinuityUseGlobalMatching = false;
+    double weakContinuityNoConnectCost = 2.0;
+    int weakContinuityMaxExactMatchingEndpoints = 20;
     bool weakTailCompletionShadow = false;
     bool weakTailCompletion = false;
+    bool weakTailEndpointPortShadow = false;
+    bool weakTailEndpointPortOwnership = false;
     int weakTailMinCells = 6;
     int weakTailMaxCells = 64;
     double weakTailMinAspect = 5.0;
@@ -93,6 +121,7 @@ struct TraceOptions {
     double weakTailMaxAlignmentAngle = 35.0;
     int weakTailOwnershipClearanceRadius = 2;
     int weakTailTangentRadius = 12;
+    int weakTailJunctionClearanceRadius = 2;
     bool preserveObservedSkeletonEnvelope = false;
     bool separateBranchBelts = false;
     bool rootAntiMerge = false;
@@ -156,10 +185,29 @@ struct TraceResult {
     std::vector<BranchTrace> branches;
     // Segmentation/belt mask cells before optional polygon-only local repair.
     int activeCellCount = 0;
+    bool physicalMorphologyShadowEvaluated = false;
+    double physicalMorphologyRadiusWorld = 0.0;
+    int physicalMorphologyLegacyCells = 0;
+    int physicalMorphologyCandidateCells = 0;
+    int physicalMorphologyAddedCells = 0;
+    int physicalMorphologyRemovedCells = 0;
+    double physicalMorphologyJaccard = 1.0;
     double effectiveThreshold = 0.0;
+    PercentileThresholdInfo primaryThresholdInfo;
+    PercentileThresholdInfo weakThresholdInfo;
+    PercentileThresholdInfo residualThresholdInfo;
     int skeletonEndpoints = 0;
     int skeletonJunctions = 0;
     int skeletonBranches = 0;
+    bool skeletonGraphV2ShadowEvaluated = false;
+    SkeletonGraphV2Stats skeletonGraphV2Stats;
+    bool skeletonGraphV2AttributionShadowEvaluated = false;
+    SkeletonGraphV2AttributionComparison skeletonGraphV2Attribution;
+    bool multiScaleEvidenceShadowEvaluated = false;
+    MultiScaleEvidenceSummary multiScaleEvidenceSummary;
+    bool adaptiveBoundaryShadowEvaluated = false;
+    AdaptiveBoundarySummary adaptiveBoundarySummary;
+    std::vector<AdaptiveBoundaryEvidence> adaptiveBoundaryEvidence;
     int keptBranches = 0;
     int prunedBranches = 0;
     int connectedGaps = 0;
@@ -171,6 +219,9 @@ struct TraceResult {
     int weakContinuityFinalObjectAddedEnvelopeCells = 0;
     WeakTailStats weakTailStats;
     std::vector<WeakTailCandidate> weakTailCandidates;
+    bool weakTailEndpointPortShadowEvaluated = false;
+    WeakTailStats weakTailEndpointPortShadowStats;
+    std::vector<WeakTailCandidate> weakTailEndpointPortCandidates;
     int weakTailProtectedFromAntiMergeCells = 0;
     int rootAntiMergeCandidateCutCells = 0;
     int rootAntiMergeCutCells = 0;
@@ -187,6 +238,18 @@ struct TraceResult {
     int residualFillCandidateCells = 0;
     int residualFillAddedCells = 0;
     int residualFillRejectedComponents = 0;
+    double residualTraceEffectiveThreshold = 0.0;
+    int residualTraceCandidateComponents = 0;
+    int residualTraceSizeRejectedComponents = 0;
+    int residualTraceShapeRejectedComponents = 0;
+    int residualTraceAttributeRejectedComponents = 0;
+    int residualTraceDetachedRejectedComponents = 0;
+    int residualTraceGeometryRejectedComponents = 0;
+    int residualTraceTopologyRejectedComponents = 0;
+    int residualTraceFallbackAcceptedComponents = 0;
+    int residualTraceAcceptedComponents = 0;
+    int residualTraceAcceptedPolygons = 0;
+    int residualTraceAcceptedCells = 0;
     int weakPathCandidateCells = 0;
     int weakPathAcceptedCells = 0;
     int weakPathRejectedCells = 0;
@@ -201,6 +264,19 @@ struct TraceResult {
     int weakPathAttributeRejectedFragments = 0;
     int weakPathShapeRejectedFragments = 0;
     int weakPathDirectionRejectedFragments = 0;
+    bool weakExtensionLayeredShadowEvaluated = false;
+    int weakExtensionComponentCount = 0;
+    int weakExtensionLegacyAcceptedComponents = 0;
+    int weakExtensionLayeredAcceptedComponents = 0;
+    int weakExtensionLayeredRejectedComponents = 0;
+    int weakExtensionLayeredOwnerRejectedComponents = 0;
+    int weakExtensionLayeredSizeRejectedComponents = 0;
+    int weakExtensionLayeredShapeRejectedComponents = 0;
+    int weakExtensionLayeredSupportRejectedComponents = 0;
+    int weakExtensionLayeredWidthRejectedComponents = 0;
+    int weakExtensionLegacyOnlyCells = 0;
+    int weakExtensionLayeredOnlyCells = 0;
+    std::vector<WeakExtensionGateEvidence> weakExtensionLayeredEvidence;
     int branchAttributionJunctionClusters = 0;
     int branchAttributionAcceptedPairs = 0;
     int branchAttributionAmbiguousClusters = 0;

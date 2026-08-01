@@ -1,9 +1,12 @@
 #include "../src/ui/QualityReviewModel.h"
+#include "../src/ui/TraceParameterModel.h"
+#include "../src/core/ProductDefaults.h"
 
 #include <QCoreApplication>
 #include <QFile>
 #include <QTemporaryDir>
 
+#include <cmath>
 #include <iostream>
 #include <stdexcept>
 
@@ -168,6 +171,24 @@ void testBoundsAndEmptyCandidates(const QTemporaryDir& directory) {
     require(model.items().isEmpty(), "Empty evidence must produce an empty model.");
 }
 
+void testSharedProductionDefaults() {
+    const fpt_ui::TraceParameters parameters;
+    require(std::abs(parameters.percentile -
+                     fpt::product_defaults::percentile) < 1e-12,
+            "The shared UI model must use the product percentile.");
+    require(std::abs(parameters.minArea -
+                     fpt::product_defaults::minArea) < 1e-12,
+            "The shared UI model must use the product area threshold.");
+    require(parameters.rootAntiMerge,
+            "A default-constructed UI profile must represent the released recommendation.");
+    require(!parameters.residualTrace,
+            "Residual tracing must remain opt-in in the released UI profile.");
+    const fpt_ui::TraceParameters conservative =
+        fpt_ui::presetParameters(QString::fromUtf8("保守高精度"));
+    require(!conservative.rootAntiMerge,
+            "Existing non-anti-merge presets must preserve their explicit behavior.");
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -178,6 +199,7 @@ int main(int argc, char** argv) {
         testParseFilterAndAggregate(directory);
         testInvalidAndUnsupportedFiles(directory);
         testBoundsAndEmptyCandidates(directory);
+        testSharedProductionDefaults();
         std::cout << "test_quality_review_model: PASS\n";
         return 0;
     } catch (const std::exception& error) {

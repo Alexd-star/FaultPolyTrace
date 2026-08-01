@@ -1,10 +1,14 @@
 #include "FaultTracer.h"
+
+#include "GridMetric.h"
+#include "PhysicalMorphology.h"
 #include "BranchAttribution.h"
 #include "LocalPolygonQuality.h"
 #include "SkeletonGraph.h"
 #include "Topology.h"
 #include "WeakPathSupport.h"
 #include "WeakContinuityConnector.h"
+#include "WeakExtensionGate.h"
 
 #include <algorithm>
 #include <cmath>
@@ -53,6 +57,17 @@ constexpr int kWeakPathWidthRadiusMultiplier = 16;
 constexpr double kWeakPathMaxTurnAngleDegrees = 170.0;
 
 struct WeakExtensionStats {
+    int componentCount = 0;
+    int legacyAcceptedComponents = 0;
+    int layeredAcceptedComponents = 0;
+    int layeredRejectedComponents = 0;
+    int layeredOwnerRejectedComponents = 0;
+    int layeredSizeRejectedComponents = 0;
+    int layeredShapeRejectedComponents = 0;
+    int layeredSupportRejectedComponents = 0;
+    int layeredWidthRejectedComponents = 0;
+    int legacyOnlyCells = 0;
+    int layeredOnlyCells = 0;
     int candidateCells = 0;
     int acceptedCells = 0;
     int rejectedCells = 0;
@@ -1423,6 +1438,259 @@ std::vector<std::vector<Point>> traceBoundaryRings(const Grid2D& grid, const std
     return rings;
 }
 
+bool pointInPolygonArea(const Point& point, const Polygon& polygon) {
+    if (!pointInRing(point, polygon.points)) {
+        return false;
+    }
+    for (const std::vector<Point>& hole : polygon.holes) {
+        if (pointInRing(point, hole)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+double pointToRingDistance(
+    const Point& point,
+    const std::vector<Point>& ring);
+
+bool cellIntersectsPolygonArea(
+    const Grid2D& grid,
+    int x,
+    int y,
+    const Polygon& polygon) {
+    const double minX = grid.worldX(x);
+    const double maxX = grid.worldX(x + 1);
+    const double minY = grid.worldY(y);
+    const double maxY = grid.worldY(y + 1);
+    const std::vector<Point> cellRing{
+        {minX, minY}, {maxX, minY},
+        {maxX, maxY}, {minX, maxY}
+    };
+    const Point center{
+        grid.worldX(x + 0.5),
+        grid.worldY(y + 0.5)
+    };
+    if (pointInPolygonArea(center, polygon)) {
+        return true;
+    }
+    for (const Point& corner : cellRing) {
+        if (pointInPolygonArea(corner, polygon)) {
+            return true;
+        }
+    }
+    const double halfDiagonal = 0.5 * std::hypot(grid.dx(), grid.dy());
+    if (pointToRingDistance(center, polygon.points) > halfDiagonal + 1e-9) {
+        return false;
+    }
+    if (ringBoundariesConflict(cellRing, polygon.points, false)) {
+        return true;
+    }
+    for (const Point& point : polygon.points) {
+        if (point.x >= minX && point.x <= maxX &&
+            point.y >= minY && point.y <= maxY) {
+            return true;
+        }
+    }
+    return false;
+}
+
+BinaryMask rasterizeKeptPolygonCoverage(
+    const Grid2D& grid,
+    const std::vector<Polygon>& polygons,
+    const BinaryMask* candidateMask) {
+    BinaryMask covered(grid.nx(), grid.ny());
+    for (const Polygon& polygon : polygons) {
+        if (!polygon.kept || polygon.points.size() < 3) {
+            continue;
+        }
+        double minWorldX = polygon.points.front().x;
+        double maxWorldX = polygon.points.front().x;
+        double minWorldY = polygon.points.front().y;
+        double maxWorldY = polygon.points.front().y;
+        for (const Point& point : polygon.points) {
+            minWorldX = std::min(minWorldX, point.x);
+            maxWorldX = std::max(maxWorldX, point.x);
+            minWorldY = std::min(minWorldY, point.y);
+            maxWorldY = std::max(maxWorldY, point.y);
+        }
+        const int minX = std::max(
+            0,
+            static_cast<int>(std::floor(
+                (minWorldX - grid.sx()) / grid.dx() - 0.5)) - 1);
+        const int maxX = std::min(
+            grid.nx() - 1,
+            static_cast<int>(std::ceil(
+                (maxWorldX - grid.sx()) / grid.dx() - 0.5)) + 1);
+        const int minY = std::max(
+            0,
+            static_cast<int>(std::floor(
+                (minWorldY - grid.sy()) / grid.dy() - 0.5)) - 1);
+        const int maxY = std::min(
+            grid.ny() - 1,
+            static_cast<int>(std::ceil(
+                (maxWorldY - grid.sy()) / grid.dy() - 0.5)) + 1);
+        for (int y = minY; y <= maxY; ++y) {
+            for (int x = minX; x <= maxX; ++x) {
+                if (candidateMask && !candidateMask->get(x, y)) {
+                    continue;
+                }
+                if (cellIntersectsPolygonArea(grid, x, y, polygon)) {
+                    covered.set(x, y, true);
+                }
+            }
+        }
+    }
+    return covered;
+}
+
+std::vector<std::vector<Point>> traceSubcellConnectedBoundaryRings(
+    const Grid2D& grid,
+    const std::vector<Cell>& cells,
+    const ComponentStats& stats) {
+    constexpr int kScale = 4;
+    const int sourceWidth = stats.maxX - stats.minX + 1;
+    const int sourceHeight = stats.maxY - stats.minY + 1;
+    GridMetadata metadata;
+    metadata.nx = sourceWidth * kScale;
+    metadata.ny = sourceHeight * kScale;
+    metadata.sx = grid.worldX(stats.minX);
+    metadata.sy = grid.worldY(stats.minY);
+    metadata.dx = grid.dx() / static_cast<double>(kScale);
+    metadata.dy = grid.dy() / static_cast<double>(kScale);
+    Grid2D subcellGrid(metadata);
+
+    std::vector<unsigned char> sourceMembership(
+        static_cast<std::size_t>(grid.nx() * grid.ny()), 0);
+    for (const Cell& cell : cells) {
+        sourceMembership[static_cast<std::size_t>(
+            cell.y * grid.nx() + cell.x)] = 1;
+    }
+    const auto containsSource = [&](int x, int y) {
+        return grid.inBounds(x, y) &&
+            sourceMembership[static_cast<std::size_t>(
+                y * grid.nx() + x)] != 0;
+    };
+
+    std::vector<unsigned char> subcellMembership(
+        static_cast<std::size_t>(metadata.nx * metadata.ny), 0);
+    std::vector<Cell> subcells;
+    subcells.reserve(cells.size() * kScale * kScale + cells.size());
+    const auto addSubcell = [&](int x, int y) {
+        if (x < 0 || y < 0 || x >= metadata.nx || y >= metadata.ny) {
+            return;
+        }
+        const std::size_t index = static_cast<std::size_t>(
+            y * metadata.nx + x);
+        if (!subcellMembership[index]) {
+            subcellMembership[index] = 1;
+            subcells.push_back({x, y});
+        }
+    };
+
+    for (const Cell& cell : cells) {
+        const int baseX = (cell.x - stats.minX) * kScale;
+        const int baseY = (cell.y - stats.minY) * kScale;
+        for (int oy = 0; oy < kScale; ++oy) {
+            for (int ox = 0; ox < kScale; ++ox) {
+                addSubcell(baseX + ox, baseY + oy);
+            }
+        }
+    }
+
+    const auto finiteValue = [&grid](int x, int y) {
+        if (!grid.inBounds(x, y)) {
+            return -std::numeric_limits<double>::infinity();
+        }
+        const double value = grid.value(x, y);
+        return std::isfinite(value)
+            ? value
+            : -std::numeric_limits<double>::infinity();
+    };
+    for (const Cell& cell : cells) {
+        for (const int directionY : {-1, 1}) {
+            const int diagonalX = cell.x + 1;
+            const int diagonalY = cell.y + directionY;
+            if (!containsSource(diagonalX, diagonalY) ||
+                containsSource(cell.x + 1, cell.y) ||
+                containsSource(cell.x, cell.y + directionY)) {
+                continue;
+            }
+            const int baseX = (cell.x - stats.minX) * kScale;
+            const int baseY = (cell.y - stats.minY) * kScale;
+            const int cornerX = baseX + kScale;
+            const int cornerY = baseY + (directionY > 0 ? kScale : 0);
+            const double horizontalValue =
+                finiteValue(cell.x + 1, cell.y);
+            const double verticalValue =
+                finiteValue(cell.x, cell.y + directionY);
+            if (horizontalValue >= verticalValue) {
+                addSubcell(
+                    cornerX,
+                    cornerY + (directionY > 0 ? -1 : 0));
+            } else {
+                addSubcell(
+                    cornerX - 1,
+                    cornerY + (directionY > 0 ? 0 : -1));
+            }
+        }
+    }
+    return traceBoundaryRings(subcellGrid, subcells);
+}
+
+std::vector<Point> convexCellEnvelope(
+    const Grid2D& grid,
+    const std::vector<Cell>& cells) {
+    std::vector<Point> points;
+    points.reserve(cells.size() * 4);
+    for (const Cell& cell : cells) {
+        points.push_back({grid.worldX(cell.x), grid.worldY(cell.y)});
+        points.push_back({grid.worldX(cell.x + 1), grid.worldY(cell.y)});
+        points.push_back({grid.worldX(cell.x + 1), grid.worldY(cell.y + 1)});
+        points.push_back({grid.worldX(cell.x), grid.worldY(cell.y + 1)});
+    }
+    std::sort(points.begin(), points.end(), [](const Point& first, const Point& second) {
+        return std::tie(first.x, first.y) < std::tie(second.x, second.y);
+    });
+    points.erase(
+        std::unique(
+            points.begin(), points.end(),
+            [](const Point& first, const Point& second) {
+                return first.x == second.x && first.y == second.y;
+            }),
+        points.end());
+    if (points.size() < 3) {
+        return points;
+    }
+    const auto cross = [](const Point& origin, const Point& a, const Point& b) {
+        return (a.x - origin.x) * (b.y - origin.y) -
+            (a.y - origin.y) * (b.x - origin.x);
+    };
+    std::vector<Point> hull;
+    hull.reserve(points.size() * 2);
+    for (const Point& point : points) {
+        while (hull.size() >= 2 &&
+               cross(hull[hull.size() - 2], hull.back(), point) <= 0.0) {
+            hull.pop_back();
+        }
+        hull.push_back(point);
+    }
+    const std::size_t lowerSize = hull.size();
+    for (auto iterator = points.rbegin() + 1; iterator != points.rend(); ++iterator) {
+        while (hull.size() > lowerSize &&
+               cross(hull[hull.size() - 2], hull.back(), *iterator) <= 0.0) {
+            hull.pop_back();
+        }
+        hull.push_back(*iterator);
+    }
+    if (hull.size() > 1 &&
+        hull.front().x == hull.back().x &&
+        hull.front().y == hull.back().y) {
+        hull.pop_back();
+    }
+    return hull;
+}
+
 void appendPolygonsFromMask(
     const Grid2D& grid,
     const BinaryMask& activeMask,
@@ -1506,7 +1774,7 @@ void appendPolygonsFromMask(
     }
 }
 
-void appendPolygonsFromMaskBounds(
+[[maybe_unused]] void appendPolygonsFromMaskBounds(
     const Grid2D& grid,
     const BinaryMask& activeMask,
     int minX,
@@ -1793,63 +2061,137 @@ void appendResidualTracePolygons(
                 }
             }
 
-            if (static_cast<int>(cells.size()) < options.residualMinCells) {
+            ++result.residualTraceCandidateComponents;
+            const int traceMinimumCells = std::max(
+                options.residualMinCells,
+                options.residualDetachedMinCells);
+            if (static_cast<int>(cells.size()) < traceMinimumCells) {
+                ++result.residualTraceSizeRejectedComponents;
                 continue;
             }
             if (options.residualTraceMaxCells > 0 &&
                 static_cast<int>(cells.size()) > options.residualTraceMaxCells) {
+                ++result.residualTraceSizeRejectedComponents;
                 continue;
             }
 
             const ComponentStats stats = computeComponentStats(cells);
             const int longestAxis = std::max(stats.width, stats.height);
             const double meanValue = cells.empty() ? 0.0 : sum / static_cast<double>(cells.size());
-            const bool lineLike = stats.aspect >= options.adaptiveAreaMinAspect ||
-                longestAxis >= options.residualTraceMinLength;
-            const bool strongEnough = maxValue >= result.effectiveThreshold * options.adaptiveAreaMinMaxRatio ||
-                meanValue >= result.effectiveThreshold * options.adaptiveAreaMinMeanRatio;
-            bool detachedTrace = false;
-            if (!touchesCovered && options.residualTraceDetached) {
-                const bool detachedSizeOk = static_cast<int>(cells.size()) >= options.residualDetachedMinCells;
-                const bool detachedLineLike = stats.aspect >= options.residualDetachedMinAspect &&
-                    longestAxis >= options.residualDetachedMinLength;
-                const bool detachedStrongEnough =
-                    maxValue >= result.effectiveThreshold * options.residualDetachedMinMaxRatio &&
-                    meanValue >= result.effectiveThreshold * options.residualDetachedMinMeanRatio;
-                detachedTrace = detachedSizeOk && detachedLineLike && detachedStrongEnough;
+            const bool lineLike =
+                stats.aspect >= options.residualDetachedMinAspect &&
+                longestAxis >= std::max(
+                    options.residualTraceMinLength,
+                    options.residualDetachedMinLength);
+            const bool strongEnough =
+                maxValue >= result.effectiveThreshold *
+                    options.residualDetachedMinMaxRatio &&
+                meanValue >= result.effectiveThreshold *
+                    options.residualDetachedMinMeanRatio;
+            if (!lineLike) {
+                ++result.residualTraceShapeRejectedComponents;
+                continue;
             }
-            if ((!touchesCovered && !detachedTrace) || !lineLike || !strongEnough || longestAxis < options.residualTraceMinLength) {
+            if (!strongEnough) {
+                ++result.residualTraceAttributeRejectedComponents;
+                continue;
+            }
+            if (!touchesCovered && !options.residualTraceDetached) {
+                ++result.residualTraceDetachedRejectedComponents;
                 continue;
             }
 
-            BinaryMask localMask(grid.nx(), grid.ny());
-            for (const Cell& cell : cells) {
-                localMask.set(cell.x, cell.y, true);
+            const std::size_t polygonCountBefore = result.polygons.size();
+            std::vector<BoundaryRingSet> rings = selectBoundaryRingSets(
+                traceSubcellConnectedBoundaryRings(grid, cells, stats),
+                result.suppressedInternalRings);
+            TraceOptions residualPolygonOptions = options;
+            residualPolygonOptions.simplifyTolerance = 0.0;
+            residualPolygonOptions.smoothIterations = 0;
+            for (BoundaryRingSet& ring : rings) {
+                finalizeAndAppendPolygon(
+                    grid,
+                    cells,
+                    sum,
+                    maxValue,
+                    std::move(ring.exterior),
+                    std::move(ring.holes),
+                    stats,
+                    residualPolygonOptions,
+                    result.effectiveThreshold,
+                    result,
+                    nextId);
             }
-            localMask = bufferMask(localMask, std::max(1, options.beltRadius - 1));
-            if (options.attributeConstrainedBelt) {
-                localMask = intersectMask(localMask, dilate(residualMask, std::max(1, options.attributeEnvelopeRadius)));
-            }
-            if (options.postBeltCloseRadius > 0) {
-                localMask = closeMask(localMask, options.postBeltCloseRadius);
-            }
-            for (int y = stats.minY - options.beltRadius - 2; y <= stats.maxY + options.beltRadius + 2; ++y) {
-                for (int x = stats.minX - options.beltRadius - 2; x <= stats.maxX + options.beltRadius + 2; ++x) {
-                    if (grid.inBounds(x, y) && coveredGuardMask.get(x, y)) {
-                        localMask.set(x, y, false);
+            bool topologyConflict = false;
+            bool fallbackAccepted = false;
+            if (result.polygons.size() > polygonCountBefore) {
+                for (std::size_t index = polygonCountBefore;
+                     index < result.polygons.size(); ++index) {
+                    if (result.polygons[index].kept &&
+                        polygonHasTopologyConflict(
+                            result.polygons[index], result.polygons, true)) {
+                        topologyConflict = true;
+                        break;
+                    }
+                }
+                if (topologyConflict) {
+                    result.polygons.resize(polygonCountBefore);
+                    nextId = result.polygons.empty()
+                        ? 1
+                        : result.polygons.back().id + 1;
+                }
+                if (topologyConflict) {
+                    std::vector<Point> fallback = convexCellEnvelope(grid, cells);
+                    if (fallback.size() >= 3) {
+                        finalizeAndAppendPolygon(
+                            grid,
+                            cells,
+                            sum,
+                            maxValue,
+                            std::move(fallback),
+                            {},
+                            stats,
+                            residualPolygonOptions,
+                            result.effectiveThreshold,
+                            result,
+                            nextId);
+                        if (result.polygons.size() > polygonCountBefore &&
+                            result.polygons.back().kept &&
+                            polygonHasTopologyConflict(
+                                result.polygons.back(), result.polygons, true)) {
+                            result.polygons.resize(polygonCountBefore);
+                            nextId = result.polygons.empty()
+                                ? 1
+                                : result.polygons.back().id + 1;
+                        } else if (result.polygons.size() > polygonCountBefore) {
+                            fallbackAccepted = true;
+                        }
                     }
                 }
             }
-            appendPolygonsFromMaskBounds(
-                grid,
-                localMask,
-                stats.minX - options.beltRadius - 2,
-                stats.minY - options.beltRadius - 2,
-                stats.maxX + options.beltRadius + 2,
-                stats.maxY + options.beltRadius + 2,
-                options,
-                result,
-                nextId);
+            int keptAdded = 0;
+            for (std::size_t index = polygonCountBefore;
+                 index < result.polygons.size(); ++index) {
+                keptAdded += result.polygons[index].kept ? 1 : 0;
+            }
+            if (keptAdded <= 0) {
+                result.polygons.resize(polygonCountBefore);
+                nextId = result.polygons.empty()
+                    ? 1
+                    : result.polygons.back().id + 1;
+                if (topologyConflict) {
+                    ++result.residualTraceTopologyRejectedComponents;
+                } else {
+                    ++result.residualTraceGeometryRejectedComponents;
+                }
+                continue;
+            }
+            ++result.residualTraceAcceptedComponents;
+            result.residualTraceAcceptedPolygons += keptAdded;
+            result.residualTraceAcceptedCells +=
+                static_cast<int>(cells.size());
+            result.residualTraceFallbackAcceptedComponents +=
+                fallbackAccepted ? 1 : 0;
         }
     }
 }
@@ -2342,7 +2684,10 @@ BinaryMask extendThroughWeakAttributes(
     bool weakPathGate,
     double weakPathSupportRatio,
     int weakPathMaxUnsupportedRun,
-    WeakExtensionStats* extensionStats) {
+    bool layeredShadow,
+    bool layeredGate,
+    WeakExtensionStats* extensionStats,
+    std::vector<WeakExtensionGateEvidence>* layeredEvidence) {
     if (extensionStats) {
         *extensionStats = WeakExtensionStats{};
     }
@@ -2360,6 +2705,22 @@ BinaryMask extendThroughWeakAttributes(
     BinaryMask seedMask = dilate(strongMask, connectRadius);
     BinaryMask out = strongMask;
     BinaryMask eligibleExtension(grid.nx(), grid.ny());
+    const bool evaluateLayered = layeredShadow || layeredGate;
+    WeakExtensionOwnerMap layeredOwners;
+    WeakExtensionGateOptions layeredOptions;
+    if (evaluateLayered) {
+        layeredOwners = buildWeakExtensionOwnerMap(strongMask);
+        layeredOptions.maxComponentCells = maxWeakComponentCells > 0
+            ? maxWeakComponentCells : std::numeric_limits<int>::max() / 4;
+        layeredOptions.smallComponentMaxCells = std::min(
+            layeredOptions.maxComponentCells,
+            std::max(64, 8 * (connectRadius + 1) * (connectRadius + 1)));
+        layeredOptions.ownerSearchRadius = std::max(1, connectRadius);
+        layeredOptions.largeMinAspect = std::max(1.0, minWeakComponentAspect);
+        layeredOptions.maxEstimatedWidthSamples =
+            static_cast<double>(std::max(6, 2 * connectRadius + 4));
+        validateWeakExtensionGateOptions(layeredOptions);
+    }
     std::vector<unsigned char> visited(static_cast<std::size_t>(grid.nx() * grid.ny()), 0);
 
     auto indexOf = [&grid](int x, int y) {
@@ -2431,7 +2792,52 @@ BinaryMask extendThroughWeakAttributes(
             const bool sizeOk = maxWeakComponentCells <= 0 ||
                 static_cast<int>(cells.size()) <= maxWeakComponentCells;
             const bool shapeOk = minWeakComponentAspect <= 1.0 || aspect >= minWeakComponentAspect;
-            if (touchesSeed && (sizeOk || shapeOk)) {
+            const bool legacyAccepted = touchesSeed && (sizeOk || shapeOk);
+            bool layeredAccepted = legacyAccepted;
+            if (extensionStats) {
+                ++extensionStats->componentCount;
+                extensionStats->legacyAcceptedComponents += legacyAccepted ? 1 : 0;
+            }
+            if (evaluateLayered) {
+                std::vector<SkeletonPoint> componentPoints;
+                componentPoints.reserve(cells.size());
+                for (const Cell& cell : cells) {
+                    componentPoints.push_back({cell.x, cell.y});
+                }
+                WeakExtensionGateEvidence evidence = evaluateWeakExtensionComponent(
+                    grid,
+                    componentPoints,
+                    layeredOwners,
+                    weakThreshold,
+                    strongThreshold,
+                    layeredOptions);
+                evidence.id = extensionStats ? extensionStats->componentCount :
+                    static_cast<int>(layeredEvidence ? layeredEvidence->size() + 1 : 1);
+                layeredAccepted = evidence.accepted;
+                if (extensionStats) {
+                    extensionStats->layeredAcceptedComponents += layeredAccepted ? 1 : 0;
+                    extensionStats->layeredRejectedComponents += layeredAccepted ? 0 : 1;
+                    extensionStats->legacyOnlyCells +=
+                        legacyAccepted && !layeredAccepted ? static_cast<int>(cells.size()) : 0;
+                    extensionStats->layeredOnlyCells +=
+                        layeredAccepted && !legacyAccepted ? static_cast<int>(cells.size()) : 0;
+                    extensionStats->layeredOwnerRejectedComponents +=
+                        evidence.decision == "ambiguous_or_missing_seed_owner" ? 1 : 0;
+                    extensionStats->layeredSizeRejectedComponents +=
+                        evidence.decision == "component_too_large" ? 1 : 0;
+                    extensionStats->layeredShapeRejectedComponents +=
+                        evidence.decision == "insufficient_physical_linearity" ? 1 : 0;
+                    extensionStats->layeredSupportRejectedComponents +=
+                        evidence.decision == "insufficient_attribute_support" ? 1 : 0;
+                    extensionStats->layeredWidthRejectedComponents +=
+                        evidence.decision == "unstable_or_excessive_width" ? 1 : 0;
+                }
+                if (layeredEvidence && layeredEvidence->size() < 4096) {
+                    layeredEvidence->push_back(std::move(evidence));
+                }
+            }
+            const bool componentAccepted = layeredGate ? layeredAccepted : legacyAccepted;
+            if (componentAccepted) {
                 for (const Cell& cell : cells) {
                     if (weakPathGate) {
                         if (!strongMask.get(cell.x, cell.y)) {
@@ -2607,6 +3013,11 @@ WeakContinuityOptions makeWeakContinuityOptions(const TraceOptions& options) {
     continuityOptions.thirdPartySkeletonClearanceRadius =
         options.weakContinuityThirdPartySkeletonClearanceRadius;
     continuityOptions.minCompetitionMargin = options.weakContinuityMinCompetitionMargin;
+    continuityOptions.usePhysicalMetric = options.weakContinuityUsePhysicalMetric;
+    continuityOptions.useGlobalMatching = options.weakContinuityUseGlobalMatching;
+    continuityOptions.noConnectCost = options.weakContinuityNoConnectCost;
+    continuityOptions.maxExactMatchingEndpoints =
+        options.weakContinuityMaxExactMatchingEndpoints;
     return continuityOptions;
 }
 
@@ -2622,6 +3033,8 @@ void accumulateWeakContinuityStats(
     target.searchedPaths += source.searchedPaths;
     target.foundPaths += source.foundPaths;
     target.noPathRejected += source.noPathRejected;
+    target.invalidBackgroundRejected += source.invalidBackgroundRejected;
+    target.noEvaluatedSupportRejected += source.noEvaluatedSupportRejected;
     target.attributeRejected += source.attributeRejected;
     target.unsupportedRunRejected += source.unsupportedRunRejected;
     target.curvatureRejected += source.curvatureRejected;
@@ -2629,6 +3042,17 @@ void accumulateWeakContinuityStats(
     target.competitionRejected += source.competitionRejected;
     target.endpointReuseRejected += source.endpointReuseRejected;
     target.acceptedConnections += source.acceptedConnections;
+    target.globalMatchingComponents += source.globalMatchingComponents;
+    target.globalMatchingExactComponents += source.globalMatchingExactComponents;
+    target.globalMatchingFallbackComponents += source.globalMatchingFallbackComponents;
+    target.globalMatchingNoConnectEndpoints += source.globalMatchingNoConnectEndpoints;
+    target.spatialConflictPairs += source.spatialConflictPairs;
+    target.spatialConflictRejected += source.spatialConflictRejected;
+    target.finiteBackgroundSamples += source.finiteBackgroundSamples;
+    target.invalidBackgroundSamples += source.invalidBackgroundSamples;
+    target.evaluatedSupportPixels += source.evaluatedSupportPixels;
+    target.excludedSkeletonSupportPixels += source.excludedSkeletonSupportPixels;
+    target.invalidPathSamples += source.invalidPathSamples;
     target.addedPathPixels += source.addedPathPixels;
 }
 
@@ -3251,6 +3675,14 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
     if (grid.empty()) {
         throw std::runtime_error("Cannot trace an empty grid.");
     }
+    grid.validate();
+    if (std::any_of(
+            grid.values().begin(),
+            grid.values().end(),
+            [](double value) { return !std::isfinite(value); })) {
+        throw std::runtime_error(
+            "Input grid contains a non-finite attribute value.");
+    }
     if ((options.thresholdMode == ThresholdMode::Percentile ||
          options.thresholdMode == ThresholdMode::PositivePercentile) &&
         (!std::isfinite(options.percentile) || options.percentile <= 0.0 || options.percentile >= 1.0)) {
@@ -3268,11 +3700,22 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
     if (options.openRadius < 0 || options.closeRadius < 0) {
         throw std::runtime_error("Morphology radii must be non-negative.");
     }
+    if (!std::isfinite(options.physicalCloseRadiusWorld) ||
+        options.physicalCloseRadiusWorld < 0.0) {
+        throw std::runtime_error(
+            "physicalCloseRadiusWorld must be finite and non-negative.");
+    }
     if (options.weakPercentile < 0.0 || options.weakPercentile >= 1.0) {
         throw std::runtime_error("weakPercentile must be 0 or between 0 and 1.");
     }
     if (options.weakConnectRadius < 0) {
         throw std::runtime_error("weakConnectRadius must be non-negative.");
+    }
+    if (!std::isfinite(options.weakContinuityNoConnectCost) ||
+        options.weakContinuityNoConnectCost < 0.0 ||
+        options.weakContinuityMaxExactMatchingEndpoints < 2) {
+        throw std::runtime_error(
+            "Weak continuity global matching options are invalid.");
     }
     if (!std::isfinite(options.weakPathSupportRatio) ||
         options.weakPathSupportRatio < 0.0 ||
@@ -3465,12 +3908,22 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
 
     TraceResult result;
     result.effectiveThreshold = segmentation.effectiveThreshold;
-    const double residualSupportThreshold =
+    result.primaryThresholdInfo = segmentation.thresholdInfo;
+    const auto percentileInfo = [&](double percentile) {
+        return options.thresholdMode == ThresholdMode::PositivePercentile
+            ? computePositivePercentileThresholdInfo(grid, percentile)
+            : computePercentileThresholdInfo(grid, percentile);
+    };
+    result.residualThresholdInfo =
         options.residualAttributeFill && options.residualPercentile > 0.0
-            ? (options.thresholdMode == ThresholdMode::PositivePercentile
-                ? computePositivePercentileThreshold(grid, options.residualPercentile)
-                : computePercentileThreshold(grid, options.residualPercentile))
-            : result.effectiveThreshold;
+        ? percentileInfo(options.residualPercentile)
+        : result.primaryThresholdInfo;
+    result.weakThresholdInfo = options.weakPercentile > 0.0
+        ? percentileInfo(options.weakPercentile)
+        : result.primaryThresholdInfo;
+    const double residualSupportThreshold =
+        result.residualThresholdInfo.threshold;
+    const double weakSupportThreshold = result.weakThresholdInfo.threshold;
     BinaryMask activeMask = segmentation.mask;
     BinaryMask acceptedWeakContinuityPathMask(nx, ny);
     BinaryMask acceptedWeakTailMask(nx, ny);
@@ -3487,7 +3940,10 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
         options.weakPathGate,
         options.weakPathSupportRatio,
         options.weakPathMaxUnsupportedRun,
-        &weakExtensionStats);
+        options.weakExtensionLayeredShadow,
+        options.weakExtensionLayeredGate,
+        &weakExtensionStats,
+        &result.weakExtensionLayeredEvidence);
     result.weakPathCandidateCells = weakExtensionStats.candidateCells;
     result.weakPathAcceptedCells = weakExtensionStats.acceptedCells;
     result.weakPathRejectedCells = weakExtensionStats.rejectedCells;
@@ -3511,8 +3967,55 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
         weakExtensionStats.shapeRejectedFragments;
     result.weakPathDirectionRejectedFragments =
         weakExtensionStats.directionRejectedFragments;
+    result.weakExtensionLayeredShadowEvaluated =
+        options.weakExtensionLayeredShadow || options.weakExtensionLayeredGate;
+    result.weakExtensionComponentCount = weakExtensionStats.componentCount;
+    result.weakExtensionLegacyAcceptedComponents =
+        weakExtensionStats.legacyAcceptedComponents;
+    result.weakExtensionLayeredAcceptedComponents =
+        weakExtensionStats.layeredAcceptedComponents;
+    result.weakExtensionLayeredRejectedComponents =
+        weakExtensionStats.layeredRejectedComponents;
+    result.weakExtensionLayeredOwnerRejectedComponents =
+        weakExtensionStats.layeredOwnerRejectedComponents;
+    result.weakExtensionLayeredSizeRejectedComponents =
+        weakExtensionStats.layeredSizeRejectedComponents;
+    result.weakExtensionLayeredShapeRejectedComponents =
+        weakExtensionStats.layeredShapeRejectedComponents;
+    result.weakExtensionLayeredSupportRejectedComponents =
+        weakExtensionStats.layeredSupportRejectedComponents;
+    result.weakExtensionLayeredWidthRejectedComponents =
+        weakExtensionStats.layeredWidthRejectedComponents;
+    result.weakExtensionLegacyOnlyCells = weakExtensionStats.legacyOnlyCells;
+    result.weakExtensionLayeredOnlyCells = weakExtensionStats.layeredOnlyCells;
     if (options.closeRadius > 0) {
-        activeMask = closeMask(activeMask, options.closeRadius);
+        BinaryMask legacyClosed = closeMask(activeMask, options.closeRadius);
+        if (options.physicalMorphologyShadow) {
+            const GridMetric metric(grid);
+            const double radiusWorld = options.physicalCloseRadiusWorld > 0.0
+                ? options.physicalCloseRadiusWorld
+                : static_cast<double>(options.closeRadius) * metric.maximumSpacing();
+            const BinaryMask physicalClosed =
+                closeMaskPhysical(activeMask, metric, radiusWorld);
+            int intersectionCells = 0;
+            int unionCells = 0;
+            for (std::size_t i = 0; i < legacyClosed.values().size(); ++i) {
+                const bool legacy = legacyClosed.values()[i] != 0;
+                const bool candidate = physicalClosed.values()[i] != 0;
+                intersectionCells += legacy && candidate ? 1 : 0;
+                unionCells += legacy || candidate ? 1 : 0;
+                result.physicalMorphologyAddedCells += candidate && !legacy ? 1 : 0;
+                result.physicalMorphologyRemovedCells += legacy && !candidate ? 1 : 0;
+            }
+            result.physicalMorphologyShadowEvaluated = true;
+            result.physicalMorphologyRadiusWorld = radiusWorld;
+            result.physicalMorphologyLegacyCells = legacyClosed.countActive();
+            result.physicalMorphologyCandidateCells = physicalClosed.countActive();
+            result.physicalMorphologyJaccard = unionCells > 0
+                ? static_cast<double>(intersectionCells) / static_cast<double>(unionCells)
+                : 1.0;
+        }
+        activeMask = std::move(legacyClosed);
     }
     const BinaryMask attributeMask = activeMask;
     BinaryMask residualMask = attributeMask;
@@ -3526,12 +4029,33 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
         residualSegmentationOptions.closeRadius = 0;
         residualMask = segmentFaultAttributes(grid, residualSegmentationOptions).mask;
     }
+    BinaryMask residualTraceMask = residualMask;
+    if (options.residualTrace) {
+        const double traceThreshold = std::max(
+            residualSupportThreshold, weakSupportThreshold);
+        result.residualTraceEffectiveThreshold = traceThreshold;
+        residualTraceMask = BinaryMask(nx, ny);
+        for (int y = 0; y < ny; ++y) {
+            for (int x = 0; x < nx; ++x) {
+                const double value = grid.value(x, y);
+                if (std::isfinite(value) && value >= traceThreshold) {
+                    residualTraceMask.set(x, y, true);
+                }
+            }
+        }
+    }
     if (options.traceMode == TraceMode::RidgeBelt) {
         BinaryMask skeleton = skeletonizeZhangSuen(activeMask);
         SkeletonGraph graph = buildSkeletonGraph(skeleton);
         result.skeletonEndpoints = static_cast<int>(graph.endpoints.size());
         result.skeletonJunctions = static_cast<int>(graph.junctions.size());
         result.skeletonBranches = static_cast<int>(graph.branches.size());
+        if (options.skeletonGraphV2Shadow) {
+            const SkeletonGraphV2 graphV2 = buildSkeletonGraphV2(
+                skeleton, GridMetric(grid));
+            result.skeletonGraphV2ShadowEvaluated = true;
+            result.skeletonGraphV2Stats = graphV2.stats;
+        }
 
         GapSupportContext supportContext;
         supportContext.grid = &grid;
@@ -3547,24 +4071,8 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
         result.connectedGaps = connection.connectedGaps;
         BinaryMask connectedSkeleton = connection.mask;
         if (options.weakContinuity || options.weakContinuityShadow) {
-            WeakContinuityOptions continuityOptions;
-            continuityOptions.maxDistance = options.weakContinuityMaxDistance;
-            continuityOptions.tangentWindow = options.weakContinuityTangentWindow;
-            continuityOptions.corridorRadius = options.weakContinuityCorridorRadius;
-            continuityOptions.maxCandidatesPerEndpoint = options.weakContinuityMaxCandidatesPerEndpoint;
-            continuityOptions.maxEndpointAngleDegrees = options.weakContinuityMaxEndpointAngle;
-            continuityOptions.maxWidthRatio = options.weakContinuityMaxWidthRatio;
-            continuityOptions.minAttributeRatio = options.weakContinuityMinAttributeRatio;
-            continuityOptions.localContrastRatio = options.weakContinuityLocalContrastRatio;
-            continuityOptions.minSupportRatio = options.weakContinuityMinSupportRatio;
-            continuityOptions.minMeanSupport = options.weakContinuityMinMeanSupport;
-            continuityOptions.maxUnsupportedRun = options.weakContinuityMaxUnsupportedRun;
-            continuityOptions.maxPathLengthRatio = options.weakContinuityMaxPathLengthRatio;
-            continuityOptions.maxTurnAngleDegrees = options.weakContinuityMaxTurnAngle;
-            continuityOptions.endpointExclusionRadius = options.weakContinuityEndpointExclusionRadius;
-            continuityOptions.thirdPartySkeletonClearanceRadius =
-                options.weakContinuityThirdPartySkeletonClearanceRadius;
-            continuityOptions.minCompetitionMargin = options.weakContinuityMinCompetitionMargin;
+            const WeakContinuityOptions continuityOptions =
+                makeWeakContinuityOptions(options);
             WeakContinuityResult continuity = connectWeakContinuityPaths(
                 grid,
                 connectedSkeleton,
@@ -3613,7 +4121,8 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
             }
             result.branches.push_back(std::move(branchTrace));
         }
-        if (options.weakTailCompletion || options.weakTailCompletionShadow) {
+        if (options.weakTailCompletion || options.weakTailCompletionShadow ||
+            options.weakTailEndpointPortShadow) {
             WeakTailOptions tailOptions;
             tailOptions.minCells = options.weakTailMinCells;
             tailOptions.maxCells = options.weakTailMaxCells;
@@ -3623,6 +4132,10 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
             tailOptions.maxAlignmentAngleDegrees = options.weakTailMaxAlignmentAngle;
             tailOptions.ownershipClearanceRadius = options.weakTailOwnershipClearanceRadius;
             tailOptions.tangentRadius = options.weakTailTangentRadius;
+            tailOptions.requireEndpointPortOwnership =
+                options.weakTailEndpointPortOwnership;
+            tailOptions.junctionClearanceRadius =
+                options.weakTailJunctionClearanceRadius;
             WeakTailResult tails = restoreSupportedWeakTails(
                 grid,
                 connectedSkeleton,
@@ -3631,6 +4144,25 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
                 tailOptions);
             result.weakTailStats = tails.stats;
             result.weakTailCandidates = std::move(tails.candidates);
+            if (options.weakTailEndpointPortShadow) {
+                if (options.weakTailEndpointPortOwnership) {
+                    result.weakTailEndpointPortShadowStats = result.weakTailStats;
+                    result.weakTailEndpointPortCandidates = result.weakTailCandidates;
+                } else {
+                    WeakTailOptions strictOptions = tailOptions;
+                    strictOptions.requireEndpointPortOwnership = true;
+                    WeakTailResult strictTails = restoreSupportedWeakTails(
+                        grid,
+                        connectedSkeleton,
+                        branchMask,
+                        result.effectiveThreshold,
+                        strictOptions);
+                    result.weakTailEndpointPortShadowStats = strictTails.stats;
+                    result.weakTailEndpointPortCandidates =
+                        std::move(strictTails.candidates);
+                }
+                result.weakTailEndpointPortShadowEvaluated = true;
+            }
             if (options.weakTailCompletion) {
                 branchMask = std::move(tails.mask);
                 acceptedWeakTailMask = std::move(tails.acceptedMask);
@@ -3730,6 +4262,17 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
             result.branchAttributionJunctions =
                 std::move(attribution.junctions);
         }
+        if (options.skeletonGraphV2AttributionShadow) {
+            const SkeletonGraphV2 graphV2 = buildSkeletonGraphV2(
+                connectedSkeleton, GridMetric(grid));
+            BranchAttributionOptions attributionOptions;
+            attributionOptions.supportThreshold = result.effectiveThreshold;
+            attributionOptions.maxTurnAngleDegrees = options.maxGapAngle;
+            result.skeletonGraphV2Attribution =
+                compareSkeletonGraphV2Attribution(
+                    grid, keptBranchRefs, graphV2, attributionOptions);
+            result.skeletonGraphV2AttributionShadowEvaluated = true;
+        }
         int nextId = 1;
         if (options.separateBranchBelts) {
             const int ownershipRadius = options.beltRadius + options.postBeltCloseRadius + options.attributeEnvelopeRadius + 3;
@@ -3799,15 +4342,20 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
                     nextId,
                     &coveredMask);
             }
-            appendResidualTracePolygons(
-                grid,
-                residualMask,
-                groupOwners,
-                coveredMask,
-                candidateCoveredMask,
-                options,
-                result,
-                nextId);
+            if (options.residualTrace) {
+                const BinaryMask finalPolygonCoverage =
+                    rasterizeKeptPolygonCoverage(
+                        grid, result.polygons, &residualTraceMask);
+                appendResidualTracePolygons(
+                    grid,
+                    residualTraceMask,
+                    groupOwners,
+                    finalPolygonCoverage,
+                    finalPolygonCoverage,
+                    options,
+                    result,
+                    nextId);
+            }
             result.activeCellCount = branchMask.countActive();
             applyLocalPolygonQualityIfEnabled(grid, options, result);
             return result;
@@ -4044,7 +4592,60 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
     int nextId = 1;
     result.activeCellCount = activeMask.countActive();
     appendPolygonsFromMask(grid, activeMask, options, result, nextId);
+    if (options.residualTrace) {
+        const BinaryMask finalPolygonCoverage =
+            rasterizeKeptPolygonCoverage(
+                grid, result.polygons, &residualTraceMask);
+        appendResidualTracePolygons(
+            grid,
+            residualTraceMask,
+            {},
+            finalPolygonCoverage,
+            finalPolygonCoverage,
+            options,
+            result,
+            nextId);
+    }
     applyLocalPolygonQualityIfEnabled(grid, options, result);
+
+    if (options.multiScaleEvidenceShadow || options.adaptiveBoundaryShadow) {
+        MultiScaleEvidenceOptions evidenceOptions;
+        evidenceOptions.minimumConfidence =
+            options.multiScaleEvidenceMinimumConfidence;
+        evidenceOptions.minimumRidgeResponse =
+            options.multiScaleEvidenceMinimumRidgeResponse;
+        evidenceOptions.maximumSamples = options.multiScaleEvidenceMaximumSamples;
+        MultiScaleEvidenceResult evidence = computeMultiScaleEvidence(
+            grid, &attributeMask, evidenceOptions);
+        if (options.traceMode == TraceMode::RidgeBelt) {
+            const BinaryMask shadowSkeleton = skeletonizeZhangSuen(attributeMask);
+            evaluateMultiScaleEvidenceAgainstSkeleton(
+                grid, shadowSkeleton, 35.0, evidence);
+        }
+        result.multiScaleEvidenceShadowEvaluated = true;
+        result.multiScaleEvidenceSummary = evidence.summary;
+        if (options.adaptiveBoundaryShadow) {
+            AdaptiveBoundaryOptions boundaryOptions;
+            boundaryOptions.maximumDisplacementWorld =
+                options.adaptiveBoundaryMaximumDisplacementWorld;
+            boundaryOptions.supportThreshold = result.effectiveThreshold;
+            boundaryOptions.minimumSupportGain =
+                options.adaptiveBoundaryMinimumSupportGain;
+            boundaryOptions.maximumSupportLossRatio =
+                options.adaptiveBoundaryMaximumSupportLossRatio;
+            boundaryOptions.maximumBackgroundLeakageIncreaseRatio =
+                options.adaptiveBoundaryMaximumLeakageIncreaseRatio;
+            boundaryOptions.maximumPolygons =
+                options.adaptiveBoundaryMaximumPolygons;
+            boundaryOptions.maximumVerticesPerPolygon =
+                options.adaptiveBoundaryMaximumVerticesPerPolygon;
+            AdaptiveBoundaryResult boundary = evaluateAdaptiveBoundaries(
+                grid, attributeMask, result.polygons, &evidence, boundaryOptions);
+            result.adaptiveBoundaryShadowEvaluated = true;
+            result.adaptiveBoundarySummary = boundary.summary;
+            result.adaptiveBoundaryEvidence = std::move(boundary.evidence);
+        }
+    }
 
     return result;
 }

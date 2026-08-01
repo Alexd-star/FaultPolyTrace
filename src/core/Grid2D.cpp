@@ -10,8 +10,10 @@ Grid2D::Grid2D(GridMetadata metadata) : metadata_(metadata) {
     validate();
     const std::size_t nx = static_cast<std::size_t>(metadata_.nx);
     const std::size_t ny = static_cast<std::size_t>(metadata_.ny);
+    constexpr std::size_t maximumSupportedCells = 100000000;
     if (nx > std::numeric_limits<std::size_t>::max() / ny ||
-        nx * ny > values_.max_size()) {
+        nx * ny > values_.max_size() ||
+        nx * ny > maximumSupportedCells) {
         throw std::runtime_error("Grid dimensions exceed the supported memory range.");
     }
     values_.assign(nx * ny, 0.0);

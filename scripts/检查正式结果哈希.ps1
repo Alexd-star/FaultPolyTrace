@@ -1,7 +1,8 @@
 param(
     [string]$OfficialDat = $(if ($env:FPT_OFFICIAL_DAT) { $env:FPT_OFFICIAL_DAT } else { "" }),
     [string]$Executable = "",
-    [string]$OutputDirectory = ""
+    [string]$OutputDirectory = "",
+    [switch]$SkipGeosValidation
 )
 
 $ErrorActionPreference = "Stop"
@@ -57,8 +58,20 @@ if ([int]$diagnostics.results.keptPolygonCount -ne 200) {
 }
 if ([int]$diagnostics.topology.openRings -ne 0 -or
     [int]$diagnostics.topology.selfIntersectingPolygons -ne 0 -or
-    [int]$diagnostics.topology.polygonIntersections -ne 0) {
+    [int]$diagnostics.topology.polygonIntersections -ne 0 -or
+    [int]$diagnostics.topology.invalidPolygons -ne 0 -or
+    [int]$diagnostics.topology.polygonContainments -ne 0 -or
+    [int]$diagnostics.topology.polygonInteriorOverlaps -ne 0) {
     throw "Official topology baseline regressed."
+}
+
+$geosReport = Join-Path $OutputDirectory "geos_geometry_validation.json"
+if (!$SkipGeosValidation) {
+    & python (Join-Path $repoRoot "scripts\validate_geometry_geos.py") `
+        --input $output --report $geosReport --expected-count 200
+    if ($LASTEXITCODE -ne 0) {
+        throw "GEOS release geometry validation failed with exit code $LASTEXITCODE."
+    }
 }
 
 [ordered]@{
@@ -69,7 +82,16 @@ if ([int]$diagnostics.topology.openRings -ne 0 -or
     keptPolygonCount = 200
     sha256 = $actual
     expectedSha256 = $expected
-    topology = [ordered]@{ openRings = 0; selfIntersections = 0; polygonIntersections = 0 }
+    topology = [ordered]@{
+        openRings = 0
+        selfIntersections = 0
+        polygonIntersections = 0
+        invalidPolygons = 0
+        polygonContainments = 0
+        polygonInteriorOverlaps = 0
+    }
+    geosValidation = $(if ($SkipGeosValidation) { "SKIPPED" } else { "PASS" })
+    geosReport = $(if ($SkipGeosValidation) { $null } else { (Resolve-Path -LiteralPath $geosReport).Path })
     checkedAt = (Get-Date).ToString("o")
 } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $OutputDirectory "正式结果哈希回归.json") -Encoding UTF8
 

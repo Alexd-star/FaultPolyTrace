@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../core/ProductDefaults.h"
+
 #include <QJsonObject>
 #include <QString>
 #include <QStringList>
@@ -13,6 +15,10 @@ enum class QualityMode {
 };
 
 struct TraceParameters {
+    TraceParameters() {
+        fpt::product_defaults::applyVisibleProductionDefaults(*this);
+    }
+
     QString traceMode = "ridge-belt";
     QString thresholdMode = "percentile";
     double threshold = 0.95;

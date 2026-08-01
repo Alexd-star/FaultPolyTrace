@@ -35,6 +35,92 @@ function Invoke-CppTest {
     }
 }
 
+Invoke-CppTest -Name "test_grid_metric" -Sources @(
+    (Join-Path $repoRoot "tests_cpp\test_grid_metric.cpp"),
+    (Join-Path $repoRoot "src\core\BinaryMask.cpp"),
+    (Join-Path $repoRoot "src\core\Grid2D.cpp"),
+    (Join-Path $repoRoot "src\core\GridMetric.cpp"),
+    (Join-Path $repoRoot "src\core\PhysicalMorphology.cpp")
+)
+
+Invoke-CppTest -Name "test_product_defaults" -Sources @(
+    (Join-Path $repoRoot "tests_cpp\test_product_defaults.cpp")
+)
+
+Invoke-CppTest -Name "test_segmentation_threshold_info" -Sources @(
+    (Join-Path $repoRoot "tests_cpp\test_segmentation_threshold_info.cpp"),
+    (Join-Path $repoRoot "src\core\BinaryMask.cpp"),
+    (Join-Path $repoRoot "src\core\Grid2D.cpp"),
+    (Join-Path $repoRoot "src\core\Segmentation.cpp")
+)
+
+Invoke-CppTest -Name "test_skeleton_graph_v2" -Sources @(
+    (Join-Path $repoRoot "tests_cpp\test_skeleton_graph_v2.cpp"),
+    (Join-Path $repoRoot "src\core\BinaryMask.cpp"),
+    (Join-Path $repoRoot "src\core\Grid2D.cpp"),
+    (Join-Path $repoRoot "src\core\GridMetric.cpp"),
+    (Join-Path $repoRoot "src\core\SkeletonGraphV2.cpp")
+)
+
+Invoke-CppTest -Name "test_skeleton_graph_v2_attribution" -Sources @(
+    (Join-Path $repoRoot "tests_cpp\test_skeleton_graph_v2_attribution.cpp"),
+    (Join-Path $repoRoot "src\core\BinaryMask.cpp"),
+    (Join-Path $repoRoot "src\core\BranchAttribution.cpp"),
+    (Join-Path $repoRoot "src\core\Grid2D.cpp"),
+    (Join-Path $repoRoot "src\core\GridMetric.cpp"),
+    (Join-Path $repoRoot "src\core\SkeletonGraph.cpp"),
+    (Join-Path $repoRoot "src\core\SkeletonGraphV2.cpp"),
+    (Join-Path $repoRoot "src\core\SkeletonGraphV2Attribution.cpp")
+)
+
+Invoke-CppTest -Name "test_weak_extension_gate" -Sources @(
+    (Join-Path $repoRoot "tests_cpp\test_weak_extension_gate.cpp"),
+    (Join-Path $repoRoot "src\core\BinaryMask.cpp"),
+    (Join-Path $repoRoot "src\core\Grid2D.cpp"),
+    (Join-Path $repoRoot "src\core\GridMetric.cpp"),
+    (Join-Path $repoRoot "src\core\WeakExtensionGate.cpp")
+)
+
+Invoke-CppTest -Name "test_multi_scale_evidence" -Sources @(
+    (Join-Path $repoRoot "tests_cpp\test_multi_scale_evidence.cpp"),
+    (Join-Path $repoRoot "src\core\BinaryMask.cpp"),
+    (Join-Path $repoRoot "src\core\Grid2D.cpp"),
+    (Join-Path $repoRoot "src\core\MultiScaleEvidence.cpp")
+)
+
+Invoke-CppTest -Name "test_adaptive_boundary" -Sources @(
+    (Join-Path $repoRoot "tests_cpp\test_adaptive_boundary.cpp"),
+    (Join-Path $repoRoot "src\core\AdaptiveBoundary.cpp"),
+    (Join-Path $repoRoot "src\core\BinaryMask.cpp"),
+    (Join-Path $repoRoot "src\core\Grid2D.cpp"),
+    (Join-Path $repoRoot "src\core\MultiScaleEvidence.cpp"),
+    (Join-Path $repoRoot "src\core\Polygon.cpp"),
+    (Join-Path $repoRoot "src\core\Topology.cpp")
+)
+
+Invoke-CppTest -Name "test_residual_trace" -Sources @(
+    (Join-Path $repoRoot "tests_cpp\test_residual_trace.cpp"),
+    (Join-Path $repoRoot "src\core\AdaptiveBoundary.cpp"),
+    (Join-Path $repoRoot "src\core\BinaryMask.cpp"),
+    (Join-Path $repoRoot "src\core\BranchAttribution.cpp"),
+    (Join-Path $repoRoot "src\core\FaultTracer.cpp"),
+    (Join-Path $repoRoot "src\core\Grid2D.cpp"),
+    (Join-Path $repoRoot "src\core\GridMetric.cpp"),
+    (Join-Path $repoRoot "src\core\LocalPolygonQuality.cpp"),
+    (Join-Path $repoRoot "src\core\MultiScaleEvidence.cpp"),
+    (Join-Path $repoRoot "src\core\PhysicalMorphology.cpp"),
+    (Join-Path $repoRoot "src\core\Polygon.cpp"),
+    (Join-Path $repoRoot "src\core\Segmentation.cpp"),
+    (Join-Path $repoRoot "src\core\SkeletonGraph.cpp"),
+    (Join-Path $repoRoot "src\core\SkeletonGraphV2.cpp"),
+    (Join-Path $repoRoot "src\core\SkeletonGraphV2Attribution.cpp"),
+    (Join-Path $repoRoot "src\core\Topology.cpp"),
+    (Join-Path $repoRoot "src\core\WeakContinuityConnector.cpp"),
+    (Join-Path $repoRoot "src\core\WeakExtensionGate.cpp"),
+    (Join-Path $repoRoot "src\core\WeakPathSupport.cpp"),
+    (Join-Path $repoRoot "src\core\WeakTailRestorer.cpp")
+)
+
 Invoke-CppTest -Name "test_weak_continuity_connector" -Sources @(
     (Join-Path $repoRoot "tests_cpp\test_weak_continuity_connector.cpp"),
     (Join-Path $repoRoot "src\core\BinaryMask.cpp"),
@@ -47,6 +133,7 @@ Invoke-CppTest -Name "test_weak_tail_restorer" -Sources @(
     (Join-Path $repoRoot "tests_cpp\test_weak_tail_restorer.cpp"),
     (Join-Path $repoRoot "src\core\BinaryMask.cpp"),
     (Join-Path $repoRoot "src\core\Grid2D.cpp"),
+    (Join-Path $repoRoot "src\core\SkeletonGraph.cpp"),
     (Join-Path $repoRoot "src\core\WeakTailRestorer.cpp")
 )
 
@@ -60,17 +147,24 @@ Invoke-CppTest -Name "test_weak_path_support" -Sources @(
 
 Invoke-CppTest -Name "test_weak_path_support_integration" -Sources @(
     (Join-Path $repoRoot "tests_cpp\test_weak_path_support_integration.cpp"),
+    (Join-Path $repoRoot "src\core\AdaptiveBoundary.cpp"),
     (Join-Path $repoRoot "src\core\BinaryMask.cpp"),
     (Join-Path $repoRoot "src\core\BranchAttribution.cpp"),
     (Join-Path $repoRoot "src\core\Grid2D.cpp"),
+    (Join-Path $repoRoot "src\core\GridMetric.cpp"),
     (Join-Path $repoRoot "src\core\LocalPolygonQuality.cpp"),
+    (Join-Path $repoRoot "src\core\MultiScaleEvidence.cpp"),
+    (Join-Path $repoRoot "src\core\PhysicalMorphology.cpp"),
     (Join-Path $repoRoot "src\core\Polygon.cpp"),
     (Join-Path $repoRoot "src\core\Segmentation.cpp"),
     (Join-Path $repoRoot "src\core\SkeletonGraph.cpp"),
+    (Join-Path $repoRoot "src\core\SkeletonGraphV2.cpp"),
+    (Join-Path $repoRoot "src\core\SkeletonGraphV2Attribution.cpp"),
     (Join-Path $repoRoot "src\core\Topology.cpp"),
     (Join-Path $repoRoot "src\core\FaultTracer.cpp"),
     (Join-Path $repoRoot "src\core\WeakPathSupport.cpp")
     (Join-Path $repoRoot "src\core\WeakContinuityConnector.cpp")
+    (Join-Path $repoRoot "src\core\WeakExtensionGate.cpp")
     (Join-Path $repoRoot "src\core\WeakTailRestorer.cpp")
 )
 
@@ -84,17 +178,24 @@ Invoke-CppTest -Name "test_branch_attribution" -Sources @(
 
 Invoke-CppTest -Name "test_local_polygon_quality" -Sources @(
     (Join-Path $repoRoot "tests_cpp\test_local_polygon_quality.cpp"),
+    (Join-Path $repoRoot "src\core\AdaptiveBoundary.cpp"),
     (Join-Path $repoRoot "src\core\BinaryMask.cpp"),
     (Join-Path $repoRoot "src\core\BranchAttribution.cpp"),
     (Join-Path $repoRoot "src\core\FaultTracer.cpp"),
     (Join-Path $repoRoot "src\core\Grid2D.cpp"),
+    (Join-Path $repoRoot "src\core\GridMetric.cpp"),
     (Join-Path $repoRoot "src\core\LocalPolygonQuality.cpp"),
+    (Join-Path $repoRoot "src\core\MultiScaleEvidence.cpp"),
+    (Join-Path $repoRoot "src\core\PhysicalMorphology.cpp"),
     (Join-Path $repoRoot "src\core\Polygon.cpp"),
     (Join-Path $repoRoot "src\core\Segmentation.cpp"),
     (Join-Path $repoRoot "src\core\SkeletonGraph.cpp"),
+    (Join-Path $repoRoot "src\core\SkeletonGraphV2.cpp"),
+    (Join-Path $repoRoot "src\core\SkeletonGraphV2Attribution.cpp"),
     (Join-Path $repoRoot "src\core\Topology.cpp"),
     (Join-Path $repoRoot "src\core\WeakPathSupport.cpp")
     (Join-Path $repoRoot "src\core\WeakContinuityConnector.cpp")
+    (Join-Path $repoRoot "src\core\WeakExtensionGate.cpp")
     (Join-Path $repoRoot "src\core\WeakTailRestorer.cpp")
 )
 

@@ -33,10 +33,12 @@ def test_overwrite_delete_and_explicit_delete_check_sdk_status():
 def test_runner_re_reads_written_polygons_before_reporting_success():
     assert "verifyFaultPolygonRoundTrip" in RUNNER
     assert "GeoEast round-trip verified" in RUNNER
-    assert "std::sort(expectedSignatures.begin(), expectedSignatures.end())" in RUNNER
-    assert "std::sort(actualSignatures.begin(), actualSignatures.end())" in RUNNER
-    assert "fpt::polygonArea(points)" in RUNNER
-    assert "static_cast<double>(points.size())" in RUNNER
+    assert "canonicalizeGeometry(source, true" in RUNNER
+    assert "canonicalizeGeometry(actual, false" in RUNNER
+    assert "expectedGeometry != actualGeometry" in RUNNER
+    assert "topologyIsValid(topology)" in RUNNER
+    assert "GeoEast round-trip polygon style mismatch" in RUNNER
+    assert "inspectFaultPolygonStorage" in RUNNER
 
 
 def test_runner_uses_staged_commit_with_readback_and_compensating_rollback():

@@ -29,6 +29,11 @@ struct WeakContinuityOptions {
     double attributeWeight = 3.5;
     double directionWeight = 0.8;
     double curvatureWeight = 0.55;
+    bool excludeExistingSkeletonFromSupport = false;
+    bool usePhysicalMetric = false;
+    bool useGlobalMatching = false;
+    double noConnectCost = 2.0;
+    int maxExactMatchingEndpoints = 20;
     int maxEvidenceRecords = 4096;
 };
 
@@ -38,6 +43,7 @@ struct WeakContinuityCandidate {
     SkeletonPoint endpointA;
     SkeletonPoint endpointB;
     double endpointDistance = 0.0;
+    double endpointDistanceWorld = 0.0;
     double angleA = 180.0;
     double angleB = 180.0;
     double widthA = 0.0;
@@ -53,11 +59,17 @@ struct WeakContinuityCandidate {
     double maxTurnAngleDegrees = 0.0;
     double competitionMarginA = 0.0;
     double competitionMarginB = 0.0;
+    int finiteBackgroundSamples = 0;
+    int invalidBackgroundSamples = 0;
+    int evaluatedSupportPixels = 0;
+    int excludedSkeletonSupportPixels = 0;
+    int invalidPathSamples = 0;
     int addedPathPixels = 0;
     int addedEnvelopeCells = 0;
     int contactedObjectCount = 0;
     double minimumThirdObjectClearance = -1.0;
     int nearbyThirdObjectCount = 0;
+    int spatialConflictCount = 0;
     int endpointBranchIdA = -1;
     int endpointBranchIdB = -1;
     double endpointJunctionDistanceA = -1.0;
@@ -81,6 +93,7 @@ struct WeakContinuityCandidate {
     int localHolesAfter = 0;
     bool pathFound = false;
     bool accepted = false;
+    bool selectedByGlobalMatching = false;
     std::string decision;
     std::vector<SkeletonPoint> path;
 };
@@ -95,6 +108,8 @@ struct WeakContinuityStats {
     int searchedPaths = 0;
     int foundPaths = 0;
     int noPathRejected = 0;
+    int invalidBackgroundRejected = 0;
+    int noEvaluatedSupportRejected = 0;
     int attributeRejected = 0;
     int unsupportedRunRejected = 0;
     int curvatureRejected = 0;
@@ -102,6 +117,17 @@ struct WeakContinuityStats {
     int competitionRejected = 0;
     int endpointReuseRejected = 0;
     int acceptedConnections = 0;
+    int globalMatchingComponents = 0;
+    int globalMatchingExactComponents = 0;
+    int globalMatchingFallbackComponents = 0;
+    int globalMatchingNoConnectEndpoints = 0;
+    int spatialConflictPairs = 0;
+    int spatialConflictRejected = 0;
+    int finiteBackgroundSamples = 0;
+    int invalidBackgroundSamples = 0;
+    int evaluatedSupportPixels = 0;
+    int excludedSkeletonSupportPixels = 0;
+    int invalidPathSamples = 0;
     int addedPathPixels = 0;
 };
 

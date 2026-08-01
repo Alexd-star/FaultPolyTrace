@@ -7,6 +7,7 @@
 #include <direct.h>
 #include <iostream>
 #include <limits>
+#include <set>
 #include <stdexcept>
 
 #include "bomapgrid.h"
@@ -169,6 +170,71 @@ FaultPolygonStyle readFaultPolygonStyle(
     style.blue = head.blue;
     style.lineWidth = head.linewidth;
     return style;
+}
+
+FaultPolygonStorageSummary inspectFaultPolygonStorage(
+    const GeoEastProjectPtr& project,
+    const std::string& outputName) {
+    if (!project) {
+        throw std::runtime_error("GeoEast project is null.");
+    }
+    if (outputName.empty()) {
+        throw std::runtime_error("GeoEast BOFaultPolygon output name is empty.");
+    }
+    std::shared_ptr<geobo::BOFaultPolygon> boPolygon =
+        project->getChild<geobo::BOFaultPolygon>(outputName);
+    if (!boPolygon) {
+        throw std::runtime_error("Failed to get BOFaultPolygon: " + outputName);
+    }
+
+    BAFaultPolygonHead head;
+    BAFaultPolygonData data;
+    if (!boPolygon->readData(head, data)) {
+        throw std::runtime_error("Failed to inspect BOFaultPolygon: " + outputName);
+    }
+
+    FaultPolygonStorageSummary summary;
+    summary.headerSegmentCount = head.fauNum;
+    summary.segmentCount = data.faultPolygonList.size();
+    summary.style.red = head.red;
+    summary.style.green = head.green;
+    summary.style.blue = head.blue;
+    summary.style.lineWidth = head.linewidth;
+
+    std::set<GINT64> segmentIds;
+    std::set<GINT64> combinedIds;
+    std::set<GINT64> primaryKeys;
+    for (const BAFaultPolygonSegment& segment : data.faultPolygonList) {
+        summary.pointCount += segment.faultPolygonData.size();
+        if (segment.closeFlag == 0) {
+            ++summary.openSegmentCount;
+        } else {
+            ++summary.closedSegmentCount;
+        }
+        if (segment.faultPolygonData.size() < 3) {
+            ++summary.invalidSegmentCount;
+        }
+        if (!segmentIds.insert(segment.faultPolygonSegID).second) {
+            ++summary.duplicateSegmentIdCount;
+        }
+        combinedIds.insert(segment.faultPolygonCombinedID);
+        if (!primaryKeys.insert(segment.pkID).second) {
+            ++summary.duplicatePrimaryKeyCount;
+        }
+    }
+    summary.uniqueSegmentIdCount = segmentIds.size();
+    summary.uniqueCombinedIdCount = combinedIds.size();
+    summary.uniquePrimaryKeyCount = primaryKeys.size();
+    return summary;
+}
+
+const char* faultPolygonInteriorRingPolicyName(
+    FaultPolygonInteriorRingPolicy policy) {
+    switch (policy) {
+    case FaultPolygonInteriorRingPolicy::OmitUnsupportedInteriorRings:
+        return "omit_unsupported_interior_rings";
+    }
+    return "unknown";
 }
 
 fpt::Grid2D readMapGrid(const GeoEastProjectPtr& project, const std::string& gridName) {
@@ -363,10 +429,10 @@ void writeFaultPolygons(
         }
     }
     if (omittedHoleCount > 0) {
-        // BOFaultPolygon has no parent-ring field for interior rings.  Writing
-        // them as independent segments would create false fault polygons, so
-        // the GeoEast display layer keeps each exterior ring and fills holes.
-        // The full polygon-with-holes geometry remains available in CSV/WKT.
+        // BOFaultPolygon and GeoEast's ASCII fault-polygon format have no ring
+        // role or parent-ring field. Writing holes as ordinary segments would
+        // silently create extra fault polygons, so only exterior rings are
+        // persisted. The full polygon-with-holes geometry remains in CSV/WKT.
         std::cerr << "GeoEast compatibility: omitted " << omittedHoleCount
                   << " interior ring(s); exterior fault polygons are preserved.\n";
     }

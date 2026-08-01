@@ -18,6 +18,8 @@ struct WeakTailOptions {
     double maxAlignmentAngleDegrees = 35.0;
     int ownershipClearanceRadius = 2;
     int tangentRadius = 12;
+    bool requireEndpointPortOwnership = false;
+    int junctionClearanceRadius = 2;
     int maxEvidenceRecords = 4096;
 };
 
@@ -32,6 +34,12 @@ struct WeakTailCandidate {
     int maxY = 0;
     int ownerLabel = 0;
     int touchedOwnerCount = 0;
+    int directOwnerCount = 0;
+    int directContactCount = 0;
+    int endpointPortCount = 0;
+    int endpointX = -1;
+    int endpointY = -1;
+    bool intersectsJunctionGuard = false;
     double span = 0.0;
     double aspect = 0.0;
     double meanValue = 0.0;
@@ -46,6 +54,9 @@ struct WeakTailStats {
     int shapeRejected = 0;
     int attributeRejected = 0;
     int ownershipRejected = 0;
+    int directContactRejected = 0;
+    int endpointPortRejected = 0;
+    int junctionGuardRejected = 0;
     int directionRejected = 0;
     int acceptedComponents = 0;
     int acceptedCells = 0;
