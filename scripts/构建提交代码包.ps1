@@ -217,6 +217,17 @@ if (Test-Path -LiteralPath $complexPlanarEvidence -PathType Container) {
 
 $reliabilityTarget = Join-Path $verifyDir "可靠性验证"
 New-Item -ItemType Directory -Force -Path $reliabilityTarget | Out-Null
+$latestAcceptance = Get-ChildItem -LiteralPath (Join-Path $repoRoot "examples\outputs") -Directory -Filter "acceptance_*_official_root_antimerge" -ErrorAction SilentlyContinue |
+    Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName "参数扰动稳定性\离散分位平台核验.json") -PathType Leaf } |
+    Sort-Object LastWriteTime -Descending | Select-Object -First 1
+$latestFullScoreAudit = Get-ChildItem -LiteralPath (Join-Path $repoRoot "examples\outputs") -Directory -Filter "full_score_audit_*" -ErrorAction SilentlyContinue |
+    Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName "赛题满分交付审计报告.md") -PathType Leaf } |
+    Sort-Object LastWriteTime -Descending | Select-Object -First 1
+$latestGeoEastReadback = Get-ChildItem -LiteralPath (Join-Path $repoRoot "outputs\evidence") -Directory -Filter "geoeast_transaction_readback_*" -ErrorAction SilentlyContinue |
+    Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName "transaction.json") -PathType Leaf } |
+    Sort-Object LastWriteTime -Descending | Select-Object -First 1
+$latestGeosValidation = Get-ChildItem -LiteralPath (Join-Path $repoRoot "outputs\regression") -Recurse -File -Filter "geos_geometry_validation.json" -ErrorAction SilentlyContinue |
+    Sort-Object LastWriteTime -Descending | Select-Object -First 1
 foreach ($item in @(
     @{
         Source = (Join-Path $repoRoot "outputs\verification\msvc_asan\asan_report.json")
@@ -224,14 +235,42 @@ foreach ($item in @(
     },
     @{
         Source = (Join-Path $repoRoot "examples\outputs\stability\稳定性摘要.json")
-        Target = "100次连续运行稳定性摘要.json"
+        Target = "50次连续运行稳定性摘要.json"
     },
     @{
         Source = (Join-Path $repoRoot "examples\outputs\stability\连续运行明细.csv")
-        Target = "100次连续运行明细.csv"
+        Target = "50次连续运行明细.csv"
+    },
+    @{
+        Source = (Join-Path $repoRoot "outputs\verification\application_verifier\application_verifier_report.json")
+        Target = "ApplicationVerifier验证摘要.json"
+    },
+    @{
+        Source = (Join-Path $repoRoot "outputs\verification\application_verifier\application_verifier_log.xml")
+        Target = "ApplicationVerifier日志.xml"
+    },
+    @{
+        Source = (Join-Path $repoRoot "outputs\verification\cli_robustness\cli_robustness_report.json")
+        Target = "异常输入与容错验证.json"
+    },
+    @{
+        Source = $(if ($latestGeoEastReadback) { Join-Path $latestGeoEastReadback.FullName "transaction.json" } else { $null })
+        Target = "GeoEast事务写入与回读.json"
+    },
+    @{
+        Source = $(if ($latestAcceptance) { Join-Path $latestAcceptance.FullName "参数扰动稳定性\离散分位平台核验.json" } else { $null })
+        Target = "离散分位平台内扰动核验.json"
+    },
+    @{
+        Source = $(if ($latestGeosValidation) { $latestGeosValidation.FullName } else { $null })
+        Target = "完整几何GEOS交叉验证.json"
+    },
+    @{
+        Source = $(if ($latestFullScoreAudit) { Join-Path $latestFullScoreAudit.FullName "赛题满分交付审计报告.md" } else { $null })
+        Target = "赛题满分交付审计报告.md"
     }
 )) {
-    if (Test-Path -LiteralPath $item.Source -PathType Leaf) {
+    if ($item.Source -and (Test-Path -LiteralPath $item.Source -PathType Leaf)) {
         Copy-Item -LiteralPath $item.Source -Destination (Join-Path $reliabilityTarget $item.Target) -Force
     }
 }
