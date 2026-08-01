@@ -37,6 +37,18 @@ if (!$AllowDirty -and $gitStatus.Count -gt 0) {
     throw "工作区存在未提交内容，不能生成正式提交包。请先提交，或仅在调试时使用 -AllowDirty。"
 }
 
+$trackedPowerShell = @(& git -c core.quotepath=false -C $repoRoot ls-files "*.ps1")
+foreach ($relative in $trackedPowerShell) {
+    $scriptPath = Join-Path $repoRoot $relative
+    $bytes = [System.IO.File]::ReadAllBytes($scriptPath)
+    $hasNonAscii = @($bytes | Where-Object { $_ -ge 0x80 }).Count -gt 0
+    $hasUtf8Bom = $bytes.Length -ge 3 -and
+        $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF
+    if ($hasNonAscii -and !$hasUtf8Bom) {
+        throw "Windows PowerShell 5.1 兼容检查失败：含非 ASCII 字符的脚本必须使用 UTF-8 BOM：$relative"
+    }
+}
+
 $manifestFile = Get-ChildItem -LiteralPath $releaseRoot -Filter "FPT-$Version-*_unique_build_manifest.json" |
     Sort-Object LastWriteTime -Descending | Select-Object -First 1
 if (!$manifestFile) { throw "缺少 $Version 唯一构建清单。" }

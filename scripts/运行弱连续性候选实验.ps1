@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$OfficialDat = $(if ($env:FPT_OFFICIAL_DAT) { $env:FPT_OFFICIAL_DAT } else { "D:\BaiduNetdiskDownload\BGPCup2025\test.dat" }),
     [string]$OutputDirectory = "",
     [switch]$SkipBuild,

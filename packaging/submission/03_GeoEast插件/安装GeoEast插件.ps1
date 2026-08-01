@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [string]$GeoEastRoot = $env:FPT_GEOEAST_ROOT
 )

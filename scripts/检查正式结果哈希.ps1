@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$OfficialDat = $(if ($env:FPT_OFFICIAL_DAT) { $env:FPT_OFFICIAL_DAT } else { "" }),
     [string]$Executable = "",
     [string]$OutputDirectory = "",
