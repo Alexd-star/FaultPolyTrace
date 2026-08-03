@@ -297,7 +297,14 @@ foreach ($item in @(
 }
 
 Write-Host "[5/6] 写入提交说明与许可"
-Copy-Tree -Source $templateRoot -Target $Destination -ExcludeDirs @((Join-Path $templateRoot "01_源码"))
+Copy-Tree -Source $templateRoot -Target $Destination -ExcludeDirs @(
+    (Join-Path $templateRoot "01_源码"),
+    (Join-Path $templateRoot "04_复现与验证\正式官方结果")
+)
+foreach ($name in @("lc_result.dat", "lc_result.fmt")) {
+    Copy-Item -LiteralPath (Join-Path $templateRoot "04_复现与验证\正式官方结果\$name") `
+        -Destination $officialOut -Force
+}
 Copy-Item -LiteralPath $manifestFile.FullName -Destination (Join-Path $Destination "唯一构建清单.json") -Force
 Expand-SubmissionTokens -Root $Destination
 

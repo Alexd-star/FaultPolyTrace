@@ -261,45 +261,19 @@ if (Test-Path -LiteralPath $releaseFigureDir) {
         }
     }
 }
-$officialSourceDir = Join-Path $repoRoot "examples\outputs\official"
+$officialSourceDir = Join-Path $repoRoot "packaging\submission\04_复现与验证\正式官方结果"
 $officialPackageDir = New-Item -ItemType Directory -Force -Path (Join-Path $examplesDir "outputs\official")
-foreach ($name in @(
-    "official_root_antimerge_benchmark.csv",
-    "official_root_antimerge_benchmark.csv.branches.csv",
-    "official_root_antimerge_benchmark.csv.diagnostics.json",
-    "official_root_antimerge_benchmark.csv.topology.csv"
+foreach ($mapping in @(
+    @{ Source = "FaultPolyTrace_Official_Result.csv"; Target = "official_root_antimerge_benchmark.csv" },
+    @{ Source = "FaultPolyTrace_Official_Result.diagnostics.json"; Target = "official_root_antimerge_benchmark.csv.diagnostics.json" },
+    @{ Source = "lc_result.dat"; Target = "lc_result.dat" },
+    @{ Source = "lc_result.fmt"; Target = "lc_result.fmt" }
 )) {
-    Copy-FileRequired (Join-Path $officialSourceDir $name) (Join-Path $officialPackageDir $name)
-}
-foreach ($name in @("figures", "figures_compare", "figures_smoothed")) {
-    $source = Join-Path $officialSourceDir $name
-    if (Test-Path -LiteralPath $source) {
-        Copy-Item -LiteralPath $source -Destination (Join-Path $officialPackageDir $name) -Recurse -Force
-    }
+    Copy-FileRequired `
+        (Join-Path $officialSourceDir $mapping.Source) `
+        (Join-Path $officialPackageDir $mapping.Target)
 }
 Copy-Item -LiteralPath (Join-Path $repoRoot "examples\synthetic") -Destination (Join-Path $examplesDir "synthetic") -Recurse -Force
-
-$repoOutputsDir = Join-Path $repoRoot "examples\outputs"
-$latestOfficialAcceptance = Get-ChildItem -LiteralPath $repoOutputsDir -Directory |
-    Where-Object {
-        $_.Name -like "acceptance_*_official_root_antimerge" -and
-        (Test-Path -LiteralPath (Join-Path $_.FullName "本次验收报告.md"))
-    } |
-    Sort-Object LastWriteTime -Descending |
-    Select-Object -First 1
-if ($latestOfficialAcceptance) {
-    Copy-Item -LiteralPath $latestOfficialAcceptance.FullName -Destination (Join-Path $examplesDir "outputs\$($latestOfficialAcceptance.Name)") -Recurse -Force
-}
-$latestStandaloneAcceptance = Get-ChildItem -LiteralPath $repoOutputsDir -Directory |
-    Where-Object {
-        $_.Name -like "standalone_acceptance_*" -and
-        (Test-Path -LiteralPath (Join-Path $_.FullName "独立软件发布包验收报告.md"))
-    } |
-    Sort-Object LastWriteTime -Descending |
-    Select-Object -First 1
-if ($latestStandaloneAcceptance) {
-    Copy-Item -LiteralPath $latestStandaloneAcceptance.FullName -Destination (Join-Path $examplesDir "outputs\$($latestStandaloneAcceptance.Name)") -Recurse -Force
-}
 
 foreach ($script in @(
     "run_geoeast_bgpcup2026_test7.ps1",
@@ -427,9 +401,7 @@ $manifest += '- `02_运行离线演示.cmd`：无需 GeoEast 的双击离线演�
 $manifest += '- `03_查看命令行帮助.cmd`：命令行参数帮助'
 $manifest += '- `docs/`：中文交付文档'
 $manifest += '- `figure/`：界面样式截图和 GeoEast 参考截图'
-$manifest += '- `examples/outputs/official/`：官方数据结果、图件、报告依据'
-$manifest += '- `examples/outputs/acceptance_*_official_root_antimerge/`：最新官方 DAT 一键验收证据链'
-$manifest += '- `examples/outputs/standalone_acceptance_*/`：最新独立软件发布包验收证据链'
+$manifest += '- `examples/outputs/official/`：与当前版本绑定的正式结果、GeoEast DAT 与格式定义'
 $manifest += '- `答辩评审材料包/`：评分项证据索引、答辩演示脚本和交付检查清单'
 $manifest += '- `scripts/`：运行、可视化、报告脚本'
 $manifest += '- `src/`：核心源码'
