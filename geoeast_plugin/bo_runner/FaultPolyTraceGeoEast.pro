@@ -44,17 +44,20 @@ SOURCES += \
     ../../src/core/AdaptiveBoundary.cpp \
     ../../src/core/BinaryMask.cpp \
     ../../src/core/BranchAttribution.cpp \
+    ../../src/core/FaultBeltBuilder.cpp \
     ../../src/core/FaultTracer.cpp \
     ../../src/core/FinalBridgeGate.cpp \
     ../../src/core/TraceOptionAdapters.cpp \
     ../../src/core/TraceOptionsValidation.cpp \
     ../../src/core/TracePostProcessor.cpp \
     ../../src/core/LocalPolygonQuality.cpp \
+    ../../src/core/MaskTopology.cpp \
     ../../src/core/MultiScaleEvidence.cpp \
     ../../src/core/WeakPathSupport.cpp \
     ../../src/core/WeakContinuityConnector.cpp \
     ../../src/core/WeakExtensionGate.cpp \
     ../../src/core/WeakTailRestorer.cpp \
+    ../../src/core/WeakTailTopologyGate.cpp \
     ../../src/core/Grid2D.cpp \
     ../../src/core/GridMetric.cpp \
     ../../src/core/PhysicalMorphology.cpp \
@@ -64,6 +67,7 @@ SOURCES += \
     ../../src/io/DiagnosticsIO.cpp \
     ../../src/core/Polygon.cpp \
     ../../src/core/Segmentation.cpp \
+    ../../src/core/SimpleRingCompatibility.cpp \
     ../../src/core/SkeletonGraph.cpp \
     ../../src/core/SkeletonGraphV2.cpp \
     ../../src/core/SkeletonGraphV2Attribution.cpp \
@@ -75,6 +79,7 @@ HEADERS += \
     ../../src/core/AdaptiveBoundary.h \
     ../../src/core/BinaryMask.h \
     ../../src/core/BranchAttribution.h \
+    ../../src/core/FaultBeltBuilder.h \
     ../../src/core/FaultTracer.h \
     ../../src/core/FinalBridgeGate.h \
     ../../src/core/TraceOptionAdapters.h \
@@ -83,11 +88,13 @@ HEADERS += \
     ../../src/core/TracePostProcessor.h \
     ../../src/core/TraceResult.h \
     ../../src/core/LocalPolygonQuality.h \
+    ../../src/core/MaskTopology.h \
     ../../src/core/MultiScaleEvidence.h \
     ../../src/core/WeakPathSupport.h \
     ../../src/core/WeakContinuityConnector.h \
     ../../src/core/WeakExtensionGate.h \
     ../../src/core/WeakTailRestorer.h \
+    ../../src/core/WeakTailTopologyGate.h \
     ../../src/core/Grid2D.h \
     ../../src/core/GridMetric.h \
     ../../src/core/PhysicalMorphology.h \
@@ -97,6 +104,7 @@ HEADERS += \
     ../../src/io/DiagnosticsIO.h \
     ../../src/core/Polygon.h \
     ../../src/core/Segmentation.h \
+    ../../src/core/SimpleRingCompatibility.h \
     ../../src/core/SkeletonGraph.h \
     ../../src/core/SkeletonGraphV2.h \
     ../../src/core/SkeletonGraphV2Attribution.h \

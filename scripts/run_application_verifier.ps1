@@ -1,7 +1,7 @@
 param(
     [string]$OfficialDat = $(if ($env:FPT_OFFICIAL_DAT) { $env:FPT_OFFICIAL_DAT } else { "" }),
     [string]$Executable = "",
-    [string]$ExpectedSha256 = "2911D696F880E1173F6633E6B8A4587316FDC7DFA19109CE8EB28083A076ED3A"
+    [string]$ExpectedSha256 = "3DE2427DF3E136A33396EAAAF512A83AC2AE3A0CACB3976AA52F3804A4056DCC"
 )
 
 $ErrorActionPreference = "Stop"
@@ -90,7 +90,7 @@ $logDetails = @($newLogs | ForEach-Object {
     verifierEntryCount = $verifierEntries.Count
     runLog = $runLog
     startedAt = $startedAt.ToString("o")
-    note = "Application Verifier is runtime-coverage based; this report applies to the official-data default CLI path. The output hash is locked to the released 200-polygon baseline."
+    note = "Application Verifier is runtime-coverage based; this report applies to the official-data default CLI path with GeoEast-compatible weak-tail topology gating."
     checkedAt = (Get-Date).ToString("o")
 } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $outputRoot "application_verifier_report.json") -Encoding UTF8
 

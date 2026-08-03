@@ -81,6 +81,20 @@ bool parseTailContinuationOption(
         options.trace.weakTailCompletion = true;
     } else if (arg == "--no-weak-tail-completion") {
         options.trace.weakTailCompletion = false;
+    } else if (arg == "--weak-tail-topology-gate") {
+        options.trace.weakTailTopologyGate = true;
+    } else if (arg == "--no-weak-tail-topology-gate") {
+        options.trace.weakTailTopologyGate = false;
+    } else if (arg == "--simple-ring-compatibility") {
+        options.trace.simpleRingCompatibility = true;
+    } else if (arg == "--no-simple-ring-compatibility") {
+        options.trace.simpleRingCompatibility = false;
+    } else if (arg == "--simple-ring-max-fill-cells") {
+        options.trace.simpleRingMaximumFillCells =
+            std::stoi(requireValue(arg));
+    } else if (arg == "--simple-ring-max-opening-cells") {
+        options.trace.simpleRingMaximumOpeningCells =
+            std::stoi(requireValue(arg));
     } else if (arg == "--weak-tail-completion-shadow") {
         options.trace.weakTailCompletionShadow = true;
     } else if (arg == "--no-weak-tail-completion-shadow") {
@@ -225,6 +239,10 @@ void printUsage() {
         << "  --weak-continuity-max-exact-endpoints <count>\n"
         << "  --weak-continuity-output <csv>\n"
         << "  --weak-tail-completion | --no-weak-tail-completion\n"
+        << "  --weak-tail-topology-gate | --no-weak-tail-topology-gate\n"
+        << "  --simple-ring-compatibility | --no-simple-ring-compatibility\n"
+        << "  --simple-ring-max-fill-cells <count>\n"
+        << "  --simple-ring-max-opening-cells <count>\n"
         << "  --weak-tail-completion-shadow | --no-weak-tail-completion-shadow\n"
         << "  --weak-tail-endpoint-port-shadow | --no-weak-tail-endpoint-port-shadow\n"
         << "  --weak-tail-endpoint-port-ownership | --no-weak-tail-endpoint-port-ownership\n"
@@ -1670,6 +1688,14 @@ int main(int argc, char** argv) {
                 options.trace.weakContinuityThirdPartySkeletonClearanceRadius;
             diagnostics.weakTailCompletionShadow = options.trace.weakTailCompletionShadow;
             diagnostics.weakTailCompletion = options.trace.weakTailCompletion;
+            diagnostics.weakTailTopologyGate =
+                options.trace.weakTailTopologyGate;
+            diagnostics.simpleRingCompatibility =
+                options.trace.simpleRingCompatibility;
+            diagnostics.simpleRingMaximumFillCells =
+                options.trace.simpleRingMaximumFillCells;
+            diagnostics.simpleRingMaximumOpeningCells =
+                options.trace.simpleRingMaximumOpeningCells;
             diagnostics.weakTailEndpointPortShadow =
                 options.trace.weakTailEndpointPortShadow;
             diagnostics.weakTailEndpointPortOwnership =
@@ -1832,6 +1858,10 @@ int main(int argc, char** argv) {
                 result.weakTailEndpointPortShadowStats;
             diagnostics.weakTailProtectedFromAntiMergeCells =
                 result.weakTailProtectedFromAntiMergeCells;
+            diagnostics.simpleRingCompatibilityApplied =
+                result.simpleRingCompatibilityApplied;
+            diagnostics.simpleRingCompatibilityStats =
+                result.simpleRingCompatibilityStats;
             diagnostics.rootAntiMergeCandidateCutCells =
                 result.rootAntiMergeCandidateCutCells;
             diagnostics.rootAntiMergeCutCells = result.rootAntiMergeCutCells;

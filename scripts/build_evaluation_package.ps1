@@ -1,7 +1,7 @@
 ﻿#Requires -Version 5.1
 [CmdletBinding()]
 param(
-    [string]$Version = "v1.1.1",
+    [string]$Version = "v1.1.2",
     [string]$OutputDir = "",
     [string]$LauncherPayloadDir = "",
     [string]$RunnerExe = "",

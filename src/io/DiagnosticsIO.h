@@ -102,6 +102,10 @@ struct RunDiagnostics {
     int weakContinuityMaxExactMatchingEndpoints = 20;
     bool weakTailCompletionShadow = false;
     bool weakTailCompletion = false;
+    bool weakTailTopologyGate = false;
+    bool simpleRingCompatibility = false;
+    int simpleRingMaximumFillCells = 0;
+    int simpleRingMaximumOpeningCells = 0;
     bool weakTailEndpointPortShadow = false;
     bool weakTailEndpointPortOwnership = false;
     int weakTailMinCells = 0;
@@ -193,6 +197,8 @@ struct RunDiagnostics {
     bool weakTailEndpointPortShadowEvaluated = false;
     WeakTailStats weakTailEndpointPortShadowStats;
     int weakTailProtectedFromAntiMergeCells = 0;
+    bool simpleRingCompatibilityApplied = false;
+    SimpleRingCompatibilityStats simpleRingCompatibilityStats;
     int rootAntiMergeCandidateCutCells = 0;
     int rootAntiMergeCutCells = 0;
     int rootAntiMergeRejectedCutCells = 0;

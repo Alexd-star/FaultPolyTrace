@@ -1,7 +1,7 @@
 ﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
-    从干净 Git 提交和统一 V1.1.1 构建产物生成正式竞赛代码提交包。
+    从干净 Git 提交和统一 V1.1.2 构建产物生成正式竞赛代码提交包。
 
 .DESCRIPTION
     源码只通过 git archive 导出跟踪文件，避免把 outputs、缓存、编译产物、
@@ -10,7 +10,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Version = "v1.1.1",
+    [string]$Version = "v1.1.2",
     [Parameter(Mandatory = $true)][string]$Destination,
     [switch]$KeepExisting,
     [switch]$AllowDirty
@@ -260,11 +260,11 @@ foreach ($item in @(
     },
     @{
         Source = (Join-Path $repoRoot "examples\outputs\stability\稳定性摘要.json")
-        Target = "50次连续运行稳定性摘要.json"
+        Target = "连续运行稳定性摘要.json"
     },
     @{
         Source = (Join-Path $repoRoot "examples\outputs\stability\连续运行明细.csv")
-        Target = "50次连续运行明细.csv"
+        Target = "连续运行明细.csv"
     },
     @{
         Source = (Join-Path $repoRoot "outputs\verification\application_verifier\application_verifier_report.json")

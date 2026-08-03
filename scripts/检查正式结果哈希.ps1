@@ -30,10 +30,25 @@ if ($LASTEXITCODE -ne 0) {
     throw "Official baseline run failed with exit code $LASTEXITCODE."
 }
 
-$expected = "2911D696F880E1173F6633E6B8A4587316FDC7DFA19109CE8EB28083A076ED3A"
+$expected = "3DE2427DF3E136A33396EAAAF512A83AC2AE3A0CACB3976AA52F3804A4056DCC"
 $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $output).Hash
 if ($actual -ne $expected) {
     throw "Official result hash regressed. Expected $expected, actual $actual."
+}
+$rollbackOutput = Join-Path $OutputDirectory "official_rollback_200.csv"
+& $Executable `
+    --input $OfficialDat `
+    --input-format geoeast-dat `
+    --output $rollbackOutput `
+    --no-weak-tail-topology-gate `
+    --no-simple-ring-compatibility
+if ($LASTEXITCODE -ne 0) {
+    throw "Historical rollback run failed with exit code $LASTEXITCODE."
+}
+$rollbackExpected = "2911D696F880E1173F6633E6B8A4587316FDC7DFA19109CE8EB28083A076ED3A"
+$rollbackActual = (Get-FileHash -Algorithm SHA256 -LiteralPath $rollbackOutput).Hash
+if ($rollbackActual -ne $rollbackExpected) {
+    throw "Historical rollback hash regressed. Expected $rollbackExpected, actual $rollbackActual."
 }
 $diagnostics = Get-Content -LiteralPath "$output.diagnostics.json" -Raw -Encoding UTF8 | ConvertFrom-Json
 if ([int]$diagnostics.results.keptPolygonCount -ne 200) {
@@ -65,6 +80,9 @@ if (!$SkipGeosValidation) {
     keptPolygonCount = 200
     sha256 = $actual
     expectedSha256 = $expected
+    rollbackOutput = (Resolve-Path -LiteralPath $rollbackOutput).Path
+    rollbackSha256 = $rollbackActual
+    rollbackExpectedSha256 = $rollbackExpected
     topology = [ordered]@{
         openRings = 0
         selfIntersections = 0

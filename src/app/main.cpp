@@ -161,6 +161,10 @@ struct CliOptions {
     int weakContinuityThirdPartySkeletonClearanceRadius = 2;
     bool weakTailCompletionShadow = false;
     bool weakTailCompletion = true;
+    bool weakTailTopologyGate = false;
+    bool simpleRingCompatibility = true;
+    int simpleRingMaximumFillCells = 25;
+    int simpleRingMaximumOpeningCells = 128;
     bool weakTailEndpointPortShadow = false;
     bool weakTailEndpointPortOwnership = false;
     int weakTailMinCells = 6;
@@ -320,6 +324,11 @@ void printUsage() {
         << "  --weak-continuity-max-exact-endpoints <n> Exact matching component limit. Default: 20\n"
         << "  --weak-continuity-third-party-clearance <n> Clearance from unrelated skeletons. Default: 2\n"
         << "  --weak-tail-completion Apply chain-level supported endpoint-tail restoration. Default: on\n"
+        << "  --weak-tail-topology-gate Trim weak tails that create enclosed inactive regions. Default: off\n"
+        << "  --simple-ring-compatibility Produce hole-free simple rings for GeoEast display. Default: on\n"
+        << "  --no-simple-ring-compatibility Preserve polygon interior rings.\n"
+        << "  --simple-ring-max-fill-cells <n> Fill enclosed raster voids up to n cells. Default: 25\n"
+        << "  --simple-ring-max-opening-cells <n> Maximum cells in a topology-safe ring opening. Default: 128\n"
         << "  --weak-tail-completion-shadow Diagnose endpoint tails without changing polygons. Default: off\n"
         << "  --weak-tail-endpoint-port-shadow Compare strict endpoint-port ownership without changing polygons\n"
         << "  --weak-tail-endpoint-port-ownership Apply strict endpoint-port ownership (experimental)\n"
@@ -572,6 +581,18 @@ bool parsePostProcessingOption(
         options.weakTailCompletion = true;
     } else if (arg == "--no-weak-tail-completion") {
         options.weakTailCompletion = false;
+    } else if (arg == "--weak-tail-topology-gate") {
+        options.weakTailTopologyGate = true;
+    } else if (arg == "--no-weak-tail-topology-gate") {
+        options.weakTailTopologyGate = false;
+    } else if (arg == "--simple-ring-compatibility") {
+        options.simpleRingCompatibility = true;
+    } else if (arg == "--no-simple-ring-compatibility") {
+        options.simpleRingCompatibility = false;
+    } else if (arg == "--simple-ring-max-fill-cells") {
+        options.simpleRingMaximumFillCells = std::stoi(requireValue(arg));
+    } else if (arg == "--simple-ring-max-opening-cells") {
+        options.simpleRingMaximumOpeningCells = std::stoi(requireValue(arg));
     } else if (arg == "--weak-tail-completion-shadow") {
         options.weakTailCompletionShadow = true;
     } else if (arg == "--no-weak-tail-completion-shadow") {
@@ -1226,6 +1247,12 @@ int main(int argc, char** argv) {
             cli.weakContinuityThirdPartySkeletonClearanceRadius;
         traceOptions.weakTailCompletionShadow = cli.weakTailCompletionShadow;
         traceOptions.weakTailCompletion = cli.weakTailCompletion;
+        traceOptions.weakTailTopologyGate = cli.weakTailTopologyGate;
+        traceOptions.simpleRingCompatibility = cli.simpleRingCompatibility;
+        traceOptions.simpleRingMaximumFillCells =
+            cli.simpleRingMaximumFillCells;
+        traceOptions.simpleRingMaximumOpeningCells =
+            cli.simpleRingMaximumOpeningCells;
         traceOptions.weakTailEndpointPortShadow = cli.weakTailEndpointPortShadow;
         traceOptions.weakTailEndpointPortOwnership =
             cli.weakTailEndpointPortOwnership;
@@ -1452,6 +1479,12 @@ int main(int argc, char** argv) {
             cli.weakContinuityThirdPartySkeletonClearanceRadius;
         diagnostics.weakTailCompletionShadow = cli.weakTailCompletionShadow;
         diagnostics.weakTailCompletion = cli.weakTailCompletion;
+        diagnostics.weakTailTopologyGate = cli.weakTailTopologyGate;
+        diagnostics.simpleRingCompatibility = cli.simpleRingCompatibility;
+        diagnostics.simpleRingMaximumFillCells =
+            cli.simpleRingMaximumFillCells;
+        diagnostics.simpleRingMaximumOpeningCells =
+            cli.simpleRingMaximumOpeningCells;
         diagnostics.weakTailEndpointPortShadow = cli.weakTailEndpointPortShadow;
         diagnostics.weakTailEndpointPortOwnership =
             cli.weakTailEndpointPortOwnership;
@@ -1570,6 +1603,10 @@ int main(int argc, char** argv) {
             result.weakTailEndpointPortShadowStats;
         diagnostics.weakTailProtectedFromAntiMergeCells =
             result.weakTailProtectedFromAntiMergeCells;
+        diagnostics.simpleRingCompatibilityApplied =
+            result.simpleRingCompatibilityApplied;
+        diagnostics.simpleRingCompatibilityStats =
+            result.simpleRingCompatibilityStats;
         diagnostics.rootAntiMergeCandidateCutCells = result.rootAntiMergeCandidateCutCells;
         diagnostics.rootAntiMergeCutCells = result.rootAntiMergeCutCells;
         diagnostics.rootAntiMergeRejectedCutCells = result.rootAntiMergeRejectedCutCells;

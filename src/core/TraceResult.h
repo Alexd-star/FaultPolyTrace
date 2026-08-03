@@ -6,6 +6,7 @@
 #include "MultiScaleEvidence.h"
 #include "Polygon.h"
 #include "Segmentation.h"
+#include "SimpleRingCompatibility.h"
 #include "SkeletonGraphV2.h"
 #include "SkeletonGraphV2Attribution.h"
 #include "WeakContinuityConnector.h"
@@ -46,6 +47,7 @@ struct TraceStageTimings {
     double finalWeakGateComponentHoleMs = 0.0;
     double finalWeakGateEnvelopeMs = 0.0;
     double finalWeakGateTopologyMs = 0.0;
+    double simpleRingCompatibilityMs = 0.0;
     double vectorizationMs = 0.0;
     double postProcessingMs = 0.0;
     double totalMs = 0.0;
@@ -97,6 +99,8 @@ struct TraceResult {
     WeakTailStats weakTailEndpointPortShadowStats;
     std::vector<WeakTailCandidate> weakTailEndpointPortCandidates;
     int weakTailProtectedFromAntiMergeCells = 0;
+    bool simpleRingCompatibilityApplied = false;
+    SimpleRingCompatibilityStats simpleRingCompatibilityStats;
     int rootAntiMergeCandidateCutCells = 0;
     int rootAntiMergeCutCells = 0;
     int rootAntiMergeRejectedCutCells = 0;

@@ -1,6 +1,7 @@
 #include "TraceOptionsValidation.h"
 
 #include "Grid2D.h"
+#include "SimpleRingCompatibility.h"
 #include "TraceOptionAdapters.h"
 #include "TraceOptions.h"
 
@@ -148,6 +149,14 @@ void validateTraceRequest(
         options.weakTailEndpointPortShadow) {
         validateWeakTailOptions(makeWeakTailOptions(
             options, options.weakTailEndpointPortOwnership));
+    }
+    if (options.simpleRingCompatibility) {
+        SimpleRingCompatibilityOptions compatibility;
+        compatibility.maximumFillCells =
+            options.simpleRingMaximumFillCells;
+        compatibility.maximumOpeningCells =
+            options.simpleRingMaximumOpeningCells;
+        validateSimpleRingCompatibilityOptions(compatibility);
     }
     if (options.weakContinuityFinalObjectPass &&
         (options.traceMode != TraceMode::RidgeBelt ||

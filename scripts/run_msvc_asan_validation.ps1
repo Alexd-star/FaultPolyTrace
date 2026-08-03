@@ -17,15 +17,18 @@ $sources = @(
     "src\core\AdaptiveBoundary.cpp",
     "src\core\BinaryMask.cpp",
     "src\core\BranchAttribution.cpp",
+    "src\core\FaultBeltBuilder.cpp",
     "src\core\Grid2D.cpp",
     "src\core\GridMetric.cpp",
     "src\core\LocalPolygonQuality.cpp",
+    "src\core\MaskTopology.cpp",
     "src\core\MultiScaleEvidence.cpp",
     "src\core\PhysicalMorphology.cpp",
     "src\core\Polygon.cpp",
     "src\core\PolygonQualityMetrics.cpp",
     "src\core\PolygonVectorizer.cpp",
     "src\core\Segmentation.cpp",
+    "src\core\SimpleRingCompatibility.cpp",
     "src\core\SkeletonGraph.cpp",
     "src\core\SkeletonGraphV2.cpp",
     "src\core\SkeletonGraphV2Attribution.cpp",
@@ -39,6 +42,7 @@ $sources = @(
     "src\core\WeakExtensionGate.cpp",
     "src\core\WeakPathSupport.cpp",
     "src\core\WeakTailRestorer.cpp",
+    "src\core\WeakTailTopologyGate.cpp",
     "src\io\AsciiGridIO.cpp",
     "src\io\DiagnosticsIO.cpp"
 ) | ForEach-Object { '"' + (Join-Path $repoRoot $_) + '"' }
@@ -67,6 +71,7 @@ $arguments = @(
     "--max-gap-distance", "12", "--max-gap-angle", "55", "--min-gap-support-ratio", "0.25",
     "--no-weak-continuity", "--no-weak-continuity-second-pass",
     "--weak-continuity-final-object-pass", "--weak-tail-completion",
+    "--no-weak-tail-topology-gate", "--simple-ring-compatibility",
     "--preserve-observed-skeleton-envelope",
     "--no-separate-branch-belts", "--root-anti-merge", "--root-anti-merge-support-ratio", "0.25",
     "--root-anti-merge-min-part-cells", "0", "--root-anti-merge-min-part-ratio", "0.12",
@@ -102,7 +107,7 @@ $runText = Get-Content -LiteralPath $runLog -Raw -ErrorAction SilentlyContinue
 if ($runText -match 'AddressSanitizer|ERROR:') {
     throw "AddressSanitizer reported a memory error. See $runLog"
 }
-$expectedHash = "2911D696F880E1173F6633E6B8A4587316FDC7DFA19109CE8EB28083A076ED3A"
+$expectedHash = "3DE2427DF3E136A33396EAAAF512A83AC2AE3A0CACB3976AA52F3804A4056DCC"
 $actualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $resultCsv).Hash
 if ($actualHash -ne $expectedHash) {
     throw "ASan result hash mismatch. Expected $expectedHash, actual $actualHash"

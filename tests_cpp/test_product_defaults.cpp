@@ -26,6 +26,11 @@ int main() {
             "The released production profile must enable root anti-merge.");
     require(!options.residualTrace,
             "Residual tracing must remain opt-in in the released profile.");
+    require(!options.weakTailTopologyGate && options.simpleRingCompatibility,
+            "Released results must preserve supported tails and resolve all rings in the final compatibility layer.");
+    require(options.simpleRingMaximumFillCells == 25 &&
+                options.simpleRingMaximumOpeningCells == 128,
+            "Simple-ring compatibility budgets must match the released profile.");
     require(options.residualFillRadius == 4 &&
                 options.residualTraceMaxCells == 80,
             "Residual recovery limits must match the released profile.");

@@ -101,6 +101,7 @@ struct TraceOptions {
     int weakContinuityMaxExactMatchingEndpoints = 20;
     bool weakTailCompletionShadow = false;
     bool weakTailCompletion = false;
+    bool weakTailTopologyGate = false;
     bool weakTailEndpointPortShadow = false;
     bool weakTailEndpointPortOwnership = false;
     int weakTailMinCells = 6;
@@ -112,6 +113,9 @@ struct TraceOptions {
     int weakTailOwnershipClearanceRadius = 2;
     int weakTailTangentRadius = 12;
     int weakTailJunctionClearanceRadius = 2;
+    bool simpleRingCompatibility = false;
+    int simpleRingMaximumFillCells = 25;
+    int simpleRingMaximumOpeningCells = 128;
     bool preserveObservedSkeletonEnvelope = false;
     bool separateBranchBelts = false;
     bool rootAntiMerge = false;

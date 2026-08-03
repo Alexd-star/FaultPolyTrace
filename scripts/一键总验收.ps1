@@ -1,7 +1,7 @@
 ﻿param(
     [string]$GeoEastRoot = $(if ($env:FPT_GEOEAST_ROOT) { $env:FPT_GEOEAST_ROOT } elseif ($env:USERPROFILE -and (Test-Path -LiteralPath (Join-Path $env:USERPROFILE "GeoEast"))) { Join-Path $env:USERPROFILE "GeoEast" } else { "C:\GeoEast" }),
     [string]$OfficialDat = "",
-    [string]$PackageVersion = "v1.1.1",
+    [string]$PackageVersion = "v1.1.2",
     [int]$MaxElapsedMs = 5000,
     [double]$MinStrongCoverage = 0.990,
     [double]$MinWeakCoverage = 0.955,
@@ -142,6 +142,9 @@ Write-Host "== 4/$totalSteps 运行官方数据推荐参数 =="
     --max-gap-distance 12 `
     --max-gap-angle 55 `
     --min-gap-support-ratio 0.25 `
+    --simple-ring-compatibility `
+    --simple-ring-max-fill-cells 25 `
+    --simple-ring-max-opening-cells 128 `
     --no-separate-branch-belts `
     --root-anti-merge `
     --root-anti-merge-support-ratio 0.25 `

@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "v1.1.1",
+    [string]$Version = "v1.1.2",
     [string]$GeoEastRoot = $(if ($env:FPT_GEOEAST_ROOT) { $env:FPT_GEOEAST_ROOT } elseif ($env:USERPROFILE) { Join-Path $env:USERPROFILE "GeoEast" } else { "C:\GeoEast" }),
     [switch]$SkipBuild
 )

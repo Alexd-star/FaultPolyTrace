@@ -45,6 +45,12 @@ struct WeakTailCandidate {
     double meanValue = 0.0;
     double maxValue = 0.0;
     double alignmentAngleDegrees = 180.0;
+    bool topologyGateEvaluated = false;
+    int newEnclosuresBefore = 0;
+    int newEnclosuresWithoutCandidate = 0;
+    int newEnclosureCellsBefore = 0;
+    int newEnclosureCellsWithoutCandidate = 0;
+    int topologyTrimmedCells = 0;
     std::vector<SkeletonPoint> cells;
 };
 
@@ -58,6 +64,16 @@ struct WeakTailStats {
     int endpointPortRejected = 0;
     int junctionGuardRejected = 0;
     int directionRejected = 0;
+    int topologyGateEvaluatedComponents = 0;
+    int topologyRejectedComponents = 0;
+    int topologyFallbackRejectedComponents = 0;
+    int topologyRejectedCells = 0;
+    int topologyTrimmedComponents = 0;
+    int topologyTrimmedCells = 0;
+    int topologyInitialNewEnclosures = 0;
+    int topologyInitialNewEnclosureCells = 0;
+    int topologyRemainingNewEnclosures = 0;
+    int topologyRemainingNewEnclosureCells = 0;
     int acceptedComponents = 0;
     int acceptedCells = 0;
 };

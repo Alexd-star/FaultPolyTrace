@@ -63,6 +63,10 @@ struct TraceParameters {
     int residualTraceMinLength = 6;
     int residualTraceMaxCells = 80;
     int residualCoveredGuardRadius = 0;
+    bool weakTailTopologyGate = false;
+    bool simpleRingCompatibility = true;
+    int simpleRingMaximumFillCells = 25;
+    int simpleRingMaximumOpeningCells = 128;
     double simplifyTolerance = 2.0;
     int smoothIterations = 1;
     QualityMode qualityMode = QualityMode::Production;

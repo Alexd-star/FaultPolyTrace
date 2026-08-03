@@ -125,6 +125,16 @@ QStringList traceArguments(const TraceParameters& p) {
          << "--no-weak-continuity-second-pass"
          << "--weak-continuity-final-object-pass"
          << "--weak-tail-completion"
+         << (p.weakTailTopologyGate
+                 ? "--weak-tail-topology-gate"
+                 : "--no-weak-tail-topology-gate")
+         << (p.simpleRingCompatibility
+                 ? "--simple-ring-compatibility"
+                 : "--no-simple-ring-compatibility")
+         << "--simple-ring-max-fill-cells"
+         << QString::number(p.simpleRingMaximumFillCells)
+         << "--simple-ring-max-opening-cells"
+         << QString::number(p.simpleRingMaximumOpeningCells)
          << "--preserve-observed-skeleton-envelope"
          << (p.separateBranchBelts ? "--separate-branch-belts" : "--no-separate-branch-belts")
          << (p.attributeConstrainedBelt ? "--attribute-constrained-belt" : "--no-attribute-constrained-belt")
@@ -208,6 +218,10 @@ TraceParameterValidation validateTraceParameters(const TraceParameters& p) {
     }
     if (p.minBranchLength < 1) {
         result.errors << QString::fromUtf8("最短分支必须至少为 1 个像元。");
+    }
+    if (p.simpleRingMaximumFillCells < 0 ||
+        p.simpleRingMaximumOpeningCells < 1) {
+        result.errors << QString::fromUtf8("简单环兼容的内部资源参数无效，请恢复默认参数。");
     }
     if (p.residualTrace &&
         (!finite(p.residualPercentile) || p.residualPercentile <= 0.0 || p.residualPercentile >= 1.0)) {
@@ -319,6 +333,10 @@ QJsonObject traceParametersToJson(const TraceParameters& p, const QString& prese
     object["residualTraceMinLength"] = p.residualTraceMinLength;
     object["residualTraceMaxCells"] = p.residualTraceMaxCells;
     object["residualCoveredGuardRadius"] = p.residualCoveredGuardRadius;
+    object["weakTailTopologyGate"] = p.weakTailTopologyGate;
+    object["simpleRingCompatibility"] = p.simpleRingCompatibility;
+    object["simpleRingMaximumFillCells"] = p.simpleRingMaximumFillCells;
+    object["simpleRingMaximumOpeningCells"] = p.simpleRingMaximumOpeningCells;
     object["simplifyTolerance"] = p.simplifyTolerance;
     object["smoothIterations"] = p.smoothIterations;
     return object;
@@ -440,6 +458,10 @@ bool traceParametersFromJson(const QJsonObject& object,
     FPT_READ(readInt("residualTraceMinLength", parsed.residualTraceMinLength, 1, 1000), "residualTraceMinLength");
     FPT_READ(readInt("residualTraceMaxCells", parsed.residualTraceMaxCells, 0, 1000000), "residualTraceMaxCells");
     FPT_READ(readInt("residualCoveredGuardRadius", parsed.residualCoveredGuardRadius, 0, 1024), "residualCoveredGuardRadius");
+    FPT_READ(readBool("weakTailTopologyGate", parsed.weakTailTopologyGate), "weakTailTopologyGate");
+    FPT_READ(readBool("simpleRingCompatibility", parsed.simpleRingCompatibility), "simpleRingCompatibility");
+    FPT_READ(readInt("simpleRingMaximumFillCells", parsed.simpleRingMaximumFillCells, 0, 1000000), "simpleRingMaximumFillCells");
+    FPT_READ(readInt("simpleRingMaximumOpeningCells", parsed.simpleRingMaximumOpeningCells, 1, 1000000), "simpleRingMaximumOpeningCells");
     FPT_READ(readDouble("simplifyTolerance", parsed.simplifyTolerance, 0.0, 1000.0), "simplifyTolerance");
     FPT_READ(readInt("smoothIterations", parsed.smoothIterations, 0, 5), "smoothIterations");
 #undef FPT_READ

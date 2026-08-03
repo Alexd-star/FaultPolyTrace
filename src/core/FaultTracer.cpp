@@ -1,5 +1,6 @@
 #include "FaultTracer.h"
 
+#include "FaultBeltBuilder.h"
 #include "FinalBridgeGate.h"
 #include "GridMetric.h"
 #include "PhysicalMorphology.h"
@@ -7,6 +8,7 @@
 #include "BranchAttribution.h"
 #include "LocalPolygonQuality.h"
 #include "SkeletonGraph.h"
+#include "SimpleRingCompatibility.h"
 #include "Topology.h"
 #include "TraceOptionAdapters.h"
 #include "TraceOptionsValidation.h"
@@ -14,6 +16,7 @@
 #include "WeakPathSupport.h"
 #include "WeakContinuityConnector.h"
 #include "WeakExtensionGate.h"
+#include "WeakTailTopologyGate.h"
 
 #include <algorithm>
 #include <chrono>
@@ -1879,6 +1882,7 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
             }
             result.branches.push_back(std::move(branchTrace));
         }
+        const BinaryMask branchMaskBeforeWeakTails = branchMask;
         if (options.weakTailCompletion || options.weakTailCompletionShadow ||
             options.weakTailEndpointPortShadow) {
             const WeakTailOptions tailOptions = makeWeakTailOptions(
@@ -1889,6 +1893,25 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
                 branchMask,
                 result.effectiveThreshold,
                 tailOptions);
+            if (options.weakTailCompletion && options.weakTailTopologyGate &&
+                !options.separateBranchBelts) {
+                WeakTailTopologyGateOptions topologyOptions;
+                topologyOptions.belt.beltRadius = options.beltRadius;
+                topologyOptions.belt.attributeConstrained =
+                    options.attributeConstrainedBelt;
+                topologyOptions.belt.attributeEnvelopeRadius =
+                    options.attributeEnvelopeRadius;
+                topologyOptions.belt.closeRadius = options.postBeltCloseRadius;
+                topologyOptions.belt.preserveObservedSkeletonEnvelope =
+                    options.preserveObservedSkeletonEnvelope;
+                applyWeakTailTopologyGate(
+                    branchMaskBeforeWeakTails,
+                    skeleton,
+                    attributeMask,
+                    acceptedWeakContinuityPathMask,
+                    topologyOptions,
+                    tails);
+            }
             result.weakTailStats = tails.stats;
             result.weakTailCandidates = std::move(tails.candidates);
             if (options.weakTailEndpointPortShadow) {
@@ -2120,36 +2143,20 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
         }
 
         const TraceClock::time_point beltConstructionStart = TraceClock::now();
-        activeMask = bufferMask(branchMask, options.beltRadius);
-        if (options.attributeConstrainedBelt) {
-            BinaryMask envelopeSeedMask = attributeMask;
-            if (options.preserveObservedSkeletonEnvelope) {
-                for (int y = 0; y < ny; ++y) {
-                    for (int x = 0; x < nx; ++x) {
-                        if (branchMask.get(x, y) && skeleton.get(x, y)) {
-                            envelopeSeedMask.set(x, y, true);
-                        }
-                    }
-                }
-            }
-            if (options.weakContinuity || options.weakTailCompletion) {
-                for (int y = 0; y < ny; ++y) {
-                    for (int x = 0; x < nx; ++x) {
-                        if (acceptedWeakContinuityPathMask.get(x, y) ||
-                            acceptedWeakTailMask.get(x, y)) {
-                            envelopeSeedMask.set(x, y, true);
-                        }
-                    }
-                }
-            }
-            BinaryMask envelopeMask = options.attributeEnvelopeRadius > 0
-                ? dilate(envelopeSeedMask, options.attributeEnvelopeRadius)
-                : envelopeSeedMask;
-            activeMask = intersectMask(activeMask, envelopeMask);
-        }
-        if (options.postBeltCloseRadius > 0) {
-            activeMask = closeMask(activeMask, options.postBeltCloseRadius);
-        }
+        FaultBeltBuildOptions beltOptions;
+        beltOptions.beltRadius = options.beltRadius;
+        beltOptions.attributeConstrained = options.attributeConstrainedBelt;
+        beltOptions.attributeEnvelopeRadius = options.attributeEnvelopeRadius;
+        beltOptions.closeRadius = options.postBeltCloseRadius;
+        beltOptions.preserveObservedSkeletonEnvelope =
+            options.preserveObservedSkeletonEnvelope;
+        activeMask = buildFaultBelt(
+            branchMask,
+            skeleton,
+            attributeMask,
+            acceptedWeakContinuityPathMask,
+            acceptedWeakTailMask,
+            beltOptions);
         activeMask = fillResidualAttributesNearActiveBelt(
             grid,
             activeMask,
@@ -2390,6 +2397,27 @@ TraceResult traceFaultPolygons(const Grid2D& grid, const TraceOptions& options) 
     } else {
         result.stageTimings.ridgeTracingMs =
             elapsedMilliseconds(ridgeStageStart);
+    }
+
+    if (options.simpleRingCompatibility) {
+        const TraceClock::time_point compatibilityStart = TraceClock::now();
+        SimpleRingCompatibilityOptions compatibilityOptions;
+        compatibilityOptions.maximumFillCells =
+            options.simpleRingMaximumFillCells;
+        compatibilityOptions.maximumOpeningCells =
+            options.simpleRingMaximumOpeningCells;
+        SimpleRingCompatibilityResult compatibility =
+            enforceSimpleRingCompatibility(
+                grid,
+                activeMask,
+                attributeMask,
+                result.effectiveThreshold,
+                compatibilityOptions);
+        activeMask = std::move(compatibility.mask);
+        result.simpleRingCompatibilityApplied = true;
+        result.simpleRingCompatibilityStats = compatibility.stats;
+        result.stageTimings.simpleRingCompatibilityMs =
+            elapsedMilliseconds(compatibilityStart);
     }
 
     const TraceClock::time_point vectorizationStageStart = TraceClock::now();

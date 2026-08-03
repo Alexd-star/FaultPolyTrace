@@ -8,7 +8,7 @@ param(
 $ErrorActionPreference = "Stop"
 $official = (Resolve-Path -LiteralPath $OfficialDat).Path
 $expectedInput = "21AB29456CE19B05CFC5646A1BD67BBA579FF65E30ECA99C3D39DC3C8BFFC07B"
-$expectedResult = "2911D696F880E1173F6633E6B8A4587316FDC7DFA19109CE8EB28083A076ED3A"
+$expectedResult = "3DE2427DF3E136A33396EAAAF512A83AC2AE3A0CACB3976AA52F3804A4056DCC"
 
 if ([string]::IsNullOrWhiteSpace($CliPath)) {
     $CliPath = Join-Path $PSScriptRoot "..\02_独立软件\FaultPolyTrace_Portable_{{VERSION}}\bin\faultpolytrace.exe"
@@ -41,6 +41,8 @@ $arguments = @(
     "--min-junction-branch-mean", "0.94", "--max-gap-distance", "12", "--max-gap-angle", "55",
     "--min-gap-support-ratio", "0.25", "--no-weak-continuity", "--no-weak-continuity-second-pass",
     "--weak-continuity-final-object-pass", "--weak-tail-completion",
+    "--no-weak-tail-topology-gate", "--simple-ring-compatibility",
+    "--simple-ring-max-fill-cells", "25", "--simple-ring-max-opening-cells", "128",
     "--preserve-observed-skeleton-envelope", "--no-separate-branch-belts", "--root-anti-merge",
     "--root-anti-merge-support-ratio", "0.25", "--root-anti-merge-min-part-cells", "0",
     "--root-anti-merge-min-part-ratio", "0.12", "--root-anti-merge-weak-guard-threshold", "0.66",
@@ -58,7 +60,14 @@ if ($LASTEXITCODE -ne 0) { throw "核心执行程序退出码为 $LASTEXITCODE" 
 $diag = Get-Content -LiteralPath $diagnostics -Raw | ConvertFrom-Json
 $resultHash = (Get-FileHash -LiteralPath $csv -Algorithm SHA256).Hash
 if ($diag.results.keptPolygonCount -ne 200) { throw "保留多边形数量不一致：$($diag.results.keptPolygonCount)" }
-if ($diag.topology.openRings -ne 0 -or $diag.topology.selfIntersectingPolygons -ne 0 -or $diag.topology.polygonIntersections -ne 0) {
+if ($diag.topology.openRings -ne 0 -or
+    $diag.topology.selfIntersectingPolygons -ne 0 -or
+    $diag.topology.polygonIntersections -ne 0 -or
+    $diag.topology.invalidPolygons -ne 0 -or
+    $diag.topology.polygonContainments -ne 0 -or
+    $diag.topology.polygonInteriorOverlaps -ne 0 -or
+    !$diag.simpleRingCompatibility.applied -or
+    $diag.simpleRingCompatibility.remainingHoleCount -ne 0) {
     throw "拓扑检查未通过：$($diag.topology | ConvertTo-Json -Compress)"
 }
 if ($resultHash -ne $expectedResult) { throw "结果哈希不一致：$resultHash" }

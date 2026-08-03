@@ -379,6 +379,14 @@ void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
         << d.weakContinuityMaxExactMatchingEndpoints << ",\n";
     out << "    \"weakTailCompletionShadow\": " << (d.weakTailCompletionShadow ? "true" : "false") << ",\n";
     out << "    \"weakTailCompletion\": " << (d.weakTailCompletion ? "true" : "false") << ",\n";
+    out << "    \"weakTailTopologyGate\": "
+        << (d.weakTailTopologyGate ? "true" : "false") << ",\n";
+    out << "    \"simpleRingCompatibility\": "
+        << (d.simpleRingCompatibility ? "true" : "false") << ",\n";
+    out << "    \"simpleRingMaximumFillCells\": "
+        << d.simpleRingMaximumFillCells << ",\n";
+    out << "    \"simpleRingMaximumOpeningCells\": "
+        << d.simpleRingMaximumOpeningCells << ",\n";
     out << "    \"weakTailEndpointPortShadow\": "
         << (d.weakTailEndpointPortShadow ? "true" : "false") << ",\n";
     out << "    \"weakTailEndpointPortOwnership\": "
@@ -733,10 +741,56 @@ void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
     out << "    \"endpointPortRejected\": " << d.weakTailStats.endpointPortRejected << ",\n";
     out << "    \"junctionGuardRejected\": " << d.weakTailStats.junctionGuardRejected << ",\n";
     out << "    \"directionRejected\": " << d.weakTailStats.directionRejected << ",\n";
+    out << "    \"topologyGateEvaluatedComponents\": "
+        << d.weakTailStats.topologyGateEvaluatedComponents << ",\n";
+    out << "    \"topologyRejectedComponents\": "
+        << d.weakTailStats.topologyRejectedComponents << ",\n";
+    out << "    \"topologyFallbackRejectedComponents\": "
+        << d.weakTailStats.topologyFallbackRejectedComponents << ",\n";
+    out << "    \"topologyRejectedCells\": "
+        << d.weakTailStats.topologyRejectedCells << ",\n";
+    out << "    \"topologyTrimmedComponents\": "
+        << d.weakTailStats.topologyTrimmedComponents << ",\n";
+    out << "    \"topologyTrimmedCells\": "
+        << d.weakTailStats.topologyTrimmedCells << ",\n";
+    out << "    \"topologyInitialNewEnclosures\": "
+        << d.weakTailStats.topologyInitialNewEnclosures << ",\n";
+    out << "    \"topologyInitialNewEnclosureCells\": "
+        << d.weakTailStats.topologyInitialNewEnclosureCells << ",\n";
+    out << "    \"topologyRemainingNewEnclosures\": "
+        << d.weakTailStats.topologyRemainingNewEnclosures << ",\n";
+    out << "    \"topologyRemainingNewEnclosureCells\": "
+        << d.weakTailStats.topologyRemainingNewEnclosureCells << ",\n";
     out << "    \"acceptedComponents\": " << d.weakTailStats.acceptedComponents << ",\n";
     out << "    \"acceptedCells\": " << d.weakTailStats.acceptedCells << ",\n";
     out << "    \"protectedFromAntiMergeCells\": "
         << d.weakTailProtectedFromAntiMergeCells << "\n";
+    out << "  },\n";
+    out << "  \"simpleRingCompatibility\": {\n";
+    out << "    \"applied\": "
+        << (d.simpleRingCompatibilityApplied ? "true" : "false") << ",\n";
+    out << "    \"initialHoleCount\": "
+        << d.simpleRingCompatibilityStats.initialHoleCount << ",\n";
+    out << "    \"initialHoleCells\": "
+        << d.simpleRingCompatibilityStats.initialHoleCells << ",\n";
+    out << "    \"filledHoleCount\": "
+        << d.simpleRingCompatibilityStats.filledHoleCount << ",\n";
+    out << "    \"filledCells\": "
+        << d.simpleRingCompatibilityStats.filledCells << ",\n";
+    out << "    \"fillRejectedComponents\": "
+        << d.simpleRingCompatibilityStats.fillRejectedComponents << ",\n";
+    out << "    \"openedHoleCount\": "
+        << d.simpleRingCompatibilityStats.openedHoleCount << ",\n";
+    out << "    \"openingCutCells\": "
+        << d.simpleRingCompatibilityStats.openingCutCells << ",\n";
+    out << "    \"openingAttributeCells\": "
+        << d.simpleRingCompatibilityStats.openingAttributeCells << ",\n";
+    out << "    \"openingRejectedComponents\": "
+        << d.simpleRingCompatibilityStats.openingRejectedComponents << ",\n";
+    out << "    \"remainingHoleCount\": "
+        << d.simpleRingCompatibilityStats.remainingHoleCount << ",\n";
+    out << "    \"remainingHoleCells\": "
+        << d.simpleRingCompatibilityStats.remainingHoleCells << "\n";
     out << "  },\n";
     out << "  \"weakTailEndpointPortShadow\": {\n";
     out << "    \"evaluated\": "
@@ -880,6 +934,8 @@ void writeDiagnosticsJson(const std::string& path, const RunDiagnostics& d) {
         << d.traceStages.finalWeakGateEnvelopeMs << ",\n";
     out << "    \"finalWeakGateTopologyMs\": "
         << d.traceStages.finalWeakGateTopologyMs << ",\n";
+    out << "    \"simpleRingCompatibilityMs\": "
+        << d.traceStages.simpleRingCompatibilityMs << ",\n";
     out << "    \"vectorizationMs\": " << d.traceStages.vectorizationMs << ",\n";
     out << "    \"postProcessingMs\": " << d.traceStages.postProcessingMs << ",\n";
     out << "    \"coreTotalMs\": " << d.traceStages.totalMs << ",\n";
@@ -1225,7 +1281,9 @@ void writeWeakTailCandidatesCsv(
            "owner_label,touched_owner_count,direct_owner_count,direct_contact_count,"
            "endpoint_port_count,endpoint_x,endpoint_y,intersects_junction_guard,"
            "span,aspect,mean_value,max_value,"
-           "alignment_angle,cells_grid_xy\n";
+           "alignment_angle,topology_gate_evaluated,new_enclosures_before,"
+           "new_enclosures_without_candidate,new_enclosure_cells_before,"
+           "new_enclosure_cells_without_candidate,topology_trimmed_cells,cells_grid_xy\n";
     for (const WeakTailCandidate& candidate : candidates) {
         out << candidate.id << ","
             << (candidate.accepted ? 1 : 0) << ","
@@ -1245,7 +1303,13 @@ void writeWeakTailCandidatesCsv(
             << candidate.aspect << ","
             << candidate.meanValue << ","
             << candidate.maxValue << ","
-            << candidate.alignmentAngleDegrees << ",";
+            << candidate.alignmentAngleDegrees << ","
+            << (candidate.topologyGateEvaluated ? 1 : 0) << ","
+            << candidate.newEnclosuresBefore << ","
+            << candidate.newEnclosuresWithoutCandidate << ","
+            << candidate.newEnclosureCellsBefore << ","
+            << candidate.newEnclosureCellsWithoutCandidate << ","
+            << candidate.topologyTrimmedCells << ",";
         for (std::size_t index = 0; index < candidate.cells.size(); ++index) {
             if (index > 0) {
                 out << ";";

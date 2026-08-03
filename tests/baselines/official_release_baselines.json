@@ -20,13 +20,50 @@
       "geoeastReadbackSha256": "618AE599869109BA1B1D9E5F650A48F328E724C6F34F988502BD6666B6B7CB94"
     },
     "candidateV12_200": {
-      "role": "current default candidate and rollback target",
+      "role": "stable rollback target before GeoEast hole-compatibility gating",
       "candidatePolygonCount": 212,
       "keptPolygonCount": 200,
       "cliCsvSha256": "50B0EA63A705072E8B0A4F6F66915A49E909C96DFF8588F6FCED42C3AAD65AC1",
       "canonicalKeptCsvSha256": "2911D696F880E1173F6633E6B8A4587316FDC7DFA19109CE8EB28083A076ED3A",
       "geoeastReadbackCount": 200,
       "geoeastReadbackSha256": "02415E30ED33E9A1DE591043A13507A0B4D75543D8758562AD3DE4B58B4C71E4"
+    },
+    "geoEastCompatible200": {
+      "role": "historical intermediate candidate with weak-tail post-belt topology gate",
+      "candidatePolygonCount": 212,
+      "keptPolygonCount": 200,
+      "cliCsvSha256": "33694CB8B01162F003B6FFBF28852CDC6FE292C560DD5D5BB3FCF9118512CEFB",
+      "rejectedWeakTailComponents": 1,
+      "rejectedWeakTailCells": 17,
+      "changedPolygonCount": 1,
+      "remainingInteriorRingCount": 8,
+      "remainingInteriorRingArea": 45200.0,
+      "geoeastDatSha256": "F47DA7BE05ECC0E455C9BC3B9162149CAF070F37EA73080CE8A5C727B105DF1D",
+      "geoeastReadbackCount": 200,
+      "geoeastReadbackGeometryHash": "BB553A7C70842EC0",
+      "geoeastReadbackVertexCount": 62270
+    },
+    "geoEastSimpleRing200": {
+      "role": "current default GeoEast simple-ring result",
+      "candidatePolygonCount": 212,
+      "keptPolygonCount": 200,
+      "canonicalKeptCsvSha256": "3DE2427DF3E136A33396EAAAF512A83AC2AE3A0CACB3976AA52F3804A4056DCC",
+      "strongCoverage": 0.9985520784680056,
+      "weakCoverage": 0.9765114323686566,
+      "initialInteriorRingCount": 9,
+      "filledInteriorRingCount": 6,
+      "filledCells": 32,
+      "openedInteriorRingCount": 3,
+      "openingCutCells": 6,
+      "openingAttributeCells": 0,
+      "remainingInteriorRingCount": 0,
+      "changedPolygonCount": 6,
+      "geoeastDatSha256": "93A5B6441734762F111517AA555372C44B850B51DD295345EBD5FD460C5F4CDC",
+      "geoeastDatPointRows": 62620,
+      "geoeastFmtSha256": "CC9B2C0E1D923565C959DB6DD792D048757F1A50451EC25A4F7E7BC5B242530C",
+      "geoeastReadbackCount": 200,
+      "geoeastReadbackGeometryHash": "050602F47C5FA336",
+      "geoeastReadbackVertexCount": 62420
     }
   },
   "promotionPolicy": {

@@ -392,7 +392,11 @@ WeakTailResult restoreSupportedWeakTails(
                     result.acceptedMask.set(point.x, point.y, true);
                 }
             }
-            if (static_cast<int>(result.candidates.size()) < options.maxEvidenceRecords) {
+            // Accepted components must remain available to downstream safety
+            // gates even when rejected diagnostic records have reached the cap.
+            if (candidate.accepted ||
+                static_cast<int>(result.candidates.size()) <
+                    options.maxEvidenceRecords) {
                 result.candidates.push_back(std::move(candidate));
             }
         }
