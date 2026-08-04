@@ -354,8 +354,8 @@ void printUsage() {
         << "  --root-anti-merge-min-part-ratio <v> Minimum major split part ratio after bridge cutting. Default: 0.12\n"
         << "  --root-anti-merge-weak-guard-threshold <v> Protect bridge cuts near weak response cells. Default: 0.66\n"
         << "  --root-anti-merge-weak-guard-radius <n> Experimental weak response protection radius in cells. Default: 0\n"
-        << "  --local-anti-merge         Experimental local low-value bridge cutting. Default: off\n"
-        << "  --no-local-anti-merge      Disable local low-value bridge cutting. Local anti-merge is off by default\n"
+        << "  --local-anti-merge         Enable support-envelope separation and scoped weak bridging. Default: on\n"
+        << "  --no-local-anti-merge      Disable support-envelope separation and scoped weak bridging\n"
         << "  --local-anti-merge-low-threshold <v> Raw value treated as local background bridge. Default: 0.05\n"
         << "  --local-anti-merge-bridge-radius <n> Neighborhood radius for local bridge support. Default: 2\n"
         << "  --local-anti-merge-min-part-cells <n> Minimum major split part cells. Default: 80\n"
@@ -1327,6 +1327,11 @@ int main(int argc, char** argv) {
             fpt::writeWeakContinuityCandidatesCsv(
                 cli.weakContinuityOutput,
                 result.weakContinuityCandidates);
+        }
+        if (traceOptions.localAntiMerge) {
+            fpt::writeSupportEnvelopeDecisionsCsv(
+                cli.output + ".support-envelope.csv",
+                result.supportEnvelopeDecisions);
         }
         if (!cli.weakTailOutput.empty()) {
             fpt::writeWeakTailCandidatesCsv(

@@ -1,7 +1,7 @@
 param(
     [string]$OfficialDat = $(if ($env:FPT_OFFICIAL_DAT) { $env:FPT_OFFICIAL_DAT } else { "" }),
     [string]$Executable = "",
-    [string]$ExpectedSha256 = "3DE2427DF3E136A33396EAAAF512A83AC2AE3A0CACB3976AA52F3804A4056DCC"
+    [string]$ExpectedSha256 = "EE7473CD04A3EA988166DD4502EEE70D4FB4A0D674135541A9B38490C3B91369"
 )
 
 $ErrorActionPreference = "Stop"

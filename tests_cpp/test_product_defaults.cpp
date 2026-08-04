@@ -24,6 +24,8 @@ int main() {
             "The product area threshold must come from the shared profile.");
     require(options.rootAntiMerge,
             "The released production profile must enable root anti-merge.");
+    require(options.localAntiMerge,
+            "The released profile must enable gated support-envelope separation.");
     require(!options.residualTrace,
             "Residual tracing must remain opt-in in the released profile.");
     require(!options.weakTailTopologyGate && options.simpleRingCompatibility,

@@ -76,11 +76,14 @@ def _compare(baseline, candidate, baseline_dir, candidate_dir):
         )
     }
     output_hash_equal = True
+    changed_case_count = 0
     for case in baseline["cases"]:
         case_id = case["case_id"]
         base_csv = Path(baseline_dir) / case_id / "result.csv"
         candidate_csv = Path(candidate_dir) / case_id / "result.csv"
-        output_hash_equal &= _sha256(base_csv) == _sha256(candidate_csv)
+        same_output = _sha256(base_csv) == _sha256(candidate_csv)
+        output_hash_equal &= same_output
+        changed_case_count += int(not same_output)
     checks = {
         "IoU不下降": metric_delta["pixel_iou_mean"] >= -0.002,
         "Precision不下降": metric_delta["pixel_precision_mean"] >= -0.002,
@@ -106,11 +109,21 @@ def _compare(baseline, candidate, baseline_dir, candidate_dir):
         or cand["split_excess_total"] < base["split_excess_total"]
         or cand["missed_object_count_total"] < base["missed_object_count_total"]
     )
+    if not all(checks.values()):
+        evidence_status = "rejected_regression"
+    elif output_hash_equal:
+        evidence_status = "safe_no_effect"
+    elif strict_improvement:
+        evidence_status = "promotion_gate_passed"
+    else:
+        evidence_status = "safe_small_gain_requires_more_evidence"
     return {
         "pass": bool(all(checks.values()) and strict_improvement),
+        "evidence_status": evidence_status,
         "checks": checks,
         "strict_improvement": bool(strict_improvement),
         "output_hash_equal_to_baseline": bool(output_hash_equal),
+        "changed_case_count": int(changed_case_count),
         "baseline": base,
         "candidate": cand,
         "delta": metric_delta,
@@ -134,6 +147,7 @@ def run(executable, dataset, output, modes, reuse_existing=False):
         "branch": ("--branch-attribution-candidate-groups",),
         "weak_path": ("--weak-path-gate",),
         "quality_shadow": ("--local-polygon-quality-shadow",),
+        "support_bridge": ("--local-anti-merge",),
     }
     comparisons = {}
     for mode in modes:
@@ -161,6 +175,12 @@ def run(executable, dataset, output, modes, reuse_existing=False):
         "promotion_policy": {
             "description": "候选必须保持主要质量指标、拓扑、对象粒度和耗时，并至少在一项指标上有明确改善。",
             "mean_metric_tolerance": 0.002,
+            "evidence_statuses": {
+                "promotion_gate_passed": "通过全部安全检查且达到预设明确改善阈值。",
+                "safe_no_effect": "全部输出与基线一致，可证明候选在本基准上无副作用，但不能证明有收益。",
+                "safe_small_gain_requires_more_evidence": "未见退化且存在小幅收益，仍需更多独立案例或专家复核。",
+                "rejected_regression": "至少一项安全检查失败。",
+            },
             "production_default_unchanged": True,
         },
         "metric_interpretation": {
@@ -225,7 +245,7 @@ def main():
     run_parser.add_argument(
         "--modes",
         default="branch,weak_path,quality_shadow",
-        help="逗号分隔的候选模式：branch,weak_path,quality_shadow",
+        help="逗号分隔的候选模式：branch,weak_path,quality_shadow,support_bridge",
     )
     run_parser.add_argument("--reuse-existing", action="store_true", help="复用已存在的追踪输出，只重新计算评价指标")
     args = parser.parse_args()

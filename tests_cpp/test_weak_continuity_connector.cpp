@@ -336,6 +336,136 @@ void testGlobalMatchingRejectsCrossingCandidatePaths() {
             "The rejected crossing candidate must be visible in diagnostics.");
 }
 
+void testBoundaryAdjustedDistanceFindsWideEndCaps() {
+    fpt::Grid2D grid = makeGrid();
+    fpt::BinaryMask skeleton(grid.nx(), grid.ny());
+    fpt::BinaryMask attributeMask(grid.nx(), grid.ny());
+    setLine(skeleton, grid, 4, 22, 16, 22, 0.95);
+    setLine(skeleton, grid, 31, 22, 43, 22, 0.95);
+    for (int y = 20; y <= 24; ++y) {
+        for (int x = 4; x <= 18; ++x) {
+            attributeMask.set(x, y, true);
+            grid.value(x, y) = 0.95;
+        }
+        for (int x = 29; x <= 43; ++x) {
+            attributeMask.set(x, y, true);
+            grid.value(x, y) = 0.95;
+        }
+    }
+    for (int x = 19; x < 29; ++x) {
+        grid.value(x, 22) = 0.58;
+    }
+
+    fpt::WeakContinuityOptions strict = testOptions();
+    strict.maxDistance = 12;
+    strict.minSupportRatio = 0.45;
+    strict.minMeanSupport = 0.30;
+    const fpt::WeakContinuityResult centerDistance =
+        fpt::connectWeakContinuityPaths(
+            grid, skeleton, attributeMask,
+            fpt::buildSkeletonGraph(skeleton), 0.80, strict);
+    require(centerDistance.stats.preselectedPairs == 0,
+            "Centerline endpoints beyond the limit must not be preselected.");
+
+    strict.useBoundaryAdjustedCandidateDistance = true;
+    const fpt::WeakContinuityResult adjusted =
+        fpt::connectWeakContinuityPaths(
+            grid, skeleton, attributeMask,
+            fpt::buildSkeletonGraph(skeleton), 0.80, strict);
+    require(adjusted.stats.preselectedPairs == 1,
+            "Wide end caps must use their boundary-adjusted gap distance.");
+    require(!adjusted.candidates.empty() &&
+            adjusted.candidates.front().boundaryAdjustedDistance <= 12.0,
+            "Adjusted candidate distance must be reported.");
+}
+
+void testSparseNeighborhoodSupportRescuesAlignedGap() {
+    fpt::Grid2D grid = makeGrid();
+    fpt::BinaryMask skeleton(grid.nx(), grid.ny());
+    fpt::BinaryMask attributeMask(grid.nx(), grid.ny());
+    setLine(skeleton, grid, 4, 22, 16, 22, 0.95);
+    setLine(attributeMask, grid, 4, 22, 16, 22, 0.95);
+    setLine(skeleton, grid, 27, 22, 40, 22, 0.95);
+    setLine(attributeMask, grid, 27, 22, 40, 22, 0.95);
+    for (int x = 17; x < 27; ++x) {
+        grid.value(x, 23) = 0.62;
+        if ((x - 17) % 4 == 0) {
+            grid.value(x, 22) = 0.62;
+        }
+    }
+
+    fpt::WeakContinuityOptions options = testOptions();
+    options.minSupportRatio = 0.65;
+    options.minMeanSupport = 0.52;
+    options.maxUnsupportedRun = 2;
+    options.excludeExistingSkeletonFromSupport = true;
+    options.attributeWeight = 0.0;
+    const fpt::WeakContinuityResult exactOnly =
+        fpt::connectWeakContinuityPaths(
+            grid, skeleton, attributeMask,
+            fpt::buildSkeletonGraph(skeleton), 0.80, options);
+    require(exactOnly.stats.acceptedConnections == 0,
+            "An unsupported exact path must remain rejected by default.");
+
+    options.supportNeighborhoodRadius = 1;
+    const fpt::WeakContinuityResult neighborhood =
+        fpt::connectWeakContinuityPaths(
+            grid, skeleton, attributeMask,
+            fpt::buildSkeletonGraph(skeleton), 0.80, options);
+    require(neighborhood.stats.acceptedConnections == 1,
+            "A strictly aligned point-sampled weak path should be recoverable.");
+    require(!neighborhood.candidates.empty() &&
+            neighborhood.candidates.front().usedNeighborhoodSupport,
+            "Neighborhood-supported acceptance must be explicit in diagnostics.");
+    require(neighborhood.candidates.front().exactSupportRatio <
+            neighborhood.candidates.front().neighborhoodSupportRatio,
+            "Exact and neighborhood support evidence must remain distinguishable.");
+}
+
+void testNearbyParallelSkeletonCannotLendNeighborhoodSupport() {
+    fpt::Grid2D grid = makeGrid();
+    fpt::BinaryMask skeleton(grid.nx(), grid.ny());
+    fpt::BinaryMask attributeMask(grid.nx(), grid.ny());
+    setLine(skeleton, grid, 4, 22, 16, 22, 0.95);
+    setLine(attributeMask, grid, 4, 22, 16, 22, 0.95);
+    setLine(skeleton, grid, 27, 22, 40, 22, 0.95);
+    setLine(attributeMask, grid, 27, 22, 40, 22, 0.95);
+    setLine(skeleton, grid, 18, 23, 25, 23, 0.62);
+    setLine(attributeMask, grid, 18, 23, 25, 23, 0.62);
+
+    fpt::WeakContinuityOptions options = testOptions();
+    options.minSupportRatio = 0.65;
+    options.minMeanSupport = 0.52;
+    options.maxUnsupportedRun = 2;
+    options.excludeExistingSkeletonFromSupport = true;
+    options.supportNeighborhoodRadius = 1;
+    options.thirdPartySkeletonClearanceRadius = 0;
+    options.attributeWeight = 0.0;
+    const fpt::WeakContinuityResult result =
+        fpt::connectWeakContinuityPaths(
+            grid, skeleton, attributeMask,
+            fpt::buildSkeletonGraph(skeleton), 0.80, options);
+
+    bool inspectedMainGap = false;
+    for (const fpt::WeakContinuityCandidate& candidate : result.candidates) {
+        const bool mainGap =
+            (candidate.endpointA.x == 16 && candidate.endpointA.y == 22 &&
+             candidate.endpointB.x == 27 && candidate.endpointB.y == 22) ||
+            (candidate.endpointB.x == 16 && candidate.endpointB.y == 22 &&
+             candidate.endpointA.x == 27 && candidate.endpointA.y == 22);
+        if (!mainGap) {
+            continue;
+        }
+        inspectedMainGap = true;
+        require(!candidate.accepted && !candidate.usedNeighborhoodSupport,
+            "A nearby parallel skeleton must not rescue an unsupported gap.");
+        require(candidate.neighborhoodSupportRatio < options.minSupportRatio,
+            "Third-party skeleton samples must be excluded from neighborhood evidence.");
+    }
+    require(inspectedMainGap,
+        "The main parallel-support test gap must be evaluated.");
+}
+
 } // namespace
 
 int main() {
@@ -352,6 +482,9 @@ int main() {
     testPhysicalMetricConnectsUsingWorldDistanceAndDirection();
     testGlobalMatchingCanChooseNoConnect();
     testGlobalMatchingRejectsCrossingCandidatePaths();
+    testBoundaryAdjustedDistanceFindsWideEndCaps();
+    testSparseNeighborhoodSupportRescuesAlignedGap();
+    testNearbyParallelSkeletonCannotLendNeighborhoodSupport();
     std::cout << "Weak continuity connector tests passed.\n";
     return 0;
 }

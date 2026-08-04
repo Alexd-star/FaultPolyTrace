@@ -16,7 +16,8 @@
     [string]$ReviewOutputDir = "",
     [switch]$NoImportDat,
     [switch]$BaselineReview,
-    [switch]$WeakContinuityReview
+    [switch]$WeakContinuityReview,
+    [switch]$SupportBridgeCandidate
 )
 
 $ErrorActionPreference = "Stop"
@@ -172,8 +173,13 @@ if ([string]::IsNullOrWhiteSpace($Runner) -or !(Test-Path -LiteralPath $Runner))
     throw "Cannot find faultpolytrace_geoeast_runner.exe. Build geoeast_plugin\bo_runner first, or pass -Runner."
 }
 
-if ($BaselineReview -and $WeakContinuityReview) {
-    throw "BaselineReview and WeakContinuityReview cannot be enabled together."
+$selectedReviewModeCount = @(
+    $BaselineReview,
+    $WeakContinuityReview,
+    $SupportBridgeCandidate
+).Where({ $_ }).Count
+if ($selectedReviewModeCount -gt 1) {
+    throw "BaselineReview, WeakContinuityReview, and SupportBridgeCandidate are mutually exclusive."
 }
 if ($BaselineReview -and $Output -eq "FaultPolyTrace_Result") {
     $Output = "FaultPolyTrace_Baseline_Review"
@@ -181,11 +187,16 @@ if ($BaselineReview -and $Output -eq "FaultPolyTrace_Result") {
 if ($WeakContinuityReview -and $Output -eq "FaultPolyTrace_Result") {
     $Output = "FaultPolyTrace_WeakContinuity_Review"
 }
+if ($SupportBridgeCandidate -and $Output -eq "FaultPolyTrace_Result") {
+    $Output = "FaultPolyTrace_SupportBridge_Candidate"
+}
 
-if ($BaselineReview -or $WeakContinuityReview) {
+if ($BaselineReview -or $WeakContinuityReview -or $SupportBridgeCandidate) {
     if ([string]::IsNullOrWhiteSpace($ReviewOutputDir)) {
         $repoRoot = Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")
-        $reviewName = if ($WeakContinuityReview) {
+        $reviewName = if ($SupportBridgeCandidate) {
+            "geoeast_support_bridge_candidate"
+        } elseif ($WeakContinuityReview) {
             "geoeast_weak_continuity_review"
         } else {
             "geoeast_baseline_review"
@@ -274,13 +285,25 @@ if ($WeakContinuityReview) {
         "--polygon-color", "yellow",
         "--polygon-linewidth", "1.2"
     )
+} elseif ($SupportBridgeCandidate) {
+    $runnerArgs += @(
+        "--local-anti-merge",
+        "--weak-continuity-output", (Join-Path $ReviewOutputDir "weak_continuity_candidates_geoeast.csv"),
+        "--diagnostics", (Join-Path $ReviewOutputDir "diagnostics.json"),
+        "--transaction-report", (Join-Path $ReviewOutputDir "transaction_readback.json"),
+        "--topology-output", (Join-Path $ReviewOutputDir "topology.csv"),
+        "--preview-grid-output", (Join-Path $ReviewOutputDir "input_grid.txt"),
+        "--preview-polygons-output", (Join-Path $ReviewOutputDir "candidate_polygons.csv"),
+        "--polygon-color", "magenta",
+        "--polygon-linewidth", "1.2"
+    )
 }
 
 Write-Host "GeoEast root: $GeoEastRoot"
 Write-Host "GeoEastData root: $GeoEastDataRoot"
 Write-Host "Database/project/user: $Database / $Project / $User"
 Write-Host "Runner: $Runner"
-if ($BaselineReview -or $WeakContinuityReview) {
+if ($BaselineReview -or $WeakContinuityReview -or $SupportBridgeCandidate) {
     Write-Host "Review output: $ReviewOutputDir"
 }
 & $Runner @runnerArgs

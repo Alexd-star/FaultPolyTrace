@@ -1,11 +1,16 @@
 param(
     [string]$OfficialDat = $(if ($env:FPT_OFFICIAL_DAT) { $env:FPT_OFFICIAL_DAT } else { "" }),
-    [string]$VcVars = "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars64.bat"
+    [string]$VcVars = "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars64.bat",
+    [switch]$SupportBridgeCandidate
 )
 
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$outputRoot = Join-Path $repoRoot "outputs\verification\msvc_asan"
+$outputRoot = Join-Path $repoRoot $(if ($SupportBridgeCandidate) {
+    "outputs\verification\msvc_asan_support_bridge"
+} else {
+    "outputs\verification\msvc_asan"
+})
 $buildRoot = Join-Path $repoRoot "build\asan"
 $exe = Join-Path $buildRoot "faultpolytrace_asan.exe"
 New-Item -ItemType Directory -Force -Path $outputRoot, $buildRoot | Out-Null
@@ -29,9 +34,11 @@ $sources = @(
     "src\core\PolygonVectorizer.cpp",
     "src\core\Segmentation.cpp",
     "src\core\SimpleRingCompatibility.cpp",
+    "src\core\ScopedWeakBridgePolicy.cpp",
     "src\core\SkeletonGraph.cpp",
     "src\core\SkeletonGraphV2.cpp",
     "src\core\SkeletonGraphV2Attribution.cpp",
+    "src\core\SupportEnvelopeSeparator.cpp",
     "src\core\Topology.cpp",
     "src\core\FaultTracer.cpp",
     "src\core\FinalBridgeGate.cpp",
@@ -83,6 +90,9 @@ $arguments = @(
     "--residual-covered-guard-radius", "0", "--no-residual-trace",
     "--min-area", "120", "--simplify-tolerance", "2", "--smooth-iterations", "1"
 )
+if ($SupportBridgeCandidate) {
+    $arguments += "--local-anti-merge"
+}
 & $exe @arguments *> $runLog
 $officialExit = $LASTEXITCODE
 $compilerLabel = "MSVC 2019 /fsanitize=address"
@@ -107,7 +117,11 @@ $runText = Get-Content -LiteralPath $runLog -Raw -ErrorAction SilentlyContinue
 if ($runText -match 'AddressSanitizer|ERROR:') {
     throw "AddressSanitizer reported a memory error. See $runLog"
 }
-$expectedHash = "3DE2427DF3E136A33396EAAAF512A83AC2AE3A0CACB3976AA52F3804A4056DCC"
+$expectedHash = if ($SupportBridgeCandidate) {
+    "EE7473CD04A3EA988166DD4502EEE70D4FB4A0D674135541A9B38490C3B91369"
+} else {
+    "3DE2427DF3E136A33396EAAAF512A83AC2AE3A0CACB3976AA52F3804A4056DCC"
+}
 $actualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $resultCsv).Hash
 if ($actualHash -ne $expectedHash) {
     throw "ASan result hash mismatch. Expected $expectedHash, actual $actualHash"
@@ -131,6 +145,7 @@ if ($malformedExit -eq 0) { throw "Malformed input was not rejected under ASan."
     malformedInputRejected = $true
     keptPolygonCount = 200
     resultSha256 = $actualHash
+    mode = $(if ($SupportBridgeCandidate) { "support_bridge_candidate" } else { "formal_baseline" })
     asanDumpCreated = (Test-Path -LiteralPath $env:ASAN_SAVE_DUMPS)
     note = "No AddressSanitizer memory-safety report was observed in the covered CLI paths. MSVC ASan does not provide LeakSanitizer."
     checkedAt = (Get-Date).ToString("o")

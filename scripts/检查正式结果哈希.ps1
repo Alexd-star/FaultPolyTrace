@@ -30,7 +30,7 @@ if ($LASTEXITCODE -ne 0) {
     throw "Official baseline run failed with exit code $LASTEXITCODE."
 }
 
-$expected = "3DE2427DF3E136A33396EAAAF512A83AC2AE3A0CACB3976AA52F3804A4056DCC"
+$expected = "EE7473CD04A3EA988166DD4502EEE70D4FB4A0D674135541A9B38490C3B91369"
 $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $output).Hash
 if ($actual -ne $expected) {
     throw "Official result hash regressed. Expected $expected, actual $actual."
@@ -40,6 +40,7 @@ $rollbackOutput = Join-Path $OutputDirectory "official_rollback_200.csv"
     --input $OfficialDat `
     --input-format geoeast-dat `
     --output $rollbackOutput `
+    --no-local-anti-merge `
     --no-weak-tail-topology-gate `
     --no-simple-ring-compatibility
 if ($LASTEXITCODE -ne 0) {

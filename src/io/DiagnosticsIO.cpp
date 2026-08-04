@@ -1069,8 +1069,9 @@ void writeWeakContinuityCandidatesCsv(
     std::ostream& out = output.stream();
     out << std::setprecision(12);
     out << "candidate_id,stage,accepted,selected_by_global_matching,decision,endpoint_a_x,endpoint_a_y,endpoint_b_x,endpoint_b_y,"
-           "endpoint_distance,endpoint_distance_world,angle_a,angle_b,width_a,width_b,local_background,minimum_supported_value,"
-           "normalized_cost,support_ratio,mean_support,max_unsupported_run,path_length,path_length_ratio,"
+           "endpoint_distance,endpoint_distance_world,boundary_adjusted_distance,angle_a,angle_b,width_a,width_b,local_background,minimum_supported_value,"
+           "normalized_cost,support_ratio,mean_support,max_unsupported_run,exact_support_ratio,exact_mean_support,exact_max_unsupported_run,"
+           "neighborhood_support_ratio,neighborhood_mean_support,neighborhood_max_unsupported_run,used_neighborhood_support,path_length,path_length_ratio,"
            "finite_background_samples,invalid_background_samples,evaluated_support_pixels,"
            "excluded_skeleton_support_pixels,invalid_path_samples,"
            "max_turn_angle,competition_margin_a,competition_margin_b,added_path_pixels,added_envelope_cells,"
@@ -1091,6 +1092,7 @@ void writeWeakContinuityCandidatesCsv(
             << candidate.endpointB.x << "," << candidate.endpointB.y << ","
             << candidate.endpointDistance << ","
             << candidate.endpointDistanceWorld << ","
+            << candidate.boundaryAdjustedDistance << ","
             << candidate.angleA << "," << candidate.angleB << ","
             << candidate.widthA << "," << candidate.widthB << ","
             << candidate.localBackground << ","
@@ -1099,6 +1101,13 @@ void writeWeakContinuityCandidatesCsv(
             << candidate.supportRatio << ","
             << candidate.meanSupport << ","
             << candidate.maxUnsupportedRun << ","
+            << candidate.exactSupportRatio << ","
+            << candidate.exactMeanSupport << ","
+            << candidate.exactMaxUnsupportedRun << ","
+            << candidate.neighborhoodSupportRatio << ","
+            << candidate.neighborhoodMeanSupport << ","
+            << candidate.neighborhoodMaxUnsupportedRun << ","
+            << (candidate.usedNeighborhoodSupport ? 1 : 0) << ","
             << candidate.pathLength << ","
             << candidate.pathLengthRatio << ","
             << candidate.finiteBackgroundSamples << ","
@@ -1147,6 +1156,34 @@ void writeWeakContinuityCandidatesCsv(
     output.commit();
 }
 
+void writeSupportEnvelopeDecisionsCsv(
+    const std::string& path,
+    const std::vector<SupportEnvelopeDecision>& decisions) {
+    AtomicOutputFile output(filesystemPath(path), 64 * 1024);
+    std::ostream& out = output.stream();
+    out << std::setprecision(12);
+    out << "component_id,accepted,decision,component_cells,low_cells,low_ratio,"
+           "observed_support_components,observed_major_support_components,"
+           "candidate_cut_cells,removed_ratio,resulting_components,"
+           "resulting_major_components,minimum_resulting_part_physical_aspect\n";
+    for (const SupportEnvelopeDecision& decision : decisions) {
+        out << decision.componentId << ","
+            << (decision.accepted ? 1 : 0) << ","
+            << decision.decision << ","
+            << decision.componentCells << ","
+            << decision.lowCells << ","
+            << decision.lowRatio << ","
+            << decision.observedSupportComponents << ","
+            << decision.observedMajorSupportComponents << ","
+            << decision.candidateCutCells << ","
+            << decision.removedRatio << ","
+            << decision.resultingComponents << ","
+            << decision.resultingMajorComponents << ","
+            << decision.minimumResultingPartPhysicalAspect << "\n";
+    }
+    output.commit();
+}
+
 void writeWeakContinuityCandidatesWorldCsv(
     const std::string& path,
     const std::vector<WeakContinuityCandidate>& candidates,
@@ -1165,8 +1202,9 @@ void writeWeakContinuityCandidatesWorldCsv(
            "center_grid_x,center_grid_y,"
            "endpoint_a_world_x,endpoint_a_world_y,endpoint_b_world_x,endpoint_b_world_y,"
            "center_world_x,center_world_y,"
-           "endpoint_distance,endpoint_distance_world,angle_a,angle_b,width_a,width_b,local_background,minimum_supported_value,"
-           "normalized_cost,support_ratio,mean_support,max_unsupported_run,path_length,path_length_ratio,"
+           "endpoint_distance,endpoint_distance_world,boundary_adjusted_distance,angle_a,angle_b,width_a,width_b,local_background,minimum_supported_value,"
+           "normalized_cost,support_ratio,mean_support,max_unsupported_run,exact_support_ratio,exact_mean_support,exact_max_unsupported_run,"
+           "neighborhood_support_ratio,neighborhood_mean_support,neighborhood_max_unsupported_run,used_neighborhood_support,path_length,path_length_ratio,"
            "finite_background_samples,invalid_background_samples,evaluated_support_pixels,"
            "excluded_skeleton_support_pixels,invalid_path_samples,"
            "max_turn_angle,competition_margin_a,competition_margin_b,added_path_pixels,added_envelope_cells,"
@@ -1207,6 +1245,7 @@ void writeWeakContinuityCandidatesWorldCsv(
             << sampleWorldY(centerGridY) << ","
             << candidate.endpointDistance << ","
             << candidate.endpointDistanceWorld << ","
+            << candidate.boundaryAdjustedDistance << ","
             << candidate.angleA << "," << candidate.angleB << ","
             << candidate.widthA << "," << candidate.widthB << ","
             << candidate.localBackground << ","
@@ -1215,6 +1254,13 @@ void writeWeakContinuityCandidatesWorldCsv(
             << candidate.supportRatio << ","
             << candidate.meanSupport << ","
             << candidate.maxUnsupportedRun << ","
+            << candidate.exactSupportRatio << ","
+            << candidate.exactMeanSupport << ","
+            << candidate.exactMaxUnsupportedRun << ","
+            << candidate.neighborhoodSupportRatio << ","
+            << candidate.neighborhoodMeanSupport << ","
+            << candidate.neighborhoodMaxUnsupportedRun << ","
+            << (candidate.usedNeighborhoodSupport ? 1 : 0) << ","
             << candidate.pathLength << ","
             << candidate.pathLengthRatio << ","
             << candidate.finiteBackgroundSamples << ","

@@ -72,6 +72,22 @@ Invoke-CppTest -Name "test_grid_metric" -Sources @(
     (Join-Path $repoRoot "src\core\PhysicalMorphology.cpp")
 )
 
+Invoke-CppTest -Name "test_support_envelope_separator" -Sources @(
+    (Join-Path $repoRoot "tests_cpp\test_support_envelope_separator.cpp"),
+    (Join-Path $repoRoot "src\core\BinaryMask.cpp"),
+    (Join-Path $repoRoot "src\core\Grid2D.cpp"),
+    (Join-Path $repoRoot "src\core\GridMetric.cpp"),
+    (Join-Path $repoRoot "src\core\SupportEnvelopeSeparator.cpp")
+)
+
+Invoke-CppTest -Name "test_scoped_weak_bridge_policy" -Sources @(
+    (Join-Path $repoRoot "tests_cpp\test_scoped_weak_bridge_policy.cpp"),
+    (Join-Path $repoRoot "src\core\BinaryMask.cpp"),
+    (Join-Path $repoRoot "src\core\Grid2D.cpp"),
+    (Join-Path $repoRoot "src\core\GridMetric.cpp"),
+    (Join-Path $repoRoot "src\core\ScopedWeakBridgePolicy.cpp")
+)
+
 Invoke-CppTest -Name "test_product_defaults" -Sources @(
     (Join-Path $repoRoot "tests_cpp\test_product_defaults.cpp")
 )
@@ -150,10 +166,12 @@ Invoke-CppTest -Name "test_residual_trace" -Sources @(
     (Join-Path $repoRoot "src\core\PolygonVectorizer.cpp"),
     (Join-Path $repoRoot "src\core\Segmentation.cpp"),
     (Join-Path $repoRoot "src\core\SimpleRingCompatibility.cpp"),
+    (Join-Path $repoRoot "src\core\ScopedWeakBridgePolicy.cpp"),
     (Join-Path $repoRoot "src\core\SkeletonGraph.cpp"),
     (Join-Path $repoRoot "src\core\SkeletonGraphV2.cpp"),
     (Join-Path $repoRoot "src\core\SkeletonGraphV2Attribution.cpp"),
     (Join-Path $repoRoot "src\core\Topology.cpp"),
+    (Join-Path $repoRoot "src\core\SupportEnvelopeSeparator.cpp"),
     (Join-Path $repoRoot "src\core\WeakContinuityConnector.cpp"),
     (Join-Path $repoRoot "src\core\WeakExtensionGate.cpp"),
     (Join-Path $repoRoot "src\core\WeakPathSupport.cpp"),
@@ -165,6 +183,7 @@ Invoke-CppTest -Name "test_weak_continuity_connector" -Sources @(
     (Join-Path $repoRoot "tests_cpp\test_weak_continuity_connector.cpp"),
     (Join-Path $repoRoot "src\core\BinaryMask.cpp"),
     (Join-Path $repoRoot "src\core\Grid2D.cpp"),
+    (Join-Path $repoRoot "src\core\GridMetric.cpp"),
     (Join-Path $repoRoot "src\core\SkeletonGraph.cpp"),
     (Join-Path $repoRoot "src\core\WeakContinuityConnector.cpp")
 )
@@ -226,10 +245,12 @@ Invoke-CppTest -Name "test_weak_path_support_integration" -Sources @(
     (Join-Path $repoRoot "src\core\PolygonVectorizer.cpp"),
     (Join-Path $repoRoot "src\core\Segmentation.cpp"),
     (Join-Path $repoRoot "src\core\SimpleRingCompatibility.cpp"),
+    (Join-Path $repoRoot "src\core\ScopedWeakBridgePolicy.cpp"),
     (Join-Path $repoRoot "src\core\SkeletonGraph.cpp"),
     (Join-Path $repoRoot "src\core\SkeletonGraphV2.cpp"),
     (Join-Path $repoRoot "src\core\SkeletonGraphV2Attribution.cpp"),
     (Join-Path $repoRoot "src\core\Topology.cpp"),
+    (Join-Path $repoRoot "src\core\SupportEnvelopeSeparator.cpp"),
     (Join-Path $repoRoot "src\core\FaultTracer.cpp"),
     (Join-Path $repoRoot "src\core\FinalBridgeGate.cpp"),
     (Join-Path $repoRoot "src\core\TraceOptionAdapters.cpp"),
@@ -272,10 +293,12 @@ Invoke-CppTest -Name "test_local_polygon_quality" -Sources @(
     (Join-Path $repoRoot "src\core\PolygonVectorizer.cpp"),
     (Join-Path $repoRoot "src\core\Segmentation.cpp"),
     (Join-Path $repoRoot "src\core\SimpleRingCompatibility.cpp"),
+    (Join-Path $repoRoot "src\core\ScopedWeakBridgePolicy.cpp"),
     (Join-Path $repoRoot "src\core\SkeletonGraph.cpp"),
     (Join-Path $repoRoot "src\core\SkeletonGraphV2.cpp"),
     (Join-Path $repoRoot "src\core\SkeletonGraphV2Attribution.cpp"),
     (Join-Path $repoRoot "src\core\Topology.cpp"),
+    (Join-Path $repoRoot "src\core\SupportEnvelopeSeparator.cpp"),
     (Join-Path $repoRoot "src\core\WeakPathSupport.cpp")
     (Join-Path $repoRoot "src\core\WeakContinuityConnector.cpp")
     (Join-Path $repoRoot "src\core\WeakExtensionGate.cpp")

@@ -325,6 +325,9 @@ void writeBranchAttributionDifferencesCsv(
 void writeWeakContinuityCandidatesCsv(
     const std::string& path,
     const std::vector<WeakContinuityCandidate>& candidates);
+void writeSupportEnvelopeDecisionsCsv(
+    const std::string& path,
+    const std::vector<SupportEnvelopeDecision>& decisions);
 void writeWeakContinuityCandidatesWorldCsv(
     const std::string& path,
     const std::vector<WeakContinuityCandidate>& candidates,

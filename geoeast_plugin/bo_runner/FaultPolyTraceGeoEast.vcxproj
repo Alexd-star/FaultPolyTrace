@@ -180,6 +180,7 @@
     <ClCompile Include="..\..\src\core\MaskTopology.cpp" />
     <ClCompile Include="..\..\src\core\MultiScaleEvidence.cpp" />
     <ClCompile Include="..\..\src\core\SimpleRingCompatibility.cpp" />
+    <ClCompile Include="..\..\src\core\ScopedWeakBridgePolicy.cpp" />
     <ClCompile Include="..\..\src\core\WeakPathSupport.cpp" />
     <ClCompile Include="..\..\src\core\WeakContinuityConnector.cpp" />
     <ClCompile Include="..\..\src\core\WeakExtensionGate.cpp" />
@@ -199,6 +200,7 @@
     <ClCompile Include="..\..\src\core\SkeletonGraph.cpp" />
     <ClCompile Include="..\..\src\core\SkeletonGraphV2.cpp" />
     <ClCompile Include="..\..\src\core\SkeletonGraphV2Attribution.cpp" />
+    <ClCompile Include="..\..\src\core\SupportEnvelopeSeparator.cpp" />
     <ClCompile Include="..\..\src\core\Topology.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
@@ -218,6 +220,7 @@
     <ClInclude Include="..\..\src\core\MaskTopology.h" />
     <ClInclude Include="..\..\src\core\MultiScaleEvidence.h" />
     <ClInclude Include="..\..\src\core\SimpleRingCompatibility.h" />
+    <ClInclude Include="..\..\src\core\ScopedWeakBridgePolicy.h" />
     <ClInclude Include="..\..\src\core\WeakPathSupport.h" />
     <ClInclude Include="..\..\src\core\WeakContinuityConnector.h" />
     <ClInclude Include="..\..\src\core\WeakExtensionGate.h" />
@@ -237,6 +240,7 @@
     <ClInclude Include="..\..\src\core\SkeletonGraph.h" />
     <ClInclude Include="..\..\src\core\SkeletonGraphV2.h" />
     <ClInclude Include="..\..\src\core\SkeletonGraphV2Attribution.h" />
+    <ClInclude Include="..\..\src\core\SupportEnvelopeSeparator.h" />
     <ClInclude Include="..\..\src\core\Topology.h" />
   </ItemGroup>
   <ItemGroup />

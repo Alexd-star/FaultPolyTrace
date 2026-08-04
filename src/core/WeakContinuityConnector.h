@@ -32,6 +32,8 @@ struct WeakContinuityOptions {
     bool excludeExistingSkeletonFromSupport = false;
     bool usePhysicalMetric = false;
     bool useGlobalMatching = false;
+    bool useBoundaryAdjustedCandidateDistance = false;
+    int supportNeighborhoodRadius = 0;
     double noConnectCost = 2.0;
     int maxExactMatchingEndpoints = 20;
     int maxEvidenceRecords = 4096;
@@ -44,6 +46,7 @@ struct WeakContinuityCandidate {
     SkeletonPoint endpointB;
     double endpointDistance = 0.0;
     double endpointDistanceWorld = 0.0;
+    double boundaryAdjustedDistance = 0.0;
     double angleA = 180.0;
     double angleB = 180.0;
     double widthA = 0.0;
@@ -54,6 +57,13 @@ struct WeakContinuityCandidate {
     double supportRatio = 0.0;
     double meanSupport = 0.0;
     int maxUnsupportedRun = 0;
+    double exactSupportRatio = 0.0;
+    double exactMeanSupport = 0.0;
+    int exactMaxUnsupportedRun = 0;
+    double neighborhoodSupportRatio = 0.0;
+    double neighborhoodMeanSupport = 0.0;
+    int neighborhoodMaxUnsupportedRun = 0;
+    bool usedNeighborhoodSupport = false;
     double pathLength = 0.0;
     double pathLengthRatio = 0.0;
     double maxTurnAngleDegrees = 0.0;

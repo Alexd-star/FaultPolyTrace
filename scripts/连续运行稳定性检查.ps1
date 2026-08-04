@@ -5,17 +5,30 @@
     [int]$MaxElapsedMs = 5000,
     [double]$MaxWorkingSetGrowthMb = 64.0,
     [int]$MaxHandleGrowth = 32,
-    [string]$ExpectedSha256 = "3DE2427DF3E136A33396EAAAF512A83AC2AE3A0CACB3976AA52F3804A4056DCC",
+    [string]$ExpectedSha256 = "",
+    [switch]$SupportBridgeCandidate,
     [switch]$SkipBuild
 )
 
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $exe = Join-Path $repoRoot "build\faultpolytrace.exe"
-$outputRoot = Join-Path $repoRoot "examples\outputs\stability"
+$outputRoot = Join-Path $repoRoot $(if ($SupportBridgeCandidate) {
+    "examples\outputs\stability_support_bridge"
+} else {
+    "examples\outputs\stability"
+})
 $tempDir = Join-Path $outputRoot ("run_" + (Get-Date -Format "yyyyMMdd_HHmmss_fff"))
 $summaryJson = Join-Path $outputRoot "稳定性摘要.json"
 $detailCsv = Join-Path $outputRoot "连续运行明细.csv"
+
+if ([string]::IsNullOrWhiteSpace($ExpectedSha256)) {
+    $ExpectedSha256 = if ($SupportBridgeCandidate) {
+        "EE7473CD04A3EA988166DD4502EEE70D4FB4A0D674135541A9B38490C3B91369"
+    } else {
+        "3DE2427DF3E136A33396EAAAF512A83AC2AE3A0CACB3976AA52F3804A4056DCC"
+    }
+}
 
 if ($Runs -lt 2) { throw "Runs must be at least 2." }
 if (!(Test-Path -LiteralPath $OfficialDat)) { throw "Official data not found: $OfficialDat" }
@@ -45,6 +58,9 @@ function Invoke-StabilityRun {
         "--root-anti-merge-weak-guard-radius", "0", "--no-residual-trace",
         "--simplify-tolerance", "2", "--smooth-iterations", "1"
     )
+    if ($SupportBridgeCandidate) {
+        $arguments += "--local-anti-merge"
+    }
     $quotedArguments = $arguments | ForEach-Object {
         if ($_ -match '[\s"]') { '"' + ($_ -replace '"', '\"') + '"' } else { $_ }
     }

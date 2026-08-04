@@ -68,9 +68,11 @@ SOURCES += \
     ../../src/core/Polygon.cpp \
     ../../src/core/Segmentation.cpp \
     ../../src/core/SimpleRingCompatibility.cpp \
+    ../../src/core/ScopedWeakBridgePolicy.cpp \
     ../../src/core/SkeletonGraph.cpp \
     ../../src/core/SkeletonGraphV2.cpp \
     ../../src/core/SkeletonGraphV2Attribution.cpp \
+    ../../src/core/SupportEnvelopeSeparator.cpp \
     ../../src/core/Topology.cpp
 
 HEADERS += \
@@ -105,9 +107,11 @@ HEADERS += \
     ../../src/core/Polygon.h \
     ../../src/core/Segmentation.h \
     ../../src/core/SimpleRingCompatibility.h \
+    ../../src/core/ScopedWeakBridgePolicy.h \
     ../../src/core/SkeletonGraph.h \
     ../../src/core/SkeletonGraphV2.h \
     ../../src/core/SkeletonGraphV2Attribution.h \
+    ../../src/core/SupportEnvelopeSeparator.h \
     ../../src/core/Topology.h
 
 OBJECTS_DIR = .obj

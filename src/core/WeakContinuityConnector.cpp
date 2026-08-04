@@ -29,6 +29,7 @@ struct PairSeed {
     int endpointA = -1;
     int endpointB = -1;
     double distance = 0.0;
+    double boundaryAdjustedDistance = 0.0;
     double angleA = 180.0;
     double angleB = 180.0;
     double widthA = 0.0;
@@ -457,10 +458,37 @@ void measurePath(WeakContinuityCandidate& candidate,
     candidate.minimumSupportedValue = std::max(
         supportThreshold * options.minAttributeRatio,
         background + options.localContrastRatio * std::max(0.0, supportThreshold - background));
-    int supported = 0;
-    int unsupportedRun = 0;
-    double supportSum = 0.0;
+    int exactSupported = 0;
+    int exactUnsupportedRun = 0;
+    int neighborhoodSupported = 0;
+    int neighborhoodUnsupportedRun = 0;
+    double exactSupportSum = 0.0;
+    double neighborhoodSupportSum = 0.0;
     const double supportDenominator = std::max(1e-9, supportThreshold - background);
+    std::vector<GridOffset> supportOffsets;
+    if (options.supportNeighborhoodRadius > 0) {
+        if (options.usePhysicalMetric) {
+            const GridMetric metric(grid);
+            supportOffsets = metric.offsetsWithinRadius(
+                static_cast<double>(options.supportNeighborhoodRadius) *
+                    metric.minimumSpacing());
+        } else {
+            const int radius = options.supportNeighborhoodRadius;
+            for (int oy = -radius; oy <= radius; ++oy) {
+                for (int ox = -radius; ox <= radius; ++ox) {
+                    if (ox * ox + oy * oy <= radius * radius) {
+                        supportOffsets.push_back({
+                            ox, oy, std::hypot(
+                                static_cast<double>(ox),
+                                static_cast<double>(oy))});
+                    }
+                }
+            }
+        }
+    }
+    if (supportOffsets.empty()) {
+        supportOffsets.push_back({0, 0, 0.0});
+    }
     for (std::size_t index = 0; index < candidate.path.size(); ++index) {
         const SkeletonPoint& point = candidate.path[index];
         if (index > 0) {
@@ -479,21 +507,61 @@ void measurePath(WeakContinuityCandidate& candidate,
         if (!std::isfinite(value)) {
             ++candidate.invalidPathSamples;
         }
-        supportSum += clamp01((value - background) / supportDenominator);
+        exactSupportSum += clamp01(
+            (value - background) / supportDenominator);
         if (std::isfinite(value) && value >= candidate.minimumSupportedValue) {
-            ++supported;
-            unsupportedRun = 0;
+            ++exactSupported;
+            exactUnsupportedRun = 0;
         } else {
-            ++unsupportedRun;
-            candidate.maxUnsupportedRun = std::max(candidate.maxUnsupportedRun, unsupportedRun);
+            ++exactUnsupportedRun;
+            candidate.exactMaxUnsupportedRun = std::max(
+                candidate.exactMaxUnsupportedRun, exactUnsupportedRun);
+        }
+
+        double neighborhoodValue = -kInfinity;
+        for (const GridOffset& offset : supportOffsets) {
+            const int x = point.x + offset.x;
+            const int y = point.y + offset.y;
+            if (!grid.inBounds(x, y)) {
+                continue;
+            }
+            if (options.excludeExistingSkeletonFromSupport &&
+                skeleton.get(x, y)) {
+                continue;
+            }
+            const double nearbyValue = grid.value(x, y);
+            if (std::isfinite(nearbyValue)) {
+                neighborhoodValue = std::max(
+                    neighborhoodValue, nearbyValue);
+            }
+        }
+        neighborhoodSupportSum += clamp01(
+            (neighborhoodValue - background) / supportDenominator);
+        if (std::isfinite(neighborhoodValue) &&
+            neighborhoodValue >= candidate.minimumSupportedValue) {
+            ++neighborhoodSupported;
+            neighborhoodUnsupportedRun = 0;
+        } else {
+            ++neighborhoodUnsupportedRun;
+            candidate.neighborhoodMaxUnsupportedRun = std::max(
+                candidate.neighborhoodMaxUnsupportedRun,
+                neighborhoodUnsupportedRun);
         }
     }
     if (candidate.evaluatedSupportPixels > 0) {
-        candidate.supportRatio = static_cast<double>(supported) /
+        candidate.exactSupportRatio = static_cast<double>(exactSupported) /
             static_cast<double>(candidate.evaluatedSupportPixels);
-        candidate.meanSupport = supportSum /
+        candidate.exactMeanSupport = exactSupportSum /
+            static_cast<double>(candidate.evaluatedSupportPixels);
+        candidate.neighborhoodSupportRatio =
+            static_cast<double>(neighborhoodSupported) /
+            static_cast<double>(candidate.evaluatedSupportPixels);
+        candidate.neighborhoodMeanSupport = neighborhoodSupportSum /
             static_cast<double>(candidate.evaluatedSupportPixels);
     }
+    candidate.supportRatio = candidate.exactSupportRatio;
+    candidate.meanSupport = candidate.exactMeanSupport;
+    candidate.maxUnsupportedRun = candidate.exactMaxUnsupportedRun;
     candidate.pathLengthRatio = candidate.endpointDistance > 1e-9
         ? candidate.pathLength / candidate.endpointDistance : 1.0;
 
@@ -1102,6 +1170,7 @@ void validateWeakContinuityOptions(const WeakContinuityOptions& options) {
         throw std::runtime_error("Weak continuity support ratios must be between zero and one.");
     }
     if (options.maxUnsupportedRun < 0 || options.endpointExclusionRadius < 0 ||
+        options.supportNeighborhoodRadius < 0 ||
         options.thirdPartySkeletonClearanceRadius < 0 ||
         options.minCompetitionMargin < 0.0 || options.attributeWeight < 0.0 ||
         options.directionWeight < 0.0 || options.curvatureWeight < 0.0 ||
@@ -1143,6 +1212,14 @@ WeakContinuityResult connectWeakContinuityPaths(
         componentConnectivityMask ? *componentConnectivityMask : skeleton);
     std::vector<PairSeed> seeds;
     std::vector<std::vector<PairSeed>> byEndpoint(graph.endpoints.size());
+    std::vector<double> endpointWidths(graph.endpoints.size(), 0.0);
+    for (std::size_t index = 0; index < graph.endpoints.size(); ++index) {
+        endpointWidths[index] = estimateHalfWidth(
+            attributeMask, graph.endpoints[index]);
+    }
+    const double widthScale = options.usePhysicalMetric
+        ? GridMetric(grid).minimumSpacing()
+        : 1.0;
 
     for (std::size_t i = 0; i < graph.endpoints.size(); ++i) {
         const SkeletonPoint& a = graph.endpoints[i];
@@ -1156,9 +1233,18 @@ WeakContinuityResult connectWeakContinuityPaths(
                 grid, a, b, true);
             const double endpointDistance = options.usePhysicalMetric
                 ? endpointDistanceWorld : distance(a, b);
-            if (endpointDistance > (options.usePhysicalMetric
-                                    ? maxEndpointDistance
-                                    : static_cast<double>(options.maxDistance))) {
+            const double widthA = endpointWidths[i];
+            const double widthB = endpointWidths[j];
+            const double boundaryAdjustedDistance = std::max(
+                0.0,
+                endpointDistance - (widthA + widthB) * widthScale);
+            const double candidateDistance =
+                options.useBoundaryAdjustedCandidateDistance
+                ? boundaryAdjustedDistance
+                : endpointDistance;
+            if (candidateDistance > (options.usePhysicalMetric
+                                      ? maxEndpointDistance
+                                      : static_cast<double>(options.maxDistance))) {
                 continue;
             }
             ++result.stats.distanceCandidatePairs;
@@ -1177,13 +1263,20 @@ WeakContinuityResult connectWeakContinuityPaths(
             const Vec2 gapBA{-gapAB.x, -gapAB.y};
             const double angleA = angleDegrees(tangentAIt->second, gapAB);
             const double angleB = angleDegrees(tangentBIt->second, gapBA);
+            const double directDistanceLimit = options.usePhysicalMetric
+                ? maxEndpointDistance
+                : static_cast<double>(options.maxDistance);
+            if (options.useBoundaryAdjustedCandidateDistance &&
+                endpointDistance > directDistanceLimit &&
+                (angleA > 15.0 || angleB > 15.0)) {
+                ++result.stats.directionRejectedPairs;
+                continue;
+            }
             if (angleA > options.maxEndpointAngleDegrees ||
                 angleB > options.maxEndpointAngleDegrees) {
                 ++result.stats.directionRejectedPairs;
                 continue;
             }
-            const double widthA = estimateHalfWidth(attributeMask, a);
-            const double widthB = estimateHalfWidth(attributeMask, b);
             const double widthRatio = std::max(widthA, widthB) /
                 std::max(1.0, std::min(widthA, widthB));
             if (widthRatio > options.maxWidthRatio) {
@@ -1194,11 +1287,12 @@ WeakContinuityResult connectWeakContinuityPaths(
             seed.endpointA = static_cast<int>(i);
             seed.endpointB = static_cast<int>(j);
             seed.distance = endpointDistance;
+            seed.boundaryAdjustedDistance = boundaryAdjustedDistance;
             seed.angleA = angleA;
             seed.angleB = angleB;
             seed.widthA = widthA;
             seed.widthB = widthB;
-            seed.geometricScore = endpointDistance /
+            seed.geometricScore = candidateDistance /
                     std::max(1e-9, options.usePhysicalMetric
                         ? maxEndpointDistance : static_cast<double>(options.maxDistance)) +
                 (angleA + angleB) / (2.0 * options.maxEndpointAngleDegrees);
@@ -1244,6 +1338,7 @@ WeakContinuityResult connectWeakContinuityPaths(
         candidate.endpointA = graph.endpoints[static_cast<std::size_t>(seed.endpointA)];
         candidate.endpointB = graph.endpoints[static_cast<std::size_t>(seed.endpointB)];
         candidate.endpointDistance = seed.distance;
+        candidate.boundaryAdjustedDistance = seed.boundaryAdjustedDistance;
         candidate.endpointDistanceWorld = metricDistance(
             grid, candidate.endpointA, candidate.endpointB, true);
         candidate.angleA = seed.angleA;
@@ -1282,6 +1377,32 @@ WeakContinuityResult connectWeakContinuityPaths(
             candidate.excludedSkeletonSupportPixels;
         result.stats.invalidPathSamples += candidate.invalidPathSamples;
         candidate.normalizedCost = totalCost / std::max(1.0, candidate.pathLength);
+        const bool exactSupportAccepted =
+            candidate.exactSupportRatio >= options.minSupportRatio &&
+            candidate.exactMeanSupport >= options.minMeanSupport &&
+            candidate.exactMaxUnsupportedRun <= options.maxUnsupportedRun;
+        const double maximumSparseAngle = std::min(
+            15.0, options.maxEndpointAngleDegrees);
+        const double maximumCandidateDistance = options.usePhysicalMetric
+            ? maxEndpointDistance
+            : static_cast<double>(options.maxDistance);
+        const bool neighborhoodSupportAccepted =
+            options.supportNeighborhoodRadius > 0 &&
+            candidate.angleA <= maximumSparseAngle &&
+            candidate.angleB <= maximumSparseAngle &&
+            candidate.boundaryAdjustedDistance <= maximumCandidateDistance &&
+            candidate.exactSupportRatio >= 0.25 &&
+            candidate.neighborhoodSupportRatio >= options.minSupportRatio &&
+            candidate.neighborhoodMeanSupport >= options.minMeanSupport &&
+            candidate.neighborhoodMaxUnsupportedRun <=
+                options.maxUnsupportedRun;
+        if (!exactSupportAccepted && neighborhoodSupportAccepted) {
+            candidate.supportRatio = candidate.neighborhoodSupportRatio;
+            candidate.meanSupport = candidate.neighborhoodMeanSupport;
+            candidate.maxUnsupportedRun =
+                candidate.neighborhoodMaxUnsupportedRun;
+            candidate.usedNeighborhoodSupport = true;
+        }
         if (candidate.evaluatedSupportPixels <= 0) {
             candidate.decision = "no_new_path_support_samples";
             ++result.stats.noEvaluatedSupportRejected;

@@ -137,7 +137,8 @@ void validateTraceRequest(
         throw std::runtime_error(
             "maxGapAngle must be between 0 and 180 degrees.");
     }
-    if (options.weakContinuity || options.weakContinuityShadow) {
+    if (options.weakContinuity || options.weakContinuityShadow ||
+        options.weakContinuityFinalObjectPass) {
         validateWeakContinuityOptions(makeWeakContinuityOptions(options));
         if (options.weakContinuityReferenceThresholdRatio <= 0.0 ||
             options.weakContinuityReferenceThresholdRatio > 1.0) {
@@ -195,31 +196,11 @@ void validateTraceRequest(
         throw std::runtime_error(
             "rootAntiMergeWeakGuardRadius must be non-negative.");
     }
-    if (options.localAntiMergeLowThreshold < 0.0) {
-        throw std::runtime_error(
-            "localAntiMergeLowThreshold must be non-negative.");
-    }
-    if (options.localAntiMergeBridgeRadius < 0) {
-        throw std::runtime_error(
-            "localAntiMergeBridgeRadius must be non-negative.");
-    }
-    if (options.localAntiMergeMinPartCells < 1) {
-        throw std::runtime_error(
-            "localAntiMergeMinPartCells must be at least 1.");
-    }
-    if (options.localAntiMergeMinPartRatio < 0.0 ||
-        options.localAntiMergeMinPartRatio > 0.5) {
-        throw std::runtime_error(
-            "localAntiMergeMinPartRatio must be between 0 and 0.5.");
-    }
-    if (options.localAntiMergeMinBridgeCells < 1) {
-        throw std::runtime_error(
-            "localAntiMergeMinBridgeCells must be at least 1.");
-    }
-    if (options.localAntiMergeMinLowRatio < 0.0 ||
-        options.localAntiMergeMinLowRatio > 1.0) {
-        throw std::runtime_error(
-            "localAntiMergeMinLowRatio must be between 0 and 1.");
+    if (options.localAntiMerge) {
+        validateSupportEnvelopeSeparatorOptions(
+            makeSupportEnvelopeSeparatorOptions(options, grid));
+        validateScopedWeakBridgeOptions(
+            makeScopedWeakBridgeOptions(options, grid));
     }
     if (options.simplifyTolerance < 0.0) {
         throw std::runtime_error(

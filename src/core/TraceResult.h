@@ -7,8 +7,10 @@
 #include "Polygon.h"
 #include "Segmentation.h"
 #include "SimpleRingCompatibility.h"
+#include "ScopedWeakBridgePolicy.h"
 #include "SkeletonGraphV2.h"
 #include "SkeletonGraphV2Attribution.h"
+#include "SupportEnvelopeSeparator.h"
 #include "WeakContinuityConnector.h"
 #include "WeakExtensionGate.h"
 #include "WeakTailRestorer.h"
@@ -113,6 +115,8 @@ struct TraceResult {
     int localAntiMergeRejectedCutCells = 0;
     int localAntiMergeAcceptedComponents = 0;
     int localAntiMergeRejectedComponents = 0;
+    std::vector<SupportEnvelopeDecision> supportEnvelopeDecisions;
+    ScopedWeakBridgePolicyStats scopedWeakBridgeStats;
     int residualFillCandidateCells = 0;
     int residualFillAddedCells = 0;
     int residualFillRejectedComponents = 0;

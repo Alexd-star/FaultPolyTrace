@@ -44,7 +44,7 @@
       "geoeastReadbackVertexCount": 62270
     },
     "geoEastSimpleRing200": {
-      "role": "current default GeoEast simple-ring result",
+      "role": "historical default before scoped support-envelope promotion",
       "candidatePolygonCount": 212,
       "keptPolygonCount": 200,
       "canonicalKeptCsvSha256": "3DE2427DF3E136A33396EAAAF512A83AC2AE3A0CACB3976AA52F3804A4056DCC",
@@ -64,6 +64,19 @@
       "geoeastReadbackCount": 200,
       "geoeastReadbackGeometryHash": "050602F47C5FA336",
       "geoeastReadbackVertexCount": 62420
+    },
+    "scopedSupportEnvelope200": {
+      "role": "current production default with support-envelope separation and scoped weak bridging",
+      "candidatePolygonCount": 212,
+      "keptPolygonCount": 200,
+      "canonicalKeptCsvSha256": "EE7473CD04A3EA988166DD4502EEE70D4FB4A0D674135541A9B38490C3B91369",
+      "historicalDefaultCsvSha256": "3DE2427DF3E136A33396EAAAF512A83AC2AE3A0CACB3976AA52F3804A4056DCC",
+      "geoeastReadbackCount": 200,
+      "geoeastReadbackGeometryHash": "48E8C333E2C1FEF2",
+      "geoeastReadbackVertexCount": 62576,
+      "sourceInteriorRingCount": 0,
+      "deterministicRunCount": 10,
+      "asanValidated": true
     }
   },
   "promotionPolicy": {

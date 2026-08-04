@@ -3,6 +3,7 @@
 #include "TraceOptions.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace fpt {
 
@@ -71,6 +72,40 @@ WeakContinuityOptions makeWeakContinuityOptions(
     continuity.maxExactMatchingEndpoints =
         options.weakContinuityMaxExactMatchingEndpoints;
     return continuity;
+}
+
+SupportEnvelopeSeparatorOptions makeSupportEnvelopeSeparatorOptions(
+    const TraceOptions& options,
+    const Grid2D& grid) {
+    SupportEnvelopeSeparatorOptions separator;
+    separator.enabled = options.localAntiMerge;
+    separator.lowThreshold = options.localAntiMergeLowThreshold;
+    separator.supportRadiusWorld =
+        static_cast<double>(options.localAntiMergeBridgeRadius) *
+        std::min(std::abs(grid.dx()), std::abs(grid.dy()));
+    separator.minPartCells = options.localAntiMergeMinPartCells;
+    separator.minPartRatio = options.localAntiMergeMinPartRatio;
+    separator.minRemovedCells = options.localAntiMergeMinBridgeCells;
+    separator.minLowRatio = options.localAntiMergeMinLowRatio;
+    separator.maxRemovedRatio = std::clamp(
+        options.localAntiMergeMinPartRatio, 0.04, 0.10);
+    return separator;
+}
+
+ScopedWeakBridgeOptions makeScopedWeakBridgeOptions(
+    const TraceOptions& options,
+    const Grid2D& grid) {
+    ScopedWeakBridgeOptions policy;
+    policy.enabled = options.localAntiMerge;
+    policy.baselineMaxDistance = 12.0;
+    policy.expandedMaxDistance = std::min(
+        options.weakContinuityMaxDistance, 14);
+    policy.splitInfluenceRadiusWorld =
+        static_cast<double>(std::max(
+            4, options.localAntiMergeBridgeRadius * 4)) *
+        std::min(std::abs(grid.dx()), std::abs(grid.dy()));
+    policy.supportNeighborhoodRadius = 1;
+    return policy;
 }
 
 WeakTailOptions makeWeakTailOptions(
