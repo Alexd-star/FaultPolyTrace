@@ -8,7 +8,7 @@ param(
 $ErrorActionPreference = "Stop"
 $official = (Resolve-Path -LiteralPath $OfficialDat).Path
 $expectedInput = "21AB29456CE19B05CFC5646A1BD67BBA579FF65E30ECA99C3D39DC3C8BFFC07B"
-$expectedResult = "3DE2427DF3E136A33396EAAAF512A83AC2AE3A0CACB3976AA52F3804A4056DCC"
+$expectedResult = "EE7473CD04A3EA988166DD4502EEE70D4FB4A0D674135541A9B38490C3B91369"
 
 if ([string]::IsNullOrWhiteSpace($CliPath)) {
     $CliPath = Join-Path $PSScriptRoot "..\02_独立软件\FaultPolyTrace_Portable_{{VERSION}}\bin\faultpolytrace.exe"
