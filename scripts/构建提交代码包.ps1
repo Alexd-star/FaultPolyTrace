@@ -123,6 +123,113 @@ function Expand-SubmissionTokens {
         }
 }
 
+function Convert-AbsolutePathToPortableLabel {
+    param([string]$Value)
+
+    if ([string]::IsNullOrWhiteSpace($Value) -or $Value -notmatch '^[A-Za-z]:[\\/]') {
+        return $Value
+    }
+
+    $normalized = $Value.Replace('\', '/')
+    $leaf = [System.IO.Path]::GetFileName($Value)
+    if ($normalized -match '/test\.dat$') {
+        return '<official test.dat>'
+    }
+    if ($normalized -match '/cli_robustness/cases/([^/]+)$') {
+        return "cases/$($Matches[1])"
+    }
+    if ($normalized -match '/application_verifier/application_verifier_log\.xml$') {
+        return 'ApplicationVerifier日志.xml'
+    }
+    if ($normalized -match '/application_verifier/verified_run\.log$') {
+        return 'verified_run.log'
+    }
+    if ($normalized -match '/AppVerifierLogs/([^/]+)$') {
+        return "ApplicationVerifier日志/$($Matches[1])"
+    }
+    if ($normalized -match '/official_result\.csv$' -or $normalized -match '/official_final_200\.csv$') {
+        return '正式官方结果/FaultPolyTrace_Official_Result.csv'
+    }
+    if ($normalized -match '/faultpolytrace\.exe$') {
+        return '<validated CLI executable>'
+    }
+    if (![string]::IsNullOrWhiteSpace($leaf)) {
+        return "<validation workspace>/$leaf"
+    }
+    return '<validation workspace>'
+}
+
+function Protect-JsonNodePaths {
+    param([object]$Node)
+
+    if ($null -eq $Node) { return }
+    if ($Node -is [System.Collections.IList]) {
+        for ($index = 0; $index -lt $Node.Count; $index++) {
+            if ($Node[$index] -is [string]) {
+                $Node[$index] = Convert-AbsolutePathToPortableLabel -Value $Node[$index]
+            } else {
+                Protect-JsonNodePaths -Node $Node[$index]
+            }
+        }
+        return
+    }
+    foreach ($property in $Node.PSObject.Properties) {
+        if ($property.Value -is [string]) {
+            $property.Value = Convert-AbsolutePathToPortableLabel -Value $property.Value
+        } elseif ($property.Value -is [System.Collections.IList] -or
+            $property.Value -is [System.Management.Automation.PSCustomObject]) {
+            Protect-JsonNodePaths -Node $property.Value
+        }
+    }
+}
+
+function Protect-VerificationJsonPaths {
+    param([string]$Root)
+
+    Get-ChildItem -LiteralPath $Root -Recurse -File -Filter '*.json' | ForEach-Object {
+        $data = Get-Content -LiteralPath $_.FullName -Raw | ConvertFrom-Json
+        Protect-JsonNodePaths -Node $data
+        $json = $data | ConvertTo-Json -Depth 100
+        [System.IO.File]::WriteAllText($_.FullName, $json + [Environment]::NewLine,
+            (New-Object System.Text.UTF8Encoding($false)))
+    }
+}
+
+function Assert-NoDevelopmentPathLeak {
+    param([string]$Root)
+
+    $legacyDownloadRoot = 'D:' + [System.IO.Path]::DirectorySeparatorChar + 'BaiduNetdiskDownload'
+    $forbidden = @(
+        $repoRoot,
+        $repoRoot.Replace('\', '/'),
+        [Environment]::GetFolderPath('UserProfile'),
+        [Environment]::GetFolderPath('UserProfile').Replace('\', '/'),
+        $legacyDownloadRoot,
+        $legacyDownloadRoot.Replace('\', '/')
+    ) | Where-Object { ![string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique
+    # Python contract tests intentionally contain the forbidden strings as assertions;
+    # generated reports and executable-facing text remain covered by this scan.
+    $textExtensions = @('.csv', '.fmt', '.h', '.hpp', '.in', '.ini', '.iss', '.json', '.md',
+        '.ps1', '.txt', '.xml', '.yaml', '.yml')
+    $leaks = New-Object System.Collections.Generic.List[string]
+
+    Get-ChildItem -LiteralPath $Root -Recurse -File |
+        Where-Object { $textExtensions -contains $_.Extension.ToLowerInvariant() } |
+        ForEach-Object {
+            $text = [System.IO.File]::ReadAllText($_.FullName)
+            foreach ($needle in $forbidden) {
+                if ($text.IndexOf($needle, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
+                    $relative = $_.FullName.Substring($Root.Length).TrimStart('\')
+                    $leaks.Add("$relative -> $needle")
+                    break
+                }
+            }
+        }
+    if ($leaks.Count -gt 0) {
+        throw "提交包包含开发机绝对路径：`n$($leaks -join [Environment]::NewLine)"
+    }
+}
+
 Write-Host "[1/6] 导出 Git 跟踪源码"
 $srcName = "FaultPolyTrace_Source_$Version"
 $srcDir = Join-Path $Destination "01_源码\$srcName"
@@ -316,6 +423,8 @@ foreach ($name in @("lc_result.dat", "lc_result.fmt")) {
 }
 Copy-Item -LiteralPath $manifestFile.FullName -Destination (Join-Path $Destination "唯一构建清单.json") -Force
 Expand-SubmissionTokens -Root $Destination
+Protect-VerificationJsonPaths -Root $verifyDir
+Assert-NoDevelopmentPathLeak -Root $Destination
 
 Write-Host "[6/6] 计算提交包哈希"
 $hashPath = Join-Path $Destination "SHA256SUMS.txt"
