@@ -245,25 +245,34 @@ if (Test-Path -LiteralPath $complexPlanarEvidence -PathType Container) {
 
 $reliabilityTarget = Join-Path $verifyDir "可靠性验证"
 New-Item -ItemType Directory -Force -Path $reliabilityTarget | Out-Null
-$latestAcceptance = Get-ChildItem -LiteralPath (Join-Path $repoRoot "examples\outputs") -Directory -Filter "acceptance_*_official_root_antimerge" -ErrorAction SilentlyContinue |
-    Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName "参数扰动稳定性\离散分位平台核验.json") -PathType Leaf } |
-    Sort-Object LastWriteTime -Descending | Select-Object -First 1
-$latestGeoEastReadback = Get-ChildItem -LiteralPath (Join-Path $repoRoot "outputs\evidence") -Directory -Filter "geoeast_transaction_readback_*" -ErrorAction SilentlyContinue |
-    Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName "transaction.json") -PathType Leaf } |
-    Sort-Object LastWriteTime -Descending | Select-Object -First 1
+$currentAsanReport = Join-Path $repoRoot "outputs\verification\msvc_asan\asan_report.json"
+$currentStabilityRoot = Join-Path $repoRoot "examples\outputs\stability_support_bridge"
+$currentGeoEastReadback = Join-Path $repoRoot "outputs\verification\geoeast_product_default_v1.1.3\transaction_readback.json"
+$currentParameterStability = Join-Path $repoRoot "outputs\verification\parameter_stability_support_bridge\离散分位平台核验.json"
+foreach ($requiredEvidence in @(
+    $currentAsanReport,
+    (Join-Path $currentStabilityRoot "稳定性摘要.json"),
+    (Join-Path $currentStabilityRoot "连续运行明细.csv"),
+    $currentGeoEastReadback,
+    $currentParameterStability
+)) {
+    if (!(Test-Path -LiteralPath $requiredEvidence -PathType Leaf)) {
+        throw "缺少v1.1.3正式默认线可靠性证据：$requiredEvidence"
+    }
+}
 $latestGeosValidation = Get-ChildItem -LiteralPath (Join-Path $repoRoot "outputs\regression") -Recurse -File -Filter "geos_geometry_validation.json" -ErrorAction SilentlyContinue |
     Sort-Object LastWriteTime -Descending | Select-Object -First 1
 foreach ($item in @(
     @{
-        Source = (Join-Path $repoRoot "outputs\verification\msvc_asan\asan_report.json")
+        Source = $currentAsanReport
         Target = "AddressSanitizer验证摘要.json"
     },
     @{
-        Source = (Join-Path $repoRoot "examples\outputs\stability\稳定性摘要.json")
+        Source = (Join-Path $currentStabilityRoot "稳定性摘要.json")
         Target = "连续运行稳定性摘要.json"
     },
     @{
-        Source = (Join-Path $repoRoot "examples\outputs\stability\连续运行明细.csv")
+        Source = (Join-Path $currentStabilityRoot "连续运行明细.csv")
         Target = "连续运行明细.csv"
     },
     @{
@@ -279,11 +288,11 @@ foreach ($item in @(
         Target = "异常输入与容错验证.json"
     },
     @{
-        Source = $(if ($latestGeoEastReadback) { Join-Path $latestGeoEastReadback.FullName "transaction.json" } else { $null })
+        Source = $currentGeoEastReadback
         Target = "GeoEast事务写入与回读.json"
     },
     @{
-        Source = $(if ($latestAcceptance) { Join-Path $latestAcceptance.FullName "参数扰动稳定性\离散分位平台核验.json" } else { $null })
+        Source = $currentParameterStability
         Target = "离散分位平台内扰动核验.json"
     },
     @{

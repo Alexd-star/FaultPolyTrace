@@ -117,11 +117,7 @@ $runText = Get-Content -LiteralPath $runLog -Raw -ErrorAction SilentlyContinue
 if ($runText -match 'AddressSanitizer|ERROR:') {
     throw "AddressSanitizer reported a memory error. See $runLog"
 }
-$expectedHash = if ($SupportBridgeCandidate) {
-    "EE7473CD04A3EA988166DD4502EEE70D4FB4A0D674135541A9B38490C3B91369"
-} else {
-    "3DE2427DF3E136A33396EAAAF512A83AC2AE3A0CACB3976AA52F3804A4056DCC"
-}
+$expectedHash = "EE7473CD04A3EA988166DD4502EEE70D4FB4A0D674135541A9B38490C3B91369"
 $actualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $resultCsv).Hash
 if ($actualHash -ne $expectedHash) {
     throw "ASan result hash mismatch. Expected $expectedHash, actual $actualHash"
@@ -145,7 +141,7 @@ if ($malformedExit -eq 0) { throw "Malformed input was not rejected under ASan."
     malformedInputRejected = $true
     keptPolygonCount = 200
     resultSha256 = $actualHash
-    mode = $(if ($SupportBridgeCandidate) { "support_bridge_candidate" } else { "formal_baseline" })
+    mode = $(if ($SupportBridgeCandidate) { "product_default_explicit" } else { "product_default" })
     asanDumpCreated = (Test-Path -LiteralPath $env:ASAN_SAVE_DUMPS)
     note = "No AddressSanitizer memory-safety report was observed in the covered CLI paths. MSVC ASan does not provide LeakSanitizer."
     checkedAt = (Get-Date).ToString("o")

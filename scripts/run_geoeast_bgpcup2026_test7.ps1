@@ -191,7 +191,8 @@ if ($SupportBridgeCandidate -and $Output -eq "FaultPolyTrace_Result") {
     $Output = "FaultPolyTrace_SupportBridge_Candidate"
 }
 
-if ($BaselineReview -or $WeakContinuityReview -or $SupportBridgeCandidate) {
+if ($BaselineReview -or $WeakContinuityReview -or $SupportBridgeCandidate -or
+    ![string]::IsNullOrWhiteSpace($ReviewOutputDir)) {
     if ([string]::IsNullOrWhiteSpace($ReviewOutputDir)) {
         $repoRoot = Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")
         $reviewName = if ($SupportBridgeCandidate) {
@@ -297,13 +298,25 @@ if ($WeakContinuityReview) {
         "--polygon-color", "magenta",
         "--polygon-linewidth", "1.2"
     )
+} elseif (![string]::IsNullOrWhiteSpace($ReviewOutputDir)) {
+    $runnerArgs += @(
+        "--weak-continuity-output", (Join-Path $ReviewOutputDir "weak_continuity_candidates_geoeast.csv"),
+        "--diagnostics", (Join-Path $ReviewOutputDir "diagnostics.json"),
+        "--transaction-report", (Join-Path $ReviewOutputDir "transaction_readback.json"),
+        "--topology-output", (Join-Path $ReviewOutputDir "topology.csv"),
+        "--preview-grid-output", (Join-Path $ReviewOutputDir "input_grid.txt"),
+        "--preview-polygons-output", (Join-Path $ReviewOutputDir "product_default_polygons.csv"),
+        "--polygon-color", "red",
+        "--polygon-linewidth", "1.2"
+    )
 }
 
 Write-Host "GeoEast root: $GeoEastRoot"
 Write-Host "GeoEastData root: $GeoEastDataRoot"
 Write-Host "Database/project/user: $Database / $Project / $User"
 Write-Host "Runner: $Runner"
-if ($BaselineReview -or $WeakContinuityReview -or $SupportBridgeCandidate) {
+if ($BaselineReview -or $WeakContinuityReview -or $SupportBridgeCandidate -or
+    ![string]::IsNullOrWhiteSpace($ReviewOutputDir)) {
     Write-Host "Review output: $ReviewOutputDir"
 }
 & $Runner @runnerArgs
