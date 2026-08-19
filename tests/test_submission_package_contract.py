@@ -17,6 +17,8 @@ def test_submission_source_uses_git_archive_only() -> None:
     assert "源码包异常膨胀" in script
     for forbidden in ("outputs", "build", "release", ".git", ".pytest_tmp"):
         assert f'"{forbidden}"' in script
+    assert "adaptive_boundary_cross_domain_20260805\\complex12" in script
+    assert "official_like_v2_topology_fixed_20260730" not in script
 
 
 def test_submission_requires_clean_matching_build() -> None:

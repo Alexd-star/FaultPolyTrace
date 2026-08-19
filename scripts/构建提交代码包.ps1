@@ -336,7 +336,7 @@ if (Test-Path -LiteralPath $secondPlanarEvidence -PathType Container) {
     }
 }
 
-$complexPlanarEvidence = Join-Path $repoRoot "outputs\evidence\official_like_v2_topology_fixed_20260730"
+$complexPlanarEvidence = Join-Path $repoRoot "outputs\evidence\adaptive_boundary_cross_domain_20260805\complex12"
 if (Test-Path -LiteralPath $complexPlanarEvidence -PathType Container) {
     $complexPlanarTarget = Join-Path $verifyDir "复杂同域平面验证"
     New-Item -ItemType Directory -Force -Path $complexPlanarTarget | Out-Null
