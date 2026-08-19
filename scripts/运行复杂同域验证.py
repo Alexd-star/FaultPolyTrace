@@ -11,7 +11,11 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from generalization_validation.complex_synthetic import generate_complex_case
-from generalization_validation.runner import FORMAL_TRACE_ARGUMENTS, run_benchmark
+from generalization_validation.runner import (
+    CURRENT_PRODUCT_TRACE_ARGUMENTS,
+    FORMAL_TRACE_ARGUMENTS,
+    run_benchmark,
+)
 from generalization_validation.synthetic import save_case
 
 
@@ -62,9 +66,25 @@ def _summary(payload):
     return payload["summary"]
 
 
+def _stability_summary(payload):
+    records = payload.get("stability") or []
+    if not records:
+        return None
+    minimum_values = [float(item["minimum_iou_to_baseline"]) for item in records]
+    mean_values = [float(item["mean_iou_to_baseline"]) for item in records]
+    return {
+        "case_count": len(records),
+        "minimum_iou": min(minimum_values),
+        "mean_minimum_iou": float(sum(minimum_values) / len(minimum_values)),
+        "mean_iou": float(sum(mean_values) / len(mean_values)),
+    }
+
+
 def _compare(baseline, candidate, baseline_dir, candidate_dir):
     base = _summary(baseline)
     cand = _summary(candidate)
+    base_stability = _stability_summary(baseline)
+    candidate_stability = _stability_summary(candidate)
     metric_delta = {
         key: float(cand[key] - base[key])
         for key in (
@@ -99,6 +119,14 @@ def _compare(baseline, candidate, baseline_dir, candidate_dir):
         "异常相交为零": cand["polygon_intersection_count_total"] == 0,
         "处理耗时不过度增加": cand["elapsed_ms_max"] <= max(base["elapsed_ms_max"] * 2, base["elapsed_ms_max"] + 1000),
     }
+    stability_delta = None
+    if base_stability is not None and candidate_stability is not None:
+        stability_delta = {
+            key: candidate_stability[key] - base_stability[key]
+            for key in ("minimum_iou", "mean_minimum_iou", "mean_iou")
+        }
+        checks["最差扰动稳定性不下降"] = stability_delta["minimum_iou"] >= -0.002
+        checks["平均扰动稳定性不下降"] = stability_delta["mean_iou"] >= -0.002
     strict_improvement = (
         metric_delta["pixel_iou_mean"] > 0.002
         or metric_delta["pixel_recall_mean"] > 0.002
@@ -108,6 +136,7 @@ def _compare(baseline, candidate, baseline_dir, candidate_dir):
         or cand["split_count_total"] < base["split_count_total"]
         or cand["split_excess_total"] < base["split_excess_total"]
         or cand["missed_object_count_total"] < base["missed_object_count_total"]
+        or (stability_delta is not None and stability_delta["minimum_iou"] > 0.002)
     )
     if not all(checks.values()):
         evidence_status = "rejected_regression"
@@ -127,20 +156,41 @@ def _compare(baseline, candidate, baseline_dir, candidate_dir):
         "baseline": base,
         "candidate": cand,
         "delta": metric_delta,
+        "baseline_stability": base_stability,
+        "candidate_stability": candidate_stability,
+        "stability_delta": stability_delta,
     }
 
 
-def run(executable, dataset, output, modes, reuse_existing=False):
+def _baseline_arguments(profile):
+    if profile == "current_product":
+        return tuple(CURRENT_PRODUCT_TRACE_ARGUMENTS)
+    if profile == "historical_214":
+        return tuple(FORMAL_TRACE_ARGUMENTS)
+    raise ValueError(f"Unknown baseline profile: {profile}")
+
+
+def run(
+    executable,
+    dataset,
+    output,
+    modes,
+    reuse_existing=False,
+    baseline_profile="current_product",
+    with_perturbations=False,
+):
     executable = Path(executable)
     dataset = Path(dataset)
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
     baseline_dir = output / "baseline"
+    baseline_arguments = _baseline_arguments(baseline_profile)
     baseline = run_benchmark(
         dataset,
         executable,
         baseline_dir,
-        trace_arguments=FORMAL_TRACE_ARGUMENTS,
+        trace_arguments=baseline_arguments,
+        with_perturbations=with_perturbations,
         reuse_existing=reuse_existing,
     )
     mode_arguments = {
@@ -148,6 +198,7 @@ def run(executable, dataset, output, modes, reuse_existing=False):
         "weak_path": ("--weak-path-gate",),
         "quality_shadow": ("--local-polygon-quality-shadow",),
         "support_bridge": ("--local-anti-merge",),
+        "adaptive_boundary": ("--adaptive-boundary-apply",),
     }
     comparisons = {}
     for mode in modes:
@@ -156,12 +207,13 @@ def run(executable, dataset, output, modes, reuse_existing=False):
         if mode not in mode_arguments:
             raise ValueError(f"Unknown mode: {mode}")
         candidate_dir = output / mode
-        arguments = tuple(FORMAL_TRACE_ARGUMENTS) + mode_arguments[mode]
+        arguments = baseline_arguments + mode_arguments[mode]
         candidate = run_benchmark(
             dataset,
             executable,
             candidate_dir,
             trace_arguments=arguments,
+            with_perturbations=with_perturbations,
             reuse_existing=reuse_existing,
         )
         comparisons[mode] = _compare(baseline, candidate, baseline_dir, candidate_dir)
@@ -169,6 +221,9 @@ def run(executable, dataset, output, modes, reuse_existing=False):
 
     report = {
         "schema_version": 1,
+        "baseline_profile": baseline_profile,
+        "baseline_arguments": list(baseline_arguments),
+        "with_perturbations": bool(with_perturbations),
         "benchmark": json.loads((dataset / "benchmark_manifest.json").read_text(encoding="utf-8")),
         "baseline_summary": baseline["summary"],
         "comparisons": comparisons,
@@ -222,7 +277,7 @@ def run(executable, dataset, output, modes, reuse_existing=False):
             "",
             "## 判定边界",
             "",
-            "复杂度级可控基准用于暴露算法在密集网络、近邻平行、独立交叉、分支和弱缺口条件下的行为。长路径真值与交点间结果多边形的对象粒度不同，因此对象重叠数量只用于同一基准、同一规则下的候选A/B比较，不应直接表述为专家确认的地质错误数量。该基准不能替代独立真实工区的专家解释。任何候选模式即使局部指标改善，只要对象重叠代理、拓扑、覆盖或稳定性发生退化，也不替换正式214基线。",
+            "复杂度级可控基准用于暴露算法在密集网络、近邻平行、独立交叉、分支和弱缺口条件下的行为。长路径真值与交点间结果多边形的对象粒度不同，因此对象重叠数量只用于同一基准、同一规则下的候选A/B比较，不应直接表述为专家确认的地质错误数量。该基准不能替代独立真实工区的专家解释。任何候选模式即使局部指标改善，只要对象重叠代理、拓扑、覆盖或稳定性发生退化，也不替换当前产品默认结果。",
         ]
     )
     (output / "复杂同域验证报告.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -244,10 +299,21 @@ def main():
     run_parser.add_argument("--output", type=Path, required=True)
     run_parser.add_argument(
         "--modes",
-        default="branch,weak_path,quality_shadow",
-        help="逗号分隔的候选模式：branch,weak_path,quality_shadow,support_bridge",
+        default="branch,weak_path,quality_shadow,adaptive_boundary",
+        help="逗号分隔的候选模式：branch,weak_path,quality_shadow,support_bridge,adaptive_boundary",
+    )
+    run_parser.add_argument(
+        "--baseline-profile",
+        choices=("current_product", "historical_214"),
+        default="current_product",
+        help="current_product使用当前发布产品默认；historical_214仅用于复现历史214验证。",
     )
     run_parser.add_argument("--reuse-existing", action="store_true", help="复用已存在的追踪输出，只重新计算评价指标")
+    run_parser.add_argument(
+        "--with-perturbations",
+        action="store_true",
+        help="对每个案例增加增益、轻噪声和轻平滑稳定性门控。",
+    )
     args = parser.parse_args()
     if args.command == "generate":
         result = generate(args.output, args.count, args.width, args.height, args.seed)
@@ -258,6 +324,8 @@ def main():
             args.output,
             [item for item in args.modes.split(",") if item],
             reuse_existing=args.reuse_existing,
+            baseline_profile=args.baseline_profile,
+            with_perturbations=args.with_perturbations,
         )
     print(json.dumps(result, ensure_ascii=False, indent=2))
 

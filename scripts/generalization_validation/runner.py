@@ -73,6 +73,15 @@ FORMAL_TRACE_ARGUMENTS = (
     "--smooth-iterations", "1",
 )
 
+# The released applications initialize all user-visible parameters from
+# ProductDefaults.h.  Keep this profile intentionally small so generalization
+# runs exercise the same defaults as a fresh CLI, standalone, or GeoEast run.
+# FORMAL_TRACE_ARGUMENTS remains available to reproduce the historical 214
+# validation campaign.
+CURRENT_PRODUCT_TRACE_ARGUMENTS = (
+    "--input-format", "auto",
+)
+
 
 def _load_background(path):
     path = Path(path)
