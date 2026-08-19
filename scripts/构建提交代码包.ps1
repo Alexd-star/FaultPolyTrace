@@ -239,6 +239,10 @@ New-Item -ItemType Directory -Force -Path $srcDir | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "git archive 导出源码失败。" }
 Expand-Archive -LiteralPath $sourceArchive -DestinationPath $srcDir -Force
 Remove-Item -LiteralPath $sourceArchive -Force
+# packaging/submission is the outer delivery template. Embedding it inside the
+# source payload recursively duplicates formal results and can leave reviewers
+# with more than one apparent DAT source of truth.
+Remove-Item -LiteralPath (Join-Path $srcDir "packaging\submission") -Recurse -Force -ErrorAction SilentlyContinue
 Copy-Item -LiteralPath (Join-Path $releaseDir "构建与依赖清单.json") -Destination $srcDir -Force
 Copy-Item -LiteralPath (Join-Path $templateRoot "01_源码\源码构建与工程说明.md") -Destination $srcDir -Force
 

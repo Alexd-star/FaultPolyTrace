@@ -12,6 +12,8 @@ def test_submission_source_uses_git_archive_only() -> None:
     script = read("scripts/构建提交代码包.ps1")
     assert "git -C $repoRoot archive" in script
     assert "Copy-Tree -Source $repoRoot" not in script
+    assert 'Join-Path $srcDir "packaging\\submission"' in script
+    assert "recursively duplicates formal results" in script
     assert "源码包异常膨胀" in script
     for forbidden in ("outputs", "build", "release", ".git", ".pytest_tmp"):
         assert f'"{forbidden}"' in script

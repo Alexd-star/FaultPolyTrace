@@ -29,6 +29,10 @@ def test_installer_build_script_has_no_developer_specific_source_path():
     assert "packageContentSha256" in script
     assert "[System.IO.Path]::IsPathRooted($OutputDir)" in script
     assert "$OutputDir = (Resolve-Path -LiteralPath $OutputDir).Path" in script
+    assert "GetFileName($resolvedPackage.Path.TrimEnd" in script
+    assert "GetFileName($installer)" in script
+    assert "packageDir = $resolvedPackage.Path" not in script
+    assert "installer = $installer" not in script
     assert "C:\\Users\\" not in script
 
 
