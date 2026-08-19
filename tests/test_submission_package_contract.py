@@ -54,6 +54,7 @@ def test_submission_token_expansion_cannot_rewrite_binary_files() -> None:
     assert 'Where-Object { $_.Extension.ToLowerInvariant() -in @(".md", ".ps1", ".json") }' in script
     assert '-Include "*.md", "*.ps1", "*.json"' not in script
     assert "压缩包完整性检查失败" in script
+    assert "Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8 | ConvertFrom-Json" in script
 
 
 def test_submission_templates_have_no_frozen_old_build_identity() -> None:

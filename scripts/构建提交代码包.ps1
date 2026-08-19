@@ -187,7 +187,7 @@ function Protect-VerificationJsonPaths {
     param([string]$Root)
 
     Get-ChildItem -LiteralPath $Root -Recurse -File -Filter '*.json' | ForEach-Object {
-        $data = Get-Content -LiteralPath $_.FullName -Raw | ConvertFrom-Json
+        $data = Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8 | ConvertFrom-Json
         Protect-JsonNodePaths -Node $data
         $json = $data | ConvertTo-Json -Depth 100
         [System.IO.File]::WriteAllText($_.FullName, $json + [Environment]::NewLine,
