@@ -306,11 +306,29 @@ $verifyDir = Join-Path $Destination "04_复现与验证"
 New-Item -ItemType Directory -Force -Path $verifyDir | Out-Null
 Copy-Item -LiteralPath $manifestFile.FullName -Destination (Join-Path $verifyDir "唯一构建清单.json") -Force
 Copy-Item -LiteralPath (Join-Path $releaseDir "构建与依赖清单.json") -Destination $verifyDir -Force
-$smokeRoot = Get-ChildItem -LiteralPath (Join-Path $releaseRoot "installer_smoke") -Directory -ErrorAction SilentlyContinue |
-    Sort-Object Name -Descending | Select-Object -First 1
-if (!$smokeRoot) { throw "缺少安装器完整运行检查目录。" }
-$smokeResult = Join-Path $smokeRoot.FullName "installer_smoke_summary.json"
-if (!(Test-Path -LiteralPath $smokeResult)) { throw "缺少安装器完整运行检查结果。" }
+$smokeMatch = Get-ChildItem -LiteralPath (Join-Path $releaseRoot "installer_smoke") -Directory -ErrorAction SilentlyContinue |
+    ForEach-Object {
+        $candidateResult = Join-Path $_.FullName "installer_smoke_summary.json"
+        if (Test-Path -LiteralPath $candidateResult -PathType Leaf) {
+            try {
+                $candidateData = Get-Content -LiteralPath $candidateResult -Raw -Encoding UTF8 | ConvertFrom-Json
+                if ($candidateData.status -eq "PASS" -and $candidateData.buildId -eq $manifestData.buildId) {
+                    [pscustomobject]@{
+                        Root = $_
+                        Result = $candidateResult
+                        LastWriteTimeUtc = (Get-Item -LiteralPath $candidateResult).LastWriteTimeUtc
+                    }
+                }
+            } catch {
+                Write-Warning "忽略无法解析的安装器烟测结果：$candidateResult"
+            }
+        }
+    } |
+    Sort-Object LastWriteTimeUtc -Descending |
+    Select-Object -First 1
+if (!$smokeMatch) { throw "缺少与当前构建 $($manifestData.buildId) 匹配且通过的安装器完整运行检查。" }
+$smokeRoot = $smokeMatch.Root
+$smokeResult = $smokeMatch.Result
 Copy-Item -LiteralPath $smokeResult -Destination (Join-Path $verifyDir "安装器完整运行检查.json") -Force
 $officialOut = Join-Path $verifyDir "正式官方结果"
 New-Item -ItemType Directory -Force -Path $officialOut | Out-Null

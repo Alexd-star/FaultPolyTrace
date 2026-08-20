@@ -28,6 +28,14 @@ def test_submission_requires_clean_matching_build() -> None:
     assert "$manifestData.gitDirty" in script
 
 
+def test_submission_selects_smoke_result_for_current_build() -> None:
+    script = read("scripts/构建提交代码包.ps1")
+    assert '$candidateData.status -eq "PASS"' in script
+    assert "$candidateData.buildId -eq $manifestData.buildId" in script
+    assert "Sort-Object LastWriteTimeUtc -Descending" in script
+    assert "Sort-Object Name -Descending" not in script
+
+
 def test_submission_keeps_desktop_and_plugin_packages_decoupled() -> None:
     script = read("scripts/构建提交代码包.ps1")
     assert 'Join-Path $releaseDir "geoeast_plugin"' in script
