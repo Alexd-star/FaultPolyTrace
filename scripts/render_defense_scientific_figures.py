@@ -397,6 +397,7 @@ def draw_polygons(
     fill: bool = False,
     color: str = "#F26B4A",
     alpha: float = 0.95,
+    fill_alpha: float = 0.18,
 ) -> None:
     for _, geometry in data.polygons:
         if not intersects_view(geometry, view):
@@ -407,7 +408,7 @@ def draw_polygons(
             edgecolor=color,
             facecolor="#4FB6C2" if fill else None,
             linewidth=0.88,
-            alpha=0.18 if fill else alpha,
+            alpha=fill_alpha if fill else alpha,
             zorder=11,
         )
 
@@ -430,6 +431,7 @@ def draw_candidates(
     data: FigureData,
     view: tuple[float, float, float, float],
     highlight_ids: set[int] | None = None,
+    only_highlighted: bool = False,
 ) -> None:
     view_box = box(view[0], view[2], view[1], view[3])
     for _, row in data.candidates.iterrows():
@@ -441,6 +443,8 @@ def draw_candidates(
             continue
         accepted = bool(int(row.accepted))
         candidate_id = int(row.candidate_id)
+        if only_highlighted and highlight_ids is not None and candidate_id not in highlight_ids:
+            continue
         emphasized = highlight_ids is None or candidate_id in highlight_ids
         color = COLORS["teal"] if accepted else COLORS["orange"]
         linestyle = "-" if accepted else (0, (4, 2))
@@ -573,82 +577,120 @@ def save_figure(fig: plt.Figure, out_dir: Path, stem: str, dpi: int) -> None:
     plt.close(fig)
 
 
+def add_stage_badge(ax: plt.Axes, number: int, label: str, color: str, font_prop: object) -> None:
+    ax.text(
+        0.018,
+        0.955,
+        f"{number:02d}  {label}",
+        transform=ax.transAxes,
+        ha="left",
+        va="top",
+        fontproperties=font_prop,
+        fontsize=10.2,
+        fontweight="bold",
+        color="white",
+        bbox={"boxstyle": "round,pad=0.30", "facecolor": color, "edgecolor": "white", "linewidth": 0.6, "alpha": 0.97},
+        zorder=40,
+    )
+
+
+def add_candidate_label(ax: plt.Axes, row: pd.Series, text: str, color: str, font_prop: object) -> None:
+    path = row.path_world
+    if path.size == 0:
+        return
+    point = path[len(path) // 2]
+    ax.annotate(
+        text,
+        xy=point,
+        xytext=(16, 18),
+        textcoords="offset points",
+        ha="left",
+        va="bottom",
+        fontproperties=font_prop,
+        fontsize=9.0,
+        fontweight="bold",
+        color=color,
+        bbox={"boxstyle": "round,pad=0.24", "facecolor": "white", "edgecolor": color, "linewidth": 0.9, "alpha": 0.96},
+        arrowprops={"arrowstyle": "-|>", "color": color, "linewidth": 1.0},
+        zorder=42,
+    )
+
+
 def render_p03(data: FigureData, font_prop: object, out_dir: Path, dpi: int) -> None:
-    view = data.view_from_grid(560, 770, 315, 455)
+    # A compact vertical crop allows four large, physically undistorted panels
+    # on a 16:9 slide while retaining the accepted and rejected path examples.
+    view = data.view_from_grid(560, 770, 335, 445)
     accepted = candidate_row(data, ACCEPTED_CANDIDATE_ID)
     rejected = candidate_row(data, REJECTED_CANDIDATE_ID)
     fig = plt.figure(figsize=(16, 9), constrained_layout=False)
-    gs = GridSpec(2, 4, figure=fig, height_ratios=[1.18, 1.0], hspace=0.18, wspace=0.08, left=0.045, right=0.98, top=0.92, bottom=0.085)
-    axes = [fig.add_subplot(gs[0, index]) for index in range(4)]
+    gs = GridSpec(2, 2, figure=fig, hspace=0.23, wspace=0.10, left=0.055, right=0.98, top=0.94, bottom=0.075)
+    axes = [fig.add_subplot(gs[index // 2, index % 2]) for index in range(4)]
 
     image = draw_attribute(axes[0], data, view, font_prop, show_y=True)
-    set_panel_title(axes[0], "平面断层属性", font_prop)
+    set_panel_title(axes[0], "原始平面断层属性", font_prop)
+    add_stage_badge(axes[0], 1, "属性响应", COLORS["navy"], font_prop)
 
-    draw_attribute(axes[1], data, view, font_prop, show_y=False)
+    axes[1].set_facecolor(COLORS["plate"])
+    style_map_axis(axes[1], view, font_prop, dark=True, show_y=True)
     draw_response_layers(axes[1], data)
     draw_branches(axes[1], data, view, endpoints=False, pruned=False)
-    set_panel_title(axes[1], "强弱响应与方向骨架", font_prop)
+    set_panel_title(axes[1], "强弱响应分层与方向骨架", font_prop)
+    add_stage_badge(axes[1], 2, "响应分层", "#B0871B", font_prop)
+    axes[1].text(
+        0.98,
+        0.035,
+        "强响应  ≥ 0.95     弱响应  0.66–0.95     保留骨架",
+        transform=axes[1].transAxes,
+        ha="right",
+        va="bottom",
+        fontproperties=font_prop,
+        fontsize=8.5,
+        color="white",
+        bbox={"boxstyle": "round,pad=0.28", "facecolor": "#111820", "edgecolor": "#718493", "alpha": 0.90},
+        zorder=35,
+    )
 
-    draw_attribute(axes[2], data, view, font_prop, show_y=False)
-    draw_branches(axes[2], data, view, endpoints=True, pruned=True)
-    draw_candidates(axes[2], data, view, highlight_ids={ACCEPTED_CANDIDATE_ID, REJECTED_CANDIDATE_ID})
-    set_panel_title(axes[2], "分支判断与弱路径门控", font_prop)
+    draw_attribute(axes[2], data, view, font_prop, show_y=True, cmap="gray")
+    draw_branches(axes[2], data, view, endpoints=False, pruned=True)
+    draw_candidates(
+        axes[2],
+        data,
+        view,
+        highlight_ids={ACCEPTED_CANDIDATE_ID, REJECTED_CANDIDATE_ID},
+        only_highlighted=True,
+    )
+    add_candidate_label(axes[2], accepted, "接受：方向与属性连续", COLORS["teal"], font_prop)
+    add_candidate_label(axes[2], rejected, "拒绝：弱支撑中断", COLORS["orange"], font_prop)
+    set_panel_title(axes[2], "分支归属与弱路径门控", font_prop)
+    add_stage_badge(axes[2], 3, "候选判断", COLORS["orange"], font_prop)
 
-    draw_attribute(axes[3], data, view, font_prop, show_y=False)
-    draw_polygons(axes[3], data, view, fill=True, color="#F06B4F")
-    set_panel_title(axes[3], "闭合多边形结果", font_prop)
+    axes[3].set_facecolor("#F2F6F7")
+    style_map_axis(axes[3], view, font_prop, dark=False, show_y=True)
+    draw_polygons(axes[3], data, view, fill=True, color=COLORS["navy"], fill_alpha=0.34)
+    set_panel_title(axes[3], "闭合多边形矢量结果", font_prop)
+    add_stage_badge(axes[3], 4, "矢量输出", COLORS["teal"], font_prop)
+    axes[3].text(
+        0.98,
+        0.035,
+        "闭合边界  ·  面积筛选  ·  拓扑检查",
+        transform=axes[3].transAxes,
+        ha="right",
+        va="bottom",
+        fontproperties=font_prop,
+        fontsize=9.0,
+        fontweight="bold",
+        color=COLORS["navy"],
+        bbox={"boxstyle": "round,pad=0.28", "facecolor": "white", "edgecolor": "#AEBCC5", "alpha": 0.94},
+        zorder=35,
+    )
 
     for label, ax in zip("abcd", axes):
         add_panel_label(ax, label, font_prop, dark=False)
 
-    cax = axes[0].inset_axes([0.10, 0.06, 0.68, 0.025])
+    cax = axes[0].inset_axes([0.18, 0.055, 0.58, 0.028])
     cb = fig.colorbar(image, cax=cax, orientation="horizontal")
-    cb.ax.tick_params(labelsize=6.5, colors="white", length=1.8)
+    cb.ax.tick_params(labelsize=7.2, colors="white", length=1.8)
     cb.outline.set_edgecolor("#8799A7")
-
-    for left_ax, right_ax in zip(axes[:-1], axes[1:]):
-        p0 = left_ax.get_position()
-        p1 = right_ax.get_position()
-        y_mid = 0.5 * (max(p0.y0, p1.y0) + min(p0.y1, p1.y1))
-        fig.add_artist(
-            FancyArrowPatch(
-                (p0.x1 + 0.006, y_mid),
-                (p1.x0 - 0.006, y_mid),
-                transform=fig.transFigure,
-                arrowstyle="-|>",
-                mutation_scale=13,
-                linewidth=1.1,
-                color=COLORS["slate"],
-            )
-        )
-
-    ax_profile = fig.add_subplot(gs[1, 0:2])
-    draw_path_profile(ax_profile, data, accepted, font_prop)
-    ax_profile.set_title("真实弱路径属性剖面", fontproperties=font_prop, fontsize=10.5, color=COLORS["ink"], pad=6, fontweight="bold")
-    add_panel_label(ax_profile, "e", font_prop)
-
-    ax_decision = fig.add_subplot(gs[1, 2])
-    decision_rows = [
-        ("接受路径", f"支撑率 {accepted.support_ratio:.2f}", "pass"),
-        ("方向连续性", f"最大转角 {accepted.max_turn_angle:.1f}°", "pass"),
-        ("拒绝路径", f"连续缺口 {int(rejected.max_unsupported_run)} 格", "fail"),
-        ("拒绝原因", "弱支撑中断", "fail"),
-    ]
-    draw_metric_cards(ax_decision, decision_rows, font_prop)
-    ax_decision.set_title("候选路径判定", fontproperties=font_prop, fontsize=10.5, color=COLORS["ink"], pad=6, fontweight="bold")
-    add_panel_label(ax_decision, "f", font_prop)
-
-    ax_quality = fig.add_subplot(gs[1, 3])
-    topology = data.summary["topology"]
-    quality_rows = [
-        ("保留多边形", str(data.summary["keptPolygons"]), "pass"),
-        ("开放环", str(topology["openRings"]), "pass"),
-        ("自相交", str(topology["selfIntersectingPolygons"]), "pass"),
-        ("包含与内部重叠", str(topology["polygonContainments"] + topology["polygonInteriorOverlaps"]), "pass"),
-    ]
-    draw_metric_cards(ax_quality, quality_rows, font_prop)
-    ax_quality.set_title("几何质量检查", fontproperties=font_prop, fontsize=10.5, color=COLORS["ink"], pad=6, fontweight="bold")
-    add_panel_label(ax_quality, "g", font_prop)
     save_figure(fig, out_dir, "P03_真实数据自动追踪总体流程", dpi)
 
 
