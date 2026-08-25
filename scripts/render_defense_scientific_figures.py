@@ -616,6 +616,106 @@ def add_candidate_label(ax: plt.Axes, row: pd.Series, text: str, color: str, fon
     )
 
 
+def render_p02(data: FigureData, font_prop: object, out_dir: Path, dpi: int) -> None:
+    """Official attribute overview with three source-traceable challenge regions."""
+    rows = [
+        candidate_row(data, ACCEPTED_CANDIDATE_ID),
+        candidate_row(data, REJECTED_CANDIDATE_ID),
+        candidate_row(data, 14),
+    ]
+    titles = ["弱响应与短距离缺口", "近邻分支与候选竞争", "交切位置与归属歧义"]
+    colors_local = [COLORS["teal"], COLORS["orange"], COLORS["blue"]]
+    views = [
+        candidate_view(data, rows[0], pad_x=88, pad_y=58),
+        candidate_view(data, rows[1], pad_x=88, pad_y=58),
+        candidate_view(data, rows[2], pad_x=88, pad_y=58),
+    ]
+
+    fig = plt.figure(figsize=(16, 9))
+    gs = GridSpec(
+        2,
+        3,
+        figure=fig,
+        height_ratios=[1.18, 1.0],
+        hspace=0.22,
+        wspace=0.10,
+        left=0.05,
+        right=0.98,
+        top=0.93,
+        bottom=0.075,
+    )
+
+    ax_overview = fig.add_subplot(gs[0, :])
+    draw_attribute(ax_overview, data, data.extent, font_prop, show_y=True)
+    set_panel_title(ax_overview, "正式平面断层属性与典型处理难点", font_prop)
+    add_panel_label(ax_overview, "a", font_prop)
+    roman = ["I", "II", "III"]
+    for label, view, color in zip(roman, views, colors_local):
+        ax_overview.add_patch(
+            plt.Rectangle(
+                (view[0], view[2]),
+                view[1] - view[0],
+                view[3] - view[2],
+                fill=False,
+                edgecolor=color,
+                linewidth=1.45,
+                zorder=25,
+            )
+        )
+        ax_overview.text(
+            view[0],
+            view[3],
+            f" {label} ",
+            ha="left",
+            va="bottom",
+            fontproperties=font_prop,
+            fontsize=8.2,
+            fontweight="bold",
+            color="white",
+            bbox={"boxstyle": "round,pad=0.18", "facecolor": color, "edgecolor": "white", "linewidth": 0.45},
+            zorder=28,
+        )
+
+    for index, (row, title, view, color) in enumerate(zip(rows, titles, views, colors_local)):
+        ax = fig.add_subplot(gs[1, index])
+        draw_attribute(ax, data, view, font_prop, show_y=index == 0)
+        draw_candidates(
+            ax,
+            data,
+            view,
+            highlight_ids={int(row.candidate_id)},
+            only_highlighted=True,
+        )
+        path = row.path_world
+        if path.size:
+            ax.scatter(
+                [path[0, 0], path[-1, 0]],
+                [path[0, 1], path[-1, 1]],
+                s=28,
+                facecolor=color,
+                edgecolor="white",
+                linewidth=0.8,
+                zorder=22,
+            )
+        set_panel_title(ax, f"{roman[index]}  {title}", font_prop)
+        add_panel_label(ax, chr(ord("b") + index), font_prop)
+        ax.text(
+            0.97,
+            0.04,
+            "实线：接受候选" if bool(int(row.accepted)) else "虚线：回退候选",
+            transform=ax.transAxes,
+            ha="right",
+            va="bottom",
+            fontproperties=font_prop,
+            fontsize=7.8,
+            color="white",
+            bbox={"boxstyle": "round,pad=0.25", "facecolor": "#111820", "edgecolor": color, "alpha": 0.90},
+            zorder=30,
+        )
+
+    save_figure(fig, out_dir, "P02_正式属性与典型难点", dpi)
+
+
 def render_p03(data: FigureData, font_prop: object, out_dir: Path, dpi: int) -> None:
     # A compact vertical crop allows four large, physically undistorted panels
     # on a 16:9 slide while retaining the accepted and rejected path examples.
@@ -925,6 +1025,101 @@ def render_p06(data: FigureData, font_prop: object, out_dir: Path, dpi: int) -> 
     save_figure(fig, out_dir, "P06_真实结果多边形几何质量检查", dpi)
 
 
+def render_p08(data: FigureData, font_prop: object, out_dir: Path, dpi: int) -> None:
+    """Same-extent comparison of input, vector boundaries and final overlay."""
+    fig = plt.figure(figsize=(16, 9))
+    gs = GridSpec(
+        2,
+        2,
+        figure=fig,
+        hspace=0.22,
+        wspace=0.09,
+        left=0.05,
+        right=0.98,
+        top=0.93,
+        bottom=0.075,
+    )
+
+    axes = [fig.add_subplot(gs[0, 0]), fig.add_subplot(gs[0, 1]), fig.add_subplot(gs[1, 0])]
+    draw_attribute(axes[0], data, data.extent, font_prop, show_y=True)
+    set_panel_title(axes[0], "原始平面断层属性", font_prop)
+
+    axes[1].set_facecolor("#F2F6F7")
+    style_map_axis(axes[1], data.extent, font_prop, dark=False, show_y=False)
+    draw_polygons(axes[1], data, data.extent, fill=True, color=COLORS["navy"], alpha=0.98, fill_alpha=0.28)
+    set_panel_title(axes[1], "闭合多边形纯矢量结果", font_prop)
+
+    draw_attribute(axes[2], data, data.extent, font_prop, show_y=False)
+    draw_polygons(axes[2], data, data.extent, fill=False, color="#F26B4A", alpha=0.98)
+    set_panel_title(axes[2], "属性与多边形叠加复核", font_prop)
+
+    for label, ax in zip("abc", axes):
+        add_panel_label(ax, label, font_prop)
+
+    ax_metrics = fig.add_subplot(gs[1, 1])
+    ax_metrics.set_axis_off()
+    ax_metrics.set_xlim(0, 1)
+    ax_metrics.set_ylim(0, 1)
+    topology = data.summary["topology"]
+    metrics = [
+        ("网格规模", "1501 × 701", COLORS["navy"]),
+        ("候选 / 保留", f"212 / {data.summary['keptPolygons']}", COLORS["teal"]),
+        ("强响应覆盖", "99.855%", COLORS["navy"]),
+        ("弱响应覆盖", "97.684%", COLORS["teal"]),
+        (
+            "几何异常",
+            str(
+                topology["openRings"]
+                + topology["selfIntersectingPolygons"]
+                + topology["polygonIntersections"]
+                + topology["polygonContainments"]
+                + topology["polygonInteriorOverlaps"]
+            ),
+            COLORS["teal"],
+        ),
+    ]
+    card_width = 0.445
+    card_height = 0.245
+    positions = [(0.03, 0.66), (0.525, 0.66), (0.03, 0.36), (0.525, 0.36), (0.03, 0.06)]
+    for index, (label, value, color) in enumerate(metrics):
+        x, y = positions[index]
+        width = 0.94 if index == len(metrics) - 1 else card_width
+        ax_metrics.add_patch(
+            FancyBboxPatch(
+                (x, y),
+                width,
+                card_height,
+                boxstyle="round,pad=0.012,rounding_size=0.018",
+                facecolor="#F7FAFB",
+                edgecolor="#D5DEE4",
+                linewidth=0.8,
+            )
+        )
+        ax_metrics.text(
+            x + 0.018,
+            y + card_height * 0.70,
+            label,
+            ha="left",
+            va="center",
+            fontproperties=font_prop,
+            fontsize=8.2,
+            color=COLORS["muted"],
+        )
+        ax_metrics.text(
+            x + 0.018,
+            y + card_height * 0.30,
+            value,
+            ha="left",
+            va="center",
+            fontproperties=font_prop,
+            fontsize=17.5,
+            fontweight="bold",
+            color=color,
+        )
+    add_panel_label(ax_metrics, "d", font_prop)
+    save_figure(fig, out_dir, "P08_正式输入与结果同尺度对照", dpi)
+
+
 def draw_summary_metric(ax: plt.Axes, y: float, value: str, label: str, font_prop: object, color: str) -> None:
     ax.text(0.08, y, value, transform=ax.transAxes, ha="left", va="center", fontproperties=font_prop, fontsize=22, fontweight="bold", color=color)
     ax.text(0.08, y - 0.075, label, transform=ax.transAxes, ha="left", va="top", fontproperties=font_prop, fontsize=9, color=COLORS["muted"])
@@ -1003,10 +1198,12 @@ def main() -> None:
     data = load_data(args)
     if len(data.polygons) != 200:
         raise RuntimeError(f"正式结果应为 200 个保留多边形，当前读取到 {len(data.polygons)} 个。")
+    render_p02(data, font_prop, args.out_dir, args.dpi)
     render_p03(data, font_prop, args.out_dir, args.dpi)
     render_p04(data, font_prop, args.out_dir, args.dpi)
     render_p05(data, font_prop, args.out_dir, args.dpi)
     render_p06(data, font_prop, args.out_dir, args.dpi)
+    render_p08(data, font_prop, args.out_dir, args.dpi)
     render_p12(data, font_prop, args.out_dir, args.dpi)
     for path in sorted(args.out_dir.glob("P*.png")):
         print(path)
