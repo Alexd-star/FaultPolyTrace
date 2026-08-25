@@ -211,6 +211,43 @@ def render_p07(
             spine.set_visible(True)
             spine.set_edgecolor("#C3CDD4")
             spine.set_linewidth(0.8)
+        focus_labels = (
+            ((0.020, 0.205, 0.300, 0.660), "文件输入、参数与输出"),
+            ((0.012, 0.185, 0.315, 0.690), "工区网格、参数与写回"),
+        )
+        (x, y, width, height), focus_text = focus_labels[index]
+        ax.add_patch(
+            plt.Rectangle(
+                (x, y),
+                width,
+                height,
+                transform=ax.transAxes,
+                fill=False,
+                edgecolor=color,
+                linewidth=2.0,
+                zorder=25,
+            )
+        )
+        ax.text(
+            x + 0.012,
+            y + height - 0.018,
+            focus_text,
+            transform=ax.transAxes,
+            ha="left",
+            va="top",
+            fontproperties=font_prop,
+            fontsize=8.8,
+            fontweight="bold",
+            color="white",
+            bbox={
+                "boxstyle": "round,pad=0.28",
+                "facecolor": color,
+                "edgecolor": "white",
+                "linewidth": 0.55,
+                "alpha": 0.97,
+            },
+            zorder=28,
+        )
         add_panel_label(ax, "a" if index == 0 else "b", font_prop)
 
     ax = fig.add_subplot(gs[1, :])

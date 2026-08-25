@@ -623,8 +623,13 @@ def render_p02(data: FigureData, font_prop: object, out_dir: Path, dpi: int) -> 
         candidate_row(data, REJECTED_CANDIDATE_ID),
         candidate_row(data, 14),
     ]
-    titles = ["弱响应与短距离缺口", "近邻分支与候选竞争", "交切位置与归属歧义"]
+    titles = ["弱响应连续路径", "近邻分支与候选竞争", "交切位置与归属歧义"]
     colors_local = [COLORS["teal"], COLORS["orange"], COLORS["blue"]]
+    callouts = [
+        ("方向连续，弱属性仍有支撑", "支撑率 1.00  ·  最大转角 26.6°  ·  接受"),
+        ("连续缺口与急转同时出现", "缺口 4 格  ·  最大转角 67.4°  ·  自动回退"),
+        ("局部指标通过，但对象归属冲突", "交点存在竞争分支  ·  保持原结果"),
+    ]
     views = [
         candidate_view(data, rows[0], pad_x=88, pad_y=58),
         candidate_view(data, rows[1], pad_x=88, pad_y=58),
@@ -676,7 +681,9 @@ def render_p02(data: FigureData, font_prop: object, out_dir: Path, dpi: int) -> 
             zorder=28,
         )
 
-    for index, (row, title, view, color) in enumerate(zip(rows, titles, views, colors_local)):
+    for index, (row, title, view, color, callout) in enumerate(
+        zip(rows, titles, views, colors_local, callouts)
+    ):
         ax = fig.add_subplot(gs[1, index])
         draw_attribute(ax, data, view, font_prop, show_y=index == 0)
         draw_candidates(
@@ -688,6 +695,24 @@ def render_p02(data: FigureData, font_prop: object, out_dir: Path, dpi: int) -> 
         )
         path = row.path_world
         if path.size:
+            ax.plot(
+                path[:, 0],
+                path[:, 1],
+                color=color,
+                linewidth=7.0,
+                alpha=0.30,
+                solid_capstyle="round",
+                zorder=18,
+            )
+            ax.plot(
+                path[:, 0],
+                path[:, 1],
+                color=color,
+                linewidth=2.8,
+                linestyle="-" if bool(int(row.accepted)) else (0, (4, 2)),
+                solid_capstyle="round",
+                zorder=20,
+            )
             ax.scatter(
                 [path[0, 0], path[-1, 0]],
                 [path[0, 1], path[-1, 1]],
@@ -697,21 +722,38 @@ def render_p02(data: FigureData, font_prop: object, out_dir: Path, dpi: int) -> 
                 linewidth=0.8,
                 zorder=22,
             )
+            midpoint = path[len(path) // 2]
+            ax.annotate(
+                f"{callout[0]}\n{callout[1]}",
+                xy=(midpoint[0], midpoint[1]),
+                xycoords="data",
+                xytext=(0.04, 0.92),
+                textcoords="axes fraction",
+                ha="left",
+                va="top",
+                fontproperties=font_prop,
+                fontsize=8.7,
+                fontweight="bold",
+                color="white",
+                linespacing=1.55,
+                bbox={
+                    "boxstyle": "round,pad=0.42",
+                    "facecolor": "#111820",
+                    "edgecolor": color,
+                    "linewidth": 1.25,
+                    "alpha": 0.96,
+                },
+                arrowprops={
+                    "arrowstyle": "-|>",
+                    "color": color,
+                    "linewidth": 1.7,
+                    "mutation_scale": 13,
+                    "connectionstyle": "arc3,rad=-0.12" if index == 0 else "arc3,rad=0.10",
+                },
+                zorder=35,
+            )
         set_panel_title(ax, f"{roman[index]}  {title}", font_prop)
         add_panel_label(ax, chr(ord("b") + index), font_prop)
-        ax.text(
-            0.97,
-            0.04,
-            "实线：接受候选" if bool(int(row.accepted)) else "虚线：回退候选",
-            transform=ax.transAxes,
-            ha="right",
-            va="bottom",
-            fontproperties=font_prop,
-            fontsize=7.8,
-            color="white",
-            bbox={"boxstyle": "round,pad=0.25", "facecolor": "#111820", "edgecolor": color, "alpha": 0.90},
-            zorder=30,
-        )
 
     save_figure(fig, out_dir, "P02_正式属性与典型难点", dpi)
 
@@ -804,17 +846,20 @@ def render_p04(data: FigureData, font_prop: object, out_dir: Path, dpi: int) -> 
     draw_attribute(top[0], data, view, font_prop, show_y=True)
     draw_candidates(top[0], data, view, highlight_ids={ACCEPTED_CANDIDATE_ID})
     set_panel_title(top[0], "原始属性与弱响应缺口", font_prop)
+    add_stage_badge(top[0], 1, "属性响应", COLORS["navy"], font_prop)
 
     draw_attribute(top[1], data, view, font_prop, show_y=False)
     draw_response_layers(top[1], data)
     draw_branches(top[1], data, view, endpoints=True, pruned=False)
     set_panel_title(top[1], "双阈值响应与方向骨架", font_prop)
+    add_stage_badge(top[1], 2, "方向骨架", "#B0871B", font_prop)
 
     draw_attribute(top[2], data, view, font_prop, show_y=False)
     draw_branches(top[2], data, view, endpoints=False, pruned=False)
     draw_candidates(top[2], data, view, highlight_ids={ACCEPTED_CANDIDATE_ID})
     draw_polygons(top[2], data, view, fill=True, color="#F06B4F")
     set_panel_title(top[2], "局部宽度恢复与闭合边界", font_prop)
+    add_stage_badge(top[2], 3, "断层带边界", COLORS["teal"], font_prop)
     for label, ax in zip("abc", top):
         add_panel_label(ax, label, font_prop)
 
@@ -897,10 +942,10 @@ def render_p05(data: FigureData, font_prop: object, out_dir: Path, dpi: int) -> 
     add_panel_label(ax_rej, "b", font_prop)
 
     metrics = [
-        ("属性支撑率", "support_ratio", 0.65, "higher", "{:.2f}"),
-        ("最大连续缺口 / 格", "max_unsupported_run", 5.0, "lower", "{:.0f}"),
-        ("最大转角 / °", "max_turn_angle", 50.0, "lower", "{:.1f}"),
-        ("路径绕行比", "path_length_ratio", 1.45, "lower", "{:.2f}"),
+        ("属性支撑率  ≥ 0.65", "support_ratio", 0.65, "higher", "{:.2f}"),
+        ("最大连续缺口  ≤ 5 格", "max_unsupported_run", 5.0, "lower", "{:.0f}"),
+        ("最大转角  ≤ 50°", "max_turn_angle", 50.0, "lower", "{:.1f}"),
+        ("路径绕行比  ≤ 1.45", "path_length_ratio", 1.45, "lower", "{:.2f}"),
     ]
     sub = GridSpecFromSubplotSpec(1, 4, subplot_spec=gs[1, :], wspace=0.30)
     for index, (label, field, threshold, direction, fmt) in enumerate(metrics):
@@ -926,8 +971,6 @@ def render_p05(data: FigureData, font_prop: object, out_dir: Path, dpi: int) -> 
         ax.set_title(label, fontproperties=font_prop, fontsize=9.2, color=COLORS["ink"], pad=7, fontweight="bold")
         ax.spines[:].set_visible(False)
         ax.grid(False)
-        note = "越高越优" if direction == "higher" else "越低越优"
-        ax.text(1.0, -0.36, f"虚线为门限，{note}", transform=ax.transAxes, ha="right", va="top", fontproperties=font_prop, fontsize=7.1, color=COLORS["muted"])
         add_panel_label(ax, chr(ord("c") + index), font_prop)
     save_figure(fig, out_dir, "P05_真实数据分支归属与防误合并", dpi)
 
